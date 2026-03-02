@@ -8,8 +8,8 @@ __________              .__                          __________               __
 
 
 ${AnsiColor.BRIGHT_GREEN}
-Realman Boot Version: 3.9.1
+Realman Boot Version: 1.0.0
 Spring Boot Version: ${spring-boot.version}${spring-boot.formatted-version}
 版权所属： 睿尔曼智能科技(北京)有限公司
-公司官网： https://develop.realman-robotics.com/
+公司官网： https://www.realman-robotics.cn/
 ${AnsiColor.BLACK}
