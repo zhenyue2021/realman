@@ -14,6 +14,7 @@ import org.jeecg.modules.device.mapper.IotDeviceConfigMapper;
 import org.jeecg.modules.device.mapper.IotOtaUpgradeRecordMapper;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.mqtt.publisher.MqttPublisher;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -28,6 +29,7 @@ public class PendingSyncService {
 
     private final IotDeviceConfigMapper configMapper;
     private final IotOtaUpgradeRecordMapper recordMapper;
+    @Lazy
     private final MqttPublisher mqttPublisher;
     private final ObjectMapper           objectMapper;
 

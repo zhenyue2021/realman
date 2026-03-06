@@ -18,6 +18,11 @@
             <groupId>org.jeecgframework.boot3</groupId>
             <artifactId>jeecg-boot-starter-cloud</artifactId>
         </dependency>
+        <!-- realman-boot-base-core 依赖 -->
+        <dependency>
+            <groupId>org.jeecgframework.boot3</groupId>
+            <artifactId>realman-boot-base-core</artifactId>
+        </dependency>
         <!--system cloud api-->
         <dependency>
             <groupId>org.jeecgframework.boot3</groupId>

@@ -378,6 +378,7 @@
 		<dependency>
 			<groupId>org.jeecgframework.boot3</groupId>
 			<artifactId>jeecg-boot-starter-chatgpt</artifactId>
+			<version>3.9.1.1</version>
 		</dependency>
 		<!-- 腾讯云 -->
 		<dependency>

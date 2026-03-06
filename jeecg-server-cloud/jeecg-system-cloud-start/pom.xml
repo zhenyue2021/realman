@@ -24,6 +24,11 @@
                 </exclusion>
             </exclusions>-->
         </dependency>
+        <!-- realman-boot-base-core 依赖 -->
+        <dependency>
+            <groupId>org.jeecgframework.boot3</groupId>
+            <artifactId>realman-boot-base-core</artifactId>
+        </dependency>
         <!-- jeecg-system-biz依赖 -->
         <dependency>
             <groupId>org.jeecgframework.boot3</groupId>
