@@ -46,31 +46,31 @@
         <dependency>
             <groupId>org.jeecgframework.boot3</groupId>
             <artifactId>jeecg-cloud-test-more</artifactId>
-            <version>${jeecgboot.version}</version>
+            <version>${realman-boot.version}</version>
         </dependency>-->
         <!-- rabbitmq例子
         <dependency>
             <groupId>org.jeecgframework.boot3</groupId>
             <artifactId>jeecg-cloud-test-rabbitmq</artifactId>
-            <version>${jeecgboot.version}</version>
+            <version>${realman-boot.version}</version>
         </dependency>-->
         <!-- rocketmq例子-->
         <!--<dependency>
             <groupId>org.jeecgframework.boot3</groupId>
             <artifactId>jeecg-cloud-test-rocketmq</artifactId>
-            <version>${jeecgboot.version}</version>
+            <version>${realman-boot.version}</version>
         </dependency>-->
         <!-- 分布式事务例子
        <dependency>
            <groupId>org.jeecgframework.boot3</groupId>
            <artifactId>jeecg-cloud-test-seata</artifactId>
-           <version>${jeecgboot.version}</version>
+           <version>${realman-boot.version}</version>
        </dependency>-->
         <!-- 分库分表例子
        <dependency>
            <groupId>org.jeecgframework.boot3</groupId>
            <artifactId>jeecg-cloud-test-shardingsphere</artifactId>
-           <version>${jeecgboot.version}</version>
+           <version>${realman-boot.version}</version>
        </dependency>
         <dependency>
             <groupId>org.jeecgframework.boot3</groupId>

@@ -16,13 +16,13 @@
         <dependency>
             <groupId>org.jeecgframework.boot3</groupId>
             <artifactId>realman-system-biz</artifactId>
-            <version>${jeecgboot.version}</version>
+            <version>${realman-boot.version}</version>
         </dependency>
         <!-- DEMO 示例模块 -->
         <dependency>
             <groupId>org.jeecgframework.boot3</groupId>
             <artifactId>realman-module-demo</artifactId>
-            <version>${jeecgboot.version}</version>
+            <version>${realman-boot.version}</version>
         </dependency>
         
         <!-- flyway 数据库自动升级 -->

@@ -28,7 +28,7 @@
 	</parent>
 
 	<properties>
-		<jeecgboot.version>3.9.1</jeecgboot.version>
+		<realman-boot.version>3.9.1</realman-boot.version>
 		<!-- JDK版本支持17、21、24 -->
 		<java.version>21</java.version>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -188,39 +188,39 @@
 			<dependency>
 				<groupId>org.jeecgframework.boot3</groupId>
 				<artifactId>realman-system-biz</artifactId>
-				<version>${jeecgboot.version}</version>
+				<version>${realman-boot.version}</version>
 			</dependency>
 
 			<!-- jeecg tools -->
 			<dependency>
 				<groupId>org.jeecgframework.boot3</groupId>
 				<artifactId>jeecg-boot-common</artifactId>
-				<version>${jeecgboot.version}</version>
+				<version>${realman-boot.version}</version>
 			</dependency>
 			<!-- jeecg core -->
 			<dependency>
 				<groupId>org.jeecgframework.boot3</groupId>
 				<artifactId>realman-boot-base-core</artifactId>
-				<version>${jeecgboot.version}</version>
+				<version>${realman-boot.version}</version>
 			</dependency>
 			<!-- system 单体 api -->
 			<dependency>
 				<groupId>org.jeecgframework.boot3</groupId>
 				<artifactId>realman-system-local-api</artifactId>
-				<version>${jeecgboot.version}</version>
+				<version>${realman-boot.version}</version>
 			</dependency>
 			<!-- system 微服务 api -->
 			<dependency>
 				<groupId>org.jeecgframework.boot3</groupId>
 				<artifactId>realman-system-cloud-api</artifactId>
-				<version>${jeecgboot.version}</version>
+				<version>${realman-boot.version}</version>
 			</dependency>
 
             <!--微服务启动依赖-->
             <dependency>
                 <groupId>org.jeecgframework.boot3</groupId>
                 <artifactId>jeecg-boot-starter-cloud</artifactId>
-                <version>${jeecgboot.version}</version>
+                <version>${realman-boot.version}</version>
             </dependency>
 			<!--xxl-job定时任务-->
 			<dependency>
@@ -232,13 +232,13 @@
 			<dependency>
 				<groupId>org.jeecgframework.boot3</groupId>
 				<artifactId>jeecg-boot-starter-lock</artifactId>
-				<version>${jeecgboot.version}</version>
+				<version>${realman-boot.version}</version>
 			</dependency>
 			<!--rabbitmq消息队列-->
 			<dependency>
 				<groupId>org.jeecgframework.boot3</groupId>
 				<artifactId>jeecg-boot-starter-rabbitmq</artifactId>
-				<version>${jeecgboot.version}</version>
+				<version>${realman-boot.version}</version>
 				<exclusions>
 					<exclusion>
 						<groupId>joda-time</groupId>
@@ -250,7 +250,7 @@
 			<dependency>
 				<groupId>org.jeecgframework.boot3</groupId>
 				<artifactId>jeecg-boot-starter-rocketmq</artifactId>
-				<version>${jeecgboot.version}</version>
+				<version>${realman-boot.version}</version>
 			</dependency>
 			<!--mqtt-->
 			<dependency>
@@ -290,7 +290,7 @@
 			<!--<dependency>
 				<groupId>org.jeecgframework.boot3</groupId>
 				<artifactId>jeecg-boot-starter-mongon</artifactId>
-				<version>${jeecgboot.version}</version>
+				<version>${realman-boot.version}</version>
 			</dependency>-->
 			<!-- 七牛云SDK -->
 			<dependency>

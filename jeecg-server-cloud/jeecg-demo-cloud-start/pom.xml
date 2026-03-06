@@ -33,7 +33,7 @@
         <dependency>
             <groupId>org.jeecgframework.boot3</groupId>
             <artifactId>realman-module-demo</artifactId>
-            <version>${jeecgboot.version}</version>
+            <version>${realman-boot.version}</version>
         </dependency>
     </dependencies>
 
