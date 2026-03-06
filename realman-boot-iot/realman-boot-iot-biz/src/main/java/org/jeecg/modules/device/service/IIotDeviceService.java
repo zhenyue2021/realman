@@ -22,7 +22,6 @@ public interface IIotDeviceService extends IService<IotDevice> {
 
     void changeDeviceStatus(String deviceId, Integer status, String operator);
 
-    String resetDeviceSecret(String deviceId);
 
     List<Map<String, Object>> batchGetOnlineStatus(List<String> deviceIds);
 }

@@ -58,8 +58,9 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
         device.setStatus(DeviceConstant.DeviceStatus.INACTIVE);
         device.setCreateTime(LocalDateTime.now());
         deviceMapper.insert(device);
-        // 自动生成deviceSecret，需通过安全渠道下发给设备端
-        secretService.generateSecret(device);
+        // 自动生成deviceSecret，即DigestUtil.md5Hex(device.getDeviceCode())，并放缓存
+        String generateSecret = secretService.generateSecret(device.getDeviceCode());
+        device.setDeviceSecret(generateSecret);
         logService.recordLog(device.getId(), device.getDeviceCode(),
                 DeviceConstant.OperationType.DEVICE_REGISTER,
                 "新设备注册: " + device.getDeviceCode(), null,
@@ -181,17 +182,6 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
             secretService.evict(device.getDeviceCode());
             encryptService.evictCache(device.getDeviceCode());
         }
-    }
-
-    @Override
-    public String resetDeviceSecret(String deviceId) {
-        IotDevice device = require(deviceId);
-        String newSecret = secretService.resetSecret(device.getDeviceCode());
-        encryptService.evictCache(device.getDeviceCode());
-        logService.recordLog(deviceId, device.getDeviceCode(),
-                DeviceConstant.OperationType.TOKEN_REFRESH,
-                "设备密钥重置", null, DeviceConstant.OperationSource.PLATFORM, "SUCCESS", null, null, null);
-        return newSecret;
     }
 
     @Override
