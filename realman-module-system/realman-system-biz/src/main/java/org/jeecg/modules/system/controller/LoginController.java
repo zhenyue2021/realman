@@ -86,7 +86,7 @@ public class LoginController {
 		String username = sysLoginModel.getUsername();
 		// 密码加密传输(尝试 AES解密，失败视为明文)
 		String password  = AesEncryptUtil.resolvePassword(sysLoginModel.getPassword());
-		log.debug("登录密码，原始密码:{}，解密密码:{}" , sysLoginModel.getPassword(), password);
+		log.info("登录密码，原始密码:{}，解密密码:{}" , sysLoginModel.getPassword(), password);
 
 		//step.1 登录失败超出次数5次锁定用户10分钟
 		if(isLoginFailOvertimes(username)){
@@ -123,7 +123,7 @@ public class LoginController {
 		userInfo(sysUser, result, request, CommonConstant.CLIENT_TYPE_PC);
 
 		// step.6  登录成功删除验证码
-		redisUtil.del(realKey);
+//		redisUtil.del(realKey);
 		redisUtil.del(CommonConstant.LOGIN_FAIL + username);
 
 		// step.7 记录用户登录日志
@@ -609,7 +609,7 @@ public class LoginController {
 			String realKey = keyPrefix + lowerCaseCode;
 			redisUtil.removeAll(keyPrefix);
 			redisUtil.set(realKey, lowerCaseCode, 60);
-			log.debug("获取验证码，Redis key = {}，checkCode = {}", realKey, code);
+			log.info("获取验证码，Redis key = {}，checkCode = {}", realKey, code);
 			String base64 = RandImageUtil.generate(code);
 			res.setSuccess(true);
 			res.setResult(base64);

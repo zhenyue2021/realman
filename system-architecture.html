@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>云平台系统架构图</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
+
+  :root {
+    --bg: #0a0e1a;
+    --bg2: #0f1526;
+    --bg3: #141c33;
+    --grid: rgba(99,179,237,0.04);
+    --border: rgba(99,179,237,0.15);
+    --border-bright: rgba(99,179,237,0.4);
+    --blue: #63b3ed;
+    --cyan: #4fd1c5;
+    --green: #68d391;
+    --orange: #f6ad55;
+    --red: #fc8181;
+    --purple: #b794f4;
+    --pink: #f687b3;
+    --yellow: #faf089;
+    --text: #e2e8f0;
+    --text-dim: #718096;
+    --text-muted: #4a5568;
+    --glow-blue: rgba(99,179,237,0.3);
+    --glow-cyan: rgba(79,209,197,0.3);
+    --glow-green: rgba(104,211,145,0.3);
+    --glow-purple: rgba(183,148,244,0.3);
+    --glow-orange: rgba(246,173,85,0.3);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans SC', sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    overflow-x: hidden;
+  }
+
+  /* grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 40px 32px 60px;
+  }
+
+  /* ===== HEADER ===== */
+  .header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+  .header-badge {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--cyan);
+    border: 1px solid var(--cyan);
+    padding: 3px 12px;
+    border-radius: 2px;
+    letter-spacing: 2px;
+    margin-bottom: 16px;
+    text-transform: uppercase;
+  }
+  .header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.5px;
+    margin-bottom: 8px;
+  }
+  .header h1 span { color: var(--blue); }
+  .header p {
+    color: var(--text-dim);
+    font-size: 13px;
+  }
+
+  /* ===== SECTION LABEL ===== */
+  .section-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+font-weight: bold;
+  }
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* ===== LAYER WRAPPER ===== */
+  .layer {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 16px;
+    background: var(--bg2);
+    position: relative;
+  }
+  .layer-title {
+    position: absolute;
+    top: -10px;
+    left: 20px;
+    background: var(--bg);
+    padding: 0 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1px;
+  }
+
+  /* ===== MODULE CARD ===== */
+  .modules-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .mod {
+    flex: 1;
+    min-width: 140px;
+    border-radius: 6px;
+    padding: 14px 14px 12px;
+    position: relative;
+    border: 1px solid transparent;
+    transition: all 0.2s;
+    cursor: default;
+  }
+  .mod:hover { transform: translateY(-2px); }
+
+  .mod-icon {
+    font-size: 20px;
+    margin-bottom: 8px;
+    display: block;
+  }
+  .mod-name {
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 4px;
+    display: block;
+  }
+  .mod-desc {
+    font-size: 11px;
+    color: var(--text-dim);
+    line-height: 1.6;
+  }
+  .mod-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 8px;
+  }
+  .tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 2px;
+    letter-spacing: 0.5px;
+  }
+
+  /* Color themes */
+  .theme-blue  { background: rgba(99,179,237,0.06);  border-color: rgba(99,179,237,0.25);  }
+  .theme-blue  .mod-name { color: var(--blue); }
+  .theme-blue  .tag  { background: rgba(99,179,237,0.1);  color: var(--blue); }
+
+  .theme-cyan  { background: rgba(79,209,197,0.06);  border-color: rgba(79,209,197,0.25);  }
+  .theme-cyan  .mod-name { color: var(--cyan); }
+  .theme-cyan  .tag  { background: rgba(79,209,197,0.1);  color: var(--cyan); }
+
+  .theme-green { background: rgba(104,211,145,0.06); border-color: rgba(104,211,145,0.25); }
+  .theme-green .mod-name { color: var(--green); }
+  .theme-green .tag  { background: rgba(104,211,145,0.1); color: var(--green); }
+
+  .theme-orange{ background: rgba(246,173,85,0.06);  border-color: rgba(246,173,85,0.25);  }
+  .theme-orange.mod-name { color: var(--orange); }
+  .theme-orange .mod-name { color: var(--orange); }
+  .theme-orange .tag  { background: rgba(246,173,85,0.1);  color: var(--orange); }
+
+  .theme-purple{ background: rgba(183,148,244,0.06); border-color: rgba(183,148,244,0.25); }
+  .theme-purple .mod-name { color: var(--purple); }
+  .theme-purple .tag  { background: rgba(183,148,244,0.1); color: var(--purple); }
+
+  .theme-pink  { background: rgba(246,135,179,0.06); border-color: rgba(246,135,179,0.25); }
+  .theme-pink  .mod-name { color: var(--pink); }
+  .theme-pink  .tag  { background: rgba(246,135,179,0.1);  color: var(--pink); }
+
+  .theme-red   { background: rgba(252,129,129,0.06); border-color: rgba(252,129,129,0.25); }
+  .theme-red   .mod-name { color: var(--red); }
+  .theme-red   .tag  { background: rgba(252,129,129,0.1);  color: var(--red); }
+
+  .theme-yellow{ background: rgba(250,240,137,0.06); border-color: rgba(250,240,137,0.25); }
+  .theme-yellow .mod-name { color: var(--yellow); }
+  .theme-yellow .tag  { background: rgba(250,240,137,0.1);  color: var(--yellow); }
+
+  /* Layer-level color */
+  .layer-blue   { border-color: rgba(99,179,237,0.3);  }
+  .layer-blue   .layer-title { color: var(--blue); }
+  .layer-cyan   { border-color: rgba(79,209,197,0.3);  }
+  .layer-cyan   .layer-title { color: var(--cyan); }
+  .layer-green  { border-color: rgba(104,211,145,0.3); }
+  .layer-green  .layer-title { color: var(--green); }
+  .layer-orange { border-color: rgba(246,173,85,0.3);  }
+  .layer-orange .layer-title { color: var(--orange); }
+  .layer-purple { border-color: rgba(183,148,244,0.3); }
+  .layer-purple .layer-title { color: var(--purple); }
+  .layer-gray   { border-color: rgba(113,128,150,0.3); }
+  .layer-gray   .layer-title { color: var(--text-dim); }
+
+  /* ===== ARROWS ===== */
+  .arrow-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0;
+    margin: 6px 0;
+    position: relative;
+  }
+  .arrow-line {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    flex: 1;
+    max-width: 260px;
+  }
+  .arrow-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    padding: 0 8px;
+  }
+  .arrow-body {
+    width: 100%;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+  .arrow-body::before {
+    content: '';
+    width: 80%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border-bright), transparent);
+    display: block;
+  }
+  .arrow-down {
+    font-size: 14px;
+    color: var(--border-bright);
+    text-align: center;
+  }
+
+  /* ===== INFRA GRID ===== */
+  .infra-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+  }
+  .infra-card {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    background: var(--bg3);
+    text-align: center;
+  }
+  .infra-card .ic-icon { font-size: 22px; margin-bottom: 6px; }
+  .infra-card .ic-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    margin-bottom: 3px;
+  }
+  .infra-card .ic-note { font-size: 10px; color: var(--text-dim); }
+
+  /* ===== FLOW DIAGRAM SECTION ===== */
+  .flow-section { margin-top: 48px; }
+  .flow-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .flow-title::before {
+    content: '//';
+    color: var(--cyan);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .flow-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  .flow-card {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--bg2);
+  }
+  .flow-card-header {
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .flow-card-header .fch-icon { font-size: 16px; }
+  .flow-card-header .fch-title {
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .flow-card-body { padding: 14px 16px; }
+  .flow-step {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+    align-items: flex-start;
+  }
+  .flow-step:last-child { margin-bottom: 0; }
+  .step-num {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .step-text { font-size: 11px; color: var(--text-dim); line-height: 1.6; }
+  .step-text strong { color: var(--text); }
+
+  /* color headers */
+  .fh-blue   { background: rgba(99,179,237,0.1);  }
+  .fh-blue   .fch-title { color: var(--blue); }
+  .fh-cyan   { background: rgba(79,209,197,0.1);  }
+  .fh-cyan   .fch-title { color: var(--cyan); }
+  .fh-green  { background: rgba(104,211,145,0.1); }
+  .fh-green  .fch-title { color: var(--green); }
+  .fh-orange { background: rgba(246,173,85,0.1);  }
+  .fh-orange .fch-title { color: var(--orange); }
+  .fh-purple { background: rgba(183,148,244,0.1); }
+  .fh-purple .fch-title { color: var(--purple); }
+  .fh-pink   { background: rgba(246,135,179,0.1); }
+  .fh-pink   .fch-title { color: var(--pink); }
+
+  .sn-blue   { background: rgba(99,179,237,0.15);  color: var(--blue); }
+  .sn-cyan   { background: rgba(79,209,197,0.15);  color: var(--cyan); }
+  .sn-green  { background: rgba(104,211,145,0.15); color: var(--green); }
+  .sn-orange { background: rgba(246,173,85,0.15);  color: var(--orange); }
+  .sn-purple { background: rgba(183,148,244,0.15); color: var(--purple); }
+  .sn-pink   { background: rgba(246,135,179,0.15); color: var(--pink); }
+
+  /* ===== MODULE RELATION SECTION ===== */
+  .relation-section { margin-top: 48px; }
+  .relation-grid {
+    display: grid;
+    grid-template-columns: 1fr 80px 1fr;
+    gap: 0;
+    align-items: start;
+  }
+  .rel-col { display: flex; flex-direction: column; gap: 10px; }
+  .rel-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    padding-top: 8px;
+  }
+  .rel-arrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--text-muted);
+    text-align: center;
+    writing-mode: vertical-rl;
+    letter-spacing: 2px;
+  }
+
+  .rel-item {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    background: var(--bg3);
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .rel-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* ===== TOPIC MAP ===== */
+  .topic-section { margin-top: 48px; }
+  .topic-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+  .topic-card {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 16px;
+    background: var(--bg2);
+  }
+  .topic-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .topic-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    font-size: 11px;
+  }
+  .topic-row:last-child { border-bottom: none; }
+  .topic-key {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--cyan);
+  }
+  .topic-val { color: var(--text-dim); }
+  .topic-dir {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 2px;
+  }
+  .dir-down { background: rgba(99,179,237,0.1); color: var(--blue); }
+  .dir-up   { background: rgba(104,211,145,0.1); color: var(--green); }
+
+  /* ===== LEGEND ===== */
+  .legend {
+    margin-top: 40px;
+    padding: 16px 20px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg2);
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .legend-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    flex-basis: 100%;
+    margin-bottom: 4px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+  }
+
+  /* ===== SEPARATOR ===== */
+  .sep {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 48px 0 32px;
+  }
+
+  /* connecting arrows between layers */
+  .layer-connector {
+    display: flex;
+    justify-content: center;
+    margin: -4px 0;
+    position: relative;
+    z-index: 2;
+  }
+  .lc-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+  .lc-line {
+    width: 2px;
+    height: 16px;
+    background: linear-gradient(180deg, var(--border-bright), transparent);
+  }
+  .lc-arrow { color: var(--border-bright); font-size: 12px; margin-top: -4px; }
+  .lc-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--text-muted);
+    margin-top: 2px;
+    white-space: nowrap;
+    background: var(--bg);
+    padding: 0 8px;
+    letter-spacing: 1px;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ========== HEADER ========== -->
+  <div class="header">
+    <div class="header-badge">睿尔曼智能科技</div>
+    <h1><span>RealmanBoot - IoT</span> 云平台架构设计</h1>
+    <p>JDK 21 · Spring Boot 3 · Vue 3 · MySQL · Redis · EMQX · MinIO · XXL-JOB</p>
+  </div>
+
+  <!-- ========== ARCH DIAGRAM ========== -->
+  <div class="section-label">01 · 整体分层架构</div>
+
+  <!-- CLIENT LAYER -->
+  <div class="layer layer-blue">
+    <div class="layer-title" style="color:var(--blue)">▸ CLIENT LAYER — 接入层</div>
+    <div class="modules-row">
+      <div class="mod theme-blue" style="flex:1.2">
+        <span class="mod-icon">🖥️</span>
+        <span class="mod-name">管理平台 Admin Web</span>
+        <div class="mod-desc">Vue 3 + SpringBoot · 人员权限 · 设备管理 · 工单 · 订阅 · 支付</div>
+        <div class="mod-tags"><span class="tag">Vue3</span><span class="tag">Ant Design Vue</span><span class="tag">WebSocket</span></div>
+      </div>
+      <div class="mod theme-cyan" style="flex:1.2">
+        <span class="mod-icon">📱</span>
+        <span class="mod-name">遥操平台 Remote Op</span>
+        <div class="mod-desc">设备远程操控 · 音视频通话 · 工单操作 · 实时指令下发</div>
+        <div class="mod-tags"><span class="tag">Vue3</span><span class="tag">WebRTC</span><span class="tag">MQTT.js</span></div>
+      </div>
+      <div class="mod theme-green">
+        <span class="mod-icon">📟</span>
+        <span class="mod-name">设备端 Device</span>
+        <div class="mod-desc">ESP32 / Linux · MQTT通信 · OTA升级 · 状态上报</div>
+        <div class="mod-tags"><span class="tag">MQTT</span><span class="tag">Python/C</span></div>
+      </div>
+      <div class="mod theme-orange">
+        <span class="mod-icon">📲</span>
+        <span class="mod-name">钉钉 DingTalk</span>
+        <div class="mod-desc">订阅订单同步 · 工单通知 · Webhook 回调</div>
+        <div class="mod-tags"><span class="tag">DingTalk SDK</span><span class="tag">Webhook</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="layer-connector">
+    <div class="lc-inner">
+      <div class="lc-line"></div>
+      <div class="lc-arrow">▼</div>
+      <div class="lc-label">HTTPS / WSS / MQTT over TLS</div>
+    </div>
+  </div>
+
+  <!-- GATEWAY LAYER -->
+  <div class="layer layer-cyan">
+    <div class="layer-title">▸ GATEWAY LAYER — 网关层</div>
+    <div class="modules-row">
+      <div class="mod theme-cyan" style="flex:1.5">
+        <span class="mod-icon">🔀</span>
+        <span class="mod-name">Spring Cloud Gateway</span>
+        <div class="mod-desc">统一路由 · JWT Token鉴权 · 限流熔断 · 跨域处理 · 请求日志</div>
+        <div class="mod-tags"><span class="tag">JWT验签</span><span class="tag">Rate Limit</span><span class="tag">CORS</span></div>
+      </div>
+      <div class="mod theme-blue">
+        <span class="mod-icon">🔐</span>
+        <span class="mod-name">Spring Security</span>
+        <div class="mod-desc">认证授权中心 · JWT生成/刷新 · 角色权限拦截</div>
+        <div class="mod-tags"><span class="tag">JWT</span><span class="tag">RBAC</span></div>
+      </div>
+      <div class="mod theme-purple">
+        <span class="mod-icon">🌐</span>
+        <span class="mod-name">Nginx</span>
+        <div class="mod-desc">前端静态资源 · SSL终止 · 反向代理 · 负载均衡</div>
+        <div class="mod-tags"><span class="tag">SSL</span><span class="tag">Upstream</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="layer-connector">
+    <div class="lc-inner">
+      <div class="lc-line"></div>
+      <div class="lc-arrow">▼</div>
+      <div class="lc-label">Internal HTTP · gRPC</div>
+    </div>
+  </div>
+
+  <!-- SERVICE LAYER -->
+  <div class="layer layer-green">
+    <div class="layer-title">▸ SERVICE LAYER — 业务服务层</div>
+    <div class="modules-row">
+      <div class="mod theme-blue">
+        <span class="mod-icon">🔑</span>
+        <span class="mod-name">用户权限模块</span>
+        <div class="mod-desc">用户 / 角色 / 菜单 · 登录登出 · JWT签发 · 多租户隔离</div>
+        <div class="mod-tags"><span class="tag">Security</span><span class="tag">JWT</span><span class="tag">Redis Session</span></div>
+      </div>
+      <div class="mod theme-cyan">
+        <span class="mod-icon">📡</span>
+        <span class="mod-name">设备管理模块</span>
+        <div class="mod-desc">设备CRUD · 授权管理 · 配置下发 · 遥测数据 · 在线统计</div>
+        <div class="mod-tags"><span class="tag">MQTT</span><span class="tag">WebSocket</span><span class="tag">OTA</span></div>
+      </div>
+      <div class="mod theme-green">
+        <span class="mod-icon">📋</span>
+        <span class="mod-name">订阅管理模块</span>
+        <div class="mod-desc">订阅方案 · 订单生成 · 订单同步钉钉 · 到期提醒</div>
+        <div class="mod-tags"><span class="tag">DingTalk</span><span class="tag">XXL-JOB</span></div>
+      </div>
+      <div class="mod theme-orange">
+        <span class="mod-icon">🔧</span>
+        <span class="mod-name">工单管理模块</span>
+        <div class="mod-desc">工单创建 · 合规配置 · 超时策略 · 验收流程 · 状态机</div>
+        <div class="mod-tags"><span class="tag">状态机</span><span class="tag">WebSocket</span></div>
+      </div>
+      <div class="mod theme-purple">
+        <span class="mod-icon">🎥</span>
+        <span class="mod-name">远程支持模块</span>
+        <div class="mod-desc">音视频通话 · 通话录制 · AI摘要提取 · 通话记录</div>
+        <div class="mod-tags"><span class="tag">WebRTC</span><span class="tag">AI Summary</span></div>
+      </div>
+      <div class="mod theme-pink">
+        <span class="mod-icon">💳</span>
+        <span class="mod-name">支付模块</span>
+        <div class="mod-desc">国内：微信/支付宝 · 海外：Stripe/PayPal · 订单状态回调</div>
+        <div class="mod-tags"><span class="tag">微信Pay</span><span class="tag">Alipay</span><span class="tag">Stripe</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="layer-connector">
+    <div class="lc-inner">
+      <div class="lc-line"></div>
+      <div class="lc-arrow">▼</div>
+      <div class="lc-label">JDBC · Lettuce · MQTT Client</div>
+    </div>
+  </div>
+
+  <!-- MIDDLEWARE LAYER -->
+  <div class="layer layer-orange">
+    <div class="layer-title">▸ MIDDLEWARE LAYER — 中间件层</div>
+    <div class="modules-row">
+      <div class="mod theme-cyan">
+        <span class="mod-icon">📨</span>
+        <span class="mod-name">EMQX Broker</span>
+        <div class="mod-desc">MQTT消息代理 · 设备接入 · Topic路由 · QoS保障 · Webhook回调</div>
+        <div class="mod-tags"><span class="tag">MQTT 5.0</span><span class="tag">Cluster</span><span class="tag">TLS</span></div>
+      </div>
+      <div class="mod theme-orange">
+        <span class="mod-icon">⏰</span>
+        <span class="mod-name">XXL-JOB</span>
+        <div class="mod-desc">订阅到期扫描 · 设备离线检测 · 钉钉推送 · 定时报表生成</div>
+        <div class="mod-tags"><span class="tag">分布式调度</span><span class="tag">可视化</span></div>
+      </div>
+      <div class="mod theme-blue">
+        <span class="mod-icon">🔌</span>
+        <span class="mod-name">WebSocket Server</span>
+        <div class="mod-desc">STOMP协议 · 实时设备状态推送 · 工单通知 · 大屏数据流</div>
+        <div class="mod-tags"><span class="tag">Spring WebSocket</span><span class="tag">STOMP</span></div>
+      </div>
+      <div class="mod theme-purple">
+        <span class="mod-icon">🤖</span>
+        <span class="mod-name">AI 接口</span>
+        <div class="mod-desc">通话内容转录 + 摘要提取(中文环境：FunASR + Qwen2.5 ，国际化：Whisper Large-v3 + Claude 3.5 Sonnet) · 工单智能分析</div>
+        <div class="mod-tags"><span class="tag">OpenAI API</span><span class="tag">STT</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="layer-connector">
+    <div class="lc-inner">
+      <div class="lc-line"></div>
+      <div class="lc-arrow">▼</div>
+      <div class="lc-label">JDBC · Lettuce · S3 API</div>
+    </div>
+  </div>
+
+  <!-- DATA LAYER -->
+  <div class="layer layer-gray">
+    <div class="layer-title">▸ DATA LAYER — 数据存储层</div>
+    <div class="infra-grid">
+      <div class="infra-card">
+        <div class="ic-icon">🗄️</div>
+        <div class="ic-name" style="color:var(--blue)">MySQL 8.0</div>
+        <div class="ic-note">主数据库 · 业务数据 · 用户/设备/订单/工单</div>
+      </div>
+      <div class="infra-card">
+        <div class="ic-icon">⚡</div>
+        <div class="ic-name" style="color:var(--red)">Redis 7</div>
+        <div class="ic-note">Token缓存 · 设备状态 · 限流计数 · Session</div>
+      </div>
+      <div class="infra-card">
+        <div class="ic-icon">📦</div>
+        <div class="ic-name" style="color:var(--green)">MinIO</div>
+        <div class="ic-note">OTA固件包 · 通话录音 · 文件附件 · S3兼容</div>
+      </div>
+      <div class="infra-card">
+        <div class="ic-icon">📊</div>
+        <div class="ic-name" style="color:var(--orange)">MySQL / InfluxDB</div>
+        <div class="ic-note">设备遥测时序数据 · 历史监控数据</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== SEPARATOR ========== -->
+  <hr class="sep">
+
+  <!-- ========== SERVICE RELATION ========== -->
+  <div class="section-label">02 · 模块间交互关系</div>
+
+  <div class="flow-section">
+    <div class="flow-grid">
+
+      <!-- 认证权限流 -->
+      <div class="flow-card">
+        <div class="flow-card-header fh-blue">
+          <span class="fch-icon">🔑</span>
+          <span class="fch-title">认证权限流</span>
+        </div>
+        <div class="flow-card-body">
+          <div class="flow-step">
+            <div class="step-num sn-blue">1</div>
+            <div class="step-text">前端POST <strong>/auth/login</strong>，携带用户名密码</div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num sn-blue">2</div>
+            <div class="step-text">Spring Security 验证，生成 <strong>Access Token + Refresh Token</strong>，写入 Redis</div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num sn-blue">3</div>
+            <div class="step-text">Gateway 拦截所有请求，<strong>JWT Filter</strong> 验签 + 权限检查</div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num sn-blue">4</div>
+            <div class="step-text">多租户隔离：<strong>TenantContext</strong> 注入，SQL自动追加 tenant_id</div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num sn-blue">5</div>
+            <div class="step-text">登出时 <strong>Redis 黑名单</strong> 标记 Token 失效</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 设备通信流 -->
+      <div class="flow-card">
+        <div class="flow-card-header fh-cyan">
+          <span class="fch-icon">📡</span>
+          <span class="fch-title">设备 ↔ 云端通信流</span>
+        </div>
+        <div class="flow-card-body">
+          <div class="flow-step">
+            <div class="step-num sn-cyan">1</div>
+            <div class="step-text">设备 MQTT Connect 到 <strong>EMQX</strong>，携带 clientId=deviceId</div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num sn-cyan">2</div>
+            <div class="step-text">EMQX <strong>Webhook</strong> 通知后端设备上下线，更新 Redis 在线状态</div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num sn-cyan">3</div>
+            <div class="step-text">后端 Publish <strong>device/{id}/config</strong> 下发配置；设备 Subscribe 后应用</div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num sn-cyan">4</div>
+            <div class="step-text">设备 Publish <strong>device/{id}/status</strong> 上报遥测数据</div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num sn-cyan">5</div>
+            <div class="step-text">后端接收后存库，通过 <strong>WebSocket STOMP</strong> 推送前端实时展示</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- OTA 升级流 -->
+      <div class="flow-card">
+        <div class="flow-card-header fh-green">
+          <span class="fch-icon">🚀</span>
+          <span class="fch-title">OTA 固件升级流</span>
+        </div>
+        <div class="flow-card-body">
+          <div class="flow-step">
+            <div class="step-num sn-green">1</div>
+            <div class="step-text">管理员上传固件包，后端校验MD5后存入 <strong>MinIO</strong></div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num sn-green">2</div>
+            <div class="step-text">选择目标设备（单个/批量），创建 <strong>ota_task</strong> 记录</div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num sn-green">3</div>
+            <div class="step-text">Publish <strong>device/{id}/ota</strong>，携带下载URL + MD5 + 版本号</div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num sn-green">4</div>
+            <div class="step-text">设备下载 → MD5校验 → 安装，上报 <strong>device/{id}/ota/report</strong></div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num sn-green">5</div>
+            <div class="step-text">后端更新任务状态，WebSocket 推送升级进度到前端</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 订阅支付流 -->
+      <div class="flow-card">
+        <div class="flow-card-header fh-orange">
+          <span class="fch-icon">💳</span>
+          <span class="fch-title">订阅 & 支付流</span>
+        </div>
+        <div class="flow-card-body">
+          <div class="flow-step">
+            <div class="step-num sn-orange">1</div>
+            <div class="step-text">用户选择订阅方案，后端创建 <strong>订阅订单</strong>，状态=待支付</div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num sn-orange">2</div>
+            <div class="step-text">根据用户地区选择通道：国内→<strong>微信/支付宝</strong>，海外→<strong>Stripe</strong></div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num sn-orange">3</div>
+            <div class="step-text">支付回调 Notify 接口，验签后更新订单状态为<strong>已支付</strong></div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num sn-orange">4</div>
+            <div class="step-text">异步任务同步订单信息至 <strong>钉钉</strong> 指定群/用户</div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num sn-orange">5</div>
+            <div class="step-text"><strong>XXL-JOB</strong> 定时扫描到期订阅，发送续费提醒</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 工单流 -->
+      <div class="flow-card">
+        <div class="flow-card-header fh-purple">
+          <span class="fch-icon">🔧</span>
+          <span class="fch-title">工单生命周期流</span>
+        </div>
+        <div class="flow-card-body">
+          <div class="flow-step">
+            <div class="step-num sn-purple">1</div>
+            <div class="step-text">管理平台<strong>创建工单</strong>：配置是否需验收、超时时间、指派人员</div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num sn-purple">2</div>
+            <div class="step-text">WebSocket 推送工单通知到<strong>遥操平台</strong>运维人员</div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num sn-purple">3</div>
+            <div class="step-text">运维人员在遥操平台<strong>开始工单</strong>，状态机流转：待处理→处理中</div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num sn-purple">4</div>
+            <div class="step-text">处理完成<strong>提交工单</strong>，若配置验收则流转→待验收</div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num sn-purple">5</div>
+            <div class="step-text">超时未处理触发 <strong>XXL-JOB</strong> 策略：升级通知/自动关闭</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 远程支持流 -->
+      <div class="flow-card">
+        <div class="flow-card-header fh-pink">
+          <span class="fch-icon">🎥</span>
+          <span class="fch-title">远程支持 / 音视频流</span>
+        </div>
+        <div class="flow-card-body">
+          <div class="flow-step">
+            <div class="step-num sn-pink">1</div>
+            <div class="step-text">运维人员发起通话，后端生成 <strong>WebRTC 信令房间</strong></div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num sn-pink">2</div>
+            <div class="step-text">通过 WebSocket 交换 <strong>SDP Offer/Answer + ICE候选</strong></div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num sn-pink">3</div>
+            <div class="step-text">P2P 通话建立，同步录制音频流到 <strong>MinIO</strong></div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num sn-pink">4</div>
+            <div class="step-text">通话结束，调用 <strong>STT API</strong> 转录录音为文字</div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num sn-pink">5</div>
+            <div class="step-text">调用 <strong>LLM API</strong> 提取AI摘要，写入通话记录表</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ========== SEPARATOR ========== -->
+  <hr class="sep">
+
+  <!-- ========== MQTT TOPICS ========== -->
+  <div class="section-label">03 · MQTT Topic 规划 & 数据库核心表</div>
+
+  <div class="topic-grid">
+    <div class="topic-card">
+      <div class="topic-title" style="color:var(--cyan)">📡 MQTT Topic 规范</div>
+      <div class="topic-row">
+        <span class="topic-key">device/{id}/config</span>
+        <span class="topic-val">配置参数下发</span>
+        <span class="topic-dir dir-down">↓云→设备</span>
+      </div>
+      <div class="topic-row">
+        <span class="topic-key">device/{id}/ota</span>
+        <span class="topic-val">OTA升级指令</span>
+        <span class="topic-dir dir-down">↓云→设备</span>
+      </div>
+      <div class="topic-row">
+        <span class="topic-key">device/{id}/command</span>
+        <span class="topic-val">实时控制指令</span>
+        <span class="topic-dir dir-down">↓云→设备</span>
+      </div>
+      <div class="topic-row">
+        <span class="topic-key">device/{id}/status</span>
+        <span class="topic-val">状态+遥测上报</span>
+        <span class="topic-dir dir-up">↑设备→云</span>
+      </div>
+      <div class="topic-row">
+        <span class="topic-key">device/{id}/log</span>
+        <span class="topic-val">操作日志上报</span>
+        <span class="topic-dir dir-up">↑设备→云</span>
+      </div>
+      <div class="topic-row">
+        <span class="topic-key">device/{id}/ota/report</span>
+        <span class="topic-val">OTA升级结果</span>
+        <span class="topic-dir dir-up">↑设备→云</span>
+      </div>
+    </div>
+
+    <div class="topic-card">
+      <div class="topic-title" style="color:var(--green)">🗄️ 核心数据库表</div>
+      <div class="topic-row">
+        <span class="topic-key">sys_user / sys_role / sys_menu</span>
+        <span class="topic-val">用户权限 RBAC</span>
+      </div>
+      <div class="topic-row">
+        <span class="topic-key">iot_device / iot_device_config</span>
+        <span class="topic-val">设备 & 配置</span>
+      </div>
+      <div class="topic-row">
+        <span class="topic-key">iot_device_telemetry</span>
+        <span class="topic-val">遥测时序数据</span>
+      </div>
+      <div class="topic-row">
+        <span class="topic-key">iot_firmware / iot_ota_task</span>
+        <span class="topic-val">固件 & 升级任务</span>
+      </div>
+      <div class="topic-row">
+        <span class="topic-key">sub_plan / sub_order</span>
+        <span class="topic-val">订阅方案 & 订单</span>
+      </div>
+      <div class="topic-row">
+        <span class="topic-key">work_order / work_order_config</span>
+        <span class="topic-val">工单 & 合规配置</span>
+      </div>
+      <div class="topic-row">
+        <span class="topic-key">call_record / payment_order</span>
+        <span class="topic-val">通话记录 & 支付单</span>
+      </div>
+    </div>
+
+    <div class="topic-card">
+      <div class="topic-title" style="color:var(--orange)">⚡ Redis Key 规范</div>
+      <div class="topic-row">
+        <span class="topic-key">token:access:{userId}</span>
+        <span class="topic-val">Access Token 缓存</span>
+      </div>
+      <div class="topic-row">
+        <span class="topic-key">token:blacklist:{token}</span>
+        <span class="topic-val">登出黑名单</span>
+      </div>
+      <div class="topic-row">
+        <span class="topic-key">device:online:{deviceId}</span>
+        <span class="topic-val">设备在线状态</span>
+      </div>
+      <div class="topic-row">
+        <span class="topic-key">device:status:{deviceId}</span>
+        <span class="topic-val">最新遥测快照</span>
+      </div>
+      <div class="topic-row">
+        <span class="topic-key">rate:limit:{userId}:{api}</span>
+        <span class="topic-val">接口限流计数</span>
+      </div>
+      <div class="topic-row">
+        <span class="topic-key">order:pay:expire:{orderId}</span>
+        <span class="topic-val">支付超时 TTL</span>
+      </div>
+    </div>
+
+    <div class="topic-card">
+      <div class="topic-title" style="color:var(--purple)">⏰ XXL-JOB 定时任务</div>
+      <div class="topic-row">
+        <span class="topic-key">设备离线检测</span>
+        <span class="topic-val">每2分钟扫描心跳</span>
+      </div>
+      <div class="topic-row">
+        <span class="topic-key">订阅到期提醒</span>
+        <span class="topic-val">每天09:00推钉钉</span>
+      </div>
+      <div class="topic-row">
+        <span class="topic-key">工单超时检查</span>
+        <span class="topic-val">每5分钟检查</span>
+      </div>
+      <div class="topic-row">
+        <span class="topic-key">遥测数据归档</span>
+        <span class="topic-val">每天00:00冷归档</span>
+      </div>
+      <div class="topic-row">
+        <span class="topic-key">OTA任务超时</span>
+        <span class="topic-val">每15分钟检查失败</span>
+      </div>
+      <div class="topic-row">
+        <span class="topic-key">支付订单过期</span>
+        <span class="topic-val">Redis TTL + 定时确认</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== LEGEND ========== -->
+  <div class="legend">
+    <div class="legend-title">图例 Legend</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--blue)"></div>认证/权限</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--cyan)"></div>设备/MQTT</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div>OTA/存储</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--orange)"></div>订阅/支付</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--purple)"></div>工单/AI</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--pink)"></div>音视频</div>
+    <div class="legend-item" style="margin-left:auto">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted)">
+        SpringBoot · JDK21 · Spring Boot 3 · Vue 3
+      </span>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

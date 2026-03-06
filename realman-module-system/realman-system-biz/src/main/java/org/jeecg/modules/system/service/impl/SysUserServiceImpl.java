@@ -822,7 +822,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
 		//step.4 保存职位
 		this.saveUserPosition(user.getId(),user.getPost());
         //step5 保存兼职岗位
-        this.saveUserOtherDepPost(user.getId(),user.getOtherDepPostId());
+//        this.saveUserOtherDepPost(user.getId(),user.getOtherDepPostId());
 	}
 
 	@Override

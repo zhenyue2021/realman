@@ -71,6 +71,8 @@
 		<aliyun-java-sdk-dysmsapi.version>2.1.0</aliyun-java-sdk-dysmsapi.version>
 		<aliyun.oss.version>3.17.3</aliyun.oss.version>
         <tencentcloud-sdk-java-sms.version>3.1.407</tencentcloud-sdk-java-sms.version>
+		<!-- 中间件 -->
+		<paho.version>1.2.5</paho.version>
 		<!-- shiro -->
 		<shiro.version>2.0.5</shiro.version>
 		<shiro-redis.version>3.2.3</shiro-redis.version>
@@ -88,6 +90,7 @@
         <module>realman-boot-base-core</module>
         <module>realman-module-system</module>
 		<module>realman-boot-module</module>
+        <module>realman-boot-iot</module>
     </modules>
 
 	<repositories>
@@ -249,6 +252,12 @@
 				<artifactId>jeecg-boot-starter-rocketmq</artifactId>
 				<version>${jeecgboot.version}</version>
 			</dependency>
+			<!--mqtt-->
+			<dependency>
+				<groupId>org.eclipse.paho</groupId>
+				<artifactId>org.eclipse.paho.client.mqttv3</artifactId>
+				<version>${paho.version}</version>
+			</dependency>
 			<!--分库分表shardingsphere-->
 			<dependency>
 				<groupId>org.jeecgframework.boot3</groupId>
@@ -278,29 +287,11 @@
 			</dependency>
 
 			<!--mongon db-->
-			<dependency>
+			<!--<dependency>
 				<groupId>org.jeecgframework.boot3</groupId>
 				<artifactId>jeecg-boot-starter-mongon</artifactId>
 				<version>${jeecgboot.version}</version>
-			</dependency>
-			<!--人大金仓驱动 版本号V008R006C005B0013 -->
-			<dependency>
-				<groupId>org.jeecgframework</groupId>
-				<artifactId>kingbase8</artifactId>
-				<version>9.0.0</version>
-				<scope>runtime</scope>
-			</dependency>
-			<!--达梦8数据库最新驱动 版本号1-3-26-2023.07.26-197096-20046-ENT -->
-			<dependency>
-				<groupId>com.dameng</groupId>
-				<artifactId>DmJdbcDriver18</artifactId>
-				<version>${dm8.version}</version>
-			</dependency>
-			<dependency>
-				<groupId>com.dameng</groupId>
-				<artifactId>DmDialect-for-hibernate5.0</artifactId>
-				<version>${dm8.version}</version>
-			</dependency>
+			</dependency>-->
 			<!-- 七牛云SDK -->
 			<dependency>
 				<groupId>com.qiniu</groupId>
@@ -441,7 +432,7 @@
 				</exclusions>
 			</dependency>
 			<!-- 积木报表-->
-			<dependency>
+			<!--<dependency>
 				<groupId>org.jeecgframework.jimureport</groupId>
 				<artifactId>jimureport-spring-boot3-starter</artifactId>
 				<version>${jimureport-spring-boot-starter.version}</version>
@@ -479,7 +470,7 @@
 						<artifactId>ooxml-schemas</artifactId>
 					</exclusion>
 				</exclusions>
-			</dependency>
+			</dependency>-->
 			<!-- AutoPoi Excel工具类-->
 			<dependency>
 				<groupId>org.jeecgframework</groupId>
@@ -505,7 +496,7 @@
 				</exclusions>
 			</dependency>
 			<!-- mongo、redis和文件数据集支持包，按需引入 -->
-			<dependency>
+			<!--<dependency>
 				<groupId>org.jeecgframework.jimureport</groupId>
 				<artifactId>jimureport-nosql-starter</artifactId>
 				<version>2.1.0</version>
@@ -523,13 +514,13 @@
 						<artifactId>httpclient</artifactId>
 					</exclusion>
 				</exclusions>
-			</dependency>
+			</dependency>-->
 			<!-- 后台导出接口Echart图表支持包，按需引入 -->
-			<dependency>
+			<!--<dependency>
 				<groupId>org.jeecgframework.jimureport</groupId>
 				<artifactId>jimureport-echarts-starter</artifactId>
 				<version>2.2.0</version>
-			</dependency>
+			</dependency>-->
             <!-- 积木BI大屏和仪表盘 -->
             <dependency>
                 <groupId>org.jeecgframework.jimureport</groupId>
@@ -543,11 +534,11 @@
 				</exclusions>
             </dependency>
 			<!-- chatgpt -->
-			<dependency>
+			<!--<dependency>
 				<groupId>org.jeecgframework.boot3</groupId>
 				<artifactId>jeecg-boot-starter-chatgpt</artifactId>
                 <version>3.9.1.1</version>
-			</dependency>
+			</dependency>-->
 			<!--flyway 支持 mysql5.7+、MariaDB10.3.16-->
 			<!--mysql5.6，需要把版本号改成5.2.1-->
 			<dependency>

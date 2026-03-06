@@ -6,13 +6,13 @@ RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
 
 #RUN mkdir -p /jeecg-boot/config/jeecg/
 
-WORKDIR /jeecg-boot
+WORKDIR /realman-boot
 
 EXPOSE 8080
 
 #ADD ./src/main/resources/jeecg ./config/jeecg
-ADD ./target/jeecg-system-start-3.9.1.jar ./
+ADD ./target/realman-system-start-3.9.1.jar ./
 
-RUN mkdir -p /jeecg-boot/config
+RUN mkdir -p /realman-boot/config
 
-CMD sleep 60;java -Dfile.encoding=UTF-8 -Djava.security.egd=file:/dev/./urandom -jar jeecg-system-start-3.9.1.jar
+CMD sleep 60;java -Dfile.encoding=UTF-8 -Djava.security.egd=file:/dev/./urandom -jar realman-system-start-3.9.1.jar

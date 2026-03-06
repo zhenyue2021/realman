@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.jeecg.modules.device.mapper.IotDeviceConfigMapper">
+    <update id="updateSyncStatusByDeviceCode">
+        UPDATE iot_device_config SET sync_status=#{syncStatus}, sync_time=#{syncTime}
+        WHERE device_code=#{deviceCode} AND sync_status=0
+    </update>
+</mapper>

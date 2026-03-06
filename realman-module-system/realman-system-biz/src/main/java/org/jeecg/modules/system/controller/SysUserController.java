@@ -9,6 +9,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang.StringUtils;
 import org.apache.shiro.SecurityUtils;
@@ -69,6 +71,7 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @RestController
+@Tag(name="用户管理")
 @RequestMapping("/sys/user")
 public class SysUserController {
 
@@ -120,6 +123,7 @@ public class SysUserController {
      */
     @PermissionData(pageComponent = "system/UserList")
 	@RequestMapping(value = "/list", method = RequestMethod.GET)
+    @Operation(summary="获取租户下用户数据")
 	public Result<IPage<SysUser>> queryPageList(SysUser user,@RequestParam(name="pageNo", defaultValue="1") Integer pageNo,
 									  @RequestParam(name="pageSize", defaultValue="10") Integer pageSize,HttpServletRequest req) {
 		QueryWrapper<SysUser> queryWrapper = QueryGenerator.initQueryWrapper(user, req.getParameterMap());
@@ -147,6 +151,8 @@ public class SysUserController {
      * @param req
      * @return
      */
+
+    @Operation(summary="获取系统用户数据-查询全部用户，不做租户隔离")
     @RequiresPermissions("system:user:listAll")
     @RequestMapping(value = "/listAll", method = RequestMethod.GET)
     public Result<IPage<SysUser>> queryAllPageList(SysUser user, @RequestParam(name = "pageNo", defaultValue = "1") Integer pageNo,
@@ -157,6 +163,7 @@ public class SysUserController {
 
     @RequiresPermissions("system:user:add")
 	@RequestMapping(value = "/add", method = RequestMethod.POST)
+    @Operation(summary="新增用户")
 	public Result<SysUser> add(@RequestBody JSONObject jsonObject) {
 		Result<SysUser> result = new Result<SysUser>();
 		String selectedRoles = jsonObject.getString("selectedroles");
@@ -188,6 +195,7 @@ public class SysUserController {
 
     @RequiresPermissions("system:user:edit")
 	@RequestMapping(value = "/edit", method = {RequestMethod.PUT,RequestMethod.POST})
+    @Operation(summary="编辑用户")
 	public Result<SysUser> edit(@RequestBody JSONObject jsonObject) {
 		Result<SysUser> result = new Result<SysUser>();
 		try {
@@ -266,6 +274,7 @@ public class SysUserController {
 	 */
     @RequiresPermissions("system:user:delete")
 	@RequestMapping(value = "/delete", method = RequestMethod.DELETE)
+    @Operation(summary="新增用户删除")
 	public Result<?> delete(@RequestParam(name="id",required=true) String id) {
 		baseCommonService.addLog("删除用户，id： " +id ,CommonConstant.LOG_TYPE_2, 3);
         List<String> userNameList = sysUserService.userIdToUsername(Arrays.asList(id));
@@ -282,6 +291,7 @@ public class SysUserController {
 	 */
     @RequiresPermissions("system:user:deleteBatch")
 	@RequestMapping(value = "/deleteBatch", method = RequestMethod.DELETE)
+    @Operation(summary="批量删除用户")
 	public Result<?> deleteBatch(@RequestParam(name="ids",required=true) String ids) {
 		baseCommonService.addLog("批量删除用户， ids： " +ids ,CommonConstant.LOG_TYPE_2, 3);
         List<String> userNameList = sysUserService.userIdToUsername(Arrays.asList(ids.split(",")));
@@ -301,6 +311,7 @@ public class SysUserController {
 	 */
     @RequiresPermissions("system:user:frozenBatch")
 	@RequestMapping(value = "/frozenBatch", method = RequestMethod.PUT)
+    @Operation(summary="冻结&解冻用户")
 	public Result<SysUser> frozenBatch(@RequestBody JSONObject jsonObject) {
 		Result<SysUser> result = new Result<SysUser>();
 		try {
@@ -345,6 +356,7 @@ public class SysUserController {
 
     @RequiresPermissions("system:user:queryById")
     @RequestMapping(value = "/queryById", method = RequestMethod.GET)
+    @Operation(summary="用户详情")
     public Result<SysUser> queryById(@RequestParam(name = "id", required = true) String id) {
         Result<SysUser> result = new Result<SysUser>();
         SysUser sysUser = sysUserService.getById(id);
@@ -359,6 +371,7 @@ public class SysUserController {
 
     @RequiresPermissions("system:user:queryUserRole")
     @RequestMapping(value = "/queryUserRole", method = RequestMethod.GET)
+    @Operation(summary="查询当前用户角色列表")
     public Result<List<String>> queryUserRole(@RequestParam(name = "userid", required = true) String userid) {
         Result<List<String>> result = new Result<>();
         List<String> list = new ArrayList<String>();
@@ -384,6 +397,7 @@ public class SysUserController {
      * @return
      */
     @RequestMapping(value = "/checkOnlyUser", method = RequestMethod.GET)
+    @Operation(summary="校验账号唯一性")
     public Result<Boolean> checkOnlyUser(SysUser sysUser) {
         Result<Boolean> result = new Result<>();
         //如果此参数为false则程序发生异常
@@ -412,6 +426,7 @@ public class SysUserController {
      */
     @RequiresPermissions("system:user:changepwd")
     @RequestMapping(value = "/changePassword", method = RequestMethod.PUT)
+    @Operation(summary="用户修改密码")
     public Result<?> changePassword(@RequestBody SysUser sysUser, HttpServletRequest request) {
         //-------------------------------------------------------------------------------------
         //增加 check防止恶意刷短信接口
@@ -483,6 +498,7 @@ public class SysUserController {
      * @return
      */
     @RequestMapping(value = "/queryUserByDepId", method = RequestMethod.GET)
+    @Operation(summary="查询当前企业下用户列表")
     public Result<List<SysUser>> queryUserByDepId(@RequestParam(name = "id", required = true) String id,@RequestParam(name="realname",required=false) String realname) {
         Result<List<SysUser>> result = new Result<>();
         //List<SysUser> userList = sysUserDepartService.queryUserByDepId(id);

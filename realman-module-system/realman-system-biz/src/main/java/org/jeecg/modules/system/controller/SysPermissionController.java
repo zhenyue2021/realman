@@ -4,6 +4,8 @@ import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
@@ -42,6 +44,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @RestController
 @RequestMapping("/sys/permission")
+@Tag(name="菜单管理")
 public class SysPermissionController {
 
 	@Autowired
@@ -82,6 +85,7 @@ public class SysPermissionController {
 	 * @return
 	 */
 	//@RequiresPermissions("system:permission:list")
+	@Operation(summary="登录接口")
 	@RequestMapping(value = "/list", method = RequestMethod.GET)
 	public Result<List<SysPermissionTree>> list(SysPermission sysPermission, HttpServletRequest req) {
         long start = System.currentTimeMillis();
@@ -210,27 +214,27 @@ public class SysPermissionController {
 		}
 	}
 
-//	/**
-//	 * 查询用户拥有的菜单权限和按钮权限（根据用户账号）
-//	 * 
-//	 * @return
-//	 */
-//	@RequestMapping(value = "/queryByUser", method = RequestMethod.GET)
-//	public Result<JSONArray> queryByUser(HttpServletRequest req) {
-//		Result<JSONArray> result = new Result<>();
-//		try {
-//			String username = req.getParameter("username");
-//			List<SysPermission> metaList = sysPermissionService.queryByUser(username);
-//			JSONArray jsonArray = new JSONArray();
-//			this.getPermissionJsonArray(jsonArray, metaList, null);
-//			result.setResult(jsonArray);
-//			result.success("查询成功");
-//		} catch (Exception e) {
-//			result.error500("查询失败:" + e.getMessage());
-//			log.error(e.getMessage(), e);
-//		}
-//		return result;
-//	}
+	/**
+	 * 查询用户拥有的菜单权限和按钮权限（根据用户账号）
+	 *
+	 * @return
+	 */
+	@RequestMapping(value = "/queryByUser", method = RequestMethod.GET)
+	public Result<JSONArray> queryByUser(HttpServletRequest req) {
+		Result<JSONArray> result = new Result<>();
+		try {
+			String username = req.getParameter("username");
+			List<SysPermission> metaList = sysPermissionService.queryByUser(username);
+			JSONArray jsonArray = new JSONArray();
+			this.getPermissionJsonArray(jsonArray, metaList, null);
+			result.setResult(jsonArray);
+			result.success("查询成功");
+		} catch (Exception e) {
+			result.error500("查询失败:" + e.getMessage());
+			log.error(e.getMessage(), e);
+		}
+		return result;
+	}
 
 	/**
 	 * 查询用户拥有的菜单权限和按钮权限
@@ -766,7 +770,7 @@ public class SysPermissionController {
 	 * @param permission
 	 * @return
 	 */
-		private JSONObject getPermissionJsonObject(SysPermission permission) {
+	private JSONObject getPermissionJsonObject(SysPermission permission) {
 		JSONObject json = new JSONObject();
 		// 类型(0：一级菜单 1：子菜单 2：按钮)
 		if (permission.getMenuType().equals(CommonConstant.MENU_TYPE_2)) {
