@@ -30,7 +30,7 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
-                    <mainClass>org.jeecg.modules.device.DeviceManagementApplication</mainClass>
+                    <mainClass>org.jeecg.modules.device.RealmanDeviceApplication</mainClass>
                 </configuration>
                 <executions>
                     <execution>

@@ -28,9 +28,9 @@ import java.net.UnknownHostException;
 @MapperScan("org.jeecg.modules.device.mapper")
 @EnableAsync
 @EnableScheduling
-public class DeviceManagementApplication {
+public class RealmanDeviceApplication {
     public static void main(String[] args) {
-        ConfigurableEnvironment environment = SpringApplication.run(DeviceManagementApplication.class, args).getEnvironment();
+        ConfigurableEnvironment environment = SpringApplication.run(RealmanDeviceApplication.class, args).getEnvironment();
         printStartupInfo(environment);
     }
 
@@ -48,12 +48,12 @@ public class DeviceManagementApplication {
         }
 
         System.out.println("\n" +
-                "╔══════════════════════════════════════════════════════╗\n" +
-                "║     IoT Device Management Module Started            ║\n" +
-                "╠══════════════════════════════════════════════════════╣\n" +
+                "╔════════════════════════════════════════════════════════════════════╗\n" +
+                "║                IoT Device Management Module Started                ║\n" +
+                "╠════════════════════════════════════════════════════════════════════╣\n" +
                 "║  Local:   " + protocol + "://localhost:" + serverPort + contextPath + "                  \n" +
                 "║  External:" + protocol + "://" + hostAddress + ":" + serverPort + contextPath + "      \n" +
                 "║  Swagger: " + protocol + "://localhost:" + serverPort + contextPath + "/swagger-ui/index.html  \n" +
-                "╚══════════════════════════════════════════════════════╝");
+                "╚════════════════════════════════════════════════════════════════════╝");
     }
 }

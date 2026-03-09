@@ -4,8 +4,8 @@
 --           EMQX HTTP Auth回调 /internal/mqtt/auth 完成连接层鉴权
 --           消息体使用per-device AES-256-CBC加密
 -- =========================================================
-CREATE DATABASE IF NOT EXISTS iot_device_db DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE iot_device_db;
+-- CREATE DATABASE IF NOT EXISTS iot_device_db DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+-- USE iot_device_db;
 
 -- 1. 设备基础信息
 CREATE TABLE IF NOT EXISTS `iot_device` (
