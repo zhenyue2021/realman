@@ -1,16 +1,16 @@
 server:
   port: 8085
   servlet:
-    context-path: /device-mgmt
+    context-path: /realman-iot
 
 spring:
   application:
     name: device-management
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/iot_device_db?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false
+    url: jdbc:mysql://localhost:3306/jeecg-boot?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false
     username: root
-    password: your_password_here
+    password: root@123456
     hikari:
       minimum-idle: 5
       maximum-pool-size: 20
@@ -30,6 +30,34 @@ spring:
     multipart:
       max-file-size: 500MB
       max-request-size: 500MB
+  quartz:
+    job-store-type: jdbc
+    jdbc:
+      initialize-schema: embedded
+    auto-startup: true
+    startup-delay: 1s
+    overwrite-existing-jobs: true
+    properties:
+      org:
+        quartz:
+          scheduler:
+            instanceName: MyScheduler
+            instanceId: AUTO
+          jobStore:
+            class: org.springframework.scheduling.quartz.LocalDataSourceJobStore
+            driverDelegateClass: org.quartz.impl.jdbcjobstore.StdJDBCDelegate
+            tablePrefix: QRTZ_
+            isClustered: true
+            misfireThreshold: 12000
+            clusterCheckinInterval: 15000
+          threadPool:
+            class: org.quartz.simpl.SimpleThreadPool
+            threadCount: 10
+            threadPriority: 5
+            threadsInheritContextClassLoaderOfInitializingThread: true
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: GMT+8
 
 mybatis-plus:
   mapper-locations: classpath*:mapper/**/*.xml
@@ -42,47 +70,38 @@ mybatis-plus:
       logic-delete-value: 1
       logic-not-delete-value: 0
 
-# ─────── MQTT/EMQX ───────────────────────────────────────────────────────
 mqtt:
+  enabled: true  # 临时禁用，避免启动失败
   broker:
-    url: tcp://localhost:1883
-    # 平台服务账号（在EMQX中单独配置，允许访问所有Topic）
-    username: platform
-    password: platform_secret
+    url: tcp://172.16.44.66:1883
+    username: iot-platform
+    password: realman123
     client-id: iot-platform-server
     qos: 1
     keep-alive: 60
 
-# ─────── MinIO ────────────────────────────────────────────────────────────
 minio:
-  endpoint: http://localhost:9000
+  endpoint: http://172.16.44.66:9001
   access-key: minioadmin
-  secret-key: minioadmin
+  secret-key: realman123
   bucket-name: iot-firmware
   url-expire-days: 7
 
-# ─────── XXL-Job ──────────────────────────────────────────────────────────
 xxl:
   job:
     admin:
-      addresses: http://localhost:8080/xxl-job-admin
+      addresses: http://127.0.0.1:9080/xxl-job-admin
     executor:
       appname: device-executor
       port: 9999
     accessToken: xxl-job-default-token
 
-# ─────── 设备安全配置 ─────────────────────────────────────────────────────
-# 鉴权模型：设备通过deviceSecret直连EMQX（连接层鉴权），消息体不携带鉴权信息
-# per-device AES Key = SHA256(master-key + ":" + deviceSecret)[0..31]
 device:
   encrypt:
-    # 生产环境通过环境变量注入：-DDEVICE_ENCRYPT_MASTER_KEY=xxx 或 export DEVICE_ENCRYPT_MASTER_KEY=xxx
-    master-key: ${DEVICE_ENCRYPT_MASTER_KEY:iot-platform-master-key-32bytes!!}
     enabled: true
   ota:
     chunk-temp-dir: /tmp/iot-ota-chunks
 
-# ─────── 日志 ─────────────────────────────────────────────────────────────
 logging:
   level:
     org.jeecg.modules.device: DEBUG

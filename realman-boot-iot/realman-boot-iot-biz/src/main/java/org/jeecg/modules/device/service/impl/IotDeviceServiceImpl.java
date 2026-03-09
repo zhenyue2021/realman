@@ -57,10 +57,10 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
         if (cnt > 0) throw new RuntimeException("设备编号已存在: " + device.getDeviceCode());
         device.setStatus(DeviceConstant.DeviceStatus.INACTIVE);
         device.setCreateTime(LocalDateTime.now());
-        deviceMapper.insert(device);
         // 自动生成deviceSecret，即DigestUtil.md5Hex(device.getDeviceCode())，并放缓存
         String generateSecret = secretService.generateSecret(device.getDeviceCode());
         device.setDeviceSecret(generateSecret);
+        deviceMapper.insert(device);
         logService.recordLog(device.getId(), device.getDeviceCode(),
                 DeviceConstant.OperationType.DEVICE_REGISTER,
                 "新设备注册: " + device.getDeviceCode(), null,

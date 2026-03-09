@@ -8,28 +8,30 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
+
 /**
- * EMQX HTTP Auth/ACL 回调接口
+ * EMQX HTTP Auth / ACL 回调接口（仅供 EMQX 内部调用）
  *
- * 设备鉴权流程：
- *   设备连接EMQX时携带：clientId=deviceCode, username=deviceCode, password=deviceSecret
- *   EMQX HTTP Auth插件 → POST /internal/mqtt/auth → 本接口验证deviceSecret
- *   验证通过后MQTT连接建立，后续消息体中无需携带任何鉴权信息
+ * 鉴权规则：
+ *   设备 MQTT 密码 = MD5(deviceCode)，32位小写Hex
+ *   设备端无需存储，启动时动态计算
+ *   鉴权仅在首次连接/断线重连时触发，连接建立后消息收发不再鉴权
  *
- * EMQX配置示例（emqx.conf）：
+ * EMQX 配置（emqx.conf）：
  *   authentication {
  *     backend = http; mechanism = password_based; method = post
- *     url = http://platform-host:8085/device-mgmt/internal/mqtt/auth
- *     body { clientid="${clientid}", username="${username}", password="${password}" }
+ *     url = http://平台IP:8085/device-mgmt/internal/mqtt/auth
+ *     body { clientid="${clientid}", username="${username}", password="${password}", peerhost="${peerhost}" }
  *   }
  *   authorization {
- *     sources = [{ type=http; method=post
- *       url = http://platform-host:8085/device-mgmt/internal/mqtt/acl
+ *     sources = [{
+ *       type = http; method = post
+ *       url = http://平台IP:8085/device-mgmt/internal/mqtt/acl
  *       body { clientid="${clientid}", username="${username}", topic="${topic}", action="${action}" }
  *     }]
  *   }
  *
- * 安全说明：此接口仅供EMQX内部回调，建议通过网络隔离/Nginx IP白名单限制访问来源
+ * 安全说明：建议通过 Nginx IP 白名单限制此接口仅允许 EMQX 节点访问
  */
 @Slf4j
 @Hidden
@@ -53,12 +55,12 @@ public class MqttAuthController {
 
         // 平台服务账号直接放行
         if (clientId != null && clientId.startsWith("iot-platform")) {
-            return ok("allow");
+            return allow();
         }
 
-        boolean allowed = secretService.validateSecret(username, password);
-        log.info("[MqttAuth] clientId={} ip={} result={}", clientId, peerHost, allowed ? "allow" : "deny");
-        return ok(allowed ? "allow" : "deny");
+        boolean ok = secretService.validateSecret(username, password);
+        log.info("[MqttAuth] clientId={} ip={} result={}", clientId, peerHost, ok ? "allow" : "deny");
+        return ok ? allow() :deny();
     }
 
     /**
@@ -70,15 +72,19 @@ public class MqttAuthController {
         String clientId = body.get("clientid");
         String username = body.get("username");
         String topic    = body.get("topic");
-        String action   = body.get("action");
 
-        if (clientId != null && clientId.startsWith("iot-platform")) return ok("allow");
+        if (clientId != null && clientId.startsWith("iot-platform")) return allow();
 
-        boolean allowed = secretService.validateAcl(username, topic);
-        return ok(allowed ? "allow" : "deny");
+        boolean ok = secretService.validateAcl(username, topic);
+        return ok ? allow() : deny();
     }
 
-    private ResponseEntity<Map<String, String>> ok(String result) {
-        return ResponseEntity.ok(Map.of("result", result));
+
+    private ResponseEntity<Map<String, String>> allow() {
+        return ResponseEntity.ok(Map.of("result", "allow"));
+    }
+
+    private ResponseEntity<Map<String, String>> deny() {
+        return ResponseEntity.ok(Map.of("result", "deny"));
     }
 }

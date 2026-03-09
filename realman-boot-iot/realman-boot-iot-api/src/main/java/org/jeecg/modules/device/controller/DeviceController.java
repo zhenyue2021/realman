@@ -16,9 +16,12 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 设备管理接口
- * 注：本接口供运维平台(前端)调用，受JeecgBoot管理员鉴权保护。
- *     设备端使用deviceSecret直连EMQX，不调用此接口。
+ * 设备管理接口（供运维平台调用）
+ *
+ * 鉴权说明：
+ *   设备端只有 deviceCode，MQTT 密码 = MD5(deviceCode)，无需任何其他凭证。
+ *   平台在此处提供 /secret/preview 接口，方便运维人员查看设备连接密码
+ *   （仅用于调试和设备配置核查，生产环境可按需关闭）
  */
 @RestController
 @RequestMapping("/api/device")
@@ -28,7 +31,7 @@ public class DeviceController {
 
     private final IIotDeviceService deviceService;
 
-    /** 新增设备（平台自动生成deviceSecret，需通过安全渠道下发给设备端） */
+    /** 新增设备（设备端只需 deviceCode，平台自动生成deviceSecret=MQTT密码=MD5(deviceCode)） */
     @PostMapping("/add")
     @Operation(summary = "新增设备")
     public ApiResult<IotDevice> addDevice(@Valid @RequestBody DeviceAddDTO dto) {
@@ -96,16 +99,6 @@ public class DeviceController {
         return ApiResult.ok(null);
     }
 
-    /**
-     * 重置设备密钥
-     * 重置后原密钥立即失效，需将新Secret通过安全渠道重新下发给设备端
-     */
-    @PostMapping("/{deviceId}/secret/reset")
-    @Operation(summary = "重置设备密钥（原Secret立即失效）")
-    public ApiResult<String> resetSecret(@PathVariable String deviceId) {
-        return ApiResult.ok(deviceService.resetDeviceSecret(deviceId),
-                "密钥已重置，请通过安全渠道将新Secret下发至设备端");
-    }
 
     /** 批量查询在线状态 */
     @PostMapping("/batch/online-status")

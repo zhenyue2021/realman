@@ -6,11 +6,13 @@ import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.jeecg.modules.device.security.CommandEncryptService;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import java.nio.charset.StandardCharsets;
 
 @Slf4j
 @Component
+@ConditionalOnProperty(prefix = "mqtt", name = "enabled", havingValue = "true", matchIfMissing = false)
 @RequiredArgsConstructor
 public class MqttPublisher {
 

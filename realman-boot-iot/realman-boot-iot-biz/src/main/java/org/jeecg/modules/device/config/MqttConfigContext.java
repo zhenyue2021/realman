@@ -3,6 +3,7 @@ package org.jeecg.modules.device.config;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.mqtt.handler.MqttMessageDispatcher;
 import org.springframework.beans.BeansException;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 import org.springframework.stereotype.Component;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Component;
  */
 @Slf4j
 @Component
+@ConditionalOnProperty(prefix = "mqtt", name = "enabled", havingValue = "true", matchIfMissing = false)
 public class MqttConfigContext implements ApplicationContextAware {
 
     private static ApplicationContext applicationContext;

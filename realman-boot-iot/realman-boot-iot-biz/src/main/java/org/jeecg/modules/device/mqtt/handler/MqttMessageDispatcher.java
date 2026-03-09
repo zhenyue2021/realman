@@ -3,6 +3,7 @@ package org.jeecg.modules.device.mqtt.handler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import java.nio.charset.StandardCharsets;
 import java.util.regex.Matcher;
@@ -14,6 +15,7 @@ import java.util.regex.Pattern;
  */
 @Slf4j
 @Component
+@ConditionalOnProperty(prefix = "mqtt", name = "enabled", havingValue = "true", matchIfMissing = false)
 @RequiredArgsConstructor
 public class MqttMessageDispatcher {
 

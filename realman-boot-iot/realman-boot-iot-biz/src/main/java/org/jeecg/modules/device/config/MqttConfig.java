@@ -5,6 +5,7 @@ import org.eclipse.paho.client.mqttv3.*;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 import org.jeecg.modules.device.mqtt.handler.MqttMessageDispatcher;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -19,6 +20,7 @@ import java.util.Arrays;
  */
 @Slf4j
 @Configuration
+@ConditionalOnProperty(prefix = "mqtt", name = "enabled", havingValue = "true", matchIfMissing = false)
 public class MqttConfig {
 
     @Value("${mqtt.broker.url:tcp://localhost:1883}")

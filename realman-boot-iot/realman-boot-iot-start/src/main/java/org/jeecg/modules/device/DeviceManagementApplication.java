@@ -3,8 +3,13 @@ package org.jeecg.modules.device;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.core.env.ConfigurableEnvironment;
+import org.springframework.core.env.Environment;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
+
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 
 /**
  * IoT设备管理模块启动类
@@ -25,12 +30,30 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableScheduling
 public class DeviceManagementApplication {
     public static void main(String[] args) {
-        SpringApplication.run(DeviceManagementApplication.class, args);
+        ConfigurableEnvironment environment = SpringApplication.run(DeviceManagementApplication.class, args).getEnvironment();
+        printStartupInfo(environment);
+    }
+
+
+    private static void printStartupInfo(Environment env) {
+        String protocol = "http";
+        String serverPort = env.getProperty("server.port", "8085");
+        String contextPath = env.getProperty("server.servlet.context-path", "/realman-iot");
+
+        String hostAddress = "localhost";
+        try {
+            hostAddress = InetAddress.getLocalHost().getHostAddress();
+        } catch (UnknownHostException e) {
+            // ignore
+        }
+
         System.out.println("\n" +
-            "╔══════════════════════════════════════════════════════╗\n" +
-            "║     IoT Device Management Module Started            ║\n" +
-            "║     http://localhost:8085/device-mgmt               ║\n" +
-            "║     Swagger UI: /device-mgmt/swagger-ui/index.html  ║\n" +
-            "╚══════════════════════════════════════════════════════╝");
+                "╔══════════════════════════════════════════════════════╗\n" +
+                "║     IoT Device Management Module Started            ║\n" +
+                "╠══════════════════════════════════════════════════════╣\n" +
+                "║  Local:   " + protocol + "://localhost:" + serverPort + contextPath + "                  \n" +
+                "║  External:" + protocol + "://" + hostAddress + ":" + serverPort + contextPath + "      \n" +
+                "║  Swagger: " + protocol + "://localhost:" + serverPort + contextPath + "/swagger-ui/index.html  \n" +
+                "╚══════════════════════════════════════════════════════╝");
     }
 }

@@ -10,6 +10,7 @@ import org.jeecg.modules.device.mapper.IotDeviceMapper;
 import org.jeecg.modules.device.service.IDeviceOperationLogService;
 import org.jeecg.modules.device.service.PendingSyncService;
 import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
@@ -22,6 +23,7 @@ import java.util.Map;
  */
 @Slf4j
 @Component
+@ConditionalOnProperty(prefix = "mqtt", name = "enabled", havingValue = "true", matchIfMissing = false)
 @RequiredArgsConstructor
 public class DeviceOnlineOfflineHandler {
 
