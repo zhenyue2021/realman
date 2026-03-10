@@ -23,8 +23,12 @@ import java.net.UnknownHostException;
  *   device-api   - REST对外接口层（Controller/DTO/VO）
  *   device-biz   - 业务实现层（MQTT/OTA/Security/WebSocket/Scheduler）
  *   device-start - 主启动类 + 配置文件
+ *
+ * 说明：
+ *   为了复用平台现有的 Shiro + JWT 统一认证能力，这里将扫描范围扩展到 org.jeecg，
+ *   以便加载 realman-boot-base-core 中的 ShiroConfig、ShiroRealm 等安全配置。
  */
-@SpringBootApplication(scanBasePackages = "org.jeecg.modules.device")
+@SpringBootApplication(scanBasePackages = "org.jeecg")
 @MapperScan("org.jeecg.modules.device.mapper")
 @EnableAsync
 @EnableScheduling

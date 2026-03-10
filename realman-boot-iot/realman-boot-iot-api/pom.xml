@@ -9,6 +9,12 @@
     </parent>
     <artifactId>realman-boot-iot-api</artifactId>
     <dependencies>
+        <!-- 设备模块复用平台基础能力（JwtUtil、LoginUser等） -->
+        <dependency>
+            <groupId>org.jeecgframework.boot3</groupId>
+            <artifactId>realman-boot-base-core</artifactId>
+            <version>${realman-boot.version}</version>
+        </dependency>
         <dependency>
             <groupId>org.jeecgframework.boot3</groupId>
             <artifactId>realman-boot-iot-biz</artifactId>

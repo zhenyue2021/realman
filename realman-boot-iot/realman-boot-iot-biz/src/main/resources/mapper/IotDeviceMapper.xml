@@ -1,15 +1,54 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="org.jeecg.modules.device.mapper.IotDeviceMapper">
-    <select id="selectDevicePage" resultType="org.jeecg.modules.device.entity.IotDevice">
-        SELECT * FROM iot_device
+    <select id="selectDeviceList" resultType="org.jeecg.modules.device.entity.IotDevice">
+        SELECT d.*
+        FROM iot_device d
         <where>
-            del_flag = 0
-            <if test="deviceName != null and deviceName != ''">AND device_name LIKE CONCAT('%',#{deviceName},'%')</if>
-            <if test="deviceType != null">AND device_type = #{deviceType}</if>
-            <if test="status != null">AND status = #{status}</if>
-            <if test="productId != null and productId != ''">AND product_id = #{productId}</if>
+            d.del_flag = 0
+            <if test="deviceName != null and deviceName != ''">
+                AND d.device_name LIKE CONCAT('%',#{deviceName},'%')
+            </if>
+            <if test="deviceType != null">
+                AND d.device_type = #{deviceType}
+            </if>
+            <if test="status != null">
+                AND d.status = #{status}
+            </if>
+            <if test="productId != null and productId != ''">
+                AND d.product_id = #{productId}
+            </if>
+            <if test="startTime != null">
+                AND d.create_time &gt;= #{startTime}
+            </if>
+            <if test="endTime != null">
+                AND d.create_time &lt;= #{endTime}
+            </if>
+
+            <!-- 数据权限：非超级管理员时，只能看到自己或所在租户被授权的设备 -->
+            <if test="superAdmin == null or superAdmin == false">
+                AND EXISTS (
+                    SELECT 1
+                    FROM iot_device_auth a
+                    WHERE a.device_id = d.id
+                      AND a.del_flag = 0
+                      AND a.status = 1
+                      AND (a.effective_time IS NULL OR a.effective_time &lt;= NOW())
+                      AND (a.expire_time IS NULL OR a.expire_time &gt;= NOW())
+                      AND (
+                          <if test="currentUsername != null and currentUsername != ''">
+                              (a.subject_type = 'USER' AND a.subject_id = #{currentUsername})
+                          </if>
+                          <if test="(currentUsername != null and currentUsername != '' ) and (currentTenantId != null and currentTenantId != '' )">
+                              OR
+                          </if>
+                          <if test="currentTenantId != null and currentTenantId != ''">
+                              (a.subject_type = 'TENANT' AND a.subject_id = #{currentTenantId})
+                          </if>
+                      )
+                )
+            </if>
         </where>
-        ORDER BY create_time DESC
+        ORDER BY d.create_time DESC
     </select>
 </mapper>

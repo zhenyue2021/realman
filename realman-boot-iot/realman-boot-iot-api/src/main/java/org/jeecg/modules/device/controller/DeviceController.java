@@ -4,16 +4,24 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.jeecg.common.exception.JeecgBootException;
+import org.jeecg.common.system.util.JwtUtil;
 import org.jeecg.modules.device.dto.DeviceAddDTO;
+import org.jeecg.modules.device.dto.DeviceRequestDTO;
 import org.jeecg.modules.device.dto.DeviceRestartDTO;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.service.IIotDeviceService;
 import org.jeecg.modules.device.vo.ApiResult;
+import org.jeecg.modules.device.vo.DeviceDetailVO;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * 设备管理接口（供运维平台调用）
@@ -27,6 +35,7 @@ import java.util.Map;
 @RequestMapping("/api/device")
 @RequiredArgsConstructor
 @Tag(name = "设备管理", description = "设备注册/参数配置/实时监控/远程重启/密钥管理")
+@Slf4j
 public class DeviceController {
 
     private final IIotDeviceService deviceService;
@@ -44,17 +53,25 @@ public class DeviceController {
     }
 
     /** 分页查询设备列表 */
-    @GetMapping("/list")
+    @PostMapping("/list")
     @Operation(summary = "分页查询设备列表")
-    public ApiResult<IPage<IotDevice>> list(
-            @RequestParam(defaultValue="1") Integer pageNo,
-            @RequestParam(defaultValue="10") Integer pageSize,
-            @RequestParam(required=false) String deviceName,
-            @RequestParam(required=false) Integer deviceType,
-            @RequestParam(required=false) Integer status,
-            @RequestParam(required=false) String productId) {
-        return ApiResult.ok(deviceService.queryDevicePage(
-                new Page<>(pageNo, pageSize), deviceName, deviceType, status, productId));
+    public ApiResult<IPage<IotDevice>> list(HttpServletRequest request,
+                                            @RequestBody DeviceRequestDTO requestDTO) {
+        log.info("查询设备列表：{}", requestDTO);
+        String username = null;
+        try {
+            username = JwtUtil.getUserNameByToken(request);
+        } catch (JeecgBootException e) {
+            log.warn("获取登录用户失败: {}", e.getMessage());
+        }
+        requestDTO.setCurrentUsername(username);
+        // 多租户：若前端有传租户ID，则一并参与ACL判断
+        String tenantId = request.getHeader("tenant-id");
+        requestDTO.setCurrentTenantId(tenantId);
+        requestDTO.setSuperAdmin("admin".equalsIgnoreCase(username));
+        int pageNo = Objects.nonNull(requestDTO.getPageNo()) ? requestDTO.getPageNo() : 1;
+        int pageSize = Objects.nonNull(requestDTO.getPageSize()) ? requestDTO.getPageSize() : 10;
+        return ApiResult.ok(deviceService.queryDevicePage(new Page<>(pageNo, pageSize), requestDTO));
     }
 
     /** 查询设备详情 */
@@ -62,6 +79,13 @@ public class DeviceController {
     @Operation(summary = "查询设备详情")
     public ApiResult<IotDevice> detail(@PathVariable String deviceId) {
         return ApiResult.ok(deviceService.getById(deviceId));
+    }
+
+    /** 查询设备详情（管理平台聚合：基础信息 + 实时状态 + 最近上报 + 最近日志） */
+    @GetMapping("/{deviceId}/detail")
+    @Operation(summary = "查询设备详情（聚合）")
+    public ApiResult<DeviceDetailVO> detailAgg(@PathVariable String deviceId) {
+        return ApiResult.ok(deviceService.getDeviceDetail(deviceId));
     }
 
     /** 设置参数并同步到设备（在线立即推送，离线待上线后同步） */

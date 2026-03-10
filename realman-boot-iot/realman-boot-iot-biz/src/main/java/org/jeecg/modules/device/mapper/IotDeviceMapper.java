@@ -8,9 +8,14 @@ import org.jeecg.modules.device.entity.IotDevice;
 
 @Mapper
 public interface IotDeviceMapper extends BaseMapper<IotDevice> {
-    IPage<IotDevice> selectDevicePage(Page<IotDevice> page,
+    IPage<IotDevice> selectDeviceList(Page<IotDevice> page,
         @Param("deviceName") String deviceName,
         @Param("deviceType") Integer deviceType,
         @Param("status")     Integer status,
-        @Param("productId")  String productId);
+        @Param("productId")  String productId,
+        @Param("startTime")  java.time.LocalDateTime startTime,
+        @Param("endTime")    java.time.LocalDateTime endTime,
+        @Param("currentUsername") String currentUsername,
+        @Param("currentTenantId") String currentTenantId,
+        @Param("superAdmin")      Boolean superAdmin);
 }

@@ -5,11 +5,12 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.type.TypeReference;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.constant.DeviceConstant;
+import org.jeecg.modules.device.dto.DeviceRequestDTO;
 import org.jeecg.modules.device.entity.*;
 import org.jeecg.modules.device.mapper.*;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
@@ -18,11 +19,14 @@ import org.jeecg.modules.device.security.CommandEncryptService;
 import org.jeecg.modules.device.security.DeviceSecretService;
 import org.jeecg.modules.device.service.IDeviceOperationLogService;
 import org.jeecg.modules.device.service.IIotDeviceService;
+import org.jeecg.modules.device.vo.DeviceDetailVO;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -69,9 +73,19 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
     }
 
     @Override
-    public IPage<IotDevice> queryDevicePage(Page<IotDevice> page, String deviceName,
-                                            Integer deviceType, Integer status, String productId) {
-        return deviceMapper.selectDevicePage(page, deviceName, deviceType, status, productId);
+    public IPage<IotDevice> queryDevicePage(Page<IotDevice> page, DeviceRequestDTO request) {
+        return deviceMapper.selectDeviceList(
+                page,
+                request.getDeviceName(),
+                request.getDeviceType(),
+                request.getStatus(),
+                request.getProductId(),
+                request.getStartTime(),
+                request.getEndTime(),
+                request.getCurrentUsername(),
+                request.getCurrentTenantId(),
+                request.getSuperAdmin()
+        );
     }
 
     @Override
@@ -130,7 +144,9 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
                 DeviceConstant.RedisKey.DEVICE_STATUS_PREFIX + device.getDeviceCode());
         if (cached != null) {
             try {
-                result.putAll(objectMapper.readValue(cached, Map.class));
+                Map<String, Object> cachedMap = objectMapper.readValue(
+                        cached, new TypeReference<Map<String, Object>>() {});
+                result.putAll(cachedMap);
                 result.put("dataSource", "realtime");
             } catch (Exception ignored) {
             }
@@ -151,6 +167,58 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
             }
         }
         return result;
+    }
+
+    @Override
+    public DeviceDetailVO getDeviceDetail(String deviceId) {
+        IotDevice device = require(deviceId);
+
+        // 1) 在线状态
+        boolean online = Boolean.TRUE.equals(redisTemplate.opsForSet()
+                .isMember(DeviceConstant.RedisKey.DEVICE_ONLINE_SET, device.getDeviceCode()));
+
+        // 2) 实时状态（Redis）+ 最近DB记录（fallback）
+        Map<String, Object> monitor = getDeviceMonitorStatus(deviceId);
+        Map<String, Object> realtime = monitor;
+
+        // 3) 最近DB状态记录（用于详情页补全/兜底）
+        IotDeviceStatus latest = statusMapper.selectOne(new LambdaQueryWrapper<IotDeviceStatus>()
+                .eq(IotDeviceStatus::getDeviceId, deviceId)
+                .orderByDesc(IotDeviceStatus::getReceiveTime).last("LIMIT 1"));
+
+        // 4) 心跳时间：优先取 realtime.timestamp（毫秒），否则取 latest.reportTime/receiveTime
+        LocalDateTime heartbeat = null;
+        if (realtime != null) {
+            Object ts = realtime.get("timestamp");
+            if (ts instanceof Number n) {
+                heartbeat = LocalDateTime.ofInstant(
+                        Instant.ofEpochMilli(n.longValue()), ZoneId.systemDefault());
+            } else if (ts instanceof String s) {
+                try {
+                    long ms = Long.parseLong(s);
+                    heartbeat = LocalDateTime.ofInstant(
+                            Instant.ofEpochMilli(ms), ZoneId.systemDefault());
+                } catch (Exception ignored) {
+                }
+            }
+        }
+        if (heartbeat == null && latest != null) {
+            heartbeat = latest.getReportTime() != null ? latest.getReportTime() : latest.getReceiveTime();
+        }
+
+        // 5) 最近日志（默认20条）
+        List<IotDeviceOperationLog> recentLogs = logService
+                .queryLogPage(new Page<>(1, 20), deviceId, null, null, null)
+                .getRecords();
+
+        DeviceDetailVO vo = new DeviceDetailVO();
+        vo.setDevice(device);
+        vo.setOnline(online);
+        vo.setRealtimeStatus(realtime);
+        vo.setLatestStatus(latest);
+        vo.setLastHeartbeatTime(heartbeat);
+        vo.setRecentLogs(recentLogs);
+        return vo;
     }
 
     @Override

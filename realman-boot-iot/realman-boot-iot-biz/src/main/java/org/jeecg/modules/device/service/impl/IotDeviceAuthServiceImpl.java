@@ -1,0 +1,56 @@
+package org.jeecg.modules.device.service.impl;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import lombok.RequiredArgsConstructor;
+import org.jeecg.modules.device.dto.DeviceAuthQueryDTO;
+import org.jeecg.modules.device.entity.IotDeviceAuth;
+import org.jeecg.modules.device.mapper.IotDeviceAuthMapper;
+import org.jeecg.modules.device.service.IIotDeviceAuthService;
+import org.springframework.stereotype.Service;
+
+@Service
+@RequiredArgsConstructor
+public class IotDeviceAuthServiceImpl
+        extends ServiceImpl<IotDeviceAuthMapper, IotDeviceAuth>
+        implements IIotDeviceAuthService {
+
+    @Override
+    public IPage<IotDeviceAuth> queryAuthPage(Page<IotDeviceAuth> page,
+                                              DeviceAuthQueryDTO query,
+                                              String currentUsername,
+                                              boolean superAdmin) {
+        LambdaQueryWrapper<IotDeviceAuth> wrapper = new LambdaQueryWrapper<>();
+
+        if (query != null) {
+            wrapper.eq(query.getSubjectType() != null && !query.getSubjectType().isEmpty(),
+                    IotDeviceAuth::getSubjectType, query.getSubjectType());
+            wrapper.eq(query.getSubjectId() != null && !query.getSubjectId().isEmpty(),
+                    IotDeviceAuth::getSubjectId, query.getSubjectId());
+            wrapper.eq(query.getControllerId() != null && !query.getControllerId().isEmpty(),
+                    IotDeviceAuth::getControllerId, query.getControllerId());
+            wrapper.eq(query.getDeviceId() != null && !query.getDeviceId().isEmpty(),
+                    IotDeviceAuth::getDeviceId, query.getDeviceId());
+            wrapper.eq(query.getStatus() != null,
+                    IotDeviceAuth::getStatus, query.getStatus());
+            if (query.getStartEffectiveTime() != null) {
+                wrapper.ge(IotDeviceAuth::getEffectiveTime, query.getStartEffectiveTime());
+            }
+            if (query.getEndEffectiveTime() != null) {
+                wrapper.le(IotDeviceAuth::getExpireTime, query.getEndEffectiveTime());
+            }
+        }
+
+        // 数据权限：非超管只看自己作为主体（USER/username）的授权
+        if (!superAdmin && currentUsername != null && !currentUsername.isEmpty()) {
+            wrapper.eq(IotDeviceAuth::getSubjectType, "USER")
+                   .eq(IotDeviceAuth::getSubjectId, currentUsername);
+        }
+
+        wrapper.orderByDesc(IotDeviceAuth::getCreateTime);
+        return this.page(page, wrapper);
+    }
+}
+
