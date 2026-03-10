@@ -1,49 +1,173 @@
 package org.jeecg.modules.device.constant;
 
+/**
+ * IoT 设备管理模块常量定义
+ *
+ * <p>模块整体架构：
+ * <pre>
+ *   设备端 → EMQX（MQTT Broker）→ MqttConfig 订阅 → MqttMessageDispatcher 分发 → 各 Handler 处理
+ *   平台端 → DeviceController/OtaController → Service → MqttPublisher → EMQX → 设备端
+ * </pre>
+ *
+ * <p>鉴权模型：
+ *   设备使用 deviceCode 作为 clientId/username，MD5(deviceCode) 作为 password
+ *   EMQX HTTP Auth 插件回调本平台 /internal/mqtt/auth 完成连接层鉴权
+ *   连接建立后，消息 Payload 使用 Per-Device AES-256-CBC 加密
+ */
 public interface DeviceConstant {
-    interface DeviceStatus { int INACTIVE=0,ONLINE=1,OFFLINE=2,DISABLED=3; }
 
+    /**
+     * 设备状态常量
+     * <p>状态流转：INACTIVE → ONLINE ↔ OFFLINE，DISABLED 为强制禁用
+     */
+    interface DeviceStatus {
+        /** 未激活（新设备默认状态，首次上线后变为 ONLINE） */
+        int INACTIVE  = 0;
+        /** 在线（已建立 MQTT 连接） */
+        int ONLINE    = 1;
+        /** 离线（MQTT 连接断开 或 超时无心跳） */
+        int OFFLINE   = 2;
+        /** 已禁用（禁用后立即清除密钥缓存，EMQX 将拒绝该设备连接） */
+        int DISABLED  = 3;
+    }
+
+    /**
+     * MQTT Topic 模板（均为 printf 格式，%s 填入 deviceCode）
+     *
+     * <p>Topic 命名规则：
+     * <pre>
+     *   上行（设备 → 平台）：device/{deviceCode}/status/report  等
+     *   下行（平台 → 设备）：device/{deviceCode}/config/push    等
+     *   系统事件（EMQX）  ：$SYS/brokers/+/clients/+/connected 等
+     * </pre>
+     */
     interface MqttTopic {
-        String STATUS_REPORT  = "device/%s/status/report";
-        String CONFIG_ACK     = "device/%s/config/ack";
-        String RESTART_ACK    = "device/%s/command/restart/ack";
-        String OTA_PROGRESS   = "device/%s/ota/progress";
-        String OPERATION_LOG  = "device/%s/log/operation";
-        String CONFIG_PUSH    = "device/%s/config/push";
-        String REMOTE_RESTART = "device/%s/command/restart";
-        String OTA_NOTIFY     = "device/%s/ota/notify";
+        /** 上行：设备状态上报（温湿度/电量/信号/定位等） */
+        String STATUS_REPORT    = "device/%s/status/report";
+        /** 上行：设备配置同步结果确认（响应平台下发的 CONFIG_PUSH） */
+        String CONFIG_ACK       = "device/%s/config/ack";
+        /** 上行：设备重启执行确认（响应平台下发的 REMOTE_RESTART） */
+        String RESTART_ACK      = "device/%s/command/restart/ack";
+        /** 上行：OTA 升级进度上报（含下载百分比、已下载字节、成功/失败状态） */
+        String OTA_PROGRESS     = "device/%s/ota/progress";
+        /** 上行：设备操作日志上报（设备端主动记录的行为日志） */
+        String OPERATION_LOG    = "device/%s/log/operation";
+        /** 下行：平台向设备推送参数配置（加密，QoS=1） */
+        String CONFIG_PUSH      = "device/%s/config/push";
+        /** 下行：平台向设备发送远程重启指令（加密，QoS=1） */
+        String REMOTE_RESTART   = "device/%s/command/restart";
+        /** 下行：平台向设备推送 OTA 升级通知（含固件下载 URL、MD5、大小等） */
+        String OTA_NOTIFY       = "device/%s/ota/notify";
+        /** EMQX 系统事件：设备 MQTT 连接建立（clientId 从 topic 路径中提取） */
         String SYS_CONNECTED    = "$SYS/brokers/+/clients/+/connected";
+        /** EMQX 系统事件：设备 MQTT 连接断开 */
         String SYS_DISCONNECTED = "$SYS/brokers/+/clients/+/disconnected";
     }
 
+    /**
+     * OTA 升级记录状态流转：
+     * <pre>
+     *   PENDING → NOTIFIED → CONFIRMED → DOWNLOADING → DOWNLOADED → INSTALLING → SUCCESS
+     *                                                                          ↘ FAILED
+     *   任何阶段超时 → TIMEOUT（由定时任务 checkOtaTimeout 检测）
+     * </pre>
+     */
     interface OtaUpgradeStatus {
-        int PENDING=0,NOTIFIED=1,CONFIRMED=2,DOWNLOADING=3,
-            DOWNLOADED=4,INSTALLING=5,SUCCESS=6,FAILED=7,TIMEOUT=8;
+        /** 待通知（任务已创建，尚未下发 OTA 通知消息） */
+        int PENDING     = 0;
+        /** 已通知（平台已发送 OTA_NOTIFY，等待设备确认） */
+        int NOTIFIED    = 1;
+        /** 设备已确认收到通知，准备开始下载 */
+        int CONFIRMED   = 2;
+        /** 下载中（设备正在分片下载固件） */
+        int DOWNLOADING = 3;
+        /** 下载完成（校验 MD5 通过，准备安装） */
+        int DOWNLOADED  = 4;
+        /** 安装中（固件写入 Flash） */
+        int INSTALLING  = 5;
+        /** 升级成功（设备重启后上报新版本号） */
+        int SUCCESS     = 6;
+        /** 升级失败（下载/校验/安装任一环节出错） */
+        int FAILED      = 7;
+        /** 升级超时（超过 Timeout.OTA_UPGRADE_TIMEOUT_MINUTES 分钟无进度更新） */
+        int TIMEOUT     = 8;
     }
 
-    interface ConfigSyncStatus { int PENDING=0,SUCCESS=1,FAILED=2; }
+    /**
+     * 配置同步状态
+     * <pre>
+     *   PENDING → SUCCESS（设备回复 ConfigAck code=0）
+     *   PENDING → FAILED （设备回复 ConfigAck code≠0 或同步超时）
+     * </pre>
+     */
+    interface ConfigSyncStatus {
+        /** 待同步（已保存至 DB，尚未得到设备确认） */
+        int PENDING = 0;
+        /** 同步成功 */
+        int SUCCESS = 1;
+        /** 同步失败 */
+        int FAILED  = 2;
+    }
 
+    /**
+     * 设备操作类型（用于操作日志分类）
+     */
     interface OperationType {
-        String PARAM_MODIFY="PARAM_MODIFY", FIRMWARE_UPGRADE="FIRMWARE_UPGRADE",
-               REMOTE_RESTART="REMOTE_RESTART", DEVICE_ONLINE="DEVICE_ONLINE",
-               DEVICE_OFFLINE="DEVICE_OFFLINE", DEVICE_REGISTER="DEVICE_REGISTER",
-               COMMAND_SEND="COMMAND_SEND", TOKEN_REFRESH="SECRET_RESET";
+        /** 参数修改（平台下发配置 或 设备配置同步） */
+        String PARAM_MODIFY      = "PARAM_MODIFY";
+        /** 固件升级（OTA 流程） */
+        String FIRMWARE_UPGRADE  = "FIRMWARE_UPGRADE";
+        /** 远程重启指令 */
+        String REMOTE_RESTART    = "REMOTE_RESTART";
+        /** 设备上线事件 */
+        String DEVICE_ONLINE     = "DEVICE_ONLINE";
+        /** 设备离线事件 */
+        String DEVICE_OFFLINE    = "DEVICE_OFFLINE";
+        /** 设备注册（新设备首次添加） */
+        String DEVICE_REGISTER   = "DEVICE_REGISTER";
+        /** 向设备发送指令 */
+        String COMMAND_SEND      = "COMMAND_SEND";
+        /** 设备密钥重置 */
+        String TOKEN_REFRESH     = "SECRET_RESET";
     }
 
-    interface OperationSource { String PLATFORM="PLATFORM", DEVICE="DEVICE"; }
+    /**
+     * 操作来源：区分由平台发起还是设备端主动上报
+     */
+    interface OperationSource {
+        /** 由管理平台发起的操作（Controller → Service） */
+        String PLATFORM = "PLATFORM";
+        /** 由设备端主动上报的事件（MQTT 消息） */
+        String DEVICE   = "DEVICE";
+    }
 
+    /**
+     * Redis Key 前缀规范（统一命名空间 iot:）
+     */
     interface RedisKey {
+        /** 设备实时状态缓存 Key：iot:device:status:{deviceCode}，TTL = 离线阈值 + 1min */
         String DEVICE_STATUS_PREFIX = "iot:device:status:";
+        /** 设备 MQTT 密钥缓存 Key：iot:device:secret:{deviceCode}，TTL = 24h */
         String DEVICE_SECRET_PREFIX = "iot:device:secret:";
+        /** 在线设备集合（Redis Set）：iot:device:online，成员为 deviceCode */
         String DEVICE_ONLINE_SET    = "iot:device:online";
+        /** OTA 断点续传进度 Key：iot:ota:progress:{deviceCode}:{recordId}，值为已下载字节数 */
         String OTA_PROGRESS_PREFIX  = "iot:ota:progress:";
+        /** 配置同步等待 Key：iot:config:sync:{deviceCode}:{commandId}，TTL = CONFIG_SYNC_TIMEOUT_SECONDS */
         String CONFIG_SYNC_PREFIX   = "iot:config:sync:";
+        /** 固件分片上传进度 Key：iot:upload:chunk:{uploadId}，值为 Set<chunkIndex> */
         String UPLOAD_CHUNK_PREFIX  = "iot:upload:chunk:";
     }
 
+    /**
+     * 各类超时阈值配置
+     */
     interface Timeout {
+        /** OTA 升级超时阈值（分钟）：超过此时间无进度更新则标记为 TIMEOUT */
         long OTA_UPGRADE_TIMEOUT_MINUTES      = 30L;
+        /** 配置同步等待超时（秒）：超过此时间未收到 ConfigAck 则认为同步失败 */
         long CONFIG_SYNC_TIMEOUT_SECONDS      = 30L;
+        /** 设备离线判定阈值（分钟）：状态 Redis Key 的 TTL，Key 消失即视为设备离线 */
         long DEVICE_OFFLINE_THRESHOLD_MINUTES = 5L;
     }
 }

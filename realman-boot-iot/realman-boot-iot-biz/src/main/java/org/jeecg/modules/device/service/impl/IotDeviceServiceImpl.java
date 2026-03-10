@@ -32,10 +32,20 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
- * 设备管理Service实现
- * <p>
- * 鉴权说明：设备通过deviceSecret直连EMQX，无需应用层登录。
- * 下行消息使用per-device AES-256密钥加密（由deviceSecret派生）。
+ * 设备管理 Service 实现
+ *
+ * <p>核心职责：
+ * <ul>
+ *   <li>设备生命周期管理（注册/禁用/启用）</li>
+ *   <li>参数配置下发与同步状态跟踪</li>
+ *   <li>实时状态查询（Redis 优先，DB 降级）</li>
+ *   <li>远程重启指令下发（MQTT + AES 加密）</li>
+ *   <li>在线状态批量查询</li>
+ * </ul>
+ *
+ * <p>鉴权说明：
+ *   设备通过 MD5(deviceCode) 作为 MQTT 密码直连 EMQX，无需应用层登录。
+ *   下行消息使用 Per-Device AES-256 密钥加密（密钥由 deviceCode 通过 SHA256 派生）。
  */
 @Slf4j
 @Service
@@ -43,28 +53,52 @@ import java.util.stream.Collectors;
 public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice>
         implements IIotDeviceService {
 
-    private final IotDeviceMapper deviceMapper;
-    private final IotDeviceConfigMapper configMapper;
-    private final IotDeviceStatusMapper statusMapper;
-    private final DeviceSecretService secretService;
-    private final CommandEncryptService encryptService;
-    private final MqttPublisher mqttPublisher;
-    private final StringRedisTemplate redisTemplate;
-    private final ObjectMapper objectMapper;
+    private final IotDeviceMapper         deviceMapper;
+    private final IotDeviceConfigMapper   configMapper;
+    private final IotDeviceStatusMapper   statusMapper;
+    private final DeviceSecretService     secretService;
+    private final CommandEncryptService   encryptService;
+    private final MqttPublisher           mqttPublisher;
+    private final StringRedisTemplate     redisTemplate;
+    private final ObjectMapper            objectMapper;
     private final IDeviceOperationLogService logService;
 
+    /**
+     * 注册新设备
+     *
+     * <p>执行流程：
+     * <ol>
+     *   <li>校验 deviceCode 唯一性</li>
+     *   <li>设置初始状态为 INACTIVE（等待首次上线）</li>
+     *   <li>自动生成 deviceSecret = MD5(deviceCode)，并写入 Redis 缓存 24h</li>
+     *   <li>插入设备记录到 DB</li>
+     *   <li>记录设备注册操作日志</li>
+     * </ol>
+     *
+     * @param device 设备基础信息（需包含 deviceCode）
+     * @return 插入后的设备对象（含 id 和 deviceSecret）
+     * @throws RuntimeException deviceCode 已存在时抛出
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public IotDevice addDevice(IotDevice device) {
+        // 1. 校验 deviceCode 唯一性
         long cnt = deviceMapper.selectCount(new LambdaQueryWrapper<IotDevice>()
                 .eq(IotDevice::getDeviceCode, device.getDeviceCode()));
         if (cnt > 0) throw new RuntimeException("设备编号已存在: " + device.getDeviceCode());
+
+        // 2. 初始化状态
         device.setStatus(DeviceConstant.DeviceStatus.INACTIVE);
         device.setCreateTime(LocalDateTime.now());
-        // 自动生成deviceSecret，即DigestUtil.md5Hex(device.getDeviceCode())，并放缓存
+
+        // 3. 生成 deviceSecret = MD5(deviceCode)，同时预热 Redis 缓存
         String generateSecret = secretService.generateSecret(device.getDeviceCode());
         device.setDeviceSecret(generateSecret);
+
+        // 4. 持久化
         deviceMapper.insert(device);
+
+        // 5. 记录操作日志
         logService.recordLog(device.getId(), device.getDeviceCode(),
                 DeviceConstant.OperationType.DEVICE_REGISTER,
                 "新设备注册: " + device.getDeviceCode(), null,
@@ -72,6 +106,20 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
         return device;
     }
 
+    /**
+     * 分页查询设备列表（带权限控制）
+     *
+     * <p>权限规则：
+     * <ul>
+     *   <li>超级管理员（admin）可查看全部设备</li>
+     *   <li>普通用户只能查看与自己关联（通过设备授权表）的设备</li>
+     *   <li>多租户场景下通过 tenantId 进一步过滤</li>
+     * </ul>
+     *
+     * @param page       分页参数
+     * @param request    查询条件（设备名/类型/状态/产品ID/时间范围/当前用户信息）
+     * @return 分页结果
+     */
     @Override
     public IPage<IotDevice> queryDevicePage(Page<IotDevice> page, DeviceRequestDTO request) {
         return deviceMapper.selectDeviceList(
@@ -88,11 +136,29 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
         );
     }
 
+    /**
+     * 设置并同步设备参数配置
+     *
+     * <p>执行流程：
+     * <ol>
+     *   <li>查询设备基础信息（验证存在性）</li>
+     *   <li>生成本次同步 commandId（用于 ACK 关联）</li>
+     *   <li>遍历参数：已有配置则更新，没有则新增，均标记为 PENDING</li>
+     *   <li>若设备在线：立即加密推送 ConfigPush 消息，并写入 Redis 等待 ACK Key（TTL=30s）</li>
+     *   <li>若设备离线：仅保存到 DB，待上线后由 PendingSyncService 补推</li>
+     * </ol>
+     *
+     * @param deviceId 设备 ID
+     * @param params   参数键值对（configKey → configValue）
+     * @throws RuntimeException 设备不存在或在线时 MQTT 推送失败时抛出
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void setAndSyncConfig(String deviceId, Map<String, Object> params) {
         IotDevice device = require(deviceId);
         String commandId = IdUtil.fastSimpleUUID();
+
+        // 逐条 upsert 配置记录（存在则更新，不存在则新增），统一标记为 PENDING
         params.forEach((key, value) -> {
             IotDeviceConfig cfg = configMapper.selectOne(new LambdaQueryWrapper<IotDeviceConfig>()
                     .eq(IotDeviceConfig::getDeviceId, deviceId)
@@ -115,11 +181,13 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
         });
 
         if (DeviceConstant.DeviceStatus.ONLINE == device.getStatus()) {
+            // 设备在线：立即加密推送
             try {
                 String payload = objectMapper.writeValueAsString(MqttMessageModel.ConfigPush.builder()
                         .commandId(commandId).params(params).timestamp(System.currentTimeMillis()).build());
                 mqttPublisher.publishToDevice(device.getDeviceCode(),
                         String.format(DeviceConstant.MqttTopic.CONFIG_PUSH, device.getDeviceCode()), payload, 1);
+                // 写入 ACK 等待 Key，超时后自然过期（设备未响应不阻塞后续逻辑）
                 redisTemplate.opsForValue().set(
                         DeviceConstant.RedisKey.CONFIG_SYNC_PREFIX + device.getDeviceCode() + ":" + commandId,
                         "pending", DeviceConstant.Timeout.CONFIG_SYNC_TIMEOUT_SECONDS, TimeUnit.SECONDS);
@@ -127,19 +195,33 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
                 throw new RuntimeException("配置推送失败: " + e.getMessage());
             }
         } else {
+            // 设备离线：配置已持久化，待上线后补推
             log.warn("[Config] 设备[{}]离线，配置已保存待上线后同步", device.getDeviceCode());
         }
     }
 
-
+    /**
+     * 获取设备实时监控状态
+     *
+     * <p>数据源策略（优先级从高到低）：
+     * <ol>
+     *   <li>Redis 实时缓存（设备最近一次上报，TTL≤离线阈值）→ dataSource="realtime"</li>
+     *   <li>DB 最近一条历史状态记录（Redis Key 过期说明已超时）→ dataSource="database"</li>
+     * </ol>
+     *
+     * @param deviceId 设备 ID
+     * @return 包含 deviceId/deviceCode/status/lastOnlineTime 和传感器数据的 Map
+     */
     @Override
     public Map<String, Object> getDeviceMonitorStatus(String deviceId) {
         IotDevice device = require(deviceId);
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("deviceId", deviceId);
-        result.put("deviceCode", device.getDeviceCode());
-        result.put("status", device.getStatus());
+        result.put("deviceId",       deviceId);
+        result.put("deviceCode",     device.getDeviceCode());
+        result.put("status",         device.getStatus());
         result.put("lastOnlineTime", device.getLastOnlineTime());
+
+        // 优先取 Redis 实时状态
         String cached = redisTemplate.opsForValue().get(
                 DeviceConstant.RedisKey.DEVICE_STATUS_PREFIX + device.getDeviceCode());
         if (cached != null) {
@@ -151,53 +233,67 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
             } catch (Exception ignored) {
             }
         } else {
+            // 降级：从 DB 取最近一条历史记录
             IotDeviceStatus s = statusMapper.selectOne(new LambdaQueryWrapper<IotDeviceStatus>()
                     .eq(IotDeviceStatus::getDeviceId, deviceId)
                     .orderByDesc(IotDeviceStatus::getReceiveTime).last("LIMIT 1"));
             if (s != null) {
-                result.put("temperature", s.getTemperature());
-                result.put("humidity", s.getHumidity());
-                result.put("batteryLevel", s.getBatteryLevel());
+                result.put("temperature",    s.getTemperature());
+                result.put("humidity",       s.getHumidity());
+                result.put("batteryLevel",   s.getBatteryLevel());
                 result.put("signalStrength", s.getSignalStrength());
-                result.put("longitude", s.getLongitude());
-                result.put("latitude", s.getLatitude());
-                result.put("runStatus", s.getRunStatus());
-                result.put("reportTime", s.getReportTime());
-                result.put("dataSource", "database");
+                result.put("longitude",      s.getLongitude());
+                result.put("latitude",       s.getLatitude());
+                result.put("runStatus",      s.getRunStatus());
+                result.put("reportTime",     s.getReportTime());
+                result.put("dataSource",     "database");
             }
         }
         return result;
     }
 
+    /**
+     * 获取设备详情聚合视图（管理平台详情页使用）
+     *
+     * <p>聚合内容：
+     * <ol>
+     *   <li>设备基础信息（iot_device 表）</li>
+     *   <li>在线状态（Redis Set 中是否存在）</li>
+     *   <li>实时状态（Redis 优先，DB 降级）</li>
+     *   <li>最近一条 DB 状态记录（用于详情页补全字段）</li>
+     *   <li>最后心跳时间（优先取 realtime.timestamp，降级取 DB reportTime/receiveTime）</li>
+     *   <li>最近 20 条操作日志</li>
+     * </ol>
+     *
+     * @param deviceId 设备 ID
+     * @return 聚合视图对象 {@link DeviceDetailVO}
+     */
     @Override
     public DeviceDetailVO getDeviceDetail(String deviceId) {
         IotDevice device = require(deviceId);
 
-        // 1) 在线状态
+        // 1. 从 Redis 在线集合判断实时在线状态
         boolean online = Boolean.TRUE.equals(redisTemplate.opsForSet()
                 .isMember(DeviceConstant.RedisKey.DEVICE_ONLINE_SET, device.getDeviceCode()));
 
-        // 2) 实时状态（Redis）+ 最近DB记录（fallback）
-        Map<String, Object> monitor = getDeviceMonitorStatus(deviceId);
-        Map<String, Object> realtime = monitor;
+        // 2. 获取实时状态（Redis 优先，DB 降级）
+        Map<String, Object> realtime = getDeviceMonitorStatus(deviceId);
 
-        // 3) 最近DB状态记录（用于详情页补全/兜底）
+        // 3. DB 最近一条状态记录（用于详情页字段兜底）
         IotDeviceStatus latest = statusMapper.selectOne(new LambdaQueryWrapper<IotDeviceStatus>()
                 .eq(IotDeviceStatus::getDeviceId, deviceId)
                 .orderByDesc(IotDeviceStatus::getReceiveTime).last("LIMIT 1"));
 
-        // 4) 心跳时间：优先取 realtime.timestamp（毫秒），否则取 latest.reportTime/receiveTime
+        // 4. 心跳时间：优先取 realtime 中的 timestamp 字段（毫秒），降级取 DB 时间
         LocalDateTime heartbeat = null;
         if (realtime != null) {
             Object ts = realtime.get("timestamp");
             if (ts instanceof Number n) {
-                heartbeat = LocalDateTime.ofInstant(
-                        Instant.ofEpochMilli(n.longValue()), ZoneId.systemDefault());
+                heartbeat = LocalDateTime.ofInstant(Instant.ofEpochMilli(n.longValue()), ZoneId.systemDefault());
             } else if (ts instanceof String s) {
                 try {
                     long ms = Long.parseLong(s);
-                    heartbeat = LocalDateTime.ofInstant(
-                            Instant.ofEpochMilli(ms), ZoneId.systemDefault());
+                    heartbeat = LocalDateTime.ofInstant(Instant.ofEpochMilli(ms), ZoneId.systemDefault());
                 } catch (Exception ignored) {
                 }
             }
@@ -206,11 +302,12 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
             heartbeat = latest.getReportTime() != null ? latest.getReportTime() : latest.getReceiveTime();
         }
 
-        // 5) 最近日志（默认20条）
+        // 5. 最近 20 条操作日志
         List<IotDeviceOperationLog> recentLogs = logService
                 .queryLogPage(new Page<>(1, 20), deviceId, null, null, null)
                 .getRecords();
 
+        // 6. 组装 VO
         DeviceDetailVO vo = new DeviceDetailVO();
         vo.setDevice(device);
         vo.setOnline(online);
@@ -221,17 +318,37 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
         return vo;
     }
 
+    /**
+     * 发送远程重启指令
+     *
+     * <p>执行流程：
+     * <ol>
+     *   <li>校验设备存在且当前在线（离线设备无法接收 MQTT 指令）</li>
+     *   <li>生成 commandId（用于 RestartAck 关联）</li>
+     *   <li>构造加密 RemoteRestartCommand 消息并发布到 MQTT</li>
+     *   <li>记录 PENDING 状态操作日志（等待设备回复 RestartAck 后更新为最终状态）</li>
+     * </ol>
+     *
+     * @param deviceId 设备 ID
+     * @param reason   重启原因（便于日志追溯）
+     * @param operator 操作人
+     * @throws RuntimeException 设备不在线或 MQTT 发送失败时抛出
+     */
     @Override
     public void remoteRestart(String deviceId, String reason, String operator) {
         IotDevice device = require(deviceId);
-        if (DeviceConstant.DeviceStatus.ONLINE != device.getStatus())
+        if (DeviceConstant.DeviceStatus.ONLINE != device.getStatus()) {
             throw new RuntimeException("设备不在线");
+        }
         String commandId = IdUtil.fastSimpleUUID();
         try {
+            // 构造并加密发送重启指令
             String payload = objectMapper.writeValueAsString(MqttMessageModel.RemoteRestartCommand.builder()
                     .commandId(commandId).reason(reason).timestamp(System.currentTimeMillis()).build());
             mqttPublisher.publishToDevice(device.getDeviceCode(),
                     String.format(DeviceConstant.MqttTopic.REMOTE_RESTART, device.getDeviceCode()), payload, 1);
+
+            // 记录 PENDING 状态日志，等待设备 RestartAck 后由 DeviceRestartAckHandler 补充最终结果
             logService.recordLog(deviceId, device.getDeviceCode(),
                     DeviceConstant.OperationType.REMOTE_RESTART,
                     "远程重启: " + reason, "{commandId:" + commandId + "}",
@@ -241,17 +358,38 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
         }
     }
 
+    /**
+     * 更改设备启用/禁用状态
+     *
+     * <p>禁用设备时，立即清除 Redis 中的密钥和 AES Key 缓存，
+     * 使 EMQX 下次认证回调时从 DB 查询并拒绝连接（已连接的设备在下次心跳或重连时断线）。
+     *
+     * @param deviceId 设备 ID
+     * @param status   目标状态（参考 DeviceConstant.DeviceStatus）
+     * @param operator 操作人
+     */
     @Override
     public void changeDeviceStatus(String deviceId, Integer status, String operator) {
         IotDevice device = require(deviceId);
         device.setStatus(status);
         deviceMapper.updateById(device);
+
+        // 禁用时立即失效密钥缓存，使 EMQX 实时感知到设备被禁用
         if (DeviceConstant.DeviceStatus.DISABLED == status) {
             secretService.evict(device.getDeviceCode());
             encryptService.evictCache(device.getDeviceCode());
         }
     }
 
+    /**
+     * 批量查询设备在线状态
+     *
+     * <p>同时返回 DB 中的 status 字段和 Redis 实时在线集合中的状态，
+     * 两者可能短暂不一致（DB 更新存在延迟），前端可据此显示"疑似在线"等状态。
+     *
+     * @param deviceIds 设备 ID 列表
+     * @return 每个设备的 id/deviceCode/status/onlineInRedis/lastOnlineTime
+     */
     @Override
     public List<Map<String, Object>> batchGetOnlineStatus(List<String> deviceIds) {
         return deviceIds.stream().map(id -> {
@@ -260,9 +398,9 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
             if (d != null) {
                 boolean online = Boolean.TRUE.equals(redisTemplate.opsForSet()
                         .isMember(DeviceConstant.RedisKey.DEVICE_ONLINE_SET, d.getDeviceCode()));
-                item.put("deviceId", id);
-                item.put("deviceCode", d.getDeviceCode());
-                item.put("status", d.getStatus());
+                item.put("deviceId",      id);
+                item.put("deviceCode",    d.getDeviceCode());
+                item.put("status",        d.getStatus());
                 item.put("onlineInRedis", online);
                 item.put("lastOnlineTime", d.getLastOnlineTime());
             }
@@ -270,6 +408,13 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
         }).collect(Collectors.toList());
     }
 
+    /**
+     * 查询设备，不存在则抛出异常（统一防御性校验）
+     *
+     * @param deviceId 设备 ID
+     * @return 设备对象
+     * @throws RuntimeException 设备不存在时抛出
+     */
     private IotDevice require(String deviceId) {
         IotDevice d = deviceMapper.selectById(deviceId);
         if (d == null) throw new RuntimeException("设备不存在: " + deviceId);

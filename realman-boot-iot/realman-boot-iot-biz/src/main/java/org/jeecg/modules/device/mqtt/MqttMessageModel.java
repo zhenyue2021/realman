@@ -7,92 +7,241 @@ import java.math.BigDecimal;
 import java.util.Map;
 
 /**
- * MQTT消息协议体（Payload均使用per-device AES-256-CBC加密，消息体中不含任何鉴权信息）
+ * MQTT 消息协议体定义（所有 Payload 均经 Per-Device AES-256-CBC 加密传输）
+ *
+ * <p>消息流向说明：
+ * <pre>
+ *   上行（设备 → 平台）：StatusReport / ConfigAck / RestartAck / OtaProgress / OperationLogReport
+ *   下行（平台 → 设备）：ConfigPush / RemoteRestartCommand / OtaNotify
+ * </pre>
+ *
+ * <p>加密协议：
+ *   密文格式 = ivHex(32char) + ":" + Base64(AES密文)
+ *   密钥派生 = SHA256(deviceCode)[0..31]（设备端离线计算，无需存储）
+ *
+ * @see org.jeecg.modules.device.security.CommandEncryptService 加解密实现
  */
 public class MqttMessageModel {
 
+    /**
+     * 上行：设备状态上报（Topic: device/{deviceCode}/status/report）
+     *
+     * <p>设备定期（或状态变化时）上报自身运行状态，平台收到后：
+     * <ol>
+     *   <li>解密 → 解析本类</li>
+     *   <li>更新 Redis 实时状态缓存（TTL=离线阈值+1min）</li>
+     *   <li>维护在线集合（iot:device:online）</li>
+     *   <li>异步写入 DB 历史状态表（iot_device_status）</li>
+     *   <li>WebSocket 推送前端实时刷新</li>
+     * </ol>
+     *
+     * @see org.jeecg.modules.device.mqtt.handler.DeviceStatusHandler
+     */
     @Data
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class StatusReport {
-        private BigDecimal temperature, humidity, batteryLevel;
-        private Integer signalStrength, runStatus;
-        private BigDecimal longitude, latitude;
+        /** 温度（℃），可为 null */
+        private BigDecimal temperature;
+        /** 湿度（%RH），可为 null */
+        private BigDecimal humidity;
+        /** 电量百分比（0-100），可为 null */
+        private BigDecimal batteryLevel;
+        /** 信号强度（dBm），可为 null */
+        private Integer signalStrength;
+        /** 运行状态（业务自定义枚举值），可为 null */
+        private Integer runStatus;
+        /** 经度（WGS84），可为 null */
+        private BigDecimal longitude;
+        /** 纬度（WGS84），可为 null */
+        private BigDecimal latitude;
+        /** 消息时间戳（毫秒 epoch，设备本地时间） */
         private long timestamp;
+        /** 扩展字段（业务自定义 KV），可为 null */
         private Map<String, Object> extra;
     }
 
+    /**
+     * 下行：平台向设备推送参数配置（Topic: device/{deviceCode}/config/push）
+     *
+     * <p>平台调用 /api/device/{deviceId}/config/sync 时，若设备在线则立即发送本消息。
+     * 设备收到后应用参数并回复 {@link ConfigAck}；若设备离线，配置以 PENDING 状态存 DB，
+     * 待设备上线后由 {@link org.jeecg.modules.device.service.PendingSyncService} 补推。
+     *
+     * @see org.jeecg.modules.device.mqtt.handler.DeviceConfigAckHandler
+     */
     @Data
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
     public static class ConfigPush {
+        /** 指令唯一 ID（UUID），用于关联 ConfigAck 响应 */
         private String commandId;
+        /** 参数键值对（configKey → configValue） */
         private Map<String, Object> params;
+        /** 平台发送时间戳（毫秒） */
         private long timestamp;
     }
 
+    /**
+     * 上行：设备配置同步结果确认（Topic: device/{deviceCode}/config/ack）
+     *
+     * <p>设备收到 {@link ConfigPush} 并应用配置后，上报本消息。
+     * 平台收到后根据 code 更新 DB 中对应配置记录的同步状态。
+     *
+     * @see org.jeecg.modules.device.mqtt.handler.DeviceConfigAckHandler
+     */
     @Data
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
     public static class ConfigAck {
+        /** 对应 {@link ConfigPush#commandId}，用于追踪哪条配置推送被确认 */
         private String commandId;
+        /** 执行结果码：0=成功，非0=失败 */
         private int code;
+        /** 失败原因描述（code≠0 时填写） */
         private String message;
+        /** 设备确认时间戳（毫秒） */
         private long timestamp;
     }
 
+    /**
+     * 下行：平台向设备发送远程重启指令（Topic: device/{deviceCode}/command/restart）
+     *
+     * <p>平台调用 /api/device/{deviceId}/restart，设备在线时立即下发本消息。
+     * 设备收到后应执行重启，并在重启完成或无法重启时回复 {@link RestartAck}。
+     *
+     * @see org.jeecg.modules.device.mqtt.handler.DeviceRestartAckHandler
+     */
     @Data
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
     public static class RemoteRestartCommand {
-        private String commandId, reason;
+        /** 指令唯一 ID（UUID），用于关联 RestartAck 响应 */
+        private String commandId;
+        /** 重启原因说明（操作人填写，便于日志追溯） */
+        private String reason;
+        /** 平台发送时间戳（毫秒） */
         private long timestamp;
     }
 
+    /**
+     * 上行：设备重启执行确认（Topic: device/{deviceCode}/command/restart/ack）
+     *
+     * <p>设备收到 {@link RemoteRestartCommand} 后，若能立即重启则回复 code=0，
+     * 若无法重启（如正在 OTA 或关键任务中）则回复 code≠0 并说明原因。
+     *
+     * @see org.jeecg.modules.device.mqtt.handler.DeviceRestartAckHandler
+     */
     @Data
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
     public static class RestartAck {
-        private String commandId, message;
+        /** 对应 {@link RemoteRestartCommand#commandId} */
+        private String commandId;
+        /** 失败或备注信息 */
+        private String message;
+        /** 执行结果码：0=已执行重启，非0=拒绝重启 */
         private int code;
+        /** 设备回复时间戳（毫秒） */
         private long timestamp;
     }
 
+    /**
+     * 下行：平台向设备推送 OTA 升级通知（Topic: device/{deviceCode}/ota/notify）
+     *
+     * <p>执行升级任务时，平台为每台目标设备发送本消息，携带固件下载地址和校验信息。
+     * 设备下载固件时应支持断点续传（通过 downloadedBytes 记录已下载偏移）。
+     *
+     * @see org.jeecg.modules.device.mqtt.handler.OtaProgressHandler
+     * @see org.jeecg.modules.device.service.impl.IotOtaServiceImpl#executeUpgradeTask
+     */
     @Data
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
     public static class OtaNotify {
-        private String taskId, recordId, firmwareId, version;
-        private String downloadUrl, fileMd5;
+        /** 升级任务 ID（对应 iot_ota_upgrade_task.id） */
+        private String taskId;
+        /** 本设备的升级记录 ID（对应 iot_ota_upgrade_record.id） */
+        private String recordId;
+        /** 固件 ID（对应 iot_ota_firmware.id） */
+        private String firmwareId;
+        /** 目标固件版本号 */
+        private String version;
+        /** 固件 HTTP 下载地址（MinIO 预签名 URL，有效期 urlExpireDays 天） */
+        private String downloadUrl;
+        /** 固件文件 MD5（设备下载完成后校验完整性） */
+        private String fileMd5;
+        /** 固件文件总大小（字节），用于断点续传计算偏移 */
         private Long fileSize;
+        /** 是否强制升级：1=强制（设备不可拒绝），0=可选 */
         private Integer forceUpgrade;
+        /** 平台发送时间戳（毫秒） */
         private long timestamp;
     }
 
+    /**
+     * 上行：OTA 升级进度上报（Topic: device/{deviceCode}/ota/progress）
+     *
+     * <p>设备在 OTA 各阶段（确认/下载中/完成/失败）均需上报本消息。
+     * 平台收到后更新升级记录状态、刷新任务统计、通过 WebSocket 推送进度。
+     *
+     * <p>状态机流转（对应 {@link org.jeecg.modules.device.constant.DeviceConstant.OtaUpgradeStatus}）：
+     * NOTIFIED → CONFIRMED → DOWNLOADING → DOWNLOADED → INSTALLING → SUCCESS / FAILED
+     *
+     * @see org.jeecg.modules.device.mqtt.handler.OtaProgressHandler
+     */
     @Data
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
     public static class OtaProgress {
-        private String taskId, recordId, failReason, newVersion;
-        private Integer status, progress;
+        /** 对应 {@link OtaNotify#taskId} */
+        private String taskId;
+        /** 对应 {@link OtaNotify#recordId}，用于精确定位升级记录 */
+        private String recordId;
+        /** 升级失败原因（status=FAILED 时填写） */
+        private String failReason;
+        /** 升级成功后的新版本号（status=SUCCESS 时填写，平台用于更新设备固件版本字段） */
+        private String newVersion;
+        /** 当前升级状态码（见 OtaUpgradeStatus 枚举） */
+        private Integer status;
+        /** 下载进度（0-100 百分比） */
+        private Integer progress;
+        /** 已下载字节数（用于断点续传，平台缓存至 Redis） */
         private Long downloadedBytes;
+        /** 设备上报时间戳（毫秒） */
         private long timestamp;
     }
 
+    /**
+     * 上行：设备操作日志上报（Topic: device/{deviceCode}/log/operation）
+     *
+     * <p>设备端主动记录并上报的行为日志，由平台异步写入 DB。
+     * 与平台侧日志（IDeviceOperationLogService）合并展示，形成完整操作审计链路。
+     *
+     * @see org.jeecg.modules.device.mqtt.handler.DeviceOperationLogHandler
+     */
     @Data
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
     public static class OperationLogReport {
-        private String operationType, operationDesc, operationDetail, operationResult;
+        /** 操作类型（参考 DeviceConstant.OperationType 或设备自定义类型） */
+        private String operationType;
+        /** 操作描述（人读文本） */
+        private String operationDesc;
+        /** 操作详情（JSON 或附加信息，可为 null） */
+        private String operationDetail;
+        /** 操作结果：SUCCESS / FAIL */
+        private String operationResult;
+        /** 设备端操作发生时间戳（毫秒） */
         private long operationTime;
     }
 }

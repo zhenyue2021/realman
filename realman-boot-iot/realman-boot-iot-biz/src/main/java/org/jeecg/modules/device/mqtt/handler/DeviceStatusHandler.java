@@ -18,6 +18,25 @@ import org.springframework.stereotype.Component;
 import java.time.*;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * 设备状态上报消息处理器（Topic: device/{deviceCode}/status/report）
+ *
+ * <p>处理流程：
+ * <ol>
+ *   <li>解密 AES 密文 → 解析为 {@link MqttMessageModel.StatusReport}</li>
+ *   <li>查询设备基础信息（验证 deviceCode 是否合法）</li>
+ *   <li>更新 Redis 实时状态缓存（TTL = 离线阈值 + 1min 缓冲）</li>
+ *   <li>将设备加入在线集合（iot:device:online）</li>
+ *   <li>同步更新 DB 设备在线状态及位置信息</li>
+ *   <li>通过 WebSocket 推送实时状态到前端</li>
+ *   <li>异步将历史状态记录写入 DB（不阻塞 MQTT 消费线程）</li>
+ * </ol>
+ *
+ * <p>离线检测机制：
+ * Redis Key TTL = DEVICE_OFFLINE_THRESHOLD_MINUTES + 1（分钟）。
+ * 若设备停止上报，Key 自然过期；定时任务 {@link org.jeecg.modules.device.scheduler.DeviceSchedulerJob#checkOfflineDevices}
+ * 轮询在线设备，发现 Key 不存在则标记为离线。
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -30,34 +49,59 @@ public class DeviceStatusHandler {
     private final StringRedisTemplate   redisTemplate;
     private final DeviceWebSocketServer webSocketServer;
 
+    /**
+     * 处理设备状态上报消息
+     *
+     * @param deviceCode 设备编号（从 Topic 中提取）
+     * @param payload    AES 加密的消息体密文
+     * @throws Exception 解密失败或 JSON 解析失败时抛出
+     */
     public void handle(String deviceCode, String payload) throws Exception {
+        // 1. 解密 + 解析消息体
         String decrypted = encryptService.decryptFromDevice(deviceCode, payload);
         MqttMessageModel.StatusReport r = objectMapper.readValue(decrypted, MqttMessageModel.StatusReport.class);
 
+        // 2. 校验设备是否存在（防止脏数据）
         IotDevice device = deviceMapper.selectOne(new LambdaQueryWrapper<IotDevice>()
                 .eq(IotDevice::getDeviceCode, deviceCode));
-        if (device == null) { log.warn("[StatusHandler] 未知设备: {}", deviceCode); return; }
+        if (device == null) {
+            log.warn("[StatusHandler] 未知设备: {}", deviceCode);
+            return;
+        }
 
-        // Redis缓存实时状态（TTL = 离线判定阈值 + 1min 缓冲）
+        // 3. 更新 Redis 实时状态缓存，TTL = 离线判定阈值 + 1min 缓冲
+        //    Key 过期即视为设备失联，定时任务据此将设备标记为 OFFLINE
         redisTemplate.opsForValue().set(
                 DeviceConstant.RedisKey.DEVICE_STATUS_PREFIX + deviceCode, decrypted,
                 DeviceConstant.Timeout.DEVICE_OFFLINE_THRESHOLD_MINUTES + 1, TimeUnit.MINUTES);
+
+        // 4. 维护在线设备集合（用于批量查询在线状态）
         redisTemplate.opsForSet().add(DeviceConstant.RedisKey.DEVICE_ONLINE_SET, deviceCode);
 
-        // 更新设备在线
+        // 5. 同步更新 DB 中的在线状态和位置（经纬度有值才覆盖，避免用空值覆盖历史有效位置）
         device.setStatus(DeviceConstant.DeviceStatus.ONLINE);
         device.setLastOnlineTime(LocalDateTime.now());
         if (r.getLongitude() != null) device.setLongitude(r.getLongitude());
         if (r.getLatitude()  != null) device.setLatitude(r.getLatitude());
         deviceMapper.updateById(device);
 
-        // WebSocket实时推送
+        // 6. WebSocket 实时推送给前端监控页面
         webSocketServer.pushDeviceStatus(deviceCode, decrypted);
 
-        // 异步写DB历史记录
+        // 7. 异步写入历史状态 DB（使用独立线程池，不占用 MQTT 消费线程）
         persistAsync(device, r, decrypted);
     }
 
+    /**
+     * 异步持久化历史状态记录到 DB
+     *
+     * <p>使用 {@code @Async("deviceTaskExecutor")} 在独立线程池执行，
+     * 避免 DB 写入阻塞 MQTT 消费线程，保证消息吞吐量。
+     *
+     * @param device 设备基础信息
+     * @param r      已解析的状态上报对象
+     * @param raw    原始解密 JSON 字符串（存入 raw_data 字段备查）
+     */
     @Async("deviceTaskExecutor")
     public void persistAsync(IotDevice device, MqttMessageModel.StatusReport r, String raw) {
         IotDeviceStatus s = new IotDeviceStatus();
@@ -71,7 +115,9 @@ public class DeviceStatusHandler {
         s.setLatitude(r.getLatitude());
         s.setRunStatus(r.getRunStatus());
         s.setRawData(raw);
+        // reportTime 使用设备端 timestamp（毫秒转 LocalDateTime），反映设备实际采集时间
         s.setReportTime(LocalDateTime.ofInstant(Instant.ofEpochMilli(r.getTimestamp()), ZoneId.systemDefault()));
+        // receiveTime 使用平台接收时间，两者差值可用于评估网络延迟
         s.setReceiveTime(LocalDateTime.now());
         statusMapper.insert(s);
     }
