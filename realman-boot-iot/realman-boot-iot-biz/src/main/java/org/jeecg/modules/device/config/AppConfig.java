@@ -1,13 +1,20 @@
 package org.jeecg.modules.device.config;
 
+import com.baomidou.mybatisplus.annotation.DbType;
+import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
+import com.baomidou.mybatisplus.extension.plugins.inner.OptimisticLockerInnerInterceptor;
+import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
+import com.baomidou.mybatisplus.extension.toolkit.JdbcUtils;
 import io.minio.MinioClient;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
-import org.springframework.web.socket.server.standard.ServerEndpointExporter;
 
+import javax.sql.DataSource;
+import java.sql.SQLException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadPoolExecutor;
 
@@ -18,6 +25,27 @@ public class AppConfig {
     @Value("${minio.endpoint:http://localhost:9000}")   private String endpoint;
     @Value("${minio.access-key:minioadmin}")            private String accessKey;
     @Value("${minio.secret-key:minioadmin}")            private String secretKey;
+
+    @Autowired
+    private DataSource dataSource;
+
+    /** IoT 独立运行时使用：替代平台 MybatisPlusSaasConfig（单数据源，无 dynamic-datasource） */
+    @Bean
+    public MybatisPlusInterceptor mybatisPlusInterceptor() {
+        MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
+        DbType dbType = null;
+        try {
+            dbType = JdbcUtils.getDbType(dataSource.getConnection().getMetaData().getURL());
+        } catch (SQLException ignored) {
+        }
+        if (dbType != null && (dbType == DbType.SQL_SERVER || dbType == DbType.SQL_SERVER2005)) {
+            interceptor.addInnerInterceptor(new PaginationInnerInterceptor(DbType.SQL_SERVER2005));
+        } else {
+            interceptor.addInnerInterceptor(new PaginationInnerInterceptor());
+        }
+        interceptor.addInnerInterceptor(new OptimisticLockerInnerInterceptor());
+        return interceptor;
+    }
 
     @Bean
     public MinioClient minioClient() {
@@ -39,8 +67,5 @@ public class AppConfig {
         return executor;
     }
 
-    @Bean
-    public ServerEndpointExporter serverEndpointExporter() {
-        return new ServerEndpointExporter();
-    }
+    /** WebSocket：使用平台 WebSocketConfig 中的 serverEndpointExporter，不在此重复定义 */
 }

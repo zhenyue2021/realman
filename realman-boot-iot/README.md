@@ -105,8 +105,8 @@ java -DDEVICE_ENCRYPT_MASTER_KEY=your-32-bytes-master-key \
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| POST | /api/device/add | 新增设备（自动生成deviceSecret） |
-| GET  | /api/device/list | 分页查询设备 |
+| POST | /api/device/add | 新增设备 |
+| POST | /api/device/list | 分页查询设备 |
 | POST | /api/device/{id}/config/sync | 参数设置并同步 |
 | GET  | /api/device/{id}/monitor | 实时监控状态 |
 | POST | /api/device/{id}/restart | 远程重启 |
