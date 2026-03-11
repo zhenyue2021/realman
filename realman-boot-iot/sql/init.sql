@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS `iot_device` (
   `id`                  VARCHAR(32)    NOT NULL COMMENT '设备ID（雪花）',
   `device_code`         VARCHAR(64)    NOT NULL COMMENT '设备编号（全局唯一，同时作为MQTT ClientId/Username）',
   `device_name`         VARCHAR(128)   NOT NULL COMMENT '设备名称',
-  `device_type`         TINYINT        NOT NULL DEFAULT 1   COMMENT '1-网关 2-传感器 3-控制器',
+  `device_type`         TINYINT        NOT NULL DEFAULT 1   COMMENT '1-机器人设备 2-主控设备',
   `product_id`          VARCHAR(32)    DEFAULT NULL,
   `device_model`        VARCHAR(64)    DEFAULT NULL,
   `serial_number`       VARCHAR(64)    DEFAULT NULL,
@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS `iot_device` (
   `description`         VARCHAR(512)   DEFAULT NULL,
   `last_online_time`    DATETIME       DEFAULT NULL,
   `last_offline_time`   DATETIME       DEFAULT NULL,
+  `last_login_time`     DATETIME       DEFAULT NULL COMMENT '主控设备最后一次登录时间',
   `longitude`           DECIMAL(10,7)  DEFAULT NULL,
   `latitude`            DECIMAL(10,7)  DEFAULT NULL,
   `create_by`           VARCHAR(64)    DEFAULT NULL,
@@ -35,6 +36,46 @@ CREATE TABLE IF NOT EXISTS `iot_device` (
   KEY `idx_status` (`status`),
   KEY `idx_product_id` (`product_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='IoT设备基础信息';
+
+-- 1.1 设备授权表（主控/机器人授权给租户或用户）
+CREATE TABLE IF NOT EXISTS `iot_device_auth` (
+  `id`              VARCHAR(32)   NOT NULL,
+  `subject_type`    VARCHAR(16)   NOT NULL COMMENT 'USER/TENANT',
+  `subject_id`      VARCHAR(64)   NOT NULL COMMENT '用户或租户ID',
+  `controller_id`   VARCHAR(32)   NOT NULL COMMENT '主控设备ID',
+  `device_id`       VARCHAR(32)   NOT NULL COMMENT '机器人设备ID',
+  `device_code`     VARCHAR(64)   DEFAULT NULL,
+  `admin_user_id`   VARCHAR(64)   DEFAULT NULL,
+  `admin_username`  VARCHAR(64)   DEFAULT NULL,
+  `effective_time`  DATETIME       DEFAULT NULL,
+  `expire_time`     DATETIME       DEFAULT NULL,
+  `status`          TINYINT       NOT NULL DEFAULT 1 COMMENT '1-启用 0-禁用',
+  `create_by`       VARCHAR(64)   DEFAULT NULL,
+  `create_time`     DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `update_by`       VARCHAR(64)   DEFAULT NULL,
+  `update_time`     DATETIME       DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  `del_flag`        TINYINT       NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`),
+  KEY `idx_controller_device` (`controller_id`,`device_id`),
+  KEY `idx_subject` (`subject_type`,`subject_id`),
+  KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='设备授权表';
+
+-- 1.2 主控端登录记录表
+CREATE TABLE IF NOT EXISTS `iot_controller_login_log` (
+  `id`                    VARCHAR(32)  NOT NULL,
+  `controller_id`         VARCHAR(32)  NOT NULL COMMENT '主控设备ID',
+  `controller_code`       VARCHAR(64)  NOT NULL,
+  `operator_id`           VARCHAR(64)  DEFAULT NULL,
+  `operator_name`         VARCHAR(64)  DEFAULT NULL,
+  `associated_robot_id`  VARCHAR(32)  DEFAULT NULL,
+  `associated_robot_code` VARCHAR(64)  DEFAULT NULL,
+  `login_time`            DATETIME    NOT NULL,
+  `create_time`           DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_controller_id` (`controller_id`),
+  KEY `idx_login_time`   (`login_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='主控端登录记录';
 
 -- 2. 设备参数配置
 CREATE TABLE IF NOT EXISTS `iot_device_config` (

@@ -55,7 +55,7 @@ public class MqttMessageDispatcherEndToEndTest {
     // 被测 Handler
     private DeviceStatusHandler statusHandler;
     private DeviceConfigAckHandler configAckHandler;
-    private DeviceRestartAckHandler restartAckHandler;
+    private DeviceCommandAckHandler commandAckHandler;
     private OtaProgressHandler otaProgressHandler;
     private DeviceOperationLogHandler operationLogHandler;
 
@@ -113,7 +113,7 @@ public class MqttMessageDispatcherEndToEndTest {
                 logService
         );
 
-        restartAckHandler = new DeviceRestartAckHandler(
+        commandAckHandler = new DeviceCommandAckHandler(
                 encryptService,
                 objectMapper,
                 logService
@@ -140,7 +140,7 @@ public class MqttMessageDispatcherEndToEndTest {
         dispatcher = new MqttMessageDispatcher(
                 statusHandler,
                 configAckHandler,
-                restartAckHandler,
+                commandAckHandler,
                 otaProgressHandler,
                 operationLogHandler,
                 onlineOfflineHandler
@@ -236,7 +236,7 @@ public class MqttMessageDispatcherEndToEndTest {
     }
 
     /**
-     * 整链路：重启确认上报 → 分发器 → DeviceRestartAckHandler
+     * 整链路：指令确认上报（restart） → 分发器 → DeviceCommandAckHandler
      */
     @Test
     void endToEnd_restartAck() throws Exception {

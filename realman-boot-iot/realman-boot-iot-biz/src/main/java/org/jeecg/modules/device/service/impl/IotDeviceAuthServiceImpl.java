@@ -52,5 +52,16 @@ public class IotDeviceAuthServiceImpl
         wrapper.orderByDesc(IotDeviceAuth::getCreateTime);
         return this.page(page, wrapper);
     }
+
+    @Override
+    public byte[] exportAuthList(DeviceAuthQueryDTO query, String currentUsername, boolean superAdmin) {
+        int max = 10000;
+        IPage<IotDeviceAuth> page = queryAuthPage(new Page<>(1, max), query, currentUsername, superAdmin);
+        try {
+            return org.jeecg.modules.device.util.DeviceExcelExportUtil.exportAuthList(page.getRecords());
+        } catch (Exception e) {
+            throw new RuntimeException("导出授权Excel失败", e);
+        }
+    }
 }
 

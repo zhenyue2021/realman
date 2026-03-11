@@ -59,8 +59,7 @@ public class CommandEncryptService {
      * @return 密文（ivHex:Base64），或原文（加密关闭时）
      */
     public String encryptForDevice(String deviceCode, String plain) {
-//        if (!encryptEnabled || plain == null) return plain;
-        if (plain == null) return null;
+        if (!encryptEnabled || plain == null) return plain;
         return doEncrypt(getAesKey(deviceCode), plain);
     }
 
@@ -74,8 +73,7 @@ public class CommandEncryptService {
      * @return 解密后的明文 JSON 字符串
      */
     public String decryptFromDevice(String deviceCode, String enc) {
-//        if (!encryptEnabled || !isEncrypted(enc)) return enc;
-        if (!isEncrypted(enc)) return enc;
+        if (!encryptEnabled || !isEncrypted(enc)) return enc;
         return doDecrypt(getAesKey(deviceCode), enc);
     }
 

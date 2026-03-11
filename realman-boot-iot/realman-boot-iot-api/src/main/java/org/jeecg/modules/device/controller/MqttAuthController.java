@@ -20,13 +20,13 @@ import java.util.Map;
  * EMQX 配置（emqx.conf）：
  *   authentication {
  *     backend = http; mechanism = password_based; method = post
- *     url = http://平台IP:8085/device-mgmt/internal/mqtt/auth
+ *     url = http://平台IP:8085/realman-iot/internal/mqtt/auth
  *     body { clientid="${clientid}", username="${username}", password="${password}", peerhost="${peerhost}" }
  *   }
  *   authorization {
  *     sources = [{
  *       type = http; method = post
- *       url = http://平台IP:8085/device-mgmt/internal/mqtt/acl
+ *       url = http://平台IP:8085/realman-iot/internal/mqtt/acl
  *       body { clientid="${clientid}", username="${username}", topic="${topic}", action="${action}" }
  *     }]
  *   }
@@ -59,7 +59,7 @@ public class MqttAuthController {
         }
 
         boolean ok = secretService.validateSecret(username, password);
-        log.info("[MqttAuth] clientId={} ip={} result={}", clientId, peerHost, ok ? "allow" : "deny");
+        log.info("[MqttAuth] clientId={} ip={} result={}", clientId, peerHost, ok ? allow() : deny());
         return ok ? allow() :deny();
     }
 

@@ -114,7 +114,7 @@ public class MqttMessageModel {
      * <p>平台调用 /api/device/{deviceId}/restart，设备在线时立即下发本消息。
      * 设备收到后应执行重启，并在重启完成或无法重启时回复 {@link RestartAck}。
      *
-     * @see org.jeecg.modules.device.mqtt.handler.DeviceRestartAckHandler
+     * @see org.jeecg.modules.device.mqtt.handler.DeviceCommandAckHandler
      */
     @Data
     @Builder
@@ -135,7 +135,7 @@ public class MqttMessageModel {
      * <p>设备收到 {@link RemoteRestartCommand} 后，若能立即重启则回复 code=0，
      * 若无法重启（如正在 OTA 或关键任务中）则回复 code≠0 并说明原因。
      *
-     * @see org.jeecg.modules.device.mqtt.handler.DeviceRestartAckHandler
+     * @see org.jeecg.modules.device.mqtt.handler.DeviceCommandAckHandler
      */
     @Data
     @Builder
@@ -147,6 +147,45 @@ public class MqttMessageModel {
         /** 失败或备注信息 */
         private String message;
         /** 执行结果码：0=已执行重启，非0=拒绝重启 */
+        private int code;
+        /** 设备回复时间戳（毫秒） */
+        private long timestamp;
+    }
+
+    /**
+     * 下行：平台向设备发送紧急停机指令（Topic: device/{deviceCode}/command/emergency-stop）
+     *
+     * <p>设备收到后应立即进入安全停机状态，并回复 {@link EmergencyStopAck}。
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class EmergencyStopCommand {
+        /** 指令唯一 ID（UUID），用于关联 EmergencyStopAck 响应 */
+        private String commandId;
+        /** 停机原因说明（操作人填写，便于日志追溯） */
+        private String reason;
+        /** 平台发送时间戳（毫秒） */
+        private long timestamp;
+    }
+
+    /**
+     * 上行：设备紧急停机执行确认（Topic: device/{deviceCode}/command/emergency-stop/ack）
+     *
+     * <p>设备收到 {@link EmergencyStopCommand} 后，若已进入停机状态则 code=0；
+     * 若拒绝或失败则 code≠0 并说明原因。
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class EmergencyStopAck {
+        /** 对应 {@link EmergencyStopCommand#commandId} */
+        private String commandId;
+        /** 失败或备注信息 */
+        private String message;
+        /** 执行结果码：0=已停机，非0=失败/拒绝 */
         private int code;
         /** 设备回复时间戳（毫秒） */
         private long timestamp;

@@ -13,7 +13,13 @@ import org.jeecg.modules.device.dto.DeviceAuthQueryDTO;
 import org.jeecg.modules.device.entity.IotDeviceAuth;
 import org.jeecg.modules.device.service.IIotDeviceAuthService;
 import org.jeecg.modules.device.vo.ApiResult;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 
 /**
  * 设备授权管理
@@ -82,10 +88,28 @@ public class DeviceAuthController {
     }
 
     @DeleteMapping("/{id}")
-    @Operation(summary = "删除设备授权")
+    @Operation(summary = "删除设备授权（逻辑删除）")
     public ApiResult<Void> delete(@PathVariable String id) {
         authService.removeById(id);
         return ApiResult.ok(null);
+    }
+
+    @PostMapping("/export")
+    @Operation(summary = "导出授权列表Excel")
+    public ResponseEntity<byte[]> export(HttpServletRequest request, @RequestBody DeviceAuthQueryDTO query) {
+        String username = null;
+        try {
+            username = JwtUtil.getUserNameByToken(request);
+        } catch (JeecgBootException e) {
+            log.warn("获取登录用户失败: {}", e.getMessage());
+        }
+        boolean superAdmin = "admin".equalsIgnoreCase(username);
+        byte[] bytes = authService.exportAuthList(query, username, superAdmin);
+        String filename = "device_auth_" + System.currentTimeMillis() + ".xlsx";
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + URLEncoder.encode(filename, StandardCharsets.UTF_8))
+                .body(bytes);
     }
 }
 

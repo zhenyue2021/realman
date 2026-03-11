@@ -22,7 +22,7 @@ import java.util.regex.Pattern;
  *   $SYS/.../clients/.../disconnected → DeviceOnlineOfflineHandler.handleOffline()
  *   device/{code}/status/report       → DeviceStatusHandler.handle()
  *   device/{code}/config/ack          → DeviceConfigAckHandler.handle()
- *   device/{code}/command/restart/ack → DeviceRestartAckHandler.handle()
+ *   device/{code}/command/{cmd}/ack   → DeviceCommandAckHandler.handle()
  *   device/{code}/ota/progress        → OtaProgressHandler.handle()
  *   device/{code}/log/operation       → DeviceOperationLogHandler.handle()
  * </pre>
@@ -44,7 +44,7 @@ public class MqttMessageDispatcher {
 
     private final DeviceStatusHandler statusHandler;
     private final DeviceConfigAckHandler configAckHandler;
-    private final DeviceRestartAckHandler restartAckHandler;
+    private final DeviceCommandAckHandler commandAckHandler;
     private final OtaProgressHandler otaProgressHandler;
     private final DeviceOperationLogHandler operationLogHandler;
     private final DeviceOnlineOfflineHandler onlineOfflineHandler;
@@ -87,13 +87,24 @@ public class MqttMessageDispatcher {
             String path       = m.group(2);
 
             // 3. 按 path 路由到对应业务 Handler（各 Handler 内部解密并处理）
+            // 3. 按 path 路由到对应业务 Handler（各 Handler 内部解密并处理）
+            // 指令集通用 ACK：command/{cmd}/ack
+            if (path.startsWith("command/") && path.endsWith("/ack")) {
+                String cmd = path.substring("command/".length(), path.length() - "/ack".length());
+                if (cmd.contains("/")) {
+                    log.warn("[Dispatcher] 未知指令ACK路径: {}", topic);
+                    return;
+                }
+                commandAckHandler.handle(deviceCode, cmd, payload);
+                return;
+            }
+
             switch (path) {
-                case "status/report"       -> statusHandler.handle(deviceCode, payload);
-                case "config/ack"          -> configAckHandler.handle(deviceCode, payload);
-                case "command/restart/ack" -> restartAckHandler.handle(deviceCode, payload);
-                case "ota/progress"        -> otaProgressHandler.handle(deviceCode, payload);
-                case "log/operation"       -> operationLogHandler.handle(deviceCode, payload);
-                default                    -> log.warn("[Dispatcher] 未知路径: {}", topic);
+                case "status/report" -> statusHandler.handle(deviceCode, payload);
+                case "config/ack" -> configAckHandler.handle(deviceCode, payload);
+                case "ota/progress" -> otaProgressHandler.handle(deviceCode, payload);
+                case "log/operation" -> operationLogHandler.handle(deviceCode, payload);
+                default -> log.warn("[Dispatcher] 未知路径: {}", topic);
             }
         } catch (Exception e) {
             // 捕获所有异常，防止单消息处理失败阻塞 MQTT 线程

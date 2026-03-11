@@ -46,8 +46,8 @@ public interface DeviceConstant {
         String STATUS_REPORT    = "device/%s/status/report";
         /** 上行：设备配置同步结果确认（响应平台下发的 CONFIG_PUSH） */
         String CONFIG_ACK       = "device/%s/config/ack";
-        /** 上行：设备重启执行确认（响应平台下发的 REMOTE_RESTART） */
-        String RESTART_ACK      = "device/%s/command/restart/ack";
+        /** 上行：指令集确认（统一为 device/{code}/command/{cmd}/ack，由平台订阅 device/+/command/+/ack） */
+        String COMMAND_ACK      = "device/%s/command/%s/ack";
         /** 上行：OTA 升级进度上报（含下载百分比、已下载字节、成功/失败状态） */
         String OTA_PROGRESS     = "device/%s/ota/progress";
         /** 上行：设备操作日志上报（设备端主动记录的行为日志） */
@@ -56,6 +56,8 @@ public interface DeviceConstant {
         String CONFIG_PUSH      = "device/%s/config/push";
         /** 下行：平台向设备发送远程重启指令（加密，QoS=1） */
         String REMOTE_RESTART   = "device/%s/command/restart";
+        /** 下行：平台向设备发送紧急停机指令（加密，QoS=1） */
+        String EMERGENCY_STOP   = "device/%s/command/emergency-stop";
         /** 下行：平台向设备推送 OTA 升级通知（含固件下载 URL、MD5、大小等） */
         String OTA_NOTIFY       = "device/%s/ota/notify";
         /** EMQX 系统事件：设备 MQTT 连接建立（clientId 从 topic 路径中提取） */
@@ -119,6 +121,12 @@ public interface DeviceConstant {
         String FIRMWARE_UPGRADE  = "FIRMWARE_UPGRADE";
         /** 远程重启指令 */
         String REMOTE_RESTART    = "REMOTE_RESTART";
+        /** 紧急停机指令 */
+        String EMERGENCY_STOP    = "EMERGENCY_STOP";
+        /** 关机指令 */
+        String POWER_OFF         = "POWER_OFF";
+        /** 复位指令 */
+        String RESET             = "RESET";
         /** 设备上线事件 */
         String DEVICE_ONLINE     = "DEVICE_ONLINE";
         /** 设备离线事件 */

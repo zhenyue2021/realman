@@ -18,7 +18,7 @@ public class IotDevice implements Serializable {
     @TableField("device_name")
     private String deviceName;
     /**
-     * 1-网关 2-传感器 3-控制器
+     * 1-机器人设备 2-主控设备
      */
     @TableField("device_type")
     private Integer deviceType;
@@ -48,6 +48,9 @@ public class IotDevice implements Serializable {
     private LocalDateTime lastOnlineTime;
     @TableField("last_offline_time")
     private LocalDateTime lastOfflineTime;
+    /** 主控设备最后一次登录时间（操作员登录主控端时更新） */
+    @TableField("last_login_time")
+    private LocalDateTime lastLoginTime;
     @TableField("longitude")
     private BigDecimal longitude;
     @TableField("latitude")

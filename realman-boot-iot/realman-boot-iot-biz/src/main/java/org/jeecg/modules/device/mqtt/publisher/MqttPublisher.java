@@ -6,17 +6,16 @@ import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.jeecg.modules.device.security.CommandEncryptService;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 import java.nio.charset.StandardCharsets;
 
 @Slf4j
 @Component
-@ConditionalOnProperty(prefix = "mqtt", name = "enabled", havingValue = "true", matchIfMissing = false)
 @RequiredArgsConstructor
 public class MqttPublisher {
 
-    private final MqttClient mqttClient;
+    private final ObjectProvider<MqttClient> mqttClientProvider;
     private final CommandEncryptService encryptService;
 
     /** 向设备发布AES加密消息 */
@@ -28,6 +27,11 @@ public class MqttPublisher {
 
     public void publishRaw(String topic, String payload, int qos, boolean retained) {
         try {
+            MqttClient mqttClient = mqttClientProvider.getIfAvailable();
+            if (mqttClient == null) {
+                log.warn("[MqttPublisher] 未启用MQTT或未创建MqttClient，跳过发布: topic={}", topic);
+                return;
+            }
             if (!mqttClient.isConnected()) {
                 log.warn("[MqttPublisher] MQTT未连接, topic={}", topic);
                 return;

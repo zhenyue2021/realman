@@ -12,5 +12,10 @@ public interface IIotDeviceAuthService extends IService<IotDeviceAuth> {
                                        DeviceAuthQueryDTO query,
                                        String currentUsername,
                                        boolean superAdmin);
+
+    /**
+     * 导出授权列表为 Excel（条件与分页查询一致，最多 10000 条）
+     */
+    byte[] exportAuthList(DeviceAuthQueryDTO query, String currentUsername, boolean superAdmin);
 }
 

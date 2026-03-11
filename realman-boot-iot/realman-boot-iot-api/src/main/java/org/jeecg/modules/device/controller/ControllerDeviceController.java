@@ -1,0 +1,215 @@
+package org.jeecg.modules.device.controller;
+
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.jeecg.common.exception.JeecgBootException;
+import org.jeecg.common.system.util.JwtUtil;
+import org.jeecg.modules.device.dto.ControllerLoginDTO;
+import org.jeecg.modules.device.dto.DeviceAddDTO;
+import org.jeecg.modules.device.dto.DeviceRequestDTO;
+import org.jeecg.modules.device.dto.DeviceRestartDTO;
+import org.jeecg.modules.device.dto.DeviceUpdateDTO;
+import org.jeecg.modules.device.dto.EmergencyStopDTO;
+import org.jeecg.modules.device.entity.IotDevice;
+import org.jeecg.modules.device.service.IControllerLoginLogService;
+import org.jeecg.modules.device.service.IIotDeviceService;
+import org.jeecg.modules.device.vo.ApiResult;
+import org.jeecg.modules.device.vo.DeviceDetailVO;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+/**
+ * 主控端管理接口（device_type=2）
+ */
+@RestController
+@RequestMapping("/api/master")
+@RequiredArgsConstructor
+@Tag(name = "主控端管理", description = "主控设备注册/参数配置/实时监控/远程重启/导出/逻辑删除/登录记录")
+@Slf4j
+public class ControllerDeviceController {
+
+    private static final int DEVICE_TYPE_CONTROLLER = 2;
+
+    private final IIotDeviceService deviceService;
+    private final IControllerLoginLogService controllerLoginLogService;
+
+    /** 新增主控设备 */
+    @PostMapping("/add")
+    @Operation(summary = "新增主控设备")
+    public ApiResult<IotDevice> add(@Valid @RequestBody DeviceAddDTO dto) {
+        IotDevice d = new IotDevice();
+        d.setDeviceCode(dto.getDeviceCode());
+        d.setDeviceName(dto.getDeviceName());
+        d.setDeviceType(DEVICE_TYPE_CONTROLLER);
+        d.setProductId(dto.getProductId());
+        d.setDeviceModel(dto.getDeviceModel());
+        d.setSerialNumber(dto.getSerialNumber());
+        d.setDescription(dto.getDescription());
+        return ApiResult.ok(deviceService.addDevice(d), "设备添加成功");
+    }
+
+    /** 分页查询主控设备列表 */
+    @PostMapping("/list")
+    @Operation(summary = "分页查询主控设备列表")
+    public ApiResult<IPage<IotDevice>> list(HttpServletRequest request,
+                                           @RequestBody DeviceRequestDTO requestDTO) {
+        fillAuthContext(request, requestDTO);
+        requestDTO.setDeviceType(DEVICE_TYPE_CONTROLLER);
+        int pageNo = Objects.nonNull(requestDTO.getPageNo()) ? requestDTO.getPageNo() : 1;
+        int pageSize = Objects.nonNull(requestDTO.getPageSize()) ? requestDTO.getPageSize() : 10;
+        return ApiResult.ok(deviceService.queryDevicePage(new Page<>(pageNo, pageSize), requestDTO));
+    }
+
+    /** 查询主控设备详情 */
+    @GetMapping("/{controllerId}")
+    @Operation(summary = "查询主控设备详情")
+    public ApiResult<IotDevice> detail(@PathVariable String controllerId) {
+        IotDevice d = deviceService.getById(controllerId);
+        if (d != null && !Objects.equals(d.getDeviceType(), DEVICE_TYPE_CONTROLLER)) {
+            throw new RuntimeException("设备类型不匹配：该ID不是主控设备");
+        }
+        return ApiResult.ok(d);
+    }
+
+    /** 查询主控设备详情（聚合） */
+    @GetMapping("/{controllerId}/detail")
+    @Operation(summary = "查询主控设备详情（聚合）")
+    public ApiResult<DeviceDetailVO> detailAgg(@PathVariable String controllerId) {
+        DeviceDetailVO vo = deviceService.getDeviceDetail(controllerId);
+        if (vo != null && vo.getDevice() != null && !Objects.equals(vo.getDevice().getDeviceType(), DEVICE_TYPE_CONTROLLER)) {
+            throw new RuntimeException("设备类型不匹配：该ID不是主控设备");
+        }
+        return ApiResult.ok(vo);
+    }
+
+    /** 设置参数并同步到主控设备 */
+    @PostMapping("/{controllerId}/config/sync")
+    @Operation(summary = "设置并同步主控设备参数")
+    public ApiResult<Void> syncConfig(@PathVariable String controllerId,
+                                      @RequestBody Map<String, Object> params) {
+        ensureDeviceType(controllerId, DEVICE_TYPE_CONTROLLER);
+        deviceService.setAndSyncConfig(controllerId, params);
+        return ApiResult.ok(null, "参数已保存，在线设备将立即收到加密配置推送");
+    }
+
+    /** 获取实时监控状态 */
+    @GetMapping("/{controllerId}/monitor")
+    @Operation(summary = "获取主控设备实时监控状态")
+    public ApiResult<Map<String, Object>> monitor(@PathVariable String controllerId) {
+        ensureDeviceType(controllerId, DEVICE_TYPE_CONTROLLER);
+        return ApiResult.ok(deviceService.getDeviceMonitorStatus(controllerId));
+    }
+
+    /** 远程重启主控 */
+    @PostMapping("/{controllerId}/restart")
+    @Operation(summary = "远程重启主控设备")
+    public ApiResult<Void> restart(@PathVariable String controllerId,
+                                   @RequestBody DeviceRestartDTO dto) {
+        ensureDeviceType(controllerId, DEVICE_TYPE_CONTROLLER);
+        deviceService.remoteRestart(controllerId, dto.getReason(), dto.getOperator());
+        return ApiResult.ok(null, "重启指令已发送，等待设备确认");
+    }
+
+    /** 紧急停机（通过MQTT向设备发送AES加密指令，设备需上行 ACK 确认） */
+    @PostMapping("/{controllerId}/emergency-stop")
+    @Operation(summary = "紧急停机主控设备")
+    public ApiResult<Void> emergencyStop(@PathVariable String controllerId,
+                                         @RequestBody EmergencyStopDTO dto) {
+        ensureDeviceType(controllerId, DEVICE_TYPE_CONTROLLER);
+        deviceService.emergencyStop(controllerId, dto.getReason(), dto.getOperator());
+        return ApiResult.ok(null, "紧急停机指令已发送，等待设备确认");
+    }
+
+    /** 编辑主控设备 */
+    @PutMapping("/{controllerId}")
+    @Operation(summary = "编辑主控设备")
+    public ApiResult<Void> update(@PathVariable String controllerId,
+                                  @RequestBody DeviceUpdateDTO dto) {
+        ensureDeviceType(controllerId, DEVICE_TYPE_CONTROLLER);
+        deviceService.updateDevice(controllerId, dto);
+        return ApiResult.ok(null, "更新成功");
+    }
+
+    /** 删除主控设备（逻辑删除） */
+    @DeleteMapping("/{controllerId}")
+    @Operation(summary = "删除主控设备（逻辑删除）")
+    public ApiResult<Void> delete(@PathVariable String controllerId) {
+        ensureDeviceType(controllerId, DEVICE_TYPE_CONTROLLER);
+        deviceService.removeById(controllerId);
+        return ApiResult.ok(null, "已删除");
+    }
+
+    /** 禁用/启用主控设备 */
+    @PutMapping("/{controllerId}/status/{status}")
+    @Operation(summary = "禁用或启用主控设备")
+    public ApiResult<Void> changeStatus(@PathVariable String controllerId,
+                                        @PathVariable Integer status,
+                                        @RequestParam(defaultValue = "system") String operator) {
+        ensureDeviceType(controllerId, DEVICE_TYPE_CONTROLLER);
+        deviceService.changeDeviceStatus(controllerId, status, operator);
+        return ApiResult.ok(null);
+    }
+
+    /** 批量查询在线状态 */
+    @PostMapping("/batch/online-status")
+    @Operation(summary = "批量查询主控设备在线状态")
+    public ApiResult<List<Map<String, Object>>> batchOnline(@RequestBody List<String> controllerIds) {
+        return ApiResult.ok(deviceService.batchGetOnlineStatus(controllerIds));
+    }
+
+    /** 主控端登录记录 */
+    @PostMapping("/login")
+    @Operation(summary = "主控端登录记录")
+    public ApiResult<Void> recordControllerLogin(@RequestBody ControllerLoginDTO dto) {
+        controllerLoginLogService.recordLogin(dto);
+        return ApiResult.ok(null, "登录记录已保存");
+    }
+
+    /** 导出主控设备列表为 Excel（条件与 list 一致，逻辑删除的不导出） */
+    @PostMapping("/export")
+    @Operation(summary = "导出主控设备列表Excel")
+    public ResponseEntity<byte[]> export(HttpServletRequest request, @RequestBody DeviceRequestDTO requestDTO) {
+        fillAuthContext(request, requestDTO);
+        requestDTO.setDeviceType(DEVICE_TYPE_CONTROLLER);
+        byte[] bytes = deviceService.exportDeviceList(requestDTO);
+        String filename = "controllers_" + System.currentTimeMillis() + ".xlsx";
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" +
+                        URLEncoder.encode(filename, StandardCharsets.UTF_8))
+                .body(bytes);
+    }
+
+    private void fillAuthContext(HttpServletRequest request, DeviceRequestDTO requestDTO) {
+        String username = null;
+        try {
+            username = JwtUtil.getUserNameByToken(request);
+        } catch (JeecgBootException e) {
+            log.warn("获取登录用户失败: {}", e.getMessage());
+        }
+        requestDTO.setCurrentUsername(username);
+        requestDTO.setCurrentTenantId(request.getHeader("tenant-id"));
+        requestDTO.setSuperAdmin("admin".equalsIgnoreCase(username));
+    }
+
+    private void ensureDeviceType(String deviceId, int expectType) {
+        IotDevice d = deviceService.getById(deviceId);
+        if (d == null) throw new RuntimeException("设备不存在: " + deviceId);
+        if (!Objects.equals(d.getDeviceType(), expectType)) throw new RuntimeException("设备类型不匹配");
+    }
+}
+

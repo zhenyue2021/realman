@@ -21,7 +21,7 @@ public class MqttMessageDispatcherTest {
 
     private DeviceStatusHandler statusHandler;
     private DeviceConfigAckHandler configAckHandler;
-    private DeviceRestartAckHandler restartAckHandler;
+    private DeviceCommandAckHandler commandAckHandler;
     private OtaProgressHandler otaProgressHandler;
     private DeviceOperationLogHandler operationLogHandler;
     private DeviceOnlineOfflineHandler onlineOfflineHandler;
@@ -32,7 +32,7 @@ public class MqttMessageDispatcherTest {
     void setUp() {
         statusHandler = Mockito.mock(DeviceStatusHandler.class);
         configAckHandler = Mockito.mock(DeviceConfigAckHandler.class);
-        restartAckHandler = Mockito.mock(DeviceRestartAckHandler.class);
+        commandAckHandler = Mockito.mock(DeviceCommandAckHandler.class);
         otaProgressHandler = Mockito.mock(OtaProgressHandler.class);
         operationLogHandler = Mockito.mock(DeviceOperationLogHandler.class);
         onlineOfflineHandler = Mockito.mock(DeviceOnlineOfflineHandler.class);
@@ -40,7 +40,7 @@ public class MqttMessageDispatcherTest {
         dispatcher = new MqttMessageDispatcher(
                 statusHandler,
                 configAckHandler,
-                restartAckHandler,
+                commandAckHandler,
                 otaProgressHandler,
                 operationLogHandler,
                 onlineOfflineHandler
@@ -62,7 +62,7 @@ public class MqttMessageDispatcherTest {
         Mockito.verifyNoMoreInteractions(
                 statusHandler,
                 configAckHandler,
-                restartAckHandler,
+                commandAckHandler,
                 otaProgressHandler,
                 operationLogHandler
         );
@@ -79,7 +79,7 @@ public class MqttMessageDispatcherTest {
         Mockito.verifyNoMoreInteractions(
                 statusHandler,
                 configAckHandler,
-                restartAckHandler,
+                commandAckHandler,
                 otaProgressHandler,
                 operationLogHandler
         );
@@ -96,7 +96,7 @@ public class MqttMessageDispatcherTest {
         Mockito.verify(statusHandler).handle(deviceCode, payload);
         Mockito.verifyNoMoreInteractions(
                 configAckHandler,
-                restartAckHandler,
+                commandAckHandler,
                 otaProgressHandler,
                 operationLogHandler,
                 onlineOfflineHandler
@@ -114,7 +114,7 @@ public class MqttMessageDispatcherTest {
         Mockito.verify(configAckHandler).handle(deviceCode, payload);
         Mockito.verifyNoMoreInteractions(
                 statusHandler,
-                restartAckHandler,
+                commandAckHandler,
                 otaProgressHandler,
                 operationLogHandler,
                 onlineOfflineHandler
@@ -129,7 +129,25 @@ public class MqttMessageDispatcherTest {
 
         dispatcher.dispatch(topic, mqttMsg(payload));
 
-        Mockito.verify(restartAckHandler).handle(deviceCode, payload);
+        Mockito.verify(commandAckHandler).handle(deviceCode, "restart", payload);
+        Mockito.verifyNoMoreInteractions(
+                statusHandler,
+                configAckHandler,
+                otaProgressHandler,
+                operationLogHandler,
+                onlineOfflineHandler
+        );
+    }
+
+    @Test
+    void testEmergencyStopAck() throws Exception {
+        String deviceCode = "DEV001";
+        String topic = "device/" + deviceCode + "/command/emergency-stop/ack";
+        String payload = "{\"commandId\":\"CMD-STOP-001\",\"code\":0,\"message\":\"OK\"}";
+
+        dispatcher.dispatch(topic, mqttMsg(payload));
+
+        Mockito.verify(commandAckHandler).handle(deviceCode, "emergency-stop", payload);
         Mockito.verifyNoMoreInteractions(
                 statusHandler,
                 configAckHandler,
@@ -151,7 +169,7 @@ public class MqttMessageDispatcherTest {
         Mockito.verifyNoMoreInteractions(
                 statusHandler,
                 configAckHandler,
-                restartAckHandler,
+                commandAckHandler,
                 operationLogHandler,
                 onlineOfflineHandler
         );
@@ -169,7 +187,7 @@ public class MqttMessageDispatcherTest {
         Mockito.verifyNoMoreInteractions(
                 statusHandler,
                 configAckHandler,
-                restartAckHandler,
+                commandAckHandler,
                 otaProgressHandler,
                 onlineOfflineHandler
         );
@@ -186,7 +204,7 @@ public class MqttMessageDispatcherTest {
         Mockito.verifyNoInteractions(
                 statusHandler,
                 configAckHandler,
-                restartAckHandler,
+                commandAckHandler,
                 otaProgressHandler,
                 operationLogHandler,
                 onlineOfflineHandler
@@ -203,7 +221,7 @@ public class MqttMessageDispatcherTest {
         Mockito.verifyNoInteractions(
                 statusHandler,
                 configAckHandler,
-                restartAckHandler,
+                commandAckHandler,
                 otaProgressHandler,
                 operationLogHandler,
                 onlineOfflineHandler

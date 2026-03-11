@@ -112,7 +112,7 @@ public class MqttConfig {
         String[] topics = {
                 "device/+/status/report",           // 设备状态上报
                 "device/+/config/ack",              // 参数配置同步确认
-                "device/+/command/restart/ack",     // 远程重启执行确认
+                "device/+/command/+/ack",           // 指令集执行确认（restart/emergency-stop/poweroff/reset...）
                 "device/+/ota/progress",            // OTA 升级进度上报
                 "device/+/log/operation",           // 设备操作日志上报
                 "$SYS/brokers/+/clients/+/connected",    // EMQX 设备上线事件

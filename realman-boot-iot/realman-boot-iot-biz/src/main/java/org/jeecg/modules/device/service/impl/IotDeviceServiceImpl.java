@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.constant.DeviceConstant;
 import org.jeecg.modules.device.dto.DeviceRequestDTO;
+import org.jeecg.modules.device.dto.DeviceUpdateDTO;
 import org.jeecg.modules.device.entity.*;
 import org.jeecg.modules.device.mapper.*;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
@@ -19,6 +20,7 @@ import org.jeecg.modules.device.security.CommandEncryptService;
 import org.jeecg.modules.device.security.DeviceSecretService;
 import org.jeecg.modules.device.service.IDeviceOperationLogService;
 import org.jeecg.modules.device.service.IIotDeviceService;
+import org.jeecg.modules.device.util.DeviceExcelExportUtil;
 import org.jeecg.modules.device.vo.DeviceDetailVO;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -134,6 +136,44 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
                 request.getCurrentTenantId(),
                 request.getSuperAdmin()
         );
+    }
+
+    /**
+     * 编辑设备（仅更新 DTO 中非空字段，deviceCode/deviceType 不可改）
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateDevice(String deviceId, DeviceUpdateDTO dto) {
+        IotDevice device = require(deviceId);
+        if (dto.getDeviceName() != null) device.setDeviceName(dto.getDeviceName());
+        if (dto.getDeviceModel() != null) device.setDeviceModel(dto.getDeviceModel());
+        if (dto.getSerialNumber() != null) device.setSerialNumber(dto.getSerialNumber());
+        if (dto.getDescription() != null) device.setDescription(dto.getDescription());
+        if (dto.getLongitude() != null) device.setLongitude(dto.getLongitude());
+        if (dto.getLatitude() != null) device.setLatitude(dto.getLatitude());
+        deviceMapper.updateById(device);
+    }
+
+    @Override
+    public byte[] exportDeviceList(DeviceRequestDTO requestDTO) {
+        int max = DeviceExcelExportUtil.getMaxExportRows();
+        IPage<IotDevice> page = deviceMapper.selectDeviceList(
+                new Page<>(1, max),
+                requestDTO.getDeviceName(),
+                requestDTO.getDeviceType(),
+                requestDTO.getStatus(),
+                requestDTO.getProductId(),
+                requestDTO.getStartTime(),
+                requestDTO.getEndTime(),
+                requestDTO.getCurrentUsername(),
+                requestDTO.getCurrentTenantId(),
+                requestDTO.getSuperAdmin()
+        );
+        try {
+            return DeviceExcelExportUtil.exportDevices(page.getRecords());
+        } catch (Exception e) {
+            throw new RuntimeException("导出Excel失败", e);
+        }
     }
 
     /**
@@ -326,44 +366,54 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
         return vo;
     }
 
-    /**
-     * 发送远程重启指令
-     *
-     * <p>执行流程：
-     * <ol>
-     *   <li>校验设备存在且当前在线（离线设备无法接收 MQTT 指令）</li>
-     *   <li>生成 commandId（用于 RestartAck 关联）</li>
-     *   <li>构造加密 RemoteRestartCommand 消息并发布到 MQTT</li>
-     *   <li>记录 PENDING 状态操作日志（等待设备回复 RestartAck 后更新为最终状态）</li>
-     * </ol>
-     *
-     * @param deviceId 设备 ID
-     * @param reason   重启原因（便于日志追溯）
-     * @param operator 操作人
-     * @throws RuntimeException 设备不在线或 MQTT 发送失败时抛出
-     */
     @Override
-    public void remoteRestart(String deviceId, String reason, String operator) {
+    public String sendCommand(String deviceId, String cmd, String reason, String operator) {
         IotDevice device = require(deviceId);
         if (DeviceConstant.DeviceStatus.ONLINE != device.getStatus()) {
             throw new RuntimeException("设备不在线");
         }
         String commandId = IdUtil.fastSimpleUUID();
         try {
-            // 构造并加密发送重启指令
-            String payload = objectMapper.writeValueAsString(MqttMessageModel.RemoteRestartCommand.builder()
-                    .commandId(commandId).reason(reason).timestamp(System.currentTimeMillis()).build());
-            mqttPublisher.publishToDevice(device.getDeviceCode(),
-                    String.format(DeviceConstant.MqttTopic.REMOTE_RESTART, device.getDeviceCode()), payload, 1);
+            String topic = String.format("device/%s/command/%s", device.getDeviceCode(), cmd);
+            Object body;
+            long now = System.currentTimeMillis();
+            switch (cmd) {
+                case "restart" -> body = MqttMessageModel.RemoteRestartCommand.builder()
+                        .commandId(commandId).reason(reason).timestamp(now).build();
+                case "emergency-stop" -> body = MqttMessageModel.EmergencyStopCommand.builder()
+                        .commandId(commandId).reason(reason).timestamp(now).build();
+                default -> {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("commandId", commandId);
+                    m.put("cmd", cmd);
+                    m.put("reason", reason);
+                    m.put("timestamp", now);
+                    body = m;
+                }
+            }
+            String payload = objectMapper.writeValueAsString(body);
+            mqttPublisher.publishToDevice(device.getDeviceCode(), topic, payload, 1);
 
-            // 记录 PENDING 状态日志，等待设备 RestartAck 后由 DeviceRestartAckHandler 补充最终结果
+            String opType = mapCommandToOperationType(cmd);
+            String desc = "发送指令[" + cmd + "]" + (reason != null ? (": " + reason) : "");
             logService.recordLog(deviceId, device.getDeviceCode(),
-                    DeviceConstant.OperationType.REMOTE_RESTART,
-                    "远程重启: " + reason, "{commandId:" + commandId + "}",
+                    opType,
+                    desc, "{commandId:" + commandId + "}",
                     DeviceConstant.OperationSource.PLATFORM, "PENDING", null, operator, null);
         } catch (Exception e) {
-            throw new RuntimeException("发送重启指令失败: " + e.getMessage());
+            throw new RuntimeException("发送指令[" + cmd + "]失败: " + e.getMessage());
         }
+        return commandId;
+    }
+
+    @Override
+    public void remoteRestart(String deviceId, String reason, String operator) {
+        sendCommand(deviceId, "restart", reason, operator);
+    }
+
+    @Override
+    public void emergencyStop(String deviceId, String reason, String operator) {
+        sendCommand(deviceId, "emergency-stop", reason, operator);
     }
 
     /**
@@ -387,6 +437,17 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
             secretService.evict(device.getDeviceCode());
             encryptService.evictCache(device.getDeviceCode());
         }
+    }
+
+    private static String mapCommandToOperationType(String cmd) {
+        if (cmd == null) return DeviceConstant.OperationType.COMMAND_SEND;
+        return switch (cmd) {
+            case "restart" -> DeviceConstant.OperationType.REMOTE_RESTART;
+            case "emergency-stop" -> DeviceConstant.OperationType.EMERGENCY_STOP;
+            case "poweroff" -> DeviceConstant.OperationType.POWER_OFF;
+            case "reset" -> DeviceConstant.OperationType.RESET;
+            default -> DeviceConstant.OperationType.COMMAND_SEND;
+        };
     }
 
     /**

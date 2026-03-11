@@ -43,7 +43,7 @@ mybatis-plus:
 
 # mqtt
 mqtt:
-  enabled: true  # 临时禁用，避免启动失败
+  enabled: false  # 临时禁用，避免启动失败
   broker:
     url: tcp://172.16.44.66:1883
     username: iot-platform
@@ -71,10 +71,13 @@ xxl:
       port: 30007
     accessToken:
 
+jeecg:
+  shiro:
+    excludeUrls: /internal/mqtt/**
 
 device:
   encrypt:
-    enabled: true
+    enabled: false
   ota:
     chunk-temp-dir: /tmp/iot-ota-chunks
 
