@@ -206,6 +206,95 @@ CREATE TABLE IF NOT EXISTS `iot_ota_upgrade_record` (
   KEY `idx_upgrade_status`(`upgrade_status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='OTA设备升级记录';
 
+-- 8. 工单合规配置
+CREATE TABLE IF NOT EXISTS `work_order_compliance_config` (
+  `id`                        VARCHAR(36)  NOT NULL PRIMARY KEY COMMENT '配置ID',
+  `agent_id`                  VARCHAR(36)  NOT NULL COMMENT '代理商ID',
+  `agent_name`                VARCHAR(100)          COMMENT '代理商名称',
+  `enterprise_id`             VARCHAR(36)           COMMENT '企业ID',
+  `enterprise_name`           VARCHAR(100)          COMMENT '企业名称',
+  `task_name`                 VARCHAR(128)          COMMENT '任务名称',
+  `task_desc`                 VARCHAR(512)          COMMENT '任务/合规说明',
+  `task_type`                 VARCHAR(32)           COMMENT '任务类型',
+  `task_level`                VARCHAR(16)           COMMENT '优先级/紧急程度',
+  `timeout_alert_enabled`     TINYINT(1)   NOT NULL DEFAULT 0 COMMENT '超时提醒开关',
+  `timeout_alert_seconds`     INT                   COMMENT '提前提醒时长（秒）',
+  `submit_limit_enabled`      TINYINT(1)   NOT NULL DEFAULT 0 COMMENT '提交时限开关',
+  `acceptance_enabled`        TINYINT(1)   NOT NULL DEFAULT 0 COMMENT '验收开关',
+  `acceptance_image_required` TINYINT(1)   NOT NULL DEFAULT 0 COMMENT '是否必须上传佐证图片',
+  `acceptance_image_desc`     VARCHAR(200)          COMMENT '图片说明文字',
+  `overtime_submit_enabled`   TINYINT(1)   NOT NULL DEFAULT 0 COMMENT '超时提交配置开关',
+  `overtime_reason_max_len`   INT          NOT NULL DEFAULT 100 COMMENT '超时原因最大字数',
+  `auto_close_enabled`        TINYINT(1)   NOT NULL DEFAULT 0 COMMENT '超时未提交自动关闭开关',
+  `auto_close_seconds`        INT                   COMMENT '自动关闭判定时间阈值（秒）',
+  `status`                    TINYINT(1)   NOT NULL DEFAULT 0 COMMENT '状态:0-未启用 1-已启用',
+  `create_by`                 VARCHAR(50)           COMMENT '创建人',
+  `create_time`               DATETIME              COMMENT '创建时间',
+  `update_by`                 VARCHAR(50)           COMMENT '修改人',
+  `update_time`               DATETIME              COMMENT '修改时间',
+  `del_flag`                  TINYINT(1)   NOT NULL DEFAULT 0 COMMENT '逻辑删除:0-正常 1-删除',
+  `tenant_id`                 VARCHAR(36)           COMMENT '租户ID'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='工单合规配置';
+
+-- 9. 工单主表
+CREATE TABLE IF NOT EXISTS `work_order` (
+  `id`                    VARCHAR(36)  NOT NULL PRIMARY KEY COMMENT '工单ID',
+  `agent_id`              VARCHAR(36)  NOT NULL COMMENT '代理商ID',
+  `agent_name`            VARCHAR(100)          COMMENT '代理商名称',
+  `department_id`         VARCHAR(36)           COMMENT '所属部门ID',
+  `department_name`       VARCHAR(100)          COMMENT '所属部门名称',
+  `compliance_id`         VARCHAR(36)  NOT NULL COMMENT '绑定合规配置ID',
+  `remark`                VARCHAR(500)          COMMENT '备注',
+  `plan_start_time`       DATETIME     NOT NULL COMMENT '计划开始时间',
+  `plan_end_time`         DATETIME     NOT NULL COMMENT '计划结束时间（失效时间）',
+  `status`                VARCHAR(20)  NOT NULL DEFAULT 'PENDING' COMMENT '状态: PENDING/STARTED/SUBMITTED/COMPLETED/TIMEOUT/CLOSED',
+  `audit_result`          VARCHAR(20)           COMMENT '审核结果: PASS/FAIL/TIMEOUT/CLOSED',
+  `operator_id`           VARCHAR(36)           COMMENT '开启人员ID',
+  `operator_name`         VARCHAR(50)           COMMENT '开启人员姓名',
+  `operator_phone`        VARCHAR(20)           COMMENT '开启人员联系方式',
+  `actual_start_time`     DATETIME              COMMENT '实际开启时间',
+  `submit_time`           DATETIME              COMMENT '提交时间',
+  `timeout_reason`        VARCHAR(100)          COMMENT '超时原因',
+  `timeout_reason_source` VARCHAR(20)           COMMENT '原因来源: USER/SYSTEM',
+  `audit_by`              VARCHAR(50)           COMMENT '审核人',
+  `audit_time`            DATETIME              COMMENT '审核时间',
+  `audit_comment`         VARCHAR(200)          COMMENT '审核意见',
+  `close_by`              VARCHAR(50)           COMMENT '关闭人',
+  `close_time`            DATETIME              COMMENT '关闭时间',
+  `close_reason`          VARCHAR(200)          COMMENT '关闭原因',
+  `create_by`             VARCHAR(50)           COMMENT '创建人',
+  `create_time`           DATETIME              COMMENT '创建时间',
+  `update_by`             VARCHAR(50)           COMMENT '修改人',
+  `update_time`           DATETIME              COMMENT '修改时间',
+  `del_flag`              TINYINT(1)  NOT NULL DEFAULT 0 COMMENT '逻辑删除',
+  `tenant_id`             VARCHAR(36)           COMMENT '租户ID'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='工单主表';
+
+-- 10. 工单绑定设备
+CREATE TABLE IF NOT EXISTS `work_order_device` (
+  `id`                  VARCHAR(36)  NOT NULL PRIMARY KEY,
+  `work_order_id`       VARCHAR(36)  NOT NULL COMMENT '工单ID',
+  `device_type`         VARCHAR(20)  NOT NULL COMMENT '设备类型: CONTROLLER/ROBOT',
+  `device_id`           VARCHAR(36)  NOT NULL COMMENT '计划设备ID',
+  `device_name`         VARCHAR(100)          COMMENT '计划设备名称',
+  `device_code`         VARCHAR(100)          COMMENT '计划设备编号',
+  `actual_device_id`    VARCHAR(36)           COMMENT '实际使用设备ID',
+  `actual_device_name`  VARCHAR(100)          COMMENT '实际使用设备名称',
+  `actual_device_code`  VARCHAR(100)          COMMENT '实际使用设备编号',
+  `create_time`         DATETIME              COMMENT '创建时间'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='工单绑定设备';
+
+-- 11. 工单佐证图片
+CREATE TABLE IF NOT EXISTS `work_order_attachment` (
+  `id`            VARCHAR(36)   NOT NULL PRIMARY KEY,
+  `work_order_id` VARCHAR(36)   NOT NULL COMMENT '工单ID',
+  `file_url`      VARCHAR(500)  NOT NULL COMMENT '图片URL',
+  `file_name`     VARCHAR(200)           COMMENT '图片文件名',
+  `description`   VARCHAR(200)           COMMENT '图片说明',
+  `create_by`     VARCHAR(50)            COMMENT '上传人',
+  `create_time`   DATETIME               COMMENT '上传时间'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='工单佐证图片';
+
 -- 测试数据（device_secret需在平台控制台生成后下发给设备端）
 INSERT INTO `iot_device` (id,device_code,device_name,device_type,product_id,device_model,firmware_version,status,device_secret,secret_create_time,description,create_by,tenant_id,create_time)
 VALUES
