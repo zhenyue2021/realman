@@ -176,6 +176,7 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
                 cfg.setConfigType("string");
                 cfg.setSyncStatus(DeviceConstant.ConfigSyncStatus.PENDING);
                 cfg.setCreateTime(LocalDateTime.now());
+                cfg.setUpdateTime(LocalDateTime.now());
                 configMapper.insert(cfg);
             }
         });
@@ -302,16 +303,23 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
             heartbeat = latest.getReportTime() != null ? latest.getReportTime() : latest.getReceiveTime();
         }
 
-        // 5. 最近 20 条操作日志
+        // 5. 设备参数配置列表（按 device_id 查询）
+        List<IotDeviceConfig> deviceConfigs = configMapper.selectList(
+                new LambdaQueryWrapper<IotDeviceConfig>()
+                        .eq(IotDeviceConfig::getDeviceId, deviceId)
+                        .orderByAsc(IotDeviceConfig::getConfigKey));
+
+        // 6. 最近 20 条操作日志
         List<IotDeviceOperationLog> recentLogs = logService
                 .queryLogPage(new Page<>(1, 20), deviceId, null, null, null)
                 .getRecords();
 
-        // 6. 组装 VO
+        // 7. 组装 VO
         DeviceDetailVO vo = new DeviceDetailVO();
         vo.setDevice(device);
         vo.setOnline(online);
         vo.setRealtimeStatus(realtime);
+        vo.setDeviceConfigs(deviceConfigs);
         vo.setLatestStatus(latest);
         vo.setLastHeartbeatTime(heartbeat);
         vo.setRecentLogs(recentLogs);

@@ -2,6 +2,7 @@ package org.jeecg.modules.device.vo;
 
 import lombok.Data;
 import org.jeecg.modules.device.entity.IotDevice;
+import org.jeecg.modules.device.entity.IotDeviceConfig;
 import org.jeecg.modules.device.entity.IotDeviceOperationLog;
 import org.jeecg.modules.device.entity.IotDeviceStatus;
 
@@ -13,6 +14,7 @@ import java.util.Map;
  * 管理平台设备详情聚合视图：
  * - 设备基础信息（iot_device）
  * - 在线/离线与实时状态（Redis）
+ * - 设备参数配置（iot_device_config）
  * - 最近一次状态上报（iot_device_status）
  * - 最近操作日志（iot_device_operation_log）
  */
@@ -29,6 +31,9 @@ public class DeviceDetailVO {
 
     /** 实时状态（Redis解密后的状态报文转Map，包含温湿度/电量/信号/定位/运行状态等） */
     private Map<String, Object> realtimeStatus;
+
+    /** 设备参数配置列表（config_key / config_value / sync_status / sync_time 等） */
+    private List<IotDeviceConfig> deviceConfigs;
 
     /** 最近一次状态记录（DB） */
     private IotDeviceStatus latestStatus;

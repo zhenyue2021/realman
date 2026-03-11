@@ -16,6 +16,7 @@ import org.jeecg.common.util.oConvertUtils;
 import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Field;
+import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.Properties;
 
@@ -61,14 +62,14 @@ public class MybatisInterceptor implements Interceptor {
 							}
 						}
 					}
-					// 注入创建时间
+					// 注入创建时间（兼容 Date 与 LocalDateTime）
 					if ("createTime".equals(field.getName())) {
 						field.setAccessible(true);
 						Object localCreateDate = field.get(parameter);
 						field.setAccessible(false);
 						if (localCreateDate == null || "".equals(localCreateDate)) {
 							field.setAccessible(true);
-							field.set(parameter, new Date());
+							field.set(parameter, nowForFieldType(field.getType()));
 							field.setAccessible(false);
 						}
 					}
@@ -161,7 +162,7 @@ public class MybatisInterceptor implements Interceptor {
 					}
 					if ("updateTime".equals(field.getName())) {
 						field.setAccessible(true);
-						field.set(parameter, new Date());
+						field.set(parameter, nowForFieldType(field.getType()));
 						field.setAccessible(false);
 					}
 				} catch (Exception e) {
@@ -180,6 +181,21 @@ public class MybatisInterceptor implements Interceptor {
 	@Override
 	public void setProperties(Properties properties) {
 		// TODO Auto-generated method stub
+	}
+
+	/**
+	 * 根据字段类型返回当前时间，兼容 java.util.Date 与 java.time.LocalDateTime。
+	 * 使用类型名判断，避免不同 ClassLoader 下 class 引用不一致导致误判。
+	 */
+	private static Object nowForFieldType(Class<?> fieldType) {
+		if (fieldType == null) {
+			return new Date();
+		}
+		if (LocalDateTime.class.equals(fieldType)
+				|| "java.time.LocalDateTime".equals(fieldType.getName())) {
+			return LocalDateTime.now();
+		}
+		return new Date();
 	}
 
     /**
