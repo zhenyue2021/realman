@@ -76,4 +76,42 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <!-- 测试前将 byte-buddy-agent 复制到 target，供 -javaagent 使用，避免 Mockito 运行时动态加载 Agent 产生 WARNING -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>copy-byte-buddy-agent</id>
+                        <phase>initialize</phase>
+                        <goals>
+                            <goal>copy</goal>
+                        </goals>
+                        <configuration>
+                            <artifactItems>
+                                <artifactItem>
+                                    <groupId>net.bytebuddy</groupId>
+                                    <artifactId>byte-buddy-agent</artifactId>
+                                    <version>1.17.7</version>
+                                    <destFileName>byte-buddy-agent.jar</destFileName>
+                                </artifactItem>
+                            </artifactItems>
+                            <outputDirectory>${project.build.directory}</outputDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <!-- 使用 @{argLine} 保留父 POM/JaCoCo 的 argLine，并追加 Mockito 所需的 javaagent，消除 self-attaching 警告 -->
+                    <argLine>@{argLine} -javaagent:${project.build.directory}/byte-buddy-agent.jar</argLine>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 </project>

@@ -64,11 +64,12 @@ public class DeviceConfigAckHandler {
                                         : DeviceConstant.ConfigSyncStatus.FAILED;
 
         // 4. 批量更新该设备所有 PENDING 状态的配置记录（一次 commandId 对应一批 params）
-        configMapper.update(null, new LambdaUpdateWrapper<IotDeviceConfig>()
+        LambdaUpdateWrapper<IotDeviceConfig> updateWrapper = new LambdaUpdateWrapper<>(IotDeviceConfig.class)
                 .eq(IotDeviceConfig::getDeviceCode, deviceCode)
                 .eq(IotDeviceConfig::getSyncStatus, DeviceConstant.ConfigSyncStatus.PENDING)
                 .set(IotDeviceConfig::getSyncStatus, status)
-                .set(IotDeviceConfig::getSyncTime, LocalDateTime.now()));
+                .set(IotDeviceConfig::getSyncTime, LocalDateTime.now());
+        configMapper.update(null, updateWrapper);
 
         // 5. 记录操作日志
         logService.recordLog(null, deviceCode, DeviceConstant.OperationType.PARAM_MODIFY,

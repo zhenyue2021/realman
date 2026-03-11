@@ -1,0 +1,213 @@
+package org.jeecg.modules.device.mqtt.handler;
+
+import org.eclipse.paho.client.mqttv3.MqttMessage;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+
+import java.nio.charset.StandardCharsets;
+
+/**
+ * 基于 {@link MqttMessageDispatcher} 的单元测试，
+ * 通过直接调用 dispatch 方法模拟设备上报的各种指令 Topic。
+ *
+ * 运行方式：
+ * - 直接在 IDE 中运行本测试类；
+ * - 或在命令行执行：mvn -pl realman-boot-iot/realman-boot-iot-biz test -Dtest=MqttMessageDispatcherTest
+ *
+ * 如需调整设备编码、Payload 等，只需要修改下面各个测试用例中的 topic / payload 字符串。
+ */
+public class MqttMessageDispatcherTest {
+
+    private DeviceStatusHandler statusHandler;
+    private DeviceConfigAckHandler configAckHandler;
+    private DeviceRestartAckHandler restartAckHandler;
+    private OtaProgressHandler otaProgressHandler;
+    private DeviceOperationLogHandler operationLogHandler;
+    private DeviceOnlineOfflineHandler onlineOfflineHandler;
+
+    private MqttMessageDispatcher dispatcher;
+
+    @BeforeEach
+    void setUp() {
+        statusHandler = Mockito.mock(DeviceStatusHandler.class);
+        configAckHandler = Mockito.mock(DeviceConfigAckHandler.class);
+        restartAckHandler = Mockito.mock(DeviceRestartAckHandler.class);
+        otaProgressHandler = Mockito.mock(OtaProgressHandler.class);
+        operationLogHandler = Mockito.mock(DeviceOperationLogHandler.class);
+        onlineOfflineHandler = Mockito.mock(DeviceOnlineOfflineHandler.class);
+
+        dispatcher = new MqttMessageDispatcher(
+                statusHandler,
+                configAckHandler,
+                restartAckHandler,
+                otaProgressHandler,
+                operationLogHandler,
+                onlineOfflineHandler
+        );
+    }
+
+    private static MqttMessage mqttMsg(String payload) {
+        return new MqttMessage(payload.getBytes(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void testSysOnlineEvent() {
+        String topic = "$SYS/brokers/emqx@127.0.0.1/clients/DEV001/connected";
+        String payload = "{\"clientid\":\"DEV001\",\"username\":\"dev001\",\"peerhost\":\"127.0.0.1\"}";
+
+        dispatcher.dispatch(topic, mqttMsg(payload));
+
+        Mockito.verify(onlineOfflineHandler).handleOnline(topic, payload);
+        Mockito.verifyNoMoreInteractions(
+                statusHandler,
+                configAckHandler,
+                restartAckHandler,
+                otaProgressHandler,
+                operationLogHandler
+        );
+    }
+
+    @Test
+    void testSysOfflineEvent() {
+        String topic = "$SYS/brokers/emqx@127.0.0.1/clients/DEV001/disconnected";
+        String payload = "{\"clientid\":\"DEV001\",\"reason\":\"timeout\"}";
+
+        dispatcher.dispatch(topic, mqttMsg(payload));
+
+        Mockito.verify(onlineOfflineHandler).handleOffline(topic, payload);
+        Mockito.verifyNoMoreInteractions(
+                statusHandler,
+                configAckHandler,
+                restartAckHandler,
+                otaProgressHandler,
+                operationLogHandler
+        );
+    }
+
+    @Test
+    void testStatusReport() throws Exception {
+        String deviceCode = "DEV001";
+        String topic = "device/" + deviceCode + "/status/report";
+        String payload = "{\"ts\":1710000000000,\"status\":\"OK\"}";
+
+        dispatcher.dispatch(topic, mqttMsg(payload));
+
+        Mockito.verify(statusHandler).handle(deviceCode, payload);
+        Mockito.verifyNoMoreInteractions(
+                configAckHandler,
+                restartAckHandler,
+                otaProgressHandler,
+                operationLogHandler,
+                onlineOfflineHandler
+        );
+    }
+
+    @Test
+    void testConfigAck() throws Exception {
+        String deviceCode = "DEV001";
+        String topic = "device/" + deviceCode + "/config/ack";
+        String payload = "{\"configId\":\"CFG-001\",\"result\":\"SUCCESS\"}";
+
+        dispatcher.dispatch(topic, mqttMsg(payload));
+
+        Mockito.verify(configAckHandler).handle(deviceCode, payload);
+        Mockito.verifyNoMoreInteractions(
+                statusHandler,
+                restartAckHandler,
+                otaProgressHandler,
+                operationLogHandler,
+                onlineOfflineHandler
+        );
+    }
+
+    @Test
+    void testRestartAck() throws Exception {
+        String deviceCode = "DEV001";
+        String topic = "device/" + deviceCode + "/command/restart/ack";
+        String payload = "{\"commandId\":\"CMD-RESTART-001\",\"result\":\"SUCCESS\"}";
+
+        dispatcher.dispatch(topic, mqttMsg(payload));
+
+        Mockito.verify(restartAckHandler).handle(deviceCode, payload);
+        Mockito.verifyNoMoreInteractions(
+                statusHandler,
+                configAckHandler,
+                otaProgressHandler,
+                operationLogHandler,
+                onlineOfflineHandler
+        );
+    }
+
+    @Test
+    void testOtaProgress() throws Exception {
+        String deviceCode = "DEV001";
+        String topic = "device/" + deviceCode + "/ota/progress";
+        String payload = "{\"taskId\":\"OTA-001\",\"progress\":80,\"status\":\"DOWNLOADING\"}";
+
+        dispatcher.dispatch(topic, mqttMsg(payload));
+
+        Mockito.verify(otaProgressHandler).handle(deviceCode, payload);
+        Mockito.verifyNoMoreInteractions(
+                statusHandler,
+                configAckHandler,
+                restartAckHandler,
+                operationLogHandler,
+                onlineOfflineHandler
+        );
+    }
+
+    @Test
+    void testOperationLog() throws Exception {
+        String deviceCode = "DEV001";
+        String topic = "device/" + deviceCode + "/log/operation";
+        String payload = "{\"level\":\"INFO\",\"msg\":\"device started\"}";
+
+        dispatcher.dispatch(topic, mqttMsg(payload));
+
+        Mockito.verify(operationLogHandler).handle(deviceCode, payload);
+        Mockito.verifyNoMoreInteractions(
+                statusHandler,
+                configAckHandler,
+                restartAckHandler,
+                otaProgressHandler,
+                onlineOfflineHandler
+        );
+    }
+
+    @Test
+    void testUnknownBusinessTopic() {
+        String deviceCode = "DEV001";
+        String topic = "device/" + deviceCode + "/unknown/path";
+        String payload = "{\"foo\":\"bar\"}";
+
+        dispatcher.dispatch(topic, mqttMsg(payload));
+
+        Mockito.verifyNoInteractions(
+                statusHandler,
+                configAckHandler,
+                restartAckHandler,
+                otaProgressHandler,
+                operationLogHandler,
+                onlineOfflineHandler
+        );
+    }
+
+    @Test
+    void testNotMatchDevicePattern() {
+        String topic = "invalid/topic";
+        String payload = "{\"foo\":\"bar\"}";
+
+        dispatcher.dispatch(topic, mqttMsg(payload));
+
+        Mockito.verifyNoInteractions(
+                statusHandler,
+                configAckHandler,
+                restartAckHandler,
+                otaProgressHandler,
+                operationLogHandler,
+                onlineOfflineHandler
+        );
+    }
+}
+

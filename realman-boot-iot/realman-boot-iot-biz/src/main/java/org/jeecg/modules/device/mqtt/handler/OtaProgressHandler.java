@@ -106,9 +106,10 @@ public class OtaProgressHandler {
             upd.setFinishTime(LocalDateTime.now());
             if (p.getStatus() == DeviceConstant.OtaUpgradeStatus.SUCCESS && p.getNewVersion() != null) {
                 // 升级成功：同步更新设备固件版本字段
-                deviceMapper.update(null, new LambdaUpdateWrapper<IotDevice>()
+                LambdaUpdateWrapper<IotDevice> updateWrapper = new LambdaUpdateWrapper<IotDevice>()
                         .eq(IotDevice::getDeviceCode, deviceCode)
-                        .set(IotDevice::getFirmwareVersion, p.getNewVersion()));
+                        .set(IotDevice::getFirmwareVersion, p.getNewVersion());
+                deviceMapper.update(null, updateWrapper);
                 // 清除断点续传缓存（升级完成，不再需要）
                 redisTemplate.delete(DeviceConstant.RedisKey.OTA_PROGRESS_PREFIX + deviceCode + ":" + record.getId());
             }
