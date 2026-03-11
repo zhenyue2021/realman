@@ -116,7 +116,14 @@ public class MqttConfig {
                 "device/+/ota/progress",            // OTA 升级进度上报
                 "device/+/log/operation",           // 设备操作日志上报
                 "$SYS/brokers/+/clients/+/connected",    // EMQX 设备上线事件
-                "$SYS/brokers/+/clients/+/disconnected"  // EMQX 设备下线事件
+                "$SYS/brokers/+/clients/+/disconnected",  // EMQX 设备下线事件
+                // ========== 订阅主控设备主动上报的数据 ==========
+                "+/master/cmd",                     // 平设备主动上报指令
+                "+/master/states",                  // 设备主动上报状态等数据
+                "+/master/rtsp/ctrl",               // 设备主动上报 RTSP
+                // ========== 订阅机器人设备主动上报的数据 ==========
+                "+/slave/cmd",                     // 机器人设备主动上报指令
+                "+/slave/states"                   // 机器人设备主动上报状态等数据
         };
         int[] qosArr = new int[topics.length];
         Arrays.fill(qosArr, qos);

@@ -59,6 +59,7 @@ public class DeviceStatusHandler {
     public void handle(String deviceCode, String payload) throws Exception {
         // 1. 解密 + 解析消息体
         String decrypted = encryptService.decryptFromDevice(deviceCode, payload);
+        log.info("[StatusHandler] 解密成功, 设备上报消息体为: {}", decrypted);
         MqttMessageModel.StatusReport r = objectMapper.readValue(decrypted, MqttMessageModel.StatusReport.class);
 
         // 2. 校验设备是否存在（防止脏数据）
@@ -86,7 +87,7 @@ public class DeviceStatusHandler {
         deviceMapper.updateById(device);
 
         // 6. WebSocket 实时推送给前端监控页面
-        webSocketServer.pushDeviceStatus(deviceCode, decrypted);
+//        webSocketServer.pushDeviceStatus(deviceCode, decrypted);
 
         // 7. 异步写入历史状态 DB（使用独立线程池，不占用 MQTT 消费线程）
         persistAsync(device, r, decrypted);

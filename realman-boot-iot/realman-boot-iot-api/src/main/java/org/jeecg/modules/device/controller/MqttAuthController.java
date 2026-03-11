@@ -48,6 +48,7 @@ public class MqttAuthController {
      */
     @PostMapping("/auth")
     public ResponseEntity<Map<String, String>> auth(@RequestBody Map<String, String> body) {
+        log.info("[MqttAuth] requestBody={}", body);
         String clientId = body.get("clientid");
         String username = body.get("username");
         String password = body.get("password");

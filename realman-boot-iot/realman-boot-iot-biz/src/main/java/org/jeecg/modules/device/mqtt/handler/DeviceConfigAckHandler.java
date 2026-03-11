@@ -53,6 +53,7 @@ public class DeviceConfigAckHandler {
     public void handle(String deviceCode, String payload) throws Exception {
         // 1. 解密 + 解析确认消息
         String decrypted = encryptService.decryptFromDevice(deviceCode, payload);
+        log.info("[ConfigAckHandler] 解密成功, 设备上报消息体为: {}", decrypted);
         MqttMessageModel.ConfigAck ack = objectMapper.readValue(decrypted, MqttMessageModel.ConfigAck.class);
         log.info("[ConfigAck] 设备[{}] commandId={} code={}", deviceCode, ack.getCommandId(), ack.getCode());
 

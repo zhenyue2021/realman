@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.jeecg.modules.device.mapper.IotDeviceStatusMapper">
+
+    <select id="selectAllDeviceIds" resultType="string">
+        SELECT DISTINCT device_id
+        FROM iot_device_status
+    </select>
+
+    <!-- 删除“今天”内每小时多余记录：同一 device+hour，只保留最大 report_time 那条 -->
+    <delete id="deleteTodayHourlyRedundant">
+        DELETE s
+        FROM iot_device_status s
+        JOIN (
+            SELECT device_id,
+                   DATE_FORMAT(report_time, '%Y-%m-%d %H') AS hour_bucket,
+                   MAX(report_time) AS max_rt
+            FROM iot_device_status
+            WHERE device_id = #{deviceId}
+              AND report_time &gt;= #{todayStart}
+            GROUP BY device_id, hour_bucket
+        ) t
+          ON s.device_id = t.device_id
+         AND DATE_FORMAT(s.report_time, '%Y-%m-%d %H') = t.hour_bucket
+         AND s.report_time &lt; t.max_rt
+    </delete>
+
+    <!-- 删除“今天”内且早于当前小时的每小时多余记录：当前小时内全部保留 -->
+    <delete id="deleteTodayHourlyRedundantBeforeHour">
+        DELETE s
+        FROM iot_device_status s
+        JOIN (
+            SELECT device_id,
+                   DATE_FORMAT(report_time, '%Y-%m-%d %H') AS hour_bucket,
+                   MAX(report_time) AS max_rt
+            FROM iot_device_status
+            WHERE device_id = #{deviceId}
+              AND report_time &gt;= #{todayStart}
+              AND report_time &lt; #{hourCutoff}
+            GROUP BY device_id, hour_bucket
+        ) t
+          ON s.device_id = t.device_id
+         AND DATE_FORMAT(s.report_time, '%Y-%m-%d %H') = t.hour_bucket
+         AND s.report_time &lt; t.max_rt
+    </delete>
+
+    <!-- 删除“今天以前、最近7天窗口内”多余记录：同一 device+day，只保留每天最大 report_time 那条 -->
+    <delete id="deleteRecentDailyRedundant">
+        DELETE s
+        FROM iot_device_status s
+        JOIN (
+            SELECT device_id,
+                   DATE(report_time) AS day_bucket,
+                   MAX(report_time) AS max_rt
+            FROM iot_device_status
+            WHERE device_id = #{deviceId}
+              AND report_time &gt;= #{startDay}
+              AND report_time &lt; #{todayStart}
+            GROUP BY device_id, day_bucket
+        ) t
+          ON s.device_id = t.device_id
+         AND DATE(s.report_time) = t.day_bucket
+         AND s.report_time &lt; t.max_rt
+    </delete>
+
+    <!-- 查询在7天窗口开始之前最新的一条记录 -->
+    <select id="selectLatestBefore" resultType="org.jeecg.modules.device.entity.IotDeviceStatus">
+        SELECT *
+        FROM iot_device_status
+        WHERE device_id = #{deviceId}
+          AND report_time &lt; #{beforeTime}
+        ORDER BY report_time DESC
+        LIMIT 1
+    </select>
+
+    <!-- 删除 beforeTime 之前的所有记录，保留 keepId（若为空则不保留） -->
+    <delete id="deleteOlderThan">
+        DELETE FROM iot_device_status
+        WHERE device_id = #{deviceId}
+          AND report_time &lt; #{beforeTime}
+          <if test="keepId != null">
+          AND id &lt;&gt; #{keepId}
+          </if>
+    </delete>
+</mapper>
+

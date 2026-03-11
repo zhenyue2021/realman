@@ -7,7 +7,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.constant.DeviceConstant;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.entity.IotOtaUpgradeRecord;
+import org.jeecg.modules.device.entity.IotDeviceStatus;
 import org.jeecg.modules.device.mapper.IotDeviceMapper;
+import org.jeecg.modules.device.mapper.IotDeviceStatusMapper;
 import org.jeecg.modules.device.mapper.IotOtaUpgradeRecordMapper;
 import org.jeecg.modules.device.mapper.IotOtaUpgradeTaskMapper;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -22,12 +24,16 @@ import java.util.List;
  * <ul>
  *   <li>{@link #checkOfflineDevices}：每分钟检测离线设备</li>
  *   <li>{@link #checkOtaTimeout}：每5分钟检测 OTA 升级超时</li>
+ *   <li>{@link #compactTodayDeviceStatus}：当天状态每小时压缩</li>
+ *   <li>{@link #compactDeviceStatusHistory}：最近7天及更早历史压缩</li>
  * </ul>
  *
  * <p>XXL-Job 配置（在 XXL-Job Admin 后台注册）：
  * <pre>
  *   deviceOfflineCheckJob     Cron: 0 * * * * ?    每分钟执行
  *   otaUpgradeTimeoutCheckJob Cron: 0 0/5 * * * ?  每5分钟执行
+ *   compactTodayDeviceStatusJob Cron: 0 30 * * * ?  每小时第30分钟执行
+ *   compactDeviceStatusJob    Cron: 0 20 2 * * ?   每天 02:20 执行
  * </pre>
  */
 @Slf4j
@@ -36,6 +42,7 @@ import java.util.List;
 public class DeviceSchedulerJob {
 
     private final IotDeviceMapper           deviceMapper;
+    private final IotDeviceStatusMapper     statusMapper;
     private final IotOtaUpgradeRecordMapper recordMapper;
     private final IotOtaUpgradeTaskMapper   taskMapper;
     private final StringRedisTemplate       redisTemplate;
@@ -120,5 +127,58 @@ public class DeviceSchedulerJob {
             taskMapper.refreshTaskStatistics(r.getTaskId());
         }
         if (!timeoutList.isEmpty()) log.warn("[OtaTimeout] 标记{}条超时升级记录", timeoutList.size());
+    }
+
+    /**
+     * 当天状态压缩任务
+     *
+     * <p>策略：对“今天内且早于当前小时”的记录进行每小时压缩——每小时仅保留最新一条；
+     * 当前小时内的所有上报记录全部保留，避免影响实时分析。
+     *
+     * <p>XXL-Job Handler Name：{@code compactTodayDeviceStatusJob}，建议 Cron：{@code 0 30 * * * ?}
+     */
+    @XxlJob("compactTodayDeviceStatusJob")
+    public void compactTodayDeviceStatus() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime todayStart = now.toLocalDate().atStartOfDay();
+        LocalDateTime currentHourStart = now.withMinute(0).withSecond(0).withNano(0);
+
+        List<String> deviceIds = statusMapper.selectAllDeviceIds();
+        int totalDeleted = 0;
+        for (String deviceId : deviceIds) {
+            totalDeleted += statusMapper.deleteTodayHourlyRedundantBeforeHour(deviceId, todayStart, currentHourStart);
+        }
+        log.info("[StatusCompact-Today] 已压缩今天内早于当前小时的状态记录 {} 条（设备数={}）", totalDeleted, deviceIds.size());
+    }
+
+    /**
+     * 最近7天及更早的状态历史压缩任务
+     *
+     * <p>策略：
+     * <ol>
+     *   <li>最近7天（不含当天）：每天仅保留最新一条记录</li>
+     *   <li>7天之前：仅保留“窗口开始时间之前”的最后一条记录，其余物理删除</li>
+     * </ol>
+     *
+     * <p>XXL-Job Handler Name：{@code compactDeviceStatusJob}，建议 Cron：{@code 0 20 2 * * ?}
+     */
+    @XxlJob("compactDeviceStatusJob")
+    public void compactDeviceStatusHistory() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime todayStart = now.toLocalDate().atStartOfDay();
+        LocalDateTime recentStart = todayStart.minusDays(7); // 最近7天窗口起点（不含更早数据）
+
+        List<String> deviceIds = statusMapper.selectAllDeviceIds();
+        int totalDeleted = 0;
+        for (String deviceId : deviceIds) {
+            // 1. 最近7天（不含当天）：每天仅保留最新一条
+            totalDeleted += statusMapper.deleteRecentDailyRedundant(deviceId, recentStart, todayStart);
+
+            // 2. 7天之前：保留窗口起点之前的最后一条，其余删除
+            IotDeviceStatus anchor = statusMapper.selectLatestBefore(deviceId, recentStart);
+            String keepId = anchor != null ? anchor.getId() : null;
+            totalDeleted += statusMapper.deleteOlderThan(deviceId, recentStart, keepId);
+        }
+        log.info("[StatusCompact-History] 本次共压缩最近7天及更早的历史记录 {} 条（设备数={}）", totalDeleted, deviceIds.size());
     }
 }

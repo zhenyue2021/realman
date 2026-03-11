@@ -49,6 +49,7 @@ public class DeviceOperationLogHandler {
     public void handle(String deviceCode, String payload) throws Exception {
         // 1. 解密 + 解析日志消息
         String decrypted = encryptService.decryptFromDevice(deviceCode, payload);
+        log.info("[OperationLogHandler] 解密成功, 设备上报消息体为: {}", decrypted);
         MqttMessageModel.OperationLogReport r = objectMapper.readValue(decrypted, MqttMessageModel.OperationLogReport.class);
 
         // 2. 写入日志（operationTime 使用设备端时间，来源标记为 DEVICE）

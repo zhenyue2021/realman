@@ -65,6 +65,7 @@ public class OtaProgressHandler {
     public void handle(String deviceCode, String payload) throws Exception {
         // 1. 解密 + 解析进度消息
         String decrypted = encryptService.decryptFromDevice(deviceCode, payload);
+        log.info("[OtaProgressHandler] 解密成功, 设备上报消息体为: {}", decrypted);
         MqttMessageModel.OtaProgress p = objectMapper.readValue(decrypted, MqttMessageModel.OtaProgress.class);
         log.info("[OTA] 设备[{}] status={} progress={}% bytes={}", deviceCode, p.getStatus(), p.getProgress(), p.getDownloadedBytes());
 

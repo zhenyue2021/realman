@@ -26,6 +26,7 @@ public class DeviceCommandAckHandler {
 
     public void handle(String deviceCode, String cmd, String payload) throws Exception {
         String decrypted = encryptService.decryptFromDevice(deviceCode, payload);
+        log.info("[CommandAckHandler] 解密成功, 设备上报消息体为: {}", decrypted);
         JsonNode node = objectMapper.readTree(decrypted);
 
         String commandId = text(node, "commandId");

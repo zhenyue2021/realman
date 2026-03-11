@@ -87,7 +87,6 @@ public class MqttMessageDispatcher {
             String path       = m.group(2);
 
             // 3. 按 path 路由到对应业务 Handler（各 Handler 内部解密并处理）
-            // 3. 按 path 路由到对应业务 Handler（各 Handler 内部解密并处理）
             // 指令集通用 ACK：command/{cmd}/ack
             if (path.startsWith("command/") && path.endsWith("/ack")) {
                 String cmd = path.substring("command/".length(), path.length() - "/ack".length());
@@ -104,6 +103,7 @@ public class MqttMessageDispatcher {
                 case "config/ack" -> configAckHandler.handle(deviceCode, payload);
                 case "ota/progress" -> otaProgressHandler.handle(deviceCode, payload);
                 case "log/operation" -> operationLogHandler.handle(deviceCode, payload);
+                // TODO 待实现 后增加的topic的处理逻辑
                 default -> log.warn("[Dispatcher] 未知路径: {}", topic);
             }
         } catch (Exception e) {
