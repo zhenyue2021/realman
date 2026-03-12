@@ -13,5 +13,7 @@ public class DeviceAddDTO {
     private String productId;
     private String deviceModel;
     private String serialNumber;
+    /** 设备网卡MAC地址 */
+    private String macAddress;
     private String description;
 }

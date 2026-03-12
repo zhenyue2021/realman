@@ -74,6 +74,24 @@ public interface DeviceConstant {
          * 由 {@link org.jeecg.modules.device.mqtt.handler.DeviceCameraStreamResponseHandler} 处理。
          */
         String CAMERA_STREAM_RESPONSE = "device/%s/camera/stream/response";
+
+        /**
+         * 下行：平台向主控查询“当前关联的机器人/设备信息”
+         *
+         * <p>Topic: device/{controllerCode}/teleop/associated-device/query
+         *
+         * <p>配合 {@link org.jeecg.modules.device.mqtt.MqttMessageModel.AssociatedDeviceQuery} 使用，
+         * 主控收到后应回复 {@link org.jeecg.modules.device.mqtt.MqttMessageModel.AssociatedDeviceResponse}。
+         */
+        String ASSOCIATED_DEVICE_QUERY    = "device/%s/teleop/associated-device/query";
+        /**
+         * 上行：主控上报“当前关联的机器人/设备信息”
+         *
+         * <p>Topic: device/{controllerCode}/teleop/associated-device/response
+         */
+        String ASSOCIATED_DEVICE_RESPONSE = "device/%s/teleop/associated-device/response";
+
+        // todo 告诉主控控制的是哪台机器人，力反馈+底盘速度设置
         /** EMQX 系统事件：设备 MQTT 连接建立（clientId 从 topic 路径中提取） */
         String SYS_CONNECTED    = "$SYS/brokers/+/clients/+/connected";
         /** EMQX 系统事件：设备 MQTT 连接断开 */

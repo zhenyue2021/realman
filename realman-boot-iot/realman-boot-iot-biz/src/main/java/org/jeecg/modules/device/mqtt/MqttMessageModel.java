@@ -345,4 +345,54 @@ public class MqttMessageModel {
         /** 设备回复时间戳（毫秒） */
         private long timestamp;
     }
+
+    /**
+     * 下行：平台向主控查询“当前关联的机器人/设备信息”（Topic: device/{controllerCode}/teleop/associated-device/query）
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class AssociatedDeviceQuery {
+        /** 指令唯一 ID（UUID），用于关联 AssociatedDeviceResponse */
+        private String commandId;
+        /** 操作员ID（可选，用于主控侧日志/校验） */
+        private String operatorId;
+        /** 登录记录ID（可选，平台用于回写 iot_controller_login_log） */
+        private String loginLogId;
+        /** 平台发送时间戳（毫秒） */
+        private long timestamp;
+    }
+
+    /**
+     * 上行：主控上报“当前关联的机器人/设备信息”（Topic: device/{controllerCode}/teleop/associated-device/response）
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class AssociatedDeviceResponse {
+        /** 对应 {@link AssociatedDeviceQuery#commandId} */
+        private String commandId;
+        /** 执行结果码：0=成功，非0=失败 */
+        private int code;
+        /** 失败原因（code≠0 时填写） */
+        private String message;
+        /** 操作员ID（可选，透传） */
+        private String operatorId;
+        /** 登录记录ID（可选，平台用于回写 iot_controller_login_log） */
+        private String loginLogId;
+
+        /** 主控当前识别到的自身 MAC 地址 */
+        private String macAddress;
+
+        /** 关联机器人ID（可选） */
+        private String robotId;
+        /** 关联机器人编码（推荐必填） */
+        private String robotCode;
+
+        /** 设备回复时间戳（毫秒） */
+        private long timestamp;
+    }
 }

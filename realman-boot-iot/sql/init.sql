@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS `iot_device` (
   `product_id`          VARCHAR(32)    DEFAULT NULL,
   `device_model`        VARCHAR(64)    DEFAULT NULL,
   `serial_number`       VARCHAR(64)    DEFAULT NULL,
+  `mac_address`         VARCHAR(64)    DEFAULT NULL COMMENT '设备网卡MAC地址',
   `firmware_version`    VARCHAR(32)    DEFAULT NULL,
   `status`              TINYINT        NOT NULL DEFAULT 0   COMMENT '0-未激活 1-在线 2-离线 3-禁用',
   `device_secret`       VARCHAR(128)   DEFAULT NULL         COMMENT '设备密钥(64位Hex)，MQTT连接密码，同时派生per-device AES Key',
@@ -34,7 +35,8 @@ CREATE TABLE IF NOT EXISTS `iot_device` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_device_code` (`device_code`),
   KEY `idx_status` (`status`),
-  KEY `idx_product_id` (`product_id`)
+  KEY `idx_product_id` (`product_id`),
+  KEY `idx_mac_address` (`mac_address`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='IoT设备基础信息';
 
 -- 1.1 设备授权表（主控/机器人授权给租户或用户）

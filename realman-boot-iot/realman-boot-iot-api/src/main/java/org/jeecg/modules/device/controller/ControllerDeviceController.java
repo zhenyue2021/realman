@@ -19,6 +19,7 @@ import org.jeecg.modules.device.dto.DeviceUpdateDTO;
 import org.jeecg.modules.device.dto.EmergencyStopDTO;
 import org.jeecg.modules.device.entity.ControllerOperationRecord;
 import org.jeecg.modules.device.entity.IotDevice;
+import org.jeecg.modules.device.service.IControllerLoginResolveService;
 import org.jeecg.modules.device.service.IControllerLoginLogService;
 import org.jeecg.modules.device.service.IControllerOperationRecordService;
 import org.jeecg.modules.device.service.IControllerUsageStatusService;
@@ -27,6 +28,7 @@ import org.jeecg.modules.device.util.DeviceExcelExportUtil;
 import org.jeecg.modules.device.vo.ApiResult;
 import org.jeecg.modules.device.vo.DeviceCameraStreamVO;
 import org.jeecg.modules.device.vo.DeviceDetailVO;
+import org.jeecg.modules.device.vo.TeleopLoginResolveVO;
 import org.jeecg.modules.device.vo.UsageStatusVO;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -43,7 +45,7 @@ import java.util.Objects;
  * 主控端管理接口（device_type=2）
  */
 @RestController
-@RequestMapping("/api/master")
+@RequestMapping("/api/teleop")
 @RequiredArgsConstructor
 @Tag(name = "主控端管理", description = "主控设备注册/参数配置/实时监控/远程重启/导出/逻辑删除/登录记录")
 @Slf4j
@@ -56,6 +58,7 @@ public class ControllerDeviceController {
     private final IControllerLoginLogService controllerLoginLogService;
     private final IControllerOperationRecordService operationRecordService;
     private final IControllerUsageStatusService usageStatusService;
+    private final IControllerLoginResolveService controllerLoginResolveService;
 
     /** 新增主控设备 */
     @PostMapping("/add")
@@ -68,6 +71,7 @@ public class ControllerDeviceController {
         d.setProductId(dto.getProductId());
         d.setDeviceModel(dto.getDeviceModel());
         d.setSerialNumber(dto.getSerialNumber());
+        d.setMacAddress(dto.getMacAddress());
         d.setDescription(dto.getDescription());
         return ApiResult.ok(deviceService.addDevice(d), "设备添加成功");
     }
@@ -187,6 +191,28 @@ public class ControllerDeviceController {
     public ApiResult<Void> recordControllerLogin(@RequestBody ControllerLoginDTO dto) {
         controllerLoginLogService.recordLogin(dto);
         return ApiResult.ok(null, "登录记录已保存");
+    }
+
+    /**
+     * 登录后同步解析“当前登录的是哪台设备/关联机器人”
+     *
+     * <p>执行流程：
+     * <ol>
+     *   <li>下发 AssociatedDeviceQuery 给主控（按 controllerCode）</li>
+     *   <li>同步等待主控 response（默认 5 秒）</li>
+     *   <li>校验：主控设备存在且为 device_type=2</li>
+     *   <li>校验：当前登录用户对该主控存在有效授权（iot_device_auth）</li>
+     *   <li>校验：响应中的机器人也在该授权绑定范围内</li>
+     *   <li>写入登录日志（iot_controller_login_log）</li>
+     *   <li>返回主控信息 + 当前机器人信息 + 可用机器人列表</li>
+     * </ol>
+     */
+    @PostMapping("/login/resolve")
+    @Operation(summary = "登录后同步解析当前主控与机器人")
+    public ApiResult<TeleopLoginResolveVO> resolveLogin(HttpServletRequest request,
+                                                        @RequestBody ControllerLoginDTO dto) {
+        TeleopLoginResolveVO vo = controllerLoginResolveService.resolve(request, dto);
+        return ApiResult.ok(vo);
     }
 
     /** 操作记录分页（遥操员使用主控操控机器人完成工单的时间） */

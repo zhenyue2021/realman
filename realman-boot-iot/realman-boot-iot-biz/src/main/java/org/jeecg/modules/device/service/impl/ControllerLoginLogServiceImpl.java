@@ -26,7 +26,7 @@ public class ControllerLoginLogServiceImpl extends ServiceImpl<IotControllerLogi
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void recordLogin(ControllerLoginDTO dto) {
+    public IotControllerLoginLog recordLogin(ControllerLoginDTO dto) {
         if ((dto.getControllerId() == null || dto.getControllerId().isEmpty())
                 && (dto.getControllerCode() == null || dto.getControllerCode().isEmpty())) {
             throw new IllegalArgumentException("主控设备ID或设备编码不能为空");
@@ -61,5 +61,6 @@ public class ControllerLoginLogServiceImpl extends ServiceImpl<IotControllerLogi
 
         controller.setLastLoginTime(now);
         deviceMapper.updateById(controller);
+        return log;
     }
 }

@@ -18,7 +18,6 @@ import org.jeecg.modules.device.dto.DeviceUpdateDTO;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.service.IIotDeviceService;
 import org.jeecg.modules.device.vo.ApiResult;
-import org.jeecg.modules.device.vo.DeviceCameraStreamVO;
 import org.jeecg.modules.device.vo.DeviceDetailVO;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -56,6 +55,7 @@ public class RobotDeviceController {
         d.setProductId(dto.getProductId());
         d.setDeviceModel(dto.getDeviceModel());
         d.setSerialNumber(dto.getSerialNumber());
+        d.setMacAddress(dto.getMacAddress());
         d.setDescription(dto.getDescription());
         return ApiResult.ok(deviceService.addDevice(d), "设备添加成功");
     }

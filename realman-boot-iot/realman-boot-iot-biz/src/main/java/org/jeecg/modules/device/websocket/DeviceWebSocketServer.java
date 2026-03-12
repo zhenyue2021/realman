@@ -122,6 +122,32 @@ public class DeviceWebSocketServer {
     }
 
     /**
+     * 推送工单开始提醒（到达 plan_start_time）
+     *
+     * <p>只推送给该主控设备（device_type=2）的订阅者。
+     *
+     * @param controllerCode 主控 deviceCode
+     * @param workOrderJson  工单 JSON（建议为 WorkOrder 对象序列化结果）
+     */
+    public void pushWorkOrderStart(String controllerCode, String workOrderJson) {
+        String msg = "{\"type\":\"WORK_ORDER_START\",\"deviceCode\":\"" + controllerCode + "\",\"data\":" + workOrderJson + "}";
+        send(controllerCode, msg);
+    }
+
+    /**
+     * 推送主控“当前关联设备信息”（登录后触发查询）
+     *
+     * <p>只推送给该主控设备（device_type=2）的订阅者。
+     *
+     * @param controllerCode 主控 deviceCode
+     * @param dataJson       JSON 对象字符串（例如：{code,message,robot:{...}}）
+     */
+    public void pushAssociatedDeviceInfo(String controllerCode, String dataJson) {
+        String msg = "{\"type\":\"ASSOCIATED_DEVICE_INFO\",\"deviceCode\":\"" + controllerCode + "\",\"data\":" + dataJson + "}";
+        send(controllerCode, msg);
+    }
+
+    /**
      * 向指定 deviceCode 的所有活跃会话推送消息
      *
      * <p>遍历 sessions，Key 以 "{deviceCode}:" 开头且会话处于打开状态的连接均会收到消息。

@@ -66,10 +66,23 @@ public class DeviceSecretService {
     }
 
     /**
-     * ACL校验：设备只能访问自身topic命名空间
+     * ACL 校验：设备只能访问自身 Topic 命名空间
+     *
+     * <p>允许的 Topic 格式：
+     * <ul>
+     *   <li>{@code device/{deviceCode}/...}   — 标准设备业务 Topic（配置/指令/OTA 等）</li>
+     *   <li>{@code {deviceCode}/master/...}   — 主控设备主动上报（如 cmd / states / rtsp/ctrl）</li>
+     *   <li>{@code {deviceCode}/slave/...}    — 机器人设备主动上报（如 cmd / states）</li>
+     * </ul>
      */
     public boolean validateAcl(String deviceCode, String topic) {
-        boolean ok = topic != null && topic.startsWith("device/" + deviceCode + "/");
+        if (topic == null || deviceCode == null) {
+            log.warn("[ACL] 设备[{}]越权访问 topic={}", deviceCode, topic);
+            return false;
+        }
+        boolean ok = topic.startsWith("device/" + deviceCode + "/")
+                || topic.startsWith(deviceCode + "/master/")
+                || topic.startsWith(deviceCode + "/slave/");
         if (!ok) log.warn("[ACL] 设备[{}]越权访问 topic={}", deviceCode, topic);
         return ok;
     }

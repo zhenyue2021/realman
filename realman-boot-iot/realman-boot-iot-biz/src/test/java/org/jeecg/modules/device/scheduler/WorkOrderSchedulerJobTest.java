@@ -1,11 +1,15 @@
 package org.jeecg.modules.device.scheduler;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.jeecg.modules.device.entity.workorder.WorkOrder;
 import org.jeecg.modules.device.entity.workorder.WorkOrderComplianceConfig;
+import org.jeecg.modules.device.entity.workorder.WorkOrderDevice;
 import org.jeecg.modules.device.mapper.workorder.WorkOrderComplianceConfigMapper;
+import org.jeecg.modules.device.mapper.workorder.WorkOrderDeviceMapper;
 import org.jeecg.modules.device.mapper.workorder.WorkOrderMapper;
 import org.jeecg.modules.device.service.IControllerOperationRecordService;
+import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -14,12 +18,16 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /**
@@ -34,6 +42,14 @@ class WorkOrderSchedulerJobTest {
     private WorkOrderComplianceConfigMapper configMapper;
     @Mock
     private IControllerOperationRecordService operationRecordService;
+    @Mock
+    private WorkOrderDeviceMapper workOrderDeviceMapper;
+    @Mock
+    private StringRedisTemplate redisTemplate;
+    @Mock
+    private DeviceWebSocketServer webSocketServer;
+    @Mock
+    private ObjectMapper objectMapper;
 
     @InjectMocks
     private WorkOrderSchedulerJob schedulerJob;
@@ -55,6 +71,62 @@ class WorkOrderSchedulerJobTest {
         config.setSubmitLimitEnabled(1);
         config.setAutoCloseEnabled(1);
         config.setAutoCloseSeconds(3600);
+    }
+
+    @Test
+    @DisplayName("startTimePush：到开始时间且首次推送时发送 WS 消息")
+    void startTimePush_pushesOnce() throws Exception {
+        WorkOrder pending = new WorkOrder();
+        pending.setId("wo-001");
+        pending.setStatus("PENDING");
+        pending.setPlanStartTime(LocalDateTime.now().minusMinutes(1));
+        pending.setDelFlag(0);
+
+        when(workOrderMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(pending));
+
+        WorkOrderDevice controller = new WorkOrderDevice();
+        controller.setWorkOrderId("wo-001");
+        controller.setDeviceType("CONTROLLER");
+        controller.setDeviceCode("MASTER001");
+        when(workOrderDeviceMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(controller));
+
+        @SuppressWarnings("unchecked")
+        ValueOperations<String, String> ops = mock(ValueOperations.class);
+        when(redisTemplate.opsForValue()).thenReturn(ops);
+        when(ops.setIfAbsent(eq("work-order:start-pushed:wo-001"), eq("1"), any(Duration.class))).thenReturn(true);
+
+        when(objectMapper.writeValueAsString(any(WorkOrder.class))).thenReturn("{\"id\":\"wo-001\"}");
+
+        schedulerJob.startTimePush();
+
+        verify(webSocketServer).pushWorkOrderStart(eq("MASTER001"), eq("{\"id\":\"wo-001\"}"));
+    }
+
+    @Test
+    @DisplayName("startTimePush：Redis 已标记则不重复推送")
+    void startTimePush_skipWhenAlreadyPushed() throws Exception {
+        WorkOrder pending = new WorkOrder();
+        pending.setId("wo-001");
+        pending.setStatus("PENDING");
+        pending.setPlanStartTime(LocalDateTime.now().minusMinutes(1));
+        pending.setDelFlag(0);
+
+        when(workOrderMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(pending));
+
+        WorkOrderDevice controller = new WorkOrderDevice();
+        controller.setWorkOrderId("wo-001");
+        controller.setDeviceType("CONTROLLER");
+        controller.setDeviceCode("MASTER001");
+        when(workOrderDeviceMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(controller));
+
+        @SuppressWarnings("unchecked")
+        ValueOperations<String, String> ops = mock(ValueOperations.class);
+        when(redisTemplate.opsForValue()).thenReturn(ops);
+        when(ops.setIfAbsent(eq("work-order:start-pushed:wo-001"), eq("1"), any(Duration.class))).thenReturn(false);
+
+        schedulerJob.startTimePush();
+
+        verifyNoInteractions(webSocketServer);
     }
 
     @Test

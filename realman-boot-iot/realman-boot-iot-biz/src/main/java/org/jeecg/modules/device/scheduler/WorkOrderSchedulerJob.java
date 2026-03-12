@@ -1,14 +1,21 @@
 package org.jeecg.modules.device.scheduler;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xxl.job.core.handler.annotation.XxlJob;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.entity.workorder.WorkOrder;
 import org.jeecg.modules.device.entity.workorder.WorkOrderComplianceConfig;
+import org.jeecg.modules.device.entity.workorder.WorkOrderDevice;
 import org.jeecg.modules.device.service.IControllerOperationRecordService;
 import org.jeecg.modules.device.mapper.workorder.WorkOrderMapper;
 import org.jeecg.modules.device.mapper.workorder.WorkOrderComplianceConfigMapper;
+import org.jeecg.modules.device.mapper.workorder.WorkOrderDeviceMapper;
+import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
@@ -31,6 +38,10 @@ public class WorkOrderSchedulerJob {
     private final WorkOrderMapper workOrderMapper;
     private final WorkOrderComplianceConfigMapper configMapper;
     private final IControllerOperationRecordService operationRecordService;
+    private final WorkOrderDeviceMapper workOrderDeviceMapper;
+    private final StringRedisTemplate redisTemplate;
+    private final DeviceWebSocketServer webSocketServer;
+    private final ObjectMapper objectMapper;
 
     /**
      * 超时提醒任务
@@ -158,6 +169,95 @@ public class WorkOrderSchedulerJob {
         if (closed > 0) {
             log.warn("[WorkOrder-AutoClose] 本次自动关闭超时未填原因工单 {} 条", closed);
         }
+    }
+
+    /**
+     * 到达工单开始时间时，推送该主控下的工单到前端（WebSocket）
+     *
+     * <p>XXL-Job Handler Name：workOrderStartPushJob
+     * 建议 Cron：0 0/1 * * * ? （每分钟）
+     *
+     * <p>去重：每个工单仅推送一次，使用 Redis Key 标记。
+     */
+    @XxlJob("workOrderStartPushJob")
+    public void startTimePush() {
+        LocalDateTime now = LocalDateTime.now();
+        // 只扫描最近24小时内已到开始时间且仍未开始的工单，避免全表扫描
+        List<WorkOrder> candidates = workOrderMapper.selectList(
+                new LambdaQueryWrapper<WorkOrder>()
+                        .eq(WorkOrder::getStatus, "PENDING")
+                        .isNotNull(WorkOrder::getPlanStartTime)
+                        .le(WorkOrder::getPlanStartTime, now)
+                        .ge(WorkOrder::getPlanStartTime, now.minusHours(24))
+                        .eq(WorkOrder::getDelFlag, 0)
+        );
+        if (candidates.isEmpty()) {
+            return;
+        }
+
+        Map<String, String> controllerCodeByOrderId = loadControllerDeviceCodes(candidates);
+        if (controllerCodeByOrderId.isEmpty()) {
+            return;
+        }
+
+        ValueOperations<String, String> ops = redisTemplate.opsForValue();
+        int pushed = 0;
+        for (WorkOrder o : candidates) {
+            String controllerCode = controllerCodeByOrderId.get(o.getId());
+            if (controllerCode == null || controllerCode.isBlank()) {
+                continue;
+            }
+            String key = "work-order:start-pushed:" + o.getId();
+            Boolean first = ops.setIfAbsent(key, "1", Duration.ofHours(48));
+            if (!Boolean.TRUE.equals(first)) {
+                continue;
+            }
+            try {
+                String json = objectMapper.writeValueAsString(o);
+                webSocketServer.pushWorkOrderStart(controllerCode, json);
+                pushed++;
+                log.info("[WorkOrder-StartPush] pushed orderId={} controllerCode={} planStartTime={}",
+                        o.getId(), controllerCode, o.getPlanStartTime());
+            } catch (JsonProcessingException e) {
+                // 序列化失败：允许下次重试（删除去重 Key）
+                redisTemplate.delete(key);
+                log.warn("[WorkOrder-StartPush] serialize failed, orderId={}", o.getId(), e);
+            } catch (Exception e) {
+                redisTemplate.delete(key);
+                log.warn("[WorkOrder-StartPush] push failed, orderId={} controllerCode={}", o.getId(), controllerCode, e);
+            }
+        }
+        if (pushed > 0) {
+            log.info("[WorkOrder-StartPush] 本次推送工单 {} 条", pushed);
+        }
+    }
+
+    private Map<String, String> loadControllerDeviceCodes(List<WorkOrder> orders) {
+        List<String> orderIds = orders.stream()
+                .map(WorkOrder::getId)
+                .filter(id -> id != null && !id.isBlank())
+                .distinct()
+                .toList();
+        if (orderIds.isEmpty()) {
+            return Map.of();
+        }
+        List<WorkOrderDevice> devices = workOrderDeviceMapper.selectList(
+                new LambdaQueryWrapper<WorkOrderDevice>()
+                        .in(WorkOrderDevice::getWorkOrderId, orderIds)
+                        .eq(WorkOrderDevice::getDeviceType, "CONTROLLER")
+        );
+        if (devices == null || devices.isEmpty()) {
+            return Map.of();
+        }
+        return devices.stream()
+                .filter(d -> d.getWorkOrderId() != null && !d.getWorkOrderId().isBlank())
+                .collect(Collectors.toMap(
+                        WorkOrderDevice::getWorkOrderId,
+                        d -> (d.getActualDeviceCode() != null && !d.getActualDeviceCode().isBlank())
+                                ? d.getActualDeviceCode()
+                                : d.getDeviceCode(),
+                        (a, b) -> a
+                ));
     }
 
     private Map<String, WorkOrderComplianceConfig> loadConfigs(List<WorkOrder> orders) {

@@ -11,6 +11,9 @@ public class ControllerLoginDTO {
     private String controllerId;
     private String controllerCode;
 
+    /** 主控设备网卡MAC地址（登录解析时用于反查设备） */
+    private String macAddress;
+
     /** 操作员ID（如 sys_user.id） */
     private String operatorId;
     /** 操作员账号/姓名 */

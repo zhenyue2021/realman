@@ -15,5 +15,5 @@ public interface IControllerLoginLogService extends IService<IotControllerLoginL
      * @param dto 主控ID/编码、操作员、关联机器人等
      * @throws IllegalArgumentException 主控设备不存在或非主控设备时
      */
-    void recordLogin(ControllerLoginDTO dto);
+    IotControllerLoginLog recordLogin(ControllerLoginDTO dto);
 }

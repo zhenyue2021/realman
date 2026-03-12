@@ -28,6 +28,9 @@ public class IotDevice implements Serializable {
     private String deviceModel;
     @TableField("serial_number")
     private String serialNumber;
+    /** 设备网卡MAC地址 */
+    @TableField("mac_address")
+    private String macAddress;
     @TableField("firmware_version")
     private String firmwareVersion;
     /**
