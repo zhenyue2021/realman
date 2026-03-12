@@ -125,7 +125,29 @@
   - 平台落库：可新增**主控登录记录表**（如 iot_controller_login_log），字段含：主控端ID、操作员ID/账号、关联机器人ID、登录时间等；或复用/扩展操作日志表。  
 - **当前实现**：设备操作日志表 `iot_device_operation_log` 存在，可扩展类型为“主控登录”；若需独立表需在库表与代码中新增。
 
-### 4.6 平台与主控设备 MQTT 通信
+### 4.6 操作记录（主控遥操操作记录）
+
+- **需求**：记录当前遥操员使用该主控设备操控哪台机器人完成工单的时间。
+- **规则**：
+  - **开始操作时间** = 工单开启时间（操作员点击「开始工单」时的 `actual_start_time`）。
+  - **结束操作时间**：正常提交的工单 = 提交时间（`submit_time`）；异常工单（超时/关闭）= 工单失效时间（`plan_end_time`）。
+- **实现**：
+  - 表 `controller_operation_record`：主控ID、主控编号、机器人ID、机器人编号、遥操员、工单ID、开始操作时间、结束操作时间。
+  - 工单**开启**时：按工单绑定设备（主控 + 机器人）为该工单创建一条或多条操作记录，`start_time` = 工单开启时间，`end_time` 为空。
+  - 工单**提交**时：将该工单下所有未结束的操作记录 `end_time` 置为提交时间。
+  - 工单**超时**（定时任务标记为 TIMEOUT）或**关闭**时：将该工单下未结束的操作记录 `end_time` 置为工单失效时间（`plan_end_time`）。
+- **接口**：见 7.2 操作记录分页、操作记录导出。
+
+### 4.7 使用状态（主控使用状态）
+
+- **需求**：主控端「使用状态」页展示：
+  - **最近登录时间**：当前主控最后一次被登录时间（`iot_device.last_login_time`，由主控端登录记录接口更新）。
+  - **最近一次遥操开始时间**：该主控在 `controller_operation_record` 中最近一条记录的 `start_time`。
+  - **当前设备**：当前正在遥操的机器人状态（即该主控下 `end_time` 为空的操作记录对应的机器人），含机器人ID、编号、名称、状态、型号、版本等。
+  - **可使用的机器人**：与该主控绑定的机器人列表（来自 `iot_device_auth` 中 `controller_id` = 该主控且启用的 `device_id`，对应 `iot_device` 中 `device_type=1` 的设备）。
+- **接口**：GET `/api/master/usage-status/{controllerCode}`，返回 `UsageStatusVO`（见 7.2）。
+
+### 4.8 平台与主控设备 MQTT 通信
 
 - 平台通过 MQTT 与主控设备通信，包括下发操作指令等。
 - **当前实现**：  
@@ -194,6 +216,7 @@
 | iot_ota_firmware | OTA 固件包 |
 | iot_ota_upgrade_task | OTA 升级任务 |
 | iot_ota_upgrade_record | 每台设备的升级记录与进度 |
+| controller_operation_record | 主控遥操操作记录（主控/机器人/遥操员/工单、开始与结束操作时间） |
 
 ### 6.2 时间字段格式
 
@@ -224,22 +247,27 @@
 
 ### 7.2 主控端管理（主控设备：device_type=2）
 
-| 方法 | 路径                                   | 说明 | 状态 |
-|------|--------------------------------------|------|------|
-| POST | /api/controller/add                      | 新增主控设备 | 已实现 |
-| POST | /api/controller/list                 | 分页+条件查询主控设备列表 | 已实现 |
-| GET | /api/controller/{id}                 | 主控设备基础详情 | 已实现 |
-| GET | /api/controller/{id}/detail          | 主控设备聚合详情 | 已实现 |
-| PUT | /api/controller/{id}                 | 编辑主控设备 | 已实现 |
-| DELETE | /api/controller/{id}                 | 删除主控设备（逻辑删除） | 已实现 |
-| POST | /api/controller/login                | 主控端登录记录 | 已实现 |
-| POST | /api/controller/export               | 导出主控设备列表 Excel | 已实现 |
-| POST | /api/controller/{id}/config/sync     | 参数设置并同步 | 已实现 |
-| GET | /api/controller/{id}/monitor         | 实时监控状态 | 已实现 |
-| POST | /api/controller/{id}/restart         | 远程重启 | 已实现 |
-| POST | /api/controller/{id}/emergency-stop  | 紧急停机 | 已实现 |
-| PUT | /api/controller/{id}/status/{status} | 禁用/启用 | 已实现 |
-| POST | /api/controller/batch/online-status  | 批量在线状态 | 已实现 |
+**说明**：主控端管理接口统一前缀为 **`/api/master`**（与代码 ControllerDeviceController 一致）。
+
+| 方法 | 路径 | 说明 | 状态 |
+|------|------|------|------|
+| POST | /api/master/add | 新增主控设备 | 已实现 |
+| POST | /api/master/list | 分页+条件查询主控设备列表 | 已实现 |
+| GET | /api/master/{id} | 主控设备基础详情 | 已实现 |
+| GET | /api/master/{id}/detail | 主控设备聚合详情 | 已实现 |
+| PUT | /api/master/{id} | 编辑主控设备 | 已实现 |
+| DELETE | /api/master/{id} | 删除主控设备（逻辑删除） | 已实现 |
+| POST | /api/master/login | 主控端登录记录 | 已实现 |
+| POST | /api/master/export | 导出主控设备列表 Excel | 已实现 |
+| POST | /api/master/{id}/config/sync | 参数设置并同步 | 已实现 |
+| GET | /api/master/{id}/monitor | 实时监控状态 | 已实现 |
+| POST | /api/master/{id}/restart | 远程重启 | 已实现 |
+| POST | /api/master/{id}/emergency-stop | 紧急停机 | 已实现 |
+| PUT | /api/master/{id}/status/{status} | 禁用/启用 | 已实现 |
+| POST | /api/master/batch/online-status | 批量在线状态 | 已实现 |
+| POST | /api/master/operation-record/page | 操作记录分页（Body: OperationRecordQueryDTO） | 已实现 |
+| POST | /api/master/operation-record/export | 操作记录导出 Excel | 已实现 |
+| GET | /api/master/usage-status/{controllerCode} | 主控使用状态（最近登录、最近遥操开始时间、当前设备、可使用的机器人） | 已实现 |
 
 ### 7.3 授权管理
 
@@ -289,6 +317,9 @@
 
 6. **iot_device_auth 表**  
    - **已实现**：init.sql 中已包含 `iot_device_auth`、`iot_controller_login_log` 建表及 `iot_device.last_login_time` 字段。
+
+7. **操作记录与使用状态**  
+   - **已实现**：表 `controller_operation_record`；工单开启/提交/超时/关闭时自动写入或更新操作记录；POST `/api/master/operation-record/page` 分页、POST `/api/master/operation-record/export` 导出；GET `/api/master/usage-status/{controllerCode}` 返回 `UsageStatusVO`（lastLoginTime、lastRemoteOperationStartTime、currentDevice、availableRobots）。
 
 ---
 

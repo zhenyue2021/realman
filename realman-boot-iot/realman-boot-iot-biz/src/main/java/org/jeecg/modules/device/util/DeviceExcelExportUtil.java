@@ -2,10 +2,12 @@ package org.jeecg.modules.device.util;
 
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
+import org.jeecg.modules.device.entity.ControllerOperationRecord;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.entity.IotDeviceAuth;
 
 import java.io.ByteArrayOutputStream;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -91,6 +93,44 @@ public final class DeviceExcelExportUtil {
             wb.write(out);
             return out.toByteArray();
         }
+    }
+
+    /** 操作记录导出（主控设备ID、机器人ID、开始/结束操作时间、操作时长） */
+    public static byte[] exportOperationRecords(List<ControllerOperationRecord> list) throws Exception {
+        try (SXSSFWorkbook wb = new SXSSFWorkbook(500);
+             ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sheet = wb.createSheet("操作记录");
+            CellStyle headerStyle = headerStyle(wb);
+            CellStyle dateStyle = dateStyle(wb);
+            String[] headers = {"主控设备ID", "主控设备编号", "机器人ID", "机器人编号", "遥操员", "工单ID",
+                    "开始操作时间", "结束操作时间", "操作时长"};
+            writeHeader(sheet, headers, headerStyle);
+            int rowNum = 1;
+            for (ControllerOperationRecord r : list) {
+                Row row = sheet.createRow(rowNum++);
+                setCell(row, 0, r.getControllerId());
+                setCell(row, 1, r.getControllerCode());
+                setCell(row, 2, r.getRobotId());
+                setCell(row, 3, r.getRobotCode());
+                setCell(row, 4, r.getOperatorName() != null ? r.getOperatorName() : r.getOperatorId());
+                setCell(row, 5, r.getWorkOrderId());
+                setCell(row, 6, format(r.getStartTime()), dateStyle);
+                setCell(row, 7, format(r.getEndTime()), dateStyle);
+                setCell(row, 8, durationStr(r.getStartTime(), r.getEndTime()));
+            }
+            autoSizeColumns(sheet, headers.length);
+            wb.write(out);
+            return out.toByteArray();
+        }
+    }
+
+    private static String durationStr(LocalDateTime start, LocalDateTime end) {
+        if (start == null || end == null) return "";
+        Duration d = Duration.between(start, end);
+        long h = d.toHours();
+        long m = d.toMinutesPart();
+        if (h > 0) return h + " h " + m + " m";
+        return m + " m";
     }
 
     private static void writeHeader(Sheet sheet, String[] headers, CellStyle style) {

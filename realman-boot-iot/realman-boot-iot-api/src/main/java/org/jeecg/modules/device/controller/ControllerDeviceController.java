@@ -12,15 +12,21 @@ import org.jeecg.common.exception.JeecgBootException;
 import org.jeecg.common.system.util.JwtUtil;
 import org.jeecg.modules.device.dto.ControllerLoginDTO;
 import org.jeecg.modules.device.dto.DeviceAddDTO;
+import org.jeecg.modules.device.dto.OperationRecordQueryDTO;
 import org.jeecg.modules.device.dto.DeviceRequestDTO;
 import org.jeecg.modules.device.dto.DeviceRestartDTO;
 import org.jeecg.modules.device.dto.DeviceUpdateDTO;
 import org.jeecg.modules.device.dto.EmergencyStopDTO;
+import org.jeecg.modules.device.entity.ControllerOperationRecord;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.service.IControllerLoginLogService;
+import org.jeecg.modules.device.service.IControllerOperationRecordService;
+import org.jeecg.modules.device.service.IControllerUsageStatusService;
 import org.jeecg.modules.device.service.IIotDeviceService;
+import org.jeecg.modules.device.util.DeviceExcelExportUtil;
 import org.jeecg.modules.device.vo.ApiResult;
 import org.jeecg.modules.device.vo.DeviceDetailVO;
+import org.jeecg.modules.device.vo.UsageStatusVO;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -46,6 +52,8 @@ public class ControllerDeviceController {
 
     private final IIotDeviceService deviceService;
     private final IControllerLoginLogService controllerLoginLogService;
+    private final IControllerOperationRecordService operationRecordService;
+    private final IControllerUsageStatusService usageStatusService;
 
     /** 新增主控设备 */
     @PostMapping("/add")
@@ -177,6 +185,52 @@ public class ControllerDeviceController {
     public ApiResult<Void> recordControllerLogin(@RequestBody ControllerLoginDTO dto) {
         controllerLoginLogService.recordLogin(dto);
         return ApiResult.ok(null, "登录记录已保存");
+    }
+
+    /** 操作记录分页（遥操员使用主控操控机器人完成工单的时间） */
+    @PostMapping("/operation-record/page")
+    @Operation(summary = "操作记录分页")
+    public ApiResult<IPage<ControllerOperationRecord>> operationRecordPage(@RequestBody OperationRecordQueryDTO query) {
+        int pageNo = query.getPageNo() != null ? query.getPageNo() : 1;
+        int pageSize = query.getPageSize() != null ? query.getPageSize() : 10;
+        com.baomidou.mybatisplus.extension.plugins.pagination.Page<ControllerOperationRecord> page =
+                new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(pageNo, pageSize);
+        IPage<ControllerOperationRecord> result = operationRecordService.pageRecords(page,
+                query.getControllerId(), query.getControllerCode(), query.getRobotId(),
+                query.getStartTimeFrom(), query.getStartTimeTo());
+        return ApiResult.ok(result);
+    }
+
+    /** 操作记录导出 Excel */
+    @PostMapping("/operation-record/export")
+    @Operation(summary = "操作记录导出")
+    public ResponseEntity<byte[]> operationRecordExport(@RequestBody OperationRecordQueryDTO query) {
+        java.util.List<ControllerOperationRecord> list = operationRecordService.listForExport(
+                query.getControllerId(), query.getControllerCode(), query.getRobotId(),
+                query.getStartTimeFrom(), query.getStartTimeTo());
+        byte[] bytes;
+        try {
+            bytes = DeviceExcelExportUtil.exportOperationRecords(list);
+        } catch (Exception e) {
+            throw new RuntimeException("导出失败", e);
+        }
+        String filename = "operation_record_" + System.currentTimeMillis() + ".xlsx";
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename*=UTF-8''" + URLEncoder.encode(filename, StandardCharsets.UTF_8))
+                .body(bytes);
+    }
+
+    /** 使用状态：最近登录时间、最近一次遥操开始时间、当前设备、可使用的机器人 */
+    @GetMapping("/usage-status/{controllerCode}")
+    @Operation(summary = "主控使用状态")
+    public ApiResult<UsageStatusVO> usageStatus(@PathVariable String controllerCode) {
+        UsageStatusVO vo = usageStatusService.getUsageStatusByCode(controllerCode);
+        if (vo == null) {
+            throw new RuntimeException("主控设备不存在或非主控设备: " + controllerCode);
+        }
+        return ApiResult.ok(vo);
     }
 
     /** 导出主控设备列表为 Excel（条件与 list 一致，逻辑删除的不导出） */

@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.entity.workorder.WorkOrder;
 import org.jeecg.modules.device.entity.workorder.WorkOrderComplianceConfig;
+import org.jeecg.modules.device.service.IControllerOperationRecordService;
 import org.jeecg.modules.device.mapper.workorder.WorkOrderMapper;
 import org.jeecg.modules.device.mapper.workorder.WorkOrderComplianceConfigMapper;
 import org.springframework.stereotype.Component;
@@ -29,6 +30,7 @@ public class WorkOrderSchedulerJob {
 
     private final WorkOrderMapper workOrderMapper;
     private final WorkOrderComplianceConfigMapper configMapper;
+    private final IControllerOperationRecordService operationRecordService;
 
     /**
      * 超时提醒任务
@@ -101,6 +103,9 @@ public class WorkOrderSchedulerJob {
             }
             o.setStatus("TIMEOUT");
             workOrderMapper.updateById(o);
+            if (o.getPlanEndTime() != null) {
+                operationRecordService.finishByWorkOrder(o.getId(), o.getPlanEndTime());
+            }
             updated++;
         }
         if (updated > 0) {

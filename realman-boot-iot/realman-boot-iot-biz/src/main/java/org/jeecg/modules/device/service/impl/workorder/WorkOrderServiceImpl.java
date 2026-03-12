@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.RequiredArgsConstructor;
 import org.jeecg.modules.device.entity.workorder.WorkOrder;
 import org.jeecg.modules.device.entity.workorder.WorkOrderDevice;
+import org.jeecg.modules.device.service.IControllerOperationRecordService;
 import org.jeecg.modules.device.mapper.workorder.WorkOrderDeviceMapper;
 import org.jeecg.modules.device.mapper.workorder.WorkOrderMapper;
 import org.jeecg.modules.device.service.workorder.IWorkOrderService;
@@ -22,6 +23,7 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
         implements IWorkOrderService {
 
     private final WorkOrderDeviceMapper workOrderDeviceMapper;
+    private final IControllerOperationRecordService operationRecordService;
 
     @Override
     public IPage<WorkOrder> pageWorkOrders(Page<WorkOrder> page, String agentId, String status) {
@@ -123,6 +125,7 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
         order.setOperatorPhone(operatorPhone);
         order.setActualStartTime(now);
         this.updateById(order);
+        operationRecordService.createRecordsForWorkOrderStart(workOrderId, operatorId, operatorName, now);
     }
 
     @Override
@@ -137,8 +140,10 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
             throw new IllegalStateException("当前工单状态不允许提交");
         }
         order.setStatus("SUBMITTED");
-        order.setSubmitTime(LocalDateTime.now());
+        LocalDateTime submitTime = LocalDateTime.now();
+        order.setSubmitTime(submitTime);
         this.updateById(order);
+        operationRecordService.finishByWorkOrder(workOrderId, submitTime);
     }
 
     @Override
@@ -189,6 +194,10 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
         order.setCloseBy(closer);
         order.setCloseTime(LocalDateTime.now());
         this.updateById(order);
+        // 关闭时结束操作时间 = 工单失效时间
+        if (order.getPlanEndTime() != null) {
+            operationRecordService.finishByWorkOrder(workOrderId, order.getPlanEndTime());
+        }
     }
 }
 

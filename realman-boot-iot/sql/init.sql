@@ -295,6 +295,26 @@ CREATE TABLE IF NOT EXISTS `work_order_attachment` (
   `create_time`   DATETIME               COMMENT '上传时间'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='工单佐证图片';
 
+-- 12. 主控遥操操作记录（操作记录：遥操员用主控操控机器人完成工单的时间）
+CREATE TABLE IF NOT EXISTS `controller_operation_record` (
+  `id`                VARCHAR(36)  NOT NULL PRIMARY KEY COMMENT '记录ID',
+  `controller_id`    VARCHAR(36)  NOT NULL COMMENT '主控设备ID',
+  `controller_code`  VARCHAR(64)  NOT NULL COMMENT '主控设备编号',
+  `robot_id`          VARCHAR(36)  NOT NULL COMMENT '机器人设备ID',
+  `robot_code`       VARCHAR(64)  NOT NULL COMMENT '机器人设备编号',
+  `operator_id`       VARCHAR(64)           COMMENT '遥操员ID',
+  `operator_name`     VARCHAR(64)           COMMENT '遥操员姓名',
+  `work_order_id`     VARCHAR(36)  NOT NULL COMMENT '工单ID',
+  `start_time`        DATETIME     NOT NULL COMMENT '开始操作时间（= 工单开启时间）',
+  `end_time`          DATETIME              COMMENT '结束操作时间（正常=提交时间，异常=工单失效时间）',
+  `create_time`       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `update_time`       DATETIME              ON UPDATE CURRENT_TIMESTAMP,
+  KEY `idx_controller_id` (`controller_id`),
+  KEY `idx_robot_id`     (`robot_id`),
+  KEY `idx_work_order_id` (`work_order_id`),
+  KEY `idx_start_time`   (`start_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='主控遥操操作记录';
+
 -- 测试数据（device_secret需在平台控制台生成后下发给设备端）
 INSERT INTO `iot_device` (id,device_code,device_name,device_type,product_id,device_model,firmware_version,status,device_secret,secret_create_time,description,create_by,tenant_id,create_time)
 VALUES
