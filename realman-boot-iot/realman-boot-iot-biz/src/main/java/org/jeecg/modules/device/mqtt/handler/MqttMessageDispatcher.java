@@ -48,6 +48,7 @@ public class MqttMessageDispatcher {
     private final OtaProgressHandler otaProgressHandler;
     private final DeviceOperationLogHandler operationLogHandler;
     private final DeviceOnlineOfflineHandler onlineOfflineHandler;
+    private final DeviceCameraStreamResponseHandler deviceCameraStreamResponseHandler;
 
     /**
      * 分发 MQTT 消息到对应 Handler
@@ -99,10 +100,11 @@ public class MqttMessageDispatcher {
             }
 
             switch (path) {
-                case "status/report" -> statusHandler.handle(deviceCode, payload);
-                case "config/ack" -> configAckHandler.handle(deviceCode, payload);
-                case "ota/progress" -> otaProgressHandler.handle(deviceCode, payload);
-                case "log/operation" -> operationLogHandler.handle(deviceCode, payload);
+                case "status/report"           -> statusHandler.handle(deviceCode, payload);
+                case "config/ack"              -> configAckHandler.handle(deviceCode, payload);
+                case "ota/progress"            -> otaProgressHandler.handle(deviceCode, payload);
+                case "log/operation"           -> operationLogHandler.handle(deviceCode, payload);
+                case "camera/stream/response"  -> deviceCameraStreamResponseHandler.handle(deviceCode, payload);
                 // TODO 待实现 后增加的topic的处理逻辑
                 default -> log.warn("[Dispatcher] 未知路径: {}", topic);
             }

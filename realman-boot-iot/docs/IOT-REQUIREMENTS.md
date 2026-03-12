@@ -202,9 +202,59 @@
 
 ---
 
-## 6. 数据模型与表结构汇总
+## 6. 一级模块四：工单管理
 
-### 6.1 核心表
+### 6.1 业务描述
+
+工单管理包含**工单合规配置**与**工单管理**两个子模块，归属 realman-boot-iot，不单独建模块。
+
+- **工单合规配置**：平台管理员定义工单执行规则（任务类型、时限策略、验收要求、超时提醒与自动关闭等）；工单创建时必须绑定一条已启用的合规配置。
+- **工单管理**：管理员创建工单并绑定主控设备与机器人；遥操人员通过主控端领取并执行工单（开始、填写补充信息、提交）；管理员负责审核与关闭。工单开启/提交/超时/关闭时会同步更新**主控遥操操作记录**（`controller_operation_record`），见 4.6。
+
+**角色**：平台管理员（维护合规配置、创建/审核/关闭工单）、遥操人员（主控端开始、补充信息、提交、填写超时原因）。
+
+**与 IoT 关系**：工单绑定的主控对应 `iot_device.device_type=2`，机器人对应 `device_type=1`；授权关系复用 `iot_device_auth`；开启工单时关联 `iot_controller_login_log`，并写入 `controller_operation_record`。
+
+### 6.2 工单合规配置
+
+- **表**：`work_order_compliance_config`。字段含：配置名称、任务类型（巡检/调试/维护/其他）、任务说明、任务等级、所属代理商/企业、超时提醒开关与提前时长、提交时限开关、验收开关与佐证图片要求、超时原因字数与预置选项、超时未提交自动关闭开关与宽限期、状态（未启用/已启用）等。
+- **条件查询**：按代理商/企业、任务类型、状态、配置名称模糊。
+- **管理操作**：新增、编辑（仅未启用）、删除（仅未启用且无工单引用）、导出 Excel。启用/禁用由管理员切换；已启用配置不可编辑、删除。
+- **当前实现**：WorkOrderComplianceController，前缀 `/api/work-order/compliance`，提供分页、新增、编辑、删除、导出。
+
+### 6.3 工单管理（业务要点）
+
+- **工单主表**：`work_order`。含工单任务名称、代理商/部门、合规配置 ID、计划开始/结束时间、状态、开启信息（操作员、实际开始时间、登录记录 ID）、提交时间、超时原因、审核结果与审核人/时间、关闭人与关闭原因等。
+- **绑定设备**：`work_order_device`。记录创建工单时绑定的主控（单台）与机器人（可多台），以及开启工单时的实际设备快照（含固件版本）。
+- **附件与人员**：`work_order_attachment`（提交佐证图片）、`work_order_personnel`（参与人员，遥操员/监督员等）。
+- **查询条件**：工单 ID/任务名称、代理商/企业、工单状态、主控/机器人、操作员、计划时间、实际开始/提交/审核时间、是否超时等。
+
+### 6.4 工单状态流转
+
+| 状态 | 说明 | 触发 |
+|------|------|------|
+| NOT_STARTED | 未开始 | 管理员创建完成 |
+| IN_PROGRESS | 已开始 | 遥操人员点击「开始」，记录操作员与 actual_start_time |
+| SUBMITTED | 已提交 | 遥操人员在 plan_end_time 前提交；若合规配置禁用验收则直接进入 COMPLETED |
+| COMPLETED | 已完成 | 管理员审核（PASS/FAIL）或配置禁用验收时自动完成 |
+| TIMEOUT | 超时异常 | 超过 plan_end_time 未提交，由定时任务或超时提交置为 TIMEOUT，需填写超时原因 |
+| CLOSED | 已关闭 | 管理员关闭或合规配置启用时定时任务自动关闭 |
+
+定时任务（WorkOrderSchedulerJob）：超时提醒（距结束前 X 分钟推送）、超时检测（IN_PROGRESS/NOT_STARTED 超 plan_end_time 置为 TIMEOUT）、超时自动关闭（TIMEOUT 且启用自动关闭时置为 CLOSED）。
+
+### 6.5 与主控/设备及操作记录的关系
+
+- 创建工单时绑定主控设备（iot_device.id/device_code，device_type=2）与机器人（device_type=1），需在授权范围内。
+- 遥操人员登录主控后，通过 GET 主控端待执行工单列表（按主控 deviceCode、状态=未开始、时间窗口筛选）领取工单；点击「开始」时写入 `controller_operation_record`（start_time=工单开启时间），提交/超时/关闭时更新该工单下操作记录的 end_time（见 4.6）。
+- 主控使用状态（4.7）中的「最近一次遥操开始时间」「当前设备」依赖 `controller_operation_record`，与工单执行一一对应。
+
+**当前实现**：工单创建、分页、详情、开始、提交、超时原因、审核、关闭、主控端待开始列表、工单附件上传；合规配置分页、增删改、导出；定时任务已实现超时检测与自动关闭。
+
+---
+
+## 7. 数据模型与表结构汇总
+
+### 7.1 核心表
 
 | 表名 | 说明 |
 |------|------|
@@ -217,17 +267,22 @@
 | iot_ota_upgrade_task | OTA 升级任务 |
 | iot_ota_upgrade_record | 每台设备的升级记录与进度 |
 | controller_operation_record | 主控遥操操作记录（主控/机器人/遥操员/工单、开始与结束操作时间） |
+| work_order_compliance_config | 工单合规配置（任务类型、时限与验收规则、超时提醒与自动关闭等） |
+| work_order | 工单主表（任务名称、合规配置、计划时间、状态、开启/提交/审核/关闭信息） |
+| work_order_device | 工单绑定设备（计划主控/机器人及开启时实际设备快照） |
+| work_order_attachment | 工单附件（佐证图片等） |
+| work_order_personnel | 工单参与人员（遥操员/监督员等） |
 
-### 6.2 时间字段格式
+### 7.2 时间字段格式
 
 所有时间字段在接口与存储中统一为 **Y/M/D H:M:S**（实现为 `LocalDateTime`，序列化格式一般为 `yyyy-MM-dd HH:mm:ss`），包括：  
 创建时间、修改时间、生效时间、失效时间、最后一次登录时间、开始/结束时间（条件查询）、last_online_time、last_offline_time 等。
 
 ---
 
-## 7. 接口清单（与现有实现对照）
+## 8. 接口清单（与现有实现对照）
 
-### 7.1 设备管理（机器人设备：device_type=1）
+### 8.1 设备管理（机器人设备：device_type=1）
 
 | 方法 | 路径 | 说明 | 状态 |
 |------|------|------|------|
@@ -245,7 +300,7 @@
 | PUT | /api/device/{id}/status/{status} | 禁用/启用 | 已实现 |
 | POST | /api/device/batch/online-status | 批量在线状态 | 已实现 |
 
-### 7.2 主控端管理（主控设备：device_type=2）
+### 8.2 主控端管理（主控设备：device_type=2）
 
 **说明**：主控端管理接口统一前缀为 **`/api/master`**（与代码 ControllerDeviceController 一致）。
 
@@ -269,7 +324,7 @@
 | POST | /api/master/operation-record/export | 操作记录导出 Excel | 已实现 |
 | GET | /api/master/usage-status/{controllerCode} | 主控使用状态（最近登录、最近遥操开始时间、当前设备、可使用的机器人） | 已实现 |
 
-### 7.3 授权管理
+### 8.3 授权管理
 
 | 方法 | 路径 | 说明 | 状态 |
 |------|------|------|------|
@@ -279,7 +334,7 @@
 | DELETE | /api/device/auth/{id} | 删除授权（逻辑删除） | 已实现 |
 | POST | /api/device/auth/export | 导出授权列表 Excel | 已实现 |
 
-### 7.4 OTA（固件升级）
+### 8.4 OTA（固件升级）
 
 | 方法 | 路径 | 说明 | 状态 |
 |------|------|------|------|
@@ -289,16 +344,46 @@
 | POST | /api/ota/task/create | 创建升级任务 | 已实现 |
 | POST | /api/ota/task/{id}/execute | 执行升级任务 | 已实现 |
 
-### 7.5 内部（EMQX 回调）
+### 8.5 内部（EMQX 回调）
 
 | 方法 | 路径 | 说明 | 状态 |
 |------|------|------|------|
 | POST | /internal/mqtt/auth | EMQX 认证回调 | 已实现 |
 | POST | /internal/mqtt/acl | EMQX ACL 回调 | 已实现 |
 
+### 8.6 工单合规配置
+
+**说明**：前缀 **`/api/work-order/compliance`**，角色为平台管理员。
+
+| 方法 | 路径 | 说明 | 状态 |
+|------|------|------|------|
+| POST | /api/work-order/compliance/page | 分页查询合规配置（Body: WorkOrderComplianceQueryDTO） | 已实现 |
+| POST | /api/work-order/compliance | 新增合规配置 | 已实现 |
+| PUT | /api/work-order/compliance/{id} | 编辑合规配置（仅未启用） | 已实现 |
+| DELETE | /api/work-order/compliance/{id} | 删除合规配置（逻辑删除，仅未启用） | 已实现 |
+| POST | /api/work-order/compliance/export | 导出合规配置 Excel | 已实现 |
+
+### 8.7 工单管理
+
+**说明**：前缀 **`/api/work-order`**。管理端：分页、创建、详情、审核、关闭、导出；主控端/遥操：待开始列表、开始、提交、超时原因、附件上传。
+
+| 方法 | 路径 | 说明 | 状态 |
+|------|------|------|------|
+| POST | /api/work-order/page | 分页查询工单（Body: WorkOrderQueryDTO） | 已实现 |
+| POST | /api/work-order | 创建工单（Body: WorkOrderCreateDTO，含绑定设备） | 已实现 |
+| GET | /api/work-order/{id} | 工单详情 | 已实现 |
+| POST | /api/work-order/{id}/start | 开启工单（Body: WorkOrderStartDTO，记录操作员与 actual_start_time） | 已实现 |
+| POST | /api/work-order/{id}/submit | 提交工单 | 已实现 |
+| POST | /api/work-order/{id}/timeout-reason | 填写超时原因（Body: WorkOrderTimeoutReasonDTO） | 已实现 |
+| POST | /api/work-order/{id}/audit | 审核工单（Body: WorkOrderAuditDTO，PASS/FAIL） | 已实现 |
+| POST | /api/work-order/{id}/close | 关闭工单（Body: 含 closeReason） | 已实现 |
+| POST | /api/work-order/export | 导出工单列表 Excel | 已实现 |
+| GET | /api/work-order/pending/controller/{controllerCode} | 主控端待开始工单列表 | 已实现 |
+| POST | /api/work-order/{id}/attachments | 新增工单附件（佐证图片等） | 已实现 |
+
 ---
 
-## 8. 待完善与可选扩展
+## 9. 待完善与可选扩展
 
 1. **主控端“最后一次登录时间”与“登录时关联的机器人”**  
    - **已实现**：表 `iot_controller_login_log`、实体 `IotControllerLoginLog`、`iot_device.last_login_time`；接口 POST `/api/controller/login`（Body：ControllerLoginDTO），记录登录并更新主控设备最后登录时间；删除均为逻辑删除。
@@ -321,11 +406,15 @@
 7. **操作记录与使用状态**  
    - **已实现**：表 `controller_operation_record`；工单开启/提交/超时/关闭时自动写入或更新操作记录；POST `/api/master/operation-record/page` 分页、POST `/api/master/operation-record/export` 导出；GET `/api/master/usage-status/{controllerCode}` 返回 `UsageStatusVO`（lastLoginTime、lastRemoteOperationStartTime、currentDevice、availableRobots）。
 
+8. **工单管理**  
+   - **已实现**：工单合规配置与工单管理全流程见 **第 6 章** 与 **8.6、8.7 接口清单**；表 `work_order_compliance_config`、`work_order`、`work_order_device`、`work_order_attachment`、`work_order_personnel`；定时任务超时检测与自动关闭；主控端待开始工单列表、开始/提交/审核/关闭、附件上传。
+
 ---
 
-## 9. 参考
+## 10. 参考
 
 - 模块结构、鉴权架构、MQTT Topic、API 列表：见 `realman-boot-iot/README.md`  
 - 设备详情聚合与设备参数配置返回：`IotDeviceServiceImpl.getDeviceDetail`、`DeviceDetailVO.deviceConfigs`  
 - 上下线更新 last_online_time / last_offline_time：`DeviceOnlineOfflineHandler`  
 - 授权查询与数据权限：`IotDeviceMapper.xml`、`DeviceAuthQueryDTO`、`IIotDeviceAuthService.queryAuthPage`
+- 工单业务与设计：`docs/工单管理设计文档.md`；工单服务 `WorkOrderServiceImpl`、合规配置 `WorkOrderComplianceConfigServiceImpl`、定时任务 `WorkOrderSchedulerJob`

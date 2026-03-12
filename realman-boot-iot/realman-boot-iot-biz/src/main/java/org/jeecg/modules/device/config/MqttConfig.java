@@ -115,6 +115,7 @@ public class MqttConfig {
                 "device/+/command/+/ack",           // 指令集执行确认（restart/emergency-stop/poweroff/reset...）
                 "device/+/ota/progress",            // OTA 升级进度上报
                 "device/+/log/operation",           // 设备操作日志上报
+                "device/+/camera/stream/response",  // 机器人上报摄像头视频流地址
                 "$SYS/brokers/+/clients/+/connected",    // EMQX 设备上线事件
                 "$SYS/brokers/+/clients/+/disconnected",  // EMQX 设备下线事件
                 // ========== 订阅主控设备主动上报的数据 ==========

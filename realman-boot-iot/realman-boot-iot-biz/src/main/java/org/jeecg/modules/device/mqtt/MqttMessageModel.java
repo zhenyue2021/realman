@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -282,5 +283,66 @@ public class MqttMessageModel {
         private String operationResult;
         /** 设备端操作发生时间戳（毫秒） */
         private long operationTime;
+    }
+
+    /**
+     * 单路摄像头信息
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class CameraInfo {
+        /** 摄像头路数索引（从 0 开始） */
+        private Integer cameraIndex;
+        /** 摄像头名称/标识，可为 null */
+        private String cameraName;
+        /** 视频流地址（RTSP/RTMP/HLS 等） */
+        private String streamUrl;
+        /** 流类型（如 rtsp、rtmp、hls），可为 null */
+        private String streamType;
+    }
+
+    /**
+     * 下行：平台向机器人查询摄像头视频流地址（Topic: device/{deviceCode}/camera/stream/query）
+     *
+     * <p>cameraIndex 为 null 时查询全部摄像头；否则查询指定路数。
+     * 机器人收到后应回复 {@link CameraStreamResponse}。
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class CameraStreamQuery {
+        /** 指令唯一 ID（UUID），用于关联 CameraStreamResponse */
+        private String commandId;
+        /** 指定摄像头路数索引，null 表示查询全部 */
+        private Integer cameraIndex;
+        /** 平台发送时间戳（毫秒） */
+        private long timestamp;
+    }
+
+    /**
+     * 上行：机器人上报摄像头视频流地址列表（Topic: device/{deviceCode}/camera/stream/response）
+     *
+     * <p>机器人收到 {@link CameraStreamQuery} 后上报本消息，携带所有（或指定路）摄像头的流地址。
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class CameraStreamResponse {
+        /** 对应 {@link CameraStreamQuery#commandId} */
+        private String commandId;
+        /** 执行结果码：0=成功，非0=失败 */
+        private int code;
+        /** 失败原因（code≠0 时填写） */
+        private String message;
+        /** 摄像头列表 */
+        private List<CameraInfo> cameras;
+        /** 设备回复时间戳（毫秒） */
+        private long timestamp;
     }
 }

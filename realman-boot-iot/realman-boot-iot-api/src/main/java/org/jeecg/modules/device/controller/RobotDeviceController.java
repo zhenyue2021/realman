@@ -18,6 +18,7 @@ import org.jeecg.modules.device.dto.DeviceUpdateDTO;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.service.IIotDeviceService;
 import org.jeecg.modules.device.vo.ApiResult;
+import org.jeecg.modules.device.vo.DeviceCameraStreamVO;
 import org.jeecg.modules.device.vo.DeviceDetailVO;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -166,6 +167,38 @@ public class RobotDeviceController {
     @Operation(summary = "批量查询机器人设备在线状态")
     public ApiResult<List<Map<String, Object>>> batchOnline(@RequestBody List<String> deviceIds) {
         return ApiResult.ok(deviceService.batchGetOnlineStatus(deviceIds));
+    }
+
+    /**
+     * 获取机器人全部摄像头视频流地址
+     *
+     * <p>调用 {@link IIotDeviceService#getCameraStreams(String, Integer)} 并传入 cameraIndex = null，
+     * 由机器人返回所有已配置摄像头的流地址列表。接口为同步调用，最长等待 10 秒。
+     */
+    @GetMapping("/{deviceId}/camera/stream")
+    @Operation(summary = "获取机器人全部摄像头视频流地址")
+    public ApiResult<List<DeviceCameraStreamVO>> getCameraStreams(@PathVariable String deviceId) {
+        ensureDeviceType(deviceId, DEVICE_TYPE_ROBOT);
+        return ApiResult.ok(deviceService.getCameraStreams(deviceId, null));
+    }
+
+    /**
+     * 获取机器人指定路数摄像头视频流地址（单路）
+     *
+     * <p>前端通过 path 传入 cameraIndex（从 0 开始），平台会校验为非负整数；
+     * Service 仍按列表形式返回，Controller 只取第一条作为“当前摄像头”的视频流信息。
+     */
+    @GetMapping("/{deviceId}/camera/stream/{cameraIndex}")
+    @Operation(summary = "获取机器人指定路数摄像头视频流地址")
+    public ApiResult<DeviceCameraStreamVO> getCameraStreamByIndex(@PathVariable String deviceId,
+                                                                  @PathVariable Integer cameraIndex) {
+        ensureDeviceType(deviceId, DEVICE_TYPE_ROBOT);
+        if (cameraIndex == null || cameraIndex < 0) {
+            throw new RuntimeException("cameraIndex 必须为非负整数");
+        }
+        List<DeviceCameraStreamVO> list = deviceService.getCameraStreams(deviceId, cameraIndex);
+        DeviceCameraStreamVO vo = list.isEmpty() ? null : list.get(0);
+        return ApiResult.ok(vo);
     }
 
     /** 导出机器人设备列表为 Excel（条件与 list 一致，逻辑删除的不导出） */

@@ -13,6 +13,7 @@ import org.jeecg.modules.device.entity.IotOtaUpgradeRecord;
 import org.jeecg.modules.device.mapper.*;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.security.CommandEncryptService;
+import org.jeecg.modules.device.service.DeviceCameraStreamPendingService;
 import org.jeecg.modules.device.service.IDeviceOperationLogService;
 import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
 import org.junit.jupiter.api.BeforeEach;
@@ -136,6 +137,13 @@ public class MqttMessageDispatcherEndToEndTest {
                 logService
         );
 
+        DeviceCameraStreamPendingService cameraStreamPendingService = Mockito.mock(DeviceCameraStreamPendingService.class);
+        DeviceCameraStreamResponseHandler deviceCameraStreamResponseHandler = new DeviceCameraStreamResponseHandler(
+                encryptService,
+                objectMapper,
+                cameraStreamPendingService
+        );
+
         // 分发器使用真实实例
         dispatcher = new MqttMessageDispatcher(
                 statusHandler,
@@ -143,7 +151,8 @@ public class MqttMessageDispatcherEndToEndTest {
                 commandAckHandler,
                 otaProgressHandler,
                 operationLogHandler,
-                onlineOfflineHandler
+                onlineOfflineHandler,
+                deviceCameraStreamResponseHandler
         );
     }
 

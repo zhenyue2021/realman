@@ -60,6 +60,20 @@ public interface DeviceConstant {
         String EMERGENCY_STOP   = "device/%s/command/emergency-stop";
         /** 下行：平台向设备推送 OTA 升级通知（含固件下载 URL、MD5、大小等） */
         String OTA_NOTIFY       = "device/%s/ota/notify";
+        /**
+         * 下行：平台向机器人查询摄像头视频流地址（Topic: device/{deviceCode}/camera/stream/query）
+         *
+         * <p>配合 {@link org.jeecg.modules.device.mqtt.MqttMessageModel.CameraStreamQuery} 使用：
+         * cameraIndex = null 表示查询全部摄像头，非 null 表示查询指定路数。
+         */
+        String CAMERA_STREAM_QUERY    = "device/%s/camera/stream/query";
+        /**
+         * 上行：机器人上报摄像头视频流地址列表（Topic: device/{deviceCode}/camera/stream/response）
+         *
+         * <p>配合 {@link org.jeecg.modules.device.mqtt.MqttMessageModel.CameraStreamResponse} 使用，
+         * 由 {@link org.jeecg.modules.device.mqtt.handler.DeviceCameraStreamResponseHandler} 处理。
+         */
+        String CAMERA_STREAM_RESPONSE = "device/%s/camera/stream/response";
         /** EMQX 系统事件：设备 MQTT 连接建立（clientId 从 topic 路径中提取） */
         String SYS_CONNECTED    = "$SYS/brokers/+/clients/+/connected";
         /** EMQX 系统事件：设备 MQTT 连接断开 */

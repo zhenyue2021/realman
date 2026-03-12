@@ -1,0 +1,49 @@
+package org.jeecg.modules.device.controller.workorder;
+
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import org.jeecg.modules.device.entity.workorder.WorkOrderComplianceConfig;
+import org.jeecg.modules.device.service.workorder.IWorkOrderComplianceConfigService;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@WebMvcTest(WorkOrderComplianceController.class)
+class WorkOrderComplianceControllerTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockBean
+    private IWorkOrderComplianceConfigService configService;
+
+    @Test
+    void page_returnsOk() throws Exception {
+        when(configService.page(any(Page.class), any())).thenReturn(new Page<>(1, 20));
+        mockMvc.perform(post("/api/work-order/compliance/page")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"pageNo\":1,\"pageSize\":20}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200));
+        verify(configService).page(any(Page.class), any());
+    }
+
+    @Test
+    void delete_returnsOk() throws Exception {
+        when(configService.removeById("cfg-1")).thenReturn(true);
+        mockMvc.perform(delete("/api/work-order/compliance/cfg-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200));
+        verify(configService).removeById("cfg-1");
+    }
+}

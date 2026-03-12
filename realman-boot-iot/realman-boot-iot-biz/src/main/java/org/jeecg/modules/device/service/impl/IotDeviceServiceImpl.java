@@ -15,12 +15,15 @@ import org.jeecg.modules.device.dto.DeviceUpdateDTO;
 import org.jeecg.modules.device.entity.*;
 import org.jeecg.modules.device.mapper.*;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
+import org.jeecg.modules.device.mqtt.handler.DeviceCameraStreamResponseHandler;
 import org.jeecg.modules.device.mqtt.publisher.MqttPublisher;
 import org.jeecg.modules.device.security.CommandEncryptService;
 import org.jeecg.modules.device.security.DeviceSecretService;
+import org.jeecg.modules.device.service.DeviceCameraStreamPendingService;
 import org.jeecg.modules.device.service.IDeviceOperationLogService;
 import org.jeecg.modules.device.service.IIotDeviceService;
 import org.jeecg.modules.device.util.DeviceExcelExportUtil;
+import org.jeecg.modules.device.vo.DeviceCameraStreamVO;
 import org.jeecg.modules.device.vo.DeviceDetailVO;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -30,6 +33,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -55,15 +59,16 @@ import java.util.stream.Collectors;
 public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice>
         implements IIotDeviceService {
 
-    private final IotDeviceMapper         deviceMapper;
-    private final IotDeviceConfigMapper   configMapper;
-    private final IotDeviceStatusMapper   statusMapper;
-    private final DeviceSecretService     secretService;
-    private final CommandEncryptService   encryptService;
-    private final MqttPublisher           mqttPublisher;
-    private final StringRedisTemplate     redisTemplate;
-    private final ObjectMapper            objectMapper;
+    private final IotDeviceMapper            deviceMapper;
+    private final IotDeviceConfigMapper      configMapper;
+    private final IotDeviceStatusMapper      statusMapper;
+    private final DeviceSecretService        secretService;
+    private final CommandEncryptService      encryptService;
+    private final MqttPublisher              mqttPublisher;
+    private final StringRedisTemplate        redisTemplate;
+    private final ObjectMapper               objectMapper;
     private final IDeviceOperationLogService logService;
+    private final DeviceCameraStreamPendingService deviceCameraStreamPendingService;
 
     /**
      * 注册新设备
@@ -475,6 +480,66 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
             }
             return item;
         }).collect(Collectors.toList());
+    }
+
+    /**
+     * 向机器人查询摄像头视频流地址（同步等待，超时 10 秒）
+     *
+     * <p>执行流程：
+     * <ol>
+     *   <li>校验设备存在且在线</li>
+     *   <li>生成 commandId，调用 {@link DeviceCameraStreamPendingService#register(String)} 注册 Future</li>
+     *   <li>构造 {@link MqttMessageModel.CameraStreamQuery}，通过 {@link MqttPublisher#publishToDevice} 发送到
+     *       {@code device/{deviceCode}/camera/stream/query}（AES 加密）</li>
+     *   <li>阻塞等待机器人响应（最长 10 秒），由 {@link DeviceCameraStreamResponseHandler} 完成 Future</li>
+     *   <li>将响应中的 {@link MqttMessageModel.CameraInfo} 列表转换为 {@link DeviceCameraStreamVO} 列表返回</li>
+     * </ol>
+     *
+     * @param deviceId    设备 ID
+     * @param cameraIndex 指定摄像头路数索引，null 表示查询全部，非 null 表示查询单路
+     * @return 摄像头流信息列表（controller 端可根据 cameraIndex 选择返回单路或多路）
+     */
+    @Override
+    public List<DeviceCameraStreamVO> getCameraStreams(String deviceId, Integer cameraIndex) {
+        IotDevice device = require(deviceId);
+        if (DeviceConstant.DeviceStatus.ONLINE != device.getStatus()) {
+            throw new RuntimeException("设备不在线");
+        }
+
+        String commandId = IdUtil.fastSimpleUUID();
+        CompletableFuture<List<MqttMessageModel.CameraInfo>> future =
+                deviceCameraStreamPendingService.register(commandId);
+
+        try {
+            MqttMessageModel.CameraStreamQuery query = MqttMessageModel.CameraStreamQuery.builder()
+                    .commandId(commandId)
+                    .cameraIndex(cameraIndex)
+                    .timestamp(System.currentTimeMillis())
+                    .build();
+            String payload = objectMapper.writeValueAsString(query);
+            String topic = String.format(DeviceConstant.MqttTopic.CAMERA_STREAM_QUERY, device.getDeviceCode());
+            mqttPublisher.publishToDevice(device.getDeviceCode(), topic, payload, 1);
+        } catch (Exception e) {
+            deviceCameraStreamPendingService.completeExceptionally(commandId, e);
+            throw new RuntimeException("摄像头流查询指令发送失败: " + e.getMessage(), e);
+        }
+
+        try {
+            List<MqttMessageModel.CameraInfo> cameras = future.get(10, TimeUnit.SECONDS);
+            return cameras.stream()
+                    .map(c -> DeviceCameraStreamVO.builder()
+                            .cameraIndex(c.getCameraIndex())
+                            .cameraName(c.getCameraName())
+                            .streamUrl(c.getStreamUrl())
+                            .streamType(c.getStreamType())
+                            .build())
+                    .collect(Collectors.toList());
+        } catch (java.util.concurrent.TimeoutException e) {
+            deviceCameraStreamPendingService.completeExceptionally(commandId, e);
+            throw new RuntimeException("等待摄像头流地址超时（10s），设备未响应");
+        } catch (Exception e) {
+            throw new RuntimeException("获取摄像头流地址失败: " + e.getMessage(), e);
+        }
     }
 
     /**
