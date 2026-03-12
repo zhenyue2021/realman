@@ -20,8 +20,9 @@ public class MqttPublisher {
 
     /** 向设备发布AES加密消息 */
     public void publishToDevice(String deviceCode, String topic, String payload, int qos) {
-        log.info("[MqttPublisher] 发送消息给设备: topic={}, payload={}", topic, payload);
+        log.info("[MqttPublisher] -1 发送消息给设备: topic={}, payload={}", topic, payload);
         String encrypted = encryptService.encryptForDevice(deviceCode, payload);
+        log.info("[MqttPublisher] -2 发送消息给设备: topic={}, payload={}", topic, encrypted);
         publishRaw(topic, encrypted, qos, false);
     }
 

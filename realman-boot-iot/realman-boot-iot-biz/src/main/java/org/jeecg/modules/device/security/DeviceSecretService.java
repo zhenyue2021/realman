@@ -77,13 +77,13 @@ public class DeviceSecretService {
      */
     public boolean validateAcl(String deviceCode, String topic) {
         if (topic == null || deviceCode == null) {
-            log.warn("[ACL] 设备[{}]越权访问 topic={}", deviceCode, topic);
+            log.warn("[ACL]-1 设备[{}]越权访问 topic={}", deviceCode, topic);
             return false;
         }
         boolean ok = topic.startsWith("device/" + deviceCode + "/")
-                || topic.startsWith(deviceCode + "/master/")
-                || topic.startsWith(deviceCode + "/slave/");
-        if (!ok) log.warn("[ACL] 设备[{}]越权访问 topic={}", deviceCode, topic);
+                || topic.startsWith("/"+deviceCode + "/master/")
+                || topic.startsWith("/"+deviceCode + "/slave/");
+        if (!ok) log.warn("[ACL]-1 设备[{}]越权访问 topic={}", deviceCode, topic);
         return ok;
     }
 

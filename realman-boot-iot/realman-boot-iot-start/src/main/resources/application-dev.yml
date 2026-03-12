@@ -1,7 +1,7 @@
 
 spring:
   application:
-    name: device-management
+    name: realman-iot
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://172.16.44.66:3306/jeecg-boot?characterEncoding=UTF-8&useUnicode=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
@@ -43,7 +43,7 @@ mybatis-plus:
 
 # mqtt
 mqtt:
-  enabled: false  # 临时禁用，避免启动失败
+  enabled: true  # 临时禁用，避免启动失败
   broker:
     url: tcp://172.16.44.66:1883
     username: iot-platform
@@ -63,7 +63,7 @@ minio:
 # 定时任务
 xxl:
   job:
-    enabled: false
+    enabled: true
     admin:
       addresses: http://172.16.44.66:9080/xxl-job-admin
     executor:

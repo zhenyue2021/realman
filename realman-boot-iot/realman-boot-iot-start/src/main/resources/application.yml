@@ -5,7 +5,7 @@ server:
 
 spring:
   application:
-    name: device-management
+    name: realman-iot
   config:
     import: optional:classpath:config/application-liteflow.yml
   profiles:

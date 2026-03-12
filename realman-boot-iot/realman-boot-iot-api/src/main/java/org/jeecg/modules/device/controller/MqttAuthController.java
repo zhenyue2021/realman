@@ -70,6 +70,7 @@ public class MqttAuthController {
      */
     @PostMapping("/acl")
     public ResponseEntity<Map<String, String>> acl(@RequestBody Map<String, String> body) {
+        log.info("[MqttAcl] requestBody={}", body);
         String clientId = body.get("clientid");
         String username = body.get("username");
         String topic    = body.get("topic");
