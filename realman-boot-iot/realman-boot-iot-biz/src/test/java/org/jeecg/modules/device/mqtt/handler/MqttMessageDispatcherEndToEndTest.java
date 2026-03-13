@@ -57,6 +57,7 @@ public class MqttMessageDispatcherEndToEndTest {
     private DeviceStatusHandler statusHandler;
     private DeviceConfigAckHandler configAckHandler;
     private DeviceCommandAckHandler commandAckHandler;
+    private MasterCommandAckHandler masterCommandAckHandler;
     private OtaProgressHandler otaProgressHandler;
     private DeviceOperationLogHandler operationLogHandler;
 
@@ -119,6 +120,7 @@ public class MqttMessageDispatcherEndToEndTest {
                 objectMapper,
                 logService
         );
+        masterCommandAckHandler = Mockito.mock(MasterCommandAckHandler.class);
 
         otaProgressHandler = new OtaProgressHandler(
                 deviceMapper,
@@ -147,16 +149,20 @@ public class MqttMessageDispatcherEndToEndTest {
         MasterAssociatedDeviceResponseHandler masterAssociatedDeviceResponseHandler =
                 Mockito.mock(MasterAssociatedDeviceResponseHandler.class);
 
+        RobotSlaveStatusHandler robotSlaveStatusHandler = Mockito.mock(RobotSlaveStatusHandler.class);
+
         // 分发器使用真实实例
         dispatcher = new MqttMessageDispatcher(
                 statusHandler,
                 configAckHandler,
                 commandAckHandler,
+                masterCommandAckHandler,
                 otaProgressHandler,
                 operationLogHandler,
                 onlineOfflineHandler,
                 deviceCameraStreamResponseHandler,
-                masterAssociatedDeviceResponseHandler
+                masterAssociatedDeviceResponseHandler,
+                robotSlaveStatusHandler
         );
     }
 

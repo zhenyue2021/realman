@@ -22,11 +22,13 @@ public class MqttMessageDispatcherTest {
     private DeviceStatusHandler statusHandler;
     private DeviceConfigAckHandler configAckHandler;
     private DeviceCommandAckHandler commandAckHandler;
+    private MasterCommandAckHandler masterCommandAckHandler;
     private OtaProgressHandler otaProgressHandler;
     private DeviceOperationLogHandler operationLogHandler;
     private DeviceOnlineOfflineHandler onlineOfflineHandler;
     private DeviceCameraStreamResponseHandler deviceCameraStreamResponseHandler;
     private MasterAssociatedDeviceResponseHandler masterAssociatedDeviceResponseHandler;
+    private RobotSlaveStatusHandler robotSlaveStatusHandler;
 
     private MqttMessageDispatcher dispatcher;
 
@@ -35,21 +37,25 @@ public class MqttMessageDispatcherTest {
         statusHandler = Mockito.mock(DeviceStatusHandler.class);
         configAckHandler = Mockito.mock(DeviceConfigAckHandler.class);
         commandAckHandler = Mockito.mock(DeviceCommandAckHandler.class);
+        masterCommandAckHandler = Mockito.mock(MasterCommandAckHandler.class);
         otaProgressHandler = Mockito.mock(OtaProgressHandler.class);
         operationLogHandler = Mockito.mock(DeviceOperationLogHandler.class);
         onlineOfflineHandler = Mockito.mock(DeviceOnlineOfflineHandler.class);
         deviceCameraStreamResponseHandler = Mockito.mock(DeviceCameraStreamResponseHandler.class);
         masterAssociatedDeviceResponseHandler = Mockito.mock(MasterAssociatedDeviceResponseHandler.class);
+        robotSlaveStatusHandler = Mockito.mock(RobotSlaveStatusHandler.class);
 
         dispatcher = new MqttMessageDispatcher(
                 statusHandler,
                 configAckHandler,
                 commandAckHandler,
+                masterCommandAckHandler,
                 otaProgressHandler,
                 operationLogHandler,
                 onlineOfflineHandler,
                 deviceCameraStreamResponseHandler,
-                masterAssociatedDeviceResponseHandler
+                masterAssociatedDeviceResponseHandler,
+                robotSlaveStatusHandler
         );
     }
 
