@@ -78,9 +78,6 @@ public class CommandEncryptService {
         return doDecrypt(getAesKey(deviceCode), enc);
     }
 
-    public static void main(String[] args) {
-        String plain = "e2138137600c5a683df1e944316c3c24:oo8r90tOoP4fS5I9GMPHvmUTnlANpiDfS1hZuzaEb3BmyL5bmWFIqBj8WuFoZdA0CGMYGcexsWHBSHwZHBxqgr761PK3GdHbY7v9EpHdrMucpgv7m85s7Osh46xnkhHV";
-    }
 
     /**
      * 判断字符串是否符合密文格式：32位十六进制 IV + ":" + Base64内容

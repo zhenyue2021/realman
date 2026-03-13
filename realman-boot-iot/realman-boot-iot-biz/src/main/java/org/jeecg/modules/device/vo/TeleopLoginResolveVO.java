@@ -2,6 +2,7 @@ package org.jeecg.modules.device.vo;
 
 import lombok.Data;
 import org.jeecg.modules.device.entity.IotDevice;
+import org.jeecg.modules.device.entity.workorder.WorkOrder;
 
 import java.util.List;
 
@@ -22,5 +23,8 @@ public class TeleopLoginResolveVO {
 
     /** 该主控在当前用户授权下可使用的机器人列表 */
     private List<UsageStatusVO.RobotBasicVO> availableRobots;
+
+    /** 当前待开启的工单（按生效时间最近一条），无则为 null */
+    private WorkOrder pendingWorkOrder;
 }
 

@@ -50,14 +50,15 @@ public class MqttMessageDispatcher {
     /** 匹配 {deviceCode}/master/{path} 或 {deviceCode}/slave/{path}，group(1)=deviceCode，group(2)=role，group(3)=path */
     private static final Pattern RAW_DEVICE_TOPIC = Pattern.compile("^([^/]+)/(master|slave)/(.+)$");
 
-    private final DeviceStatusHandler         statusHandler;
-    private final DeviceConfigAckHandler      configAckHandler;
-    private final DeviceCommandAckHandler     commandAckHandler;
-    private final OtaProgressHandler          otaProgressHandler;
-    private final DeviceOperationLogHandler   operationLogHandler;
-    private final DeviceOnlineOfflineHandler  onlineOfflineHandler;
-    private final DeviceCameraStreamResponseHandler           deviceCameraStreamResponseHandler;
-    private final ControllerAssociatedDeviceResponseHandler   controllerAssociatedDeviceResponseHandler;
+    private final DeviceStatusHandler                 statusHandler;
+    private final DeviceConfigAckHandler              configAckHandler;
+    private final DeviceCommandAckHandler             commandAckHandler;
+    private final OtaProgressHandler                  otaProgressHandler;
+    private final DeviceOperationLogHandler           operationLogHandler;
+    private final DeviceOnlineOfflineHandler          onlineOfflineHandler;
+    private final DeviceCameraStreamResponseHandler   deviceCameraStreamResponseHandler;
+    private final ControllerAssociatedDeviceResponseHandler controllerAssociatedDeviceResponseHandler;
+    private final RobotSlaveStatusHandler             robotSlaveStatusHandler;
 
     /**
      * 分发 MQTT 消息到对应 Handler
@@ -134,6 +135,11 @@ public class MqttMessageDispatcher {
      */
     private void dispatchRawTopic(String deviceCode, String role, String path, String payload) {
         // TODO: 按需注入对应 Handler 并路由
+        // 机器人原始状态上报：{robotCode}/slave/status
+        if ("slave".equals(role) && "status".equals(path)) {
+            robotSlaveStatusHandler.handle(deviceCode, payload);
+            return;
+        }
         log.debug("[Dispatcher] 原始上报 deviceCode={} role={} path={}", deviceCode, role, path);
     }
 }

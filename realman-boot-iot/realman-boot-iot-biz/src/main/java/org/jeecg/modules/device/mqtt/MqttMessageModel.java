@@ -365,7 +365,27 @@ public class MqttMessageModel {
     }
 
     /**
-     * 上行：主控上报“当前关联的机器人/设备信息”（Topic: device/{controllerCode}/teleop/associated-device/response）
+     * 下行：平台通知主控当前应操作的机器人（Topic: device/{controllerCode}/teleop/robot/assign）
+     *
+     * <p>主控登录后，平台根据工单派发本消息，主控收到后即知晓本次遥操目标机器人。
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class RobotAssignCommand {
+        /** 指令唯一 ID（UUID） */
+        private String commandId;
+        /** 目标机器人设备编码 */
+        private String robotCode;
+        /** 关联工单 ID */
+        private String workOrderId;
+        /** 平台发送时间戳（毫秒） */
+        private long timestamp;
+    }
+
+    /**
+     * 上行：主控上报”当前关联的机器人/设备信息”（Topic: device/{controllerCode}/teleop/associated-device/response）
      */
     @Data
     @Builder

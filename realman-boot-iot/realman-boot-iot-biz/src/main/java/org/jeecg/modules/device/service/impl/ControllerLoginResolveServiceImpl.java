@@ -9,22 +9,28 @@ import org.jeecg.modules.device.constant.DeviceConstant;
 import org.jeecg.modules.device.dto.ControllerLoginDTO;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.entity.IotDeviceAuth;
+import org.jeecg.modules.device.entity.workorder.WorkOrder;
+import org.jeecg.modules.device.entity.workorder.WorkOrderDevice;
 import org.jeecg.modules.device.mapper.IotDeviceAuthMapper;
 import org.jeecg.modules.device.mapper.IotDeviceMapper;
+import org.jeecg.modules.device.mapper.workorder.WorkOrderDeviceMapper;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.mqtt.publisher.MqttPublisher;
 import org.jeecg.modules.device.service.ControllerAssociatedDevicePendingService;
 import org.jeecg.modules.device.service.IControllerLoginLogService;
 import org.jeecg.modules.device.service.IControllerLoginResolveService;
+import org.jeecg.modules.device.service.workorder.IWorkOrderService;
 import org.jeecg.modules.device.util.MacResolveUtil;
 import org.jeecg.modules.device.vo.TeleopLoginResolveVO;
 import org.jeecg.modules.device.vo.UsageStatusVO;
+import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 @Service
 @RequiredArgsConstructor
@@ -34,12 +40,15 @@ public class ControllerLoginResolveServiceImpl implements IControllerLoginResolv
     private static final int DEVICE_TYPE_CONTROLLER = 2;
     private static final int DEVICE_TYPE_ROBOT = 1;
 
-    private final ControllerAssociatedDevicePendingService pendingService;
     private final MqttPublisher mqttPublisher;
     private final ObjectMapper objectMapper;
     private final IotDeviceMapper deviceMapper;
     private final IotDeviceAuthMapper deviceAuthMapper;
+    private final WorkOrderDeviceMapper workOrderDeviceMapper;
+    private final IWorkOrderService workOrderService;
     private final IControllerLoginLogService controllerLoginLogService;
+    private final DeviceWebSocketServer deviceWebSocketServer;
+    private final ControllerAssociatedDevicePendingService controllerAssociatedDevicePendingService;
 
     @Override
     public TeleopLoginResolveVO resolve(HttpServletRequest request, ControllerLoginDTO dto) {
@@ -51,7 +60,6 @@ public class ControllerLoginResolveServiceImpl implements IControllerLoginResolv
         if (tenantId == null || tenantId.isEmpty()) {
             throw new RuntimeException("缺少租户ID（x-tenant-id）");
         }
-        boolean superAdmin = false;
 
         // 解析客户端 MAC（前端不传时，尝试通过 ARP 在内网反查）
         String mac = MacResolveUtil.resolveClientMac(request, dto.getMacAddress());
@@ -70,49 +78,8 @@ public class ControllerLoginResolveServiceImpl implements IControllerLoginResolv
             throw new RuntimeException("主控设备不存在或非主控设备: mac=" + mac);
         }
 
-        // 下发 query 并等待 response
-        String commandId = UUID.randomUUID().toString();
-        CompletableFuture<MqttMessageModel.AssociatedDeviceResponse> future =
-                pendingService.register(commandId);
-        try {
-            MqttMessageModel.AssociatedDeviceQuery query = MqttMessageModel.AssociatedDeviceQuery.builder()
-                    .commandId(commandId)
-                    .operatorId(dto.getOperatorId())
-                    .loginLogId(null)
-                    .timestamp(System.currentTimeMillis())
-                    .build();
-            String topic = String.format(DeviceConstant.MqttTopic.ASSOCIATED_DEVICE_QUERY, controller.getDeviceCode());
-            mqttPublisher.publishToDevice(controller.getDeviceCode(), topic, objectMapper.writeValueAsString(query), 1);
-        } catch (Exception e) {
-            pendingService.completeExceptionally(commandId, e);
-            throw new RuntimeException("下发主控关联设备查询指令失败: " + e.getMessage(), e);
-        }
-
-        MqttMessageModel.AssociatedDeviceResponse resp;
-        try {
-            resp = future.get(5, TimeUnit.SECONDS);
-        } catch (java.util.concurrent.TimeoutException e) {
-            pendingService.completeExceptionally(commandId, e);
-            throw new RuntimeException("等待主控响应超时（5s），设备未响应");
-        } catch (Exception e) {
-            throw new RuntimeException("获取主控关联设备信息失败: " + e.getMessage(), e);
-        }
-
-        if (resp == null) {
-            throw new RuntimeException("主控响应为空");
-        }
-        if (resp.getCode() != 0) {
-            throw new RuntimeException("主控响应失败: " + (resp.getMessage() != null ? resp.getMessage() : resp.getCode()));
-        }
-        if (resp.getMacAddress() == null || resp.getMacAddress().isEmpty()) {
-            throw new RuntimeException("主控未返回 MAC 地址");
-        }
-        if (!mac.equalsIgnoreCase(resp.getMacAddress())) {
-            throw new RuntimeException("主控上报的 MAC 与当前登录 MAC 不一致");
-        }
-        if (resp.getRobotCode() == null || resp.getRobotCode().isEmpty()) {
-            throw new RuntimeException("主控未返回 robotCode");
-        }
+        // 通过 MQTT 与主控做一次在线 & MAC 一致性校验（如不通过会直接抛异常）
+        verifyControllerOnlineAndMac(controller, mac, dto);
 
         // 租户授权：当前租户对该主控的有效授权
         LocalDateTime now = LocalDateTime.now();
@@ -125,82 +92,194 @@ public class ControllerLoginResolveServiceImpl implements IControllerLoginResolv
                 .eq(IotDeviceAuth::getSubjectType, "TENANT")
                 .eq(IotDeviceAuth::getSubjectId, tenantId);
         List<IotDeviceAuth> auths = deviceAuthMapper.selectList(authWrapper);
-        if (!superAdmin && (auths == null || auths.isEmpty())) {
+        if (auths == null || auths.isEmpty()) {
             throw new RuntimeException("无权限：主控设备未授权给当前用户");
         }
 
         // 可用机器人列表（授权绑定）
         List<UsageStatusVO.RobotBasicVO> available = new ArrayList<>();
-        Set<String> allowedRobotCodes = new HashSet<>();
         Set<String> allowedRobotIds = new HashSet<>();
-        if (auths != null) {
-            for (IotDeviceAuth a : auths) {
-                if (a.getDeviceId() != null && !a.getDeviceId().isEmpty()) {
-                    allowedRobotIds.add(a.getDeviceId());
-                }
-                if (a.getDeviceCode() != null && !a.getDeviceCode().isEmpty()) {
-                    allowedRobotCodes.add(a.getDeviceCode());
-                }
-            }
-            for (String rid : allowedRobotIds) {
-                IotDevice robot = deviceMapper.selectById(rid);
-                if (robot != null && Integer.valueOf(DEVICE_TYPE_ROBOT).equals(robot.getDeviceType())) {
-                    UsageStatusVO.RobotBasicVO v = new UsageStatusVO.RobotBasicVO();
-                    v.setRobotId(robot.getId());
-                    v.setRobotCode(robot.getDeviceCode());
-                    v.setRobotName(robot.getDeviceName());
-                    v.setStatus(robot.getStatus());
-                    v.setDeviceModel(robot.getDeviceModel());
-                    v.setFirmwareVersion(robot.getFirmwareVersion());
-                    available.add(v);
-                    allowedRobotCodes.add(robot.getDeviceCode());
-                }
+        for (IotDeviceAuth a : auths) {
+            if (a.getDeviceId() != null && !a.getDeviceId().isEmpty()) {
+                allowedRobotIds.add(a.getDeviceId());
             }
         }
-
-        // 校验响应机器人在授权范围内
-        if (!superAdmin && !allowedRobotCodes.contains(resp.getRobotCode())
-                && (resp.getRobotId() == null || !allowedRobotIds.contains(resp.getRobotId()))) {
-            throw new RuntimeException("无权限：当前机器人不在授权绑定范围内");
+        for (String rid : allowedRobotIds) {
+            IotDevice robot = deviceMapper.selectById(rid);
+            if (robot != null && Integer.valueOf(DEVICE_TYPE_ROBOT).equals(robot.getDeviceType())) {
+                UsageStatusVO.RobotBasicVO v = new UsageStatusVO.RobotBasicVO();
+                v.setRobotId(robot.getId());
+                v.setRobotCode(robot.getDeviceCode());
+                v.setRobotName(robot.getDeviceName());
+                v.setStatus(robot.getStatus());
+                v.setDeviceModel(robot.getDeviceModel());
+                v.setFirmwareVersion(robot.getFirmwareVersion());
+                available.add(v);
+            }
         }
-
-        // 写登录日志（校验通过后）
+        // 构建登录日志 DTO（公共部分）
         ControllerLoginDTO logDto = new ControllerLoginDTO();
         logDto.setControllerId(controller.getId());
         logDto.setControllerCode(controller.getDeviceCode());
         logDto.setOperatorId(dto.getOperatorId());
         logDto.setOperatorName(dto.getOperatorName());
 
-        // 机器人信息补全（用于写日志/返回）
-        IotDevice robot = null;
-        if (resp.getRobotId() != null && !resp.getRobotId().isEmpty()) {
-            robot = deviceMapper.selectById(resp.getRobotId());
-        }
-        if (robot == null) {
-            robot = deviceMapper.selectOne(new LambdaQueryWrapper<IotDevice>()
-                    .eq(IotDevice::getDeviceCode, resp.getRobotCode())
-                    .eq(IotDevice::getDeviceType, DEVICE_TYPE_ROBOT));
-        }
-        if (robot == null) {
-            throw new RuntimeException("机器人设备不存在: " + resp.getRobotCode());
-        }
-        logDto.setAssociatedRobotId(robot.getId());
-        logDto.setAssociatedRobotCode(robot.getDeviceCode());
-        var loginLog = controllerLoginLogService.recordLogin(logDto);
-
         TeleopLoginResolveVO vo = new TeleopLoginResolveVO();
-        vo.setLoginLogId(loginLog != null ? loginLog.getId() : null);
         vo.setController(controller);
-        UsageStatusVO.RobotBasicVO current = new UsageStatusVO.RobotBasicVO();
-        current.setRobotId(robot.getId());
-        current.setRobotCode(robot.getDeviceCode());
-        current.setRobotName(robot.getDeviceName());
-        current.setStatus(robot.getStatus());
-        current.setDeviceModel(robot.getDeviceModel());
-        current.setFirmwareVersion(robot.getFirmwareVersion());
-        vo.setCurrentRobot(current);
         vo.setAvailableRobots(available);
+
+        // 查询该主控待开启且生效中的工单（已按计划开始时间升序）
+        List<WorkOrder> pendingOrders = workOrderService.listPendingForController(controller.getDeviceCode());
+        if (pendingOrders == null || pendingOrders.isEmpty()) {
+            // 无待开启工单，仅写登录日志，不推送工单/机器人信息给前端
+            var loginLog = controllerLoginLogService.recordLogin(logDto);
+            vo.setLoginLogId(loginLog != null ? loginLog.getId() : null);
+            return vo;
+        }
+
+        // 取生效时间最近的第一条工单
+        WorkOrder firstOrder = pendingOrders.get(0);
+
+        // 查找该工单关联的机器人设备
+        IotDevice robot = resolveWorkOrderRobot(firstOrder.getId());
+
+        // 补全登录日志中的机器人信息
+        if (robot != null) {
+            logDto.setAssociatedRobotId(robot.getId());
+            logDto.setAssociatedRobotCode(robot.getDeviceCode());
+        }
+        var loginLog = controllerLoginLogService.recordLogin(logDto);
+        vo.setLoginLogId(loginLog != null ? loginLog.getId() : null);
+
+        // 通过 WebSocket 推送工单信息给前端
+        try {
+            String workOrderJson = objectMapper.writeValueAsString(firstOrder);
+            deviceWebSocketServer.pushWorkOrderStart(controller.getDeviceCode(), workOrderJson);
+        } catch (Exception e) {
+            log.warn("[ControllerLogin] WebSocket 推送工单失败: workOrderId={}, err={}", firstOrder.getId(), e.getMessage());
+        }
+
+        // 通过 MQTT 通知主控应操作的机器人
+        if (robot != null) {
+            try {
+                MqttMessageModel.RobotAssignCommand assignCmd = MqttMessageModel.RobotAssignCommand.builder()
+                        .commandId(UUID.randomUUID().toString())
+                        .robotCode(robot.getDeviceCode())
+                        .workOrderId(firstOrder.getId())
+                        .timestamp(System.currentTimeMillis())
+                        .build();
+                String topic = String.format(DeviceConstant.MqttTopic.TELEOP_ROBOT_ASSIGN, controller.getDeviceCode());
+                mqttPublisher.publishToDevice(controller.getDeviceCode(), topic,
+                        objectMapper.writeValueAsString(assignCmd), 1);
+            } catch (Exception e) {
+                log.warn("[ControllerLogin] MQTT 推送机器人分配指令失败: robotCode={}, err={}",
+                        robot.getDeviceCode(), e.getMessage());
+            }
+        }
+
+        // 组装返回 VO
+        vo.setPendingWorkOrder(firstOrder);
+        if (robot != null) {
+            UsageStatusVO.RobotBasicVO current = new UsageStatusVO.RobotBasicVO();
+            current.setRobotId(robot.getId());
+            current.setRobotCode(robot.getDeviceCode());
+            current.setRobotName(robot.getDeviceName());
+            current.setStatus(robot.getStatus());
+            current.setDeviceModel(robot.getDeviceModel());
+            current.setFirmwareVersion(robot.getFirmwareVersion());
+            vo.setCurrentRobot(current);
+        }
         return vo;
     }
-}
 
+    /**
+     * 通过 MQTT 向主控查询“当前关联设备信息”，用于：
+     * 1）判断主控是否在线（未在超时时间内响应视为离线）；
+     * 2）比对主控实际上报的 MAC 地址与请求侧解析的 MAC 是否一致。
+     */
+    private MqttMessageModel.AssociatedDeviceResponse verifyControllerOnlineAndMac(IotDevice controller,
+                                                                                   String requestMac,
+                                                                                   ControllerLoginDTO dto) {
+        String commandId = UUID.randomUUID().toString();
+        CompletableFuture<MqttMessageModel.AssociatedDeviceResponse> future =
+                controllerAssociatedDevicePendingService.register(commandId);
+
+        MqttMessageModel.AssociatedDeviceQuery query = MqttMessageModel.AssociatedDeviceQuery.builder()
+                .commandId(commandId)
+                .operatorId(dto.getOperatorId())
+                .loginLogId(null)
+                .timestamp(System.currentTimeMillis())
+                .build();
+
+        String topic = String.format(DeviceConstant.MqttTopic.ASSOCIATED_DEVICE_QUERY, controller.getDeviceCode());
+        try {
+            mqttPublisher.publishToDevice(controller.getDeviceCode(), topic,
+                    objectMapper.writeValueAsString(query), 1);
+        } catch (Exception e) {
+            controllerAssociatedDevicePendingService.completeExceptionally(commandId, e);
+            throw new RuntimeException("主控在线状态查询失败，请稍后重试", e);
+        }
+
+        MqttMessageModel.AssociatedDeviceResponse resp;
+        try {
+            // 等待主控响应，超时则视为主控不在线
+            resp = future.get(5, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            controllerAssociatedDevicePendingService.completeExceptionally(commandId, e);
+            throw new RuntimeException("主控设备不在线或响应超时", e);
+        } catch (Exception e) {
+            controllerAssociatedDevicePendingService.completeExceptionally(commandId, e);
+            throw new RuntimeException("主控设备响应异常: " + e.getMessage(), e);
+        }
+
+        if (resp == null) {
+            throw new RuntimeException("主控设备未返回关联设备信息");
+        }
+        if (resp.getCode() != 0) {
+            throw new RuntimeException("主控设备返回错误: " + resp.getMessage());
+        }
+
+        String reportedMac = resp.getMacAddress();
+        if (reportedMac == null || reportedMac.isEmpty()) {
+            throw new RuntimeException("主控设备未上报MAC地址，无法完成校验");
+        }
+
+        if (!requestMac.equalsIgnoreCase(reportedMac)) {
+            throw new RuntimeException("主控设备MAC与当前登录终端不一致，请确认是否为当前主控");
+        }
+
+        return resp;
+    }
+
+    /**
+     * 从工单设备绑定记录中查找对应的机器人实体。
+     * 优先取 actual_device，回退到计划 device。
+     */
+    private IotDevice resolveWorkOrderRobot(String workOrderId) {
+        WorkOrderDevice bind = workOrderDeviceMapper.selectOne(
+                new LambdaQueryWrapper<WorkOrderDevice>()
+                        .eq(WorkOrderDevice::getWorkOrderId, workOrderId)
+                        .eq(WorkOrderDevice::getDeviceType, "ROBOT")
+                        .last("LIMIT 1")
+        );
+        if (bind == null) {
+            return null;
+        }
+        // 优先使用实际设备 ID
+        String deviceId = bind.getActualDeviceId() != null ? bind.getActualDeviceId() : bind.getDeviceId();
+        if (deviceId != null) {
+            IotDevice robot = deviceMapper.selectById(deviceId);
+            if (robot != null) {
+                return robot;
+            }
+        }
+        // 回退：用实际设备 code 查
+        String deviceCode = bind.getActualDeviceCode() != null ? bind.getActualDeviceCode() : bind.getDeviceCode();
+        if (deviceCode != null) {
+            return deviceMapper.selectOne(new LambdaQueryWrapper<IotDevice>()
+                    .eq(IotDevice::getDeviceCode, deviceCode)
+                    .eq(IotDevice::getDeviceType, DEVICE_TYPE_ROBOT));
+        }
+        return null;
+    }
+}

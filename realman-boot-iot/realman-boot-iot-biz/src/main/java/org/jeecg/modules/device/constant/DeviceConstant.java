@@ -91,7 +91,14 @@ public interface DeviceConstant {
          */
         String ASSOCIATED_DEVICE_RESPONSE = "device/%s/teleop/associated-device/response";
 
-        // todo 告诉主控控制的是哪台机器人，力反馈+底盘速度设置
+        /**
+         * 下行：平台通知主控当前应操作的机器人（Topic: device/{controllerCode}/teleop/robot/assign）
+         *
+         * <p>配合 {@link org.jeecg.modules.device.mqtt.MqttMessageModel.RobotAssignCommand} 使用，
+         * 主控收到后即知晓本次遥操任务对应的目标机器人。
+         */
+        String TELEOP_ROBOT_ASSIGN = "device/%s/teleop/robot/assign";
+// todo 力反馈+底盘速度设置
         /** EMQX 系统事件：设备 MQTT 连接建立（clientId 从 topic 路径中提取） */
         String SYS_CONNECTED    = "$SYS/brokers/+/clients/+/connected";
         /** EMQX 系统事件：设备 MQTT 连接断开 */
