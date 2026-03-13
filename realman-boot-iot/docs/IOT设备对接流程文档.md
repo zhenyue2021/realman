@@ -243,9 +243,13 @@ def decrypt_message(device_code: str, encrypted: str) -> str:
 |-------|-----|------|
 | `device/{deviceCode}/status/report` | 1 | 设备周期性状态上报 |
 | `device/{deviceCode}/config/ack` | 1 | 参数配置执行确认 |
-| `device/{deviceCode}/command/restart/ack` | 1 | 重启指令执行确认 |
+| `device/{deviceCode}/command/{cmd}/ack` | 1 | 指令集执行确认（如 `restart`、`emergency-stop` 等） |
 | `device/{deviceCode}/ota/progress` | 1 | OTA 升级进度上报 |
 | `device/{deviceCode}/log/operation` | 1 | 设备操作日志上报 |
+| `device/{deviceCode}/camera/stream/response` | 1 | 机器人上报摄像头视频流地址（见第 12 章） |
+| `device/{controllerCode}/teleop/associated-device/response` | 1 | 主控上报当前关联的机器人/设备信息 |
+| `master/{controllerCode}/command/{cmd}/ack` | 1 | 主控设备指令 ACK（力反馈/运动与安全参数等） |
+| `{robotCode}/slave/status` | 1 | 机器人原始状态上报（遥操作场景，明文 JSON，由平台透传至 WebSocket） |
 
 ### 4.2 下行 Topic（平台发布 → 设备订阅）
 
@@ -253,7 +257,13 @@ def decrypt_message(device_code: str, encrypted: str) -> str:
 |-------|-----|------|
 | `device/{deviceCode}/config/push` | 1 | 参数配置下发 |
 | `device/{deviceCode}/command/restart` | 1 | 远程重启指令 |
+| `device/{deviceCode}/command/emergency-stop` | 1 | 紧急停机指令 |
 | `device/{deviceCode}/ota/notify` | 1 | OTA 升级通知 |
+| `device/{deviceCode}/camera/stream/query` | 1 | 查询摄像头视频流地址（见第 12 章） |
+| `device/{controllerCode}/teleop/associated-device/query` | 1 | 平台向主控查询“当前关联机器人/设备信息” |
+| `device/{controllerCode}/teleop/robot/assign` | 1 | 平台通知主控当前应操作的机器人 |
+| `master/{controllerCode}/command/force-feedback` | 1 | 平台向主控设置力反馈参数（机械臂/夹爪力度） |
+| `master/{controllerCode}/command/sport-speed` | 1 | 平台向主控设置运动与安全参数（底盘/升降速度） |
 
 ### 4.3 系统事件 Topic（EMQX 内部，平台订阅）
 
@@ -262,7 +272,19 @@ def decrypt_message(device_code: str, encrypted: str) -> str:
 | `$SYS/brokers/+/clients/+/connected` | 设备上线通知 |
 | `$SYS/brokers/+/clients/+/disconnected` | 设备下线通知 |
 
-> **建议**：设备上线后须订阅自身的所有下行 Topic（3个），使用 `cleanSession=false` 确保离线期间的下行消息不丢失。
+### 4.4 遥操作辅助 Topic（平台订阅原始上报）
+
+> 说明：以下 Topic 主要用于主控/机器人遥操作场景，由平台统一订阅并路由给对应 Handler，设备无需感知平台内部实现细节。
+
+| Topic | 说明 |
+|-------|------|
+| `{controllerCode}/master/cmd` | 主控设备原始指令上报 |
+| `{controllerCode}/master/states` | 主控设备原始状态上报 |
+| `{controllerCode}/master/rtsp/ctrl` | 主控设备 RTSP 控制/相关信息上报 |
+| `{robotCode}/slave/cmd` | 机器人原始指令上报 |
+| `{robotCode}/slave/status` | 机器人原始状态上报（与 4.1 中相同，平台通过 WebSocket 转发给前端） |
+
+> **建议**：设备上线后须订阅自身的所有相关下行 Topic（配置、指令、OTA、摄像头等），使用 `cleanSession=false` 确保离线期间的下行消息不丢失。
 
 ---
 

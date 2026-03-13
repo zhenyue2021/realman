@@ -10,7 +10,7 @@ import java.util.List;
  * 主控端登录后，同步解析“当前设备/绑定机器人”的返回
  */
 @Data
-public class TeleopLoginResolveVO {
+public class MasterLoginResolveVO {
 
     /** 登录日志ID（写入 iot_controller_login_log 后返回） */
     private String loginLogId;

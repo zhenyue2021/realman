@@ -7,7 +7,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.RequiredArgsConstructor;
 import org.jeecg.modules.device.entity.workorder.WorkOrder;
 import org.jeecg.modules.device.entity.workorder.WorkOrderDevice;
-import org.jeecg.modules.device.service.IControllerOperationRecordService;
+import org.jeecg.modules.device.service.IMasterOperationRecordService;
 import org.jeecg.modules.device.mapper.workorder.WorkOrderDeviceMapper;
 import org.jeecg.modules.device.mapper.workorder.WorkOrderMapper;
 import org.jeecg.modules.device.service.workorder.IWorkOrderService;
@@ -23,7 +23,7 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
         implements IWorkOrderService {
 
     private final WorkOrderDeviceMapper workOrderDeviceMapper;
-    private final IControllerOperationRecordService operationRecordService;
+    private final IMasterOperationRecordService operationRecordService;
 
     @Override
     public IPage<WorkOrder> pageWorkOrders(Page<WorkOrder> page, String agentId, String status) {

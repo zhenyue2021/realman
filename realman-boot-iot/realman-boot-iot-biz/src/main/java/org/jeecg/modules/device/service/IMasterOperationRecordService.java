@@ -3,7 +3,7 @@ package org.jeecg.modules.device.service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
-import org.jeecg.modules.device.entity.ControllerOperationRecord;
+import org.jeecg.modules.device.entity.MasterOperationRecord;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -11,7 +11,7 @@ import java.util.List;
 /**
  * 主控遥操操作记录：记录遥操员使用主控操控哪台机器人完成工单的时间
  */
-public interface IControllerOperationRecordService extends IService<ControllerOperationRecord> {
+public interface IMasterOperationRecordService extends IService<MasterOperationRecord> {
 
     /**
      * 工单开启时创建操作记录（按工单绑定的主控+机器人，每条机器人一条记录）
@@ -34,13 +34,14 @@ public interface IControllerOperationRecordService extends IService<ControllerOp
     /**
      * 分页查询操作记录（按主控、机器人、时间范围等）
      */
-    IPage<ControllerOperationRecord> pageRecords(Page<ControllerOperationRecord> page,
-                                                  String controllerId, String controllerCode,
-                                                  String robotId, LocalDateTime startTimeFrom, LocalDateTime startTimeTo);
+    IPage<MasterOperationRecord> pageRecords(Page<MasterOperationRecord> page,
+                                             String controllerId, String controllerCode,
+                                             String robotId, LocalDateTime startTimeFrom, LocalDateTime startTimeTo);
 
     /**
      * 导出用列表（条件同分页）
      */
-    List<ControllerOperationRecord> listForExport(String controllerId, String controllerCode,
-                                                  String robotId, LocalDateTime startTimeFrom, LocalDateTime startTimeTo);
+    List<MasterOperationRecord> listForExport(String controllerId, String controllerCode,
+                                              String robotId, LocalDateTime startTimeFrom, LocalDateTime startTimeTo);
 }
+

@@ -27,7 +27,7 @@ import java.util.regex.Pattern;
  *   device/{code}/ota/progress           → OtaProgressHandler.handle()
  *   device/{code}/log/operation          → DeviceOperationLogHandler.handle()
  *   device/{code}/camera/stream/response → DeviceCameraStreamResponseHandler.handle()
- *   device/{code}/teleop/associated-device/response → ControllerAssociatedDeviceResponseHandler.handle()
+ *   device/{code}/teleop/associated-device/response → MasterAssociatedDeviceResponseHandler.handle()
  *
  *   {code}/master/{action}               → 主控设备原始上报（cmd/states/rtsp/ctrl 等）
  *   {code}/slave/{action}                → 机器人设备原始上报（cmd/states 等）
@@ -53,12 +53,12 @@ public class MqttMessageDispatcher {
     private final DeviceStatusHandler                 statusHandler;
     private final DeviceConfigAckHandler              configAckHandler;
     private final DeviceCommandAckHandler             commandAckHandler;
-    private final ControllerCommandAckHandler         controllerCommandAckHandler;
+    private final MasterCommandAckHandler             masterCommandAckHandler;
     private final OtaProgressHandler                  otaProgressHandler;
     private final DeviceOperationLogHandler           operationLogHandler;
     private final DeviceOnlineOfflineHandler          onlineOfflineHandler;
     private final DeviceCameraStreamResponseHandler   deviceCameraStreamResponseHandler;
-    private final ControllerAssociatedDeviceResponseHandler controllerAssociatedDeviceResponseHandler;
+    private final MasterAssociatedDeviceResponseHandler masterAssociatedDeviceResponseHandler;
     private final RobotSlaveStatusHandler             robotSlaveStatusHandler;
 
     /**
@@ -92,7 +92,7 @@ public class MqttMessageDispatcher {
                 if (parts.length == 5) {
                     String controllerCode = parts[1];
                     String cmd = parts[3];
-                    controllerCommandAckHandler.handle(controllerCode, cmd, payload);
+                    masterCommandAckHandler.handle(controllerCode, cmd, payload);
                     return;
                 }
             }
@@ -131,7 +131,7 @@ public class MqttMessageDispatcher {
             case "ota/progress"                       -> otaProgressHandler.handle(deviceCode, payload);
             case "log/operation"                      -> operationLogHandler.handle(deviceCode, payload);
             case "camera/stream/response"             -> deviceCameraStreamResponseHandler.handle(deviceCode, payload);
-            case "teleop/associated-device/response"  -> controllerAssociatedDeviceResponseHandler.handle(deviceCode, payload);
+            case "teleop/associated-device/response"  -> masterAssociatedDeviceResponseHandler.handle(deviceCode, payload);
             default -> log.warn("[Dispatcher] 未知路径: {}", topic);
         }
     }

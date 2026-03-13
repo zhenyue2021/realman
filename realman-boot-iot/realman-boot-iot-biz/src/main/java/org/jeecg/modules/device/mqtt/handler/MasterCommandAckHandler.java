@@ -18,7 +18,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class ControllerCommandAckHandler {
+public class MasterCommandAckHandler {
 
     private final CommandEncryptService      encryptService;
     private final ObjectMapper               objectMapper;
@@ -26,7 +26,7 @@ public class ControllerCommandAckHandler {
 
     public void handle(String controllerCode, String cmd, String payload) throws Exception {
         String decrypted = encryptService.decryptFromDevice(controllerCode, payload);
-        log.info("[ControllerCommandAckHandler] 解密成功, 主控上报消息体为: {}", decrypted);
+        log.info("[MasterCommandAckHandler] 解密成功, 主控上报消息体为: {}", decrypted);
         JsonNode node = objectMapper.readTree(decrypted);
 
         String commandId = text(node, "commandId");

@@ -5,7 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.security.CommandEncryptService;
-import org.jeecg.modules.device.service.ControllerAssociatedDevicePendingService;
+import org.jeecg.modules.device.service.MasterAssociatedDevicePendingService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -23,11 +23,11 @@ import org.springframework.stereotype.Component;
 @Component
 @ConditionalOnProperty(prefix = "mqtt", name = "enabled", havingValue = "true", matchIfMissing = false)
 @RequiredArgsConstructor
-public class ControllerAssociatedDeviceResponseHandler {
+public class MasterAssociatedDeviceResponseHandler {
 
     private final CommandEncryptService encryptService;
     private final ObjectMapper objectMapper;
-    private final ControllerAssociatedDevicePendingService pendingService;
+    private final MasterAssociatedDevicePendingService pendingService;
 
     public void handle(String controllerCode, String payload) {
         try {
@@ -37,11 +37,11 @@ public class ControllerAssociatedDeviceResponseHandler {
 
             boolean completed = pendingService.complete(resp.getCommandId(), resp);
             if (!completed) {
-                log.warn("[ControllerAssociatedDeviceResponseHandler] no pending future, controllerCode={}, commandId={}",
+                log.warn("[MasterAssociatedDeviceResponseHandler] no pending future, controllerCode={}, commandId={}",
                         controllerCode, resp.getCommandId());
             }
         } catch (Exception e) {
-            log.error("[ControllerAssociatedDeviceResponseHandler] handle failed controllerCode={}", controllerCode, e);
+            log.error("[MasterAssociatedDeviceResponseHandler] handle failed controllerCode={}", controllerCode, e);
         }
     }
 }

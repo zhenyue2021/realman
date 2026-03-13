@@ -7,7 +7,7 @@ import lombok.Data;
  * 力反馈（机械臂/夹爪力度） + 运动与安全参数（底盘/升降速度）一次性提交。
  */
 @Data
-public class ControllerControlParamsDTO {
+public class MasterControlParamsDTO {
 
     /** 机械臂力度等级 */
     private Integer armLevel;

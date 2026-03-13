@@ -1,30 +1,33 @@
 package org.jeecg.modules.device.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.constant.DeviceConstant;
-import org.jeecg.modules.device.dto.ControllerLoginDTO;
+import org.jeecg.modules.device.dto.MasterLoginDTO;
+import org.jeecg.modules.device.entity.IotMasterLoginLog;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.entity.IotDeviceAuth;
 import org.jeecg.modules.device.entity.workorder.WorkOrder;
 import org.jeecg.modules.device.entity.workorder.WorkOrderDevice;
+import org.jeecg.modules.device.mapper.IotMasterLoginLogMapper;
 import org.jeecg.modules.device.mapper.IotDeviceAuthMapper;
 import org.jeecg.modules.device.mapper.IotDeviceMapper;
 import org.jeecg.modules.device.mapper.workorder.WorkOrderDeviceMapper;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.mqtt.publisher.MqttPublisher;
-import org.jeecg.modules.device.service.ControllerAssociatedDevicePendingService;
-import org.jeecg.modules.device.service.IControllerLoginLogService;
-import org.jeecg.modules.device.service.IControllerLoginResolveService;
+import org.jeecg.modules.device.service.MasterAssociatedDevicePendingService;
+import org.jeecg.modules.device.service.IMasterLoginResolveService;
 import org.jeecg.modules.device.service.workorder.IWorkOrderService;
 import org.jeecg.modules.device.util.MacResolveUtil;
-import org.jeecg.modules.device.vo.TeleopLoginResolveVO;
+import org.jeecg.modules.device.vo.MasterLoginResolveVO;
 import org.jeecg.modules.device.vo.UsageStatusVO;
 import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -32,11 +35,14 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+/**
+ * 主控端登录记录：写入登录日志并更新主控设备 last_login_time
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class ControllerLoginResolveServiceImpl implements IControllerLoginResolveService {
-
+public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLogMapper, IotMasterLoginLog>
+        implements IMasterLoginResolveService {
     private static final int DEVICE_TYPE_CONTROLLER = 2;
     private static final int DEVICE_TYPE_ROBOT = 1;
 
@@ -46,12 +52,53 @@ public class ControllerLoginResolveServiceImpl implements IControllerLoginResolv
     private final IotDeviceAuthMapper deviceAuthMapper;
     private final WorkOrderDeviceMapper workOrderDeviceMapper;
     private final IWorkOrderService workOrderService;
-    private final IControllerLoginLogService controllerLoginLogService;
     private final DeviceWebSocketServer deviceWebSocketServer;
-    private final ControllerAssociatedDevicePendingService controllerAssociatedDevicePendingService;
+    private final MasterAssociatedDevicePendingService masterAssociatedDevicePendingService;
 
     @Override
-    public TeleopLoginResolveVO resolve(HttpServletRequest request, ControllerLoginDTO dto) {
+    @Transactional(rollbackFor = Exception.class)
+    public IotMasterLoginLog recordLogin(MasterLoginDTO dto) {
+        if ((dto.getDeviceId() == null || dto.getDeviceId().isEmpty())
+                && (dto.getDeviceCode() == null || dto.getDeviceCode().isEmpty())) {
+            throw new IllegalArgumentException("主控设备ID或设备编码不能为空");
+        }
+
+        IotDevice controller = null;
+        if (dto.getDeviceId() != null && !dto.getDeviceId().isEmpty()) {
+            controller = deviceMapper.selectById(dto.getDeviceId());
+        }
+        if (controller == null && dto.getDeviceCode() != null && !dto.getDeviceCode().isEmpty()) {
+            controller = deviceMapper.selectOne(new LambdaQueryWrapper<IotDevice>()
+                    .eq(IotDevice::getDeviceCode, dto.getDeviceCode()));
+        }
+        if (controller == null) {
+            throw new IllegalArgumentException("主控设备不存在");
+        }
+        if (controller.getDeviceType() == null || controller.getDeviceType() != 2) {
+            throw new IllegalArgumentException("该设备不是主控设备，无法记录主控登录");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        IotMasterLoginLog log = new IotMasterLoginLog();
+        log.setControllerId(controller.getId());
+        log.setControllerCode(controller.getDeviceCode());
+        log.setOperatorId(dto.getOperatorId());
+        log.setOperatorName(dto.getOperatorName());
+        log.setAssociatedRobotId(dto.getAssociatedRobotId());
+        log.setAssociatedRobotCode(dto.getAssociatedRobotCode());
+        log.setLoginTime(now);
+        log.setCreateTime(now);
+        save(log);
+
+        controller.setLastLoginTime(now);
+        deviceMapper.updateById(controller);
+        return log;
+    }
+
+
+    @Transactional(rollbackFor = Exception.class)
+    @Override
+    public MasterLoginResolveVO resolve(HttpServletRequest request, MasterLoginDTO dto) {
         if (dto == null) {
             throw new RuntimeException("请求体不能为空");
         }
@@ -118,13 +165,13 @@ public class ControllerLoginResolveServiceImpl implements IControllerLoginResolv
             }
         }
         // 构建登录日志 DTO（公共部分）
-        ControllerLoginDTO logDto = new ControllerLoginDTO();
-        logDto.setControllerId(controller.getId());
-        logDto.setControllerCode(controller.getDeviceCode());
+        MasterLoginDTO logDto = new MasterLoginDTO();
+        logDto.setDeviceId(controller.getId());
+        logDto.setDeviceCode(controller.getDeviceCode());
         logDto.setOperatorId(dto.getOperatorId());
         logDto.setOperatorName(dto.getOperatorName());
 
-        TeleopLoginResolveVO vo = new TeleopLoginResolveVO();
+        MasterLoginResolveVO vo = new MasterLoginResolveVO();
         vo.setController(controller);
         vo.setAvailableRobots(available);
 
@@ -132,7 +179,7 @@ public class ControllerLoginResolveServiceImpl implements IControllerLoginResolv
         List<WorkOrder> pendingOrders = workOrderService.listPendingForController(controller.getDeviceCode());
         if (pendingOrders == null || pendingOrders.isEmpty()) {
             // 无待开启工单，仅写登录日志，不推送工单/机器人信息给前端
-            var loginLog = controllerLoginLogService.recordLogin(logDto);
+            var loginLog = recordLogin(logDto);
             vo.setLoginLogId(loginLog != null ? loginLog.getId() : null);
             return vo;
         }
@@ -148,7 +195,7 @@ public class ControllerLoginResolveServiceImpl implements IControllerLoginResolv
             logDto.setAssociatedRobotId(robot.getId());
             logDto.setAssociatedRobotCode(robot.getDeviceCode());
         }
-        var loginLog = controllerLoginLogService.recordLogin(logDto);
+        var loginLog = this.recordLogin(logDto);
         vo.setLoginLogId(loginLog != null ? loginLog.getId() : null);
 
         // 通过 WebSocket 推送工单信息给前端
@@ -199,10 +246,10 @@ public class ControllerLoginResolveServiceImpl implements IControllerLoginResolv
      */
     private MqttMessageModel.AssociatedDeviceResponse verifyControllerOnlineAndMac(IotDevice controller,
                                                                                    String requestMac,
-                                                                                   ControllerLoginDTO dto) {
+                                                                                   MasterLoginDTO dto) {
         String commandId = UUID.randomUUID().toString();
         CompletableFuture<MqttMessageModel.AssociatedDeviceResponse> future =
-                controllerAssociatedDevicePendingService.register(commandId);
+                masterAssociatedDevicePendingService.register(commandId);
 
         MqttMessageModel.AssociatedDeviceQuery query = MqttMessageModel.AssociatedDeviceQuery.builder()
                 .commandId(commandId)
@@ -216,7 +263,7 @@ public class ControllerLoginResolveServiceImpl implements IControllerLoginResolv
             mqttPublisher.publishToDevice(controller.getDeviceCode(), topic,
                     objectMapper.writeValueAsString(query), 1);
         } catch (Exception e) {
-            controllerAssociatedDevicePendingService.completeExceptionally(commandId, e);
+            masterAssociatedDevicePendingService.completeExceptionally(commandId, e);
             throw new RuntimeException("主控在线状态查询失败，请稍后重试", e);
         }
 
@@ -225,10 +272,10 @@ public class ControllerLoginResolveServiceImpl implements IControllerLoginResolv
             // 等待主控响应，超时则视为主控不在线
             resp = future.get(5, TimeUnit.SECONDS);
         } catch (TimeoutException e) {
-            controllerAssociatedDevicePendingService.completeExceptionally(commandId, e);
+            masterAssociatedDevicePendingService.completeExceptionally(commandId, e);
             throw new RuntimeException("主控设备不在线或响应超时", e);
         } catch (Exception e) {
-            controllerAssociatedDevicePendingService.completeExceptionally(commandId, e);
+            masterAssociatedDevicePendingService.completeExceptionally(commandId, e);
             throw new RuntimeException("主控设备响应异常: " + e.getMessage(), e);
         }
 

@@ -6,7 +6,7 @@ import org.jeecg.modules.device.entity.workorder.WorkOrder;
 import org.jeecg.modules.device.entity.workorder.WorkOrderDevice;
 import org.jeecg.modules.device.mapper.workorder.WorkOrderDeviceMapper;
 import org.jeecg.modules.device.mapper.workorder.WorkOrderMapper;
-import org.jeecg.modules.device.service.IControllerOperationRecordService;
+import org.jeecg.modules.device.service.IMasterOperationRecordService;
 import org.jeecg.modules.device.service.impl.workorder.WorkOrderServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -38,7 +38,7 @@ class WorkOrderServiceImplTest {
     @Mock
     private WorkOrderDeviceMapper workOrderDeviceMapper;
     @Mock
-    private IControllerOperationRecordService operationRecordService;
+    private IMasterOperationRecordService operationRecordService;
 
     @InjectMocks
     private WorkOrderServiceImpl workOrderService;

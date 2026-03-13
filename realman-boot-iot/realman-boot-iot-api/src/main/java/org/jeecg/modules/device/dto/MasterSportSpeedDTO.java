@@ -6,7 +6,7 @@ import lombok.Data;
  * 主控端运动与安全参数 DTO（底盘速度/升降速度）
  */
 @Data
-public class ControllerSportSpeedDTO {
+public class MasterSportSpeedDTO {
 
     /**
      * 底盘行进速度等级（例如：0=慢、1=中、2=快）

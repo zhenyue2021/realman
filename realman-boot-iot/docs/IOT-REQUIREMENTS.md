@@ -147,7 +147,7 @@
   - **可使用的机器人**：与该主控绑定的机器人列表（来自 `iot_device_auth` 中 `controller_id` = 该主控且启用的 `device_id`，对应 `iot_device` 中 `device_type=1` 的设备）。
 - **接口**：GET `/api/master/usage-status/{controllerCode}`，返回 `UsageStatusVO`（见 7.2）。
 
-### 4.8 平台与主控设备 MQTT 通信
+### 4.8 平台与主控设备接口与 MQTT 通信
 
 - 平台通过 MQTT 与主控设备通信，包括下发操作指令等。
 - **当前实现**：  
@@ -302,27 +302,28 @@
 
 ### 8.2 主控端管理（主控设备：device_type=2）
 
-**说明**：主控端管理接口统一前缀为 **`/api/master`**（与代码 ControllerDeviceController 一致）。
+**说明**：主控端管理接口统一前缀为 **`/api/teleop`**（对应 `MasterDeviceController` 的 `@RequestMapping("/api/teleop")` 与一系列 `IMaster*` 服务接口）。
 
 | 方法 | 路径 | 说明 | 状态 |
 |------|------|------|------|
-| POST | /api/master/add | 新增主控设备 | 已实现 |
-| POST | /api/master/list | 分页+条件查询主控设备列表 | 已实现 |
-| GET | /api/master/{id} | 主控设备基础详情 | 已实现 |
-| GET | /api/master/{id}/detail | 主控设备聚合详情 | 已实现 |
-| PUT | /api/master/{id} | 编辑主控设备 | 已实现 |
-| DELETE | /api/master/{id} | 删除主控设备（逻辑删除） | 已实现 |
-| POST | /api/master/login | 主控端登录记录 | 已实现 |
-| POST | /api/master/export | 导出主控设备列表 Excel | 已实现 |
-| POST | /api/master/{id}/config/sync | 参数设置并同步 | 已实现 |
-| GET | /api/master/{id}/monitor | 实时监控状态 | 已实现 |
-| POST | /api/master/{id}/restart | 远程重启 | 已实现 |
-| POST | /api/master/{id}/emergency-stop | 紧急停机 | 已实现 |
-| PUT | /api/master/{id}/status/{status} | 禁用/启用 | 已实现 |
-| POST | /api/master/batch/online-status | 批量在线状态 | 已实现 |
-| POST | /api/master/operation-record/page | 操作记录分页（Body: OperationRecordQueryDTO） | 已实现 |
-| POST | /api/master/operation-record/export | 操作记录导出 Excel | 已实现 |
-| GET | /api/master/usage-status/{controllerCode} | 主控使用状态（最近登录、最近遥操开始时间、当前设备、可使用的机器人） | 已实现 |
+| POST | /api/teleop/add | 新增主控设备 | 已实现 |
+| POST | /api/teleop/list | 分页+条件查询主控设备列表 | 已实现 |
+| GET  | /api/teleop/{id} | 主控设备基础详情 | 已实现 |
+| GET  | /api/teleop/{id}/detail | 主控设备聚合详情 | 已实现 |
+| PUT  | /api/teleop/{id} | 编辑主控设备 | 已实现 |
+| DELETE | /api/teleop/{id} | 删除主控设备（逻辑删除） | 已实现 |
+| POST | /api/teleop/login | 主控端登录记录 | 已实现 |
+| POST | /api/teleop/export | 导出主控设备列表 Excel | 已实现 |
+| POST | /api/teleop/{id}/config/sync | 参数设置并同步 | 已实现 |
+| POST | /api/teleop/{id}/control-params | 设置主控端力反馈及运动与安全参数 | **已实现** |
+| GET  | /api/teleop/{id}/monitor | 实时监控状态 | 已实现 |
+| POST | /api/teleop/{id}/restart | 远程重启 | 已实现 |
+| POST | /api/teleop/{id}/emergency-stop | 紧急停机 | 已实现 |
+| PUT  | /api/teleop/{id}/status/{status} | 禁用/启用 | 已实现 |
+| POST | /api/teleop/batch/online-status | 批量在线状态 | 已实现 |
+| POST | /api/teleop/operation-record/page | 操作记录分页 | 已实现 |
+| POST | /api/teleop/operation-record/export | 操作记录导出 Excel | 已实现 |
+| GET  | /api/teleop/usage-status/{controllerCode} | 主控使用状态（最近登录、最近遥操开始时间、当前设备、可使用的机器人） | 已实现 |
 
 ### 8.3 授权管理
 
@@ -386,7 +387,7 @@
 ## 9. 待完善与可选扩展
 
 1. **主控端“最后一次登录时间”与“登录时关联的机器人”**  
-   - **已实现**：表 `iot_controller_login_log`、实体 `IotControllerLoginLog`、`iot_device.last_login_time`；接口 POST `/api/controller/login`（Body：ControllerLoginDTO），记录登录并更新主控设备最后登录时间；删除均为逻辑删除。
+   - **已实现**：表 `iot_controller_login_log`、实体 `IotMasterLoginLog`（Java 侧命名），`iot_device.last_login_time`；接口 POST `/api/teleop/login`（Body：MasterLoginDTO），由 `IMasterLoginResolveService` 记录登录并更新主控设备最后登录时间；删除均为逻辑删除。
 
 2. **设备编辑接口**  
    - **已实现**：PUT `/api/device/{deviceId}`，Body 为 DeviceUpdateDTO（设备名、型号、序列号、描述、经纬度等）。
@@ -404,7 +405,7 @@
    - **已实现**：init.sql 中已包含 `iot_device_auth`、`iot_controller_login_log` 建表及 `iot_device.last_login_time` 字段。
 
 7. **操作记录与使用状态**  
-   - **已实现**：表 `controller_operation_record`；工单开启/提交/超时/关闭时自动写入或更新操作记录；POST `/api/master/operation-record/page` 分页、POST `/api/master/operation-record/export` 导出；GET `/api/master/usage-status/{controllerCode}` 返回 `UsageStatusVO`（lastLoginTime、lastRemoteOperationStartTime、currentDevice、availableRobots）。
+   - **已实现**：表 `controller_operation_record`，对应实体 `MasterOperationRecord` 与服务接口 `IMasterOperationRecordService`；工单开启/提交/超时/关闭时自动写入或更新操作记录；POST `/api/teleop/operation-record/page` 分页、POST `/api/teleop/operation-record/export` 导出；GET `/api/teleop/usage-status/{controllerCode}` 通过 `IMasterUsageStatusService` 返回 `UsageStatusVO`（lastLoginTime、lastRemoteOperationStartTime、currentDevice、availableRobots）。
 
 8. **工单管理**  
    - **已实现**：工单合规配置与工单管理全流程见 **第 6 章** 与 **8.6、8.7 接口清单**；表 `work_order_compliance_config`、`work_order`、`work_order_device`、`work_order_attachment`、`work_order_personnel`；定时任务超时检测与自动关闭；主控端待开始工单列表、开始/提交/审核/关闭、附件上传。

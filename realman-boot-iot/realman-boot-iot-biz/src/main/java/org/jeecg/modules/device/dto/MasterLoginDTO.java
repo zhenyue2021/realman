@@ -6,10 +6,10 @@ import lombok.Data;
  * 主控端登录上报：操作员登录主控设备时由客户端或平台调用，记录登录信息及当时关联的机器人
  */
 @Data
-public class ControllerLoginDTO {
+public class MasterLoginDTO {
     /** 主控设备ID（iot_device.id）或设备编码 device_code，二选一 */
-    private String controllerId;
-    private String controllerCode;
+    private String deviceId;
+    private String deviceCode;
 
     /** 主控设备网卡MAC地址（登录解析时用于反查设备） */
     private String macAddress;

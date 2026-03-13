@@ -9,7 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.entity.workorder.WorkOrder;
 import org.jeecg.modules.device.entity.workorder.WorkOrderComplianceConfig;
 import org.jeecg.modules.device.entity.workorder.WorkOrderDevice;
-import org.jeecg.modules.device.service.IControllerOperationRecordService;
+import org.jeecg.modules.device.service.IMasterOperationRecordService;
 import org.jeecg.modules.device.mapper.workorder.WorkOrderMapper;
 import org.jeecg.modules.device.mapper.workorder.WorkOrderComplianceConfigMapper;
 import org.jeecg.modules.device.mapper.workorder.WorkOrderDeviceMapper;
@@ -37,7 +37,7 @@ public class WorkOrderSchedulerJob {
 
     private final WorkOrderMapper workOrderMapper;
     private final WorkOrderComplianceConfigMapper configMapper;
-    private final IControllerOperationRecordService operationRecordService;
+    private final IMasterOperationRecordService operationRecordService;
     private final WorkOrderDeviceMapper workOrderDeviceMapper;
     private final StringRedisTemplate redisTemplate;
     private final DeviceWebSocketServer webSocketServer;

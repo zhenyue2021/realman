@@ -2,7 +2,7 @@ package org.jeecg.modules.device.util;
 
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
-import org.jeecg.modules.device.entity.ControllerOperationRecord;
+import org.jeecg.modules.device.entity.MasterOperationRecord;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.entity.IotDeviceAuth;
 
@@ -96,7 +96,7 @@ public final class DeviceExcelExportUtil {
     }
 
     /** 操作记录导出（主控设备ID、机器人ID、开始/结束操作时间、操作时长） */
-    public static byte[] exportOperationRecords(List<ControllerOperationRecord> list) throws Exception {
+    public static byte[] exportOperationRecords(List<MasterOperationRecord> list) throws Exception {
         try (SXSSFWorkbook wb = new SXSSFWorkbook(500);
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Sheet sheet = wb.createSheet("操作记录");
@@ -106,7 +106,7 @@ public final class DeviceExcelExportUtil {
                     "开始操作时间", "结束操作时间", "操作时长"};
             writeHeader(sheet, headers, headerStyle);
             int rowNum = 1;
-            for (ControllerOperationRecord r : list) {
+            for (MasterOperationRecord r : list) {
                 Row row = sheet.createRow(rowNum++);
                 setCell(row, 0, r.getControllerId());
                 setCell(row, 1, r.getControllerCode());

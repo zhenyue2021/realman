@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
  */
 @Data
 @TableName("controller_operation_record")
-public class ControllerOperationRecord implements Serializable {
+public class MasterOperationRecord implements Serializable {
 
     private static final long serialVersionUID = 1L;
 

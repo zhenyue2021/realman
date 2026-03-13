@@ -5,7 +5,7 @@ import org.jeecg.modules.device.vo.UsageStatusVO;
 /**
  * 主控使用状态：最近登录时间、最近遥操开始时间、当前设备、可使用的机器人
  */
-public interface IControllerUsageStatusService {
+public interface IMasterUsageStatusService {
 
     /**
      * 按主控设备编号查询使用状态
@@ -23,3 +23,4 @@ public interface IControllerUsageStatusService {
      */
     UsageStatusVO getUsageStatusById(String controllerId);
 }
+

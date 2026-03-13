@@ -10,26 +10,25 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.common.exception.JeecgBootException;
 import org.jeecg.common.system.util.JwtUtil;
-import org.jeecg.modules.device.dto.ControllerControlParamsDTO;
-import org.jeecg.modules.device.dto.ControllerLoginDTO;
+import org.jeecg.modules.device.dto.MasterControlParamsDTO;
+import org.jeecg.modules.device.dto.MasterLoginDTO;
 import org.jeecg.modules.device.dto.DeviceAddDTO;
 import org.jeecg.modules.device.dto.OperationRecordQueryDTO;
 import org.jeecg.modules.device.dto.DeviceRequestDTO;
 import org.jeecg.modules.device.dto.DeviceRestartDTO;
 import org.jeecg.modules.device.dto.DeviceUpdateDTO;
 import org.jeecg.modules.device.dto.EmergencyStopDTO;
-import org.jeecg.modules.device.entity.ControllerOperationRecord;
+import org.jeecg.modules.device.entity.MasterOperationRecord;
 import org.jeecg.modules.device.entity.IotDevice;
-import org.jeecg.modules.device.service.IControllerLoginResolveService;
-import org.jeecg.modules.device.service.IControllerLoginLogService;
-import org.jeecg.modules.device.service.IControllerOperationRecordService;
-import org.jeecg.modules.device.service.IControllerUsageStatusService;
+import org.jeecg.modules.device.service.IMasterLoginResolveService;
+import org.jeecg.modules.device.service.IMasterOperationRecordService;
+import org.jeecg.modules.device.service.IMasterUsageStatusService;
 import org.jeecg.modules.device.service.IIotDeviceService;
 import org.jeecg.modules.device.util.DeviceExcelExportUtil;
 import org.jeecg.modules.device.vo.ApiResult;
 import org.jeecg.modules.device.vo.DeviceCameraStreamVO;
 import org.jeecg.modules.device.vo.DeviceDetailVO;
-import org.jeecg.modules.device.vo.TeleopLoginResolveVO;
+import org.jeecg.modules.device.vo.MasterLoginResolveVO;
 import org.jeecg.modules.device.vo.UsageStatusVO;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -50,16 +49,15 @@ import java.util.Objects;
 @RequiredArgsConstructor
 @Tag(name = "主控端管理", description = "主控设备注册/参数配置/实时监控/远程重启/导出/逻辑删除/登录记录")
 @Slf4j
-public class ControllerDeviceController {
+public class MasterDeviceController {
 
     private static final int DEVICE_TYPE_CONTROLLER = 2;
     private static final int DEVICE_TYPE_ROBOT = 1;
 
     private final IIotDeviceService deviceService;
-    private final IControllerLoginLogService controllerLoginLogService;
-    private final IControllerOperationRecordService operationRecordService;
-    private final IControllerUsageStatusService usageStatusService;
-    private final IControllerLoginResolveService controllerLoginResolveService;
+    private final IMasterLoginResolveService loginResolveService;
+    private final IMasterOperationRecordService operationRecordService;
+    private final IMasterUsageStatusService usageStatusService;
 
     /** 新增主控设备 */
     @PostMapping("/add")
@@ -159,7 +157,7 @@ public class ControllerDeviceController {
     @PostMapping("/{controllerId}/control-params")
     @Operation(summary = "设置主控设备力反馈及运动参数")
     public ApiResult<Void> setControlParams(@PathVariable String controllerId,
-                                            @RequestBody ControllerControlParamsDTO dto) {
+                                            @RequestBody MasterControlParamsDTO dto) {
         IotDevice controller = ensureDeviceType(controllerId, DEVICE_TYPE_CONTROLLER);
         org.jeecg.modules.device.service.impl.IotDeviceServiceImpl impl =
                 (org.jeecg.modules.device.service.impl.IotDeviceServiceImpl) deviceService;
@@ -208,8 +206,8 @@ public class ControllerDeviceController {
     /** 主控端登录记录 */
     @PostMapping("/login")
     @Operation(summary = "主控端登录记录")
-    public ApiResult<Void> recordControllerLogin(@RequestBody ControllerLoginDTO dto) {
-        controllerLoginLogService.recordLogin(dto);
+    public ApiResult<Void> recordControllerLogin(@RequestBody MasterLoginDTO dto) {
+        loginResolveService.recordLogin(dto);
         return ApiResult.ok(null, "登录记录已保存");
     }
 
@@ -229,21 +227,21 @@ public class ControllerDeviceController {
      */
     @PostMapping("/login/resolve")
     @Operation(summary = "登录后同步解析当前主控与机器人")
-    public ApiResult<TeleopLoginResolveVO> resolveLogin(HttpServletRequest request,
-                                                        @RequestBody ControllerLoginDTO dto) {
-        TeleopLoginResolveVO vo = controllerLoginResolveService.resolve(request, dto);
+    public ApiResult<MasterLoginResolveVO> resolveLogin(HttpServletRequest request,
+                                                        @RequestBody MasterLoginDTO dto) {
+        MasterLoginResolveVO vo = loginResolveService.resolve(request, dto);
         return ApiResult.ok(vo);
     }
 
     /** 操作记录分页（遥操员使用主控操控机器人完成工单的时间） */
     @PostMapping("/operation-record/page")
     @Operation(summary = "操作记录分页")
-    public ApiResult<IPage<ControllerOperationRecord>> operationRecordPage(@RequestBody OperationRecordQueryDTO query) {
+    public ApiResult<IPage<MasterOperationRecord>> operationRecordPage(@RequestBody OperationRecordQueryDTO query) {
         int pageNo = query.getPageNo() != null ? query.getPageNo() : 1;
         int pageSize = query.getPageSize() != null ? query.getPageSize() : 10;
-        com.baomidou.mybatisplus.extension.plugins.pagination.Page<ControllerOperationRecord> page =
+        com.baomidou.mybatisplus.extension.plugins.pagination.Page<MasterOperationRecord> page =
                 new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(pageNo, pageSize);
-        IPage<ControllerOperationRecord> result = operationRecordService.pageRecords(page,
+        IPage<MasterOperationRecord> result = operationRecordService.pageRecords(page,
                 query.getControllerId(), query.getControllerCode(), query.getRobotId(),
                 query.getStartTimeFrom(), query.getStartTimeTo());
         return ApiResult.ok(result);
@@ -253,7 +251,7 @@ public class ControllerDeviceController {
     @PostMapping("/operation-record/export")
     @Operation(summary = "操作记录导出")
     public ResponseEntity<byte[]> operationRecordExport(@RequestBody OperationRecordQueryDTO query) {
-        java.util.List<ControllerOperationRecord> list = operationRecordService.listForExport(
+        java.util.List<MasterOperationRecord> list = operationRecordService.listForExport(
                 query.getControllerId(), query.getControllerCode(), query.getRobotId(),
                 query.getStartTimeFrom(), query.getStartTimeTo());
         byte[] bytes;

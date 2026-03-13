@@ -12,12 +12,12 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>以 commandId 为 key，存放“平台→主控”一次查询过程对应的 {@link CompletableFuture}。
  * <ul>
  *   <li>由 Web 接口在发送 AssociatedDeviceQuery 前调用 {@link #register(String)} 注册 Future</li>
- *   <li>由 {@code ControllerAssociatedDeviceResponseHandler} 在收到 AssociatedDeviceResponse 后调用 {@link #complete(String, MqttMessageModel.AssociatedDeviceResponse)}</li>
+ *   <li>由 {@code MasterAssociatedDeviceResponseHandler} 在收到 AssociatedDeviceResponse 后调用 {@link #complete(String, MqttMessageModel.AssociatedDeviceResponse)}</li>
  *   <li>超时或发送失败时由调用方调用 {@link #completeExceptionally(String, Throwable)}</li>
  * </ul>
  */
 @Service
-public class ControllerAssociatedDevicePendingService {
+public class MasterAssociatedDevicePendingService {
 
     private final ConcurrentHashMap<String, CompletableFuture<MqttMessageModel.AssociatedDeviceResponse>> pending
             = new ConcurrentHashMap<>();

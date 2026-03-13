@@ -144,8 +144,8 @@ public class MqttMessageDispatcherEndToEndTest {
                 cameraStreamPendingService
         );
 
-        ControllerAssociatedDeviceResponseHandler controllerAssociatedDeviceResponseHandler =
-                Mockito.mock(ControllerAssociatedDeviceResponseHandler.class);
+        MasterAssociatedDeviceResponseHandler masterAssociatedDeviceResponseHandler =
+                Mockito.mock(MasterAssociatedDeviceResponseHandler.class);
 
         // 分发器使用真实实例
         dispatcher = new MqttMessageDispatcher(
@@ -156,7 +156,7 @@ public class MqttMessageDispatcherEndToEndTest {
                 operationLogHandler,
                 onlineOfflineHandler,
                 deviceCameraStreamResponseHandler,
-                controllerAssociatedDeviceResponseHandler
+                masterAssociatedDeviceResponseHandler
         );
     }
 

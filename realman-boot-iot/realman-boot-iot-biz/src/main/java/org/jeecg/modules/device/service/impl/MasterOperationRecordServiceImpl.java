@@ -6,11 +6,11 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.RequiredArgsConstructor;
-import org.jeecg.modules.device.entity.ControllerOperationRecord;
+import org.jeecg.modules.device.entity.MasterOperationRecord;
 import org.jeecg.modules.device.entity.workorder.WorkOrderDevice;
-import org.jeecg.modules.device.mapper.ControllerOperationRecordMapper;
+import org.jeecg.modules.device.mapper.MasterOperationRecordMapper;
 import org.jeecg.modules.device.mapper.workorder.WorkOrderDeviceMapper;
-import org.jeecg.modules.device.service.IControllerOperationRecordService;
+import org.jeecg.modules.device.service.IMasterOperationRecordService;
 import cn.hutool.core.util.IdUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,9 +20,9 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-public class ControllerOperationRecordServiceImpl
-        extends ServiceImpl<ControllerOperationRecordMapper, ControllerOperationRecord>
-        implements IControllerOperationRecordService {
+public class MasterOperationRecordServiceImpl
+        extends ServiceImpl<MasterOperationRecordMapper, MasterOperationRecord>
+        implements IMasterOperationRecordService {
 
     private final WorkOrderDeviceMapper workOrderDeviceMapper;
 
@@ -55,7 +55,7 @@ public class ControllerOperationRecordServiceImpl
             if (robotId == null || robotCode == null) {
                 continue;
             }
-            ControllerOperationRecord record = new ControllerOperationRecord();
+            MasterOperationRecord record = new MasterOperationRecord();
             record.setId(IdUtil.fastSimpleUUID());
             record.setControllerId(controllerId);
             record.setControllerCode(controllerCode);
@@ -77,57 +77,57 @@ public class ControllerOperationRecordServiceImpl
         if (workOrderId == null || endTime == null) {
             return;
         }
-        update(new LambdaUpdateWrapper<ControllerOperationRecord>()
-                .eq(ControllerOperationRecord::getWorkOrderId, workOrderId)
-                .isNull(ControllerOperationRecord::getEndTime)
-                .set(ControllerOperationRecord::getEndTime, endTime)
-                .set(ControllerOperationRecord::getUpdateTime, LocalDateTime.now()));
+        update(new LambdaUpdateWrapper<MasterOperationRecord>()
+                .eq(MasterOperationRecord::getWorkOrderId, workOrderId)
+                .isNull(MasterOperationRecord::getEndTime)
+                .set(MasterOperationRecord::getEndTime, endTime)
+                .set(MasterOperationRecord::getUpdateTime, LocalDateTime.now()));
     }
 
     @Override
-    public IPage<ControllerOperationRecord> pageRecords(Page<ControllerOperationRecord> page,
-                                                         String controllerId, String controllerCode,
-                                                         String robotId, LocalDateTime startTimeFrom, LocalDateTime startTimeTo) {
-        LambdaQueryWrapper<ControllerOperationRecord> w = new LambdaQueryWrapper<>();
+    public IPage<MasterOperationRecord> pageRecords(Page<MasterOperationRecord> page,
+                                                    String controllerId, String controllerCode,
+                                                    String robotId, LocalDateTime startTimeFrom, LocalDateTime startTimeTo) {
+        LambdaQueryWrapper<MasterOperationRecord> w = new LambdaQueryWrapper<>();
         if (controllerId != null && !controllerId.isEmpty()) {
-            w.eq(ControllerOperationRecord::getControllerId, controllerId);
+            w.eq(MasterOperationRecord::getControllerId, controllerId);
         }
         if (controllerCode != null && !controllerCode.isEmpty()) {
-            w.eq(ControllerOperationRecord::getControllerCode, controllerCode);
+            w.eq(MasterOperationRecord::getControllerCode, controllerCode);
         }
         if (robotId != null && !robotId.isEmpty()) {
-            w.eq(ControllerOperationRecord::getRobotId, robotId);
+            w.eq(MasterOperationRecord::getRobotId, robotId);
         }
         if (startTimeFrom != null) {
-            w.ge(ControllerOperationRecord::getStartTime, startTimeFrom);
+            w.ge(MasterOperationRecord::getStartTime, startTimeFrom);
         }
         if (startTimeTo != null) {
-            w.le(ControllerOperationRecord::getStartTime, startTimeTo);
+            w.le(MasterOperationRecord::getStartTime, startTimeTo);
         }
-        w.orderByDesc(ControllerOperationRecord::getStartTime);
+        w.orderByDesc(MasterOperationRecord::getStartTime);
         return page(page, w);
     }
 
     @Override
-    public List<ControllerOperationRecord> listForExport(String controllerId, String controllerCode,
-                                                         String robotId, LocalDateTime startTimeFrom, LocalDateTime startTimeTo) {
-        LambdaQueryWrapper<ControllerOperationRecord> w = new LambdaQueryWrapper<>();
+    public List<MasterOperationRecord> listForExport(String controllerId, String controllerCode,
+                                                     String robotId, LocalDateTime startTimeFrom, LocalDateTime startTimeTo) {
+        LambdaQueryWrapper<MasterOperationRecord> w = new LambdaQueryWrapper<>();
         if (controllerId != null && !controllerId.isEmpty()) {
-            w.eq(ControllerOperationRecord::getControllerId, controllerId);
+            w.eq(MasterOperationRecord::getControllerId, controllerId);
         }
         if (controllerCode != null && !controllerCode.isEmpty()) {
-            w.eq(ControllerOperationRecord::getControllerCode, controllerCode);
+            w.eq(MasterOperationRecord::getControllerCode, controllerCode);
         }
         if (robotId != null && !robotId.isEmpty()) {
-            w.eq(ControllerOperationRecord::getRobotId, robotId);
+            w.eq(MasterOperationRecord::getRobotId, robotId);
         }
         if (startTimeFrom != null) {
-            w.ge(ControllerOperationRecord::getStartTime, startTimeFrom);
+            w.ge(MasterOperationRecord::getStartTime, startTimeFrom);
         }
         if (startTimeTo != null) {
-            w.le(ControllerOperationRecord::getStartTime, startTimeTo);
+            w.le(MasterOperationRecord::getStartTime, startTimeTo);
         }
-        w.orderByDesc(ControllerOperationRecord::getStartTime);
+        w.orderByDesc(MasterOperationRecord::getStartTime);
         return list(w);
     }
 }

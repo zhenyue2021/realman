@@ -2,13 +2,13 @@ package org.jeecg.modules.device.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
-import org.jeecg.modules.device.entity.ControllerOperationRecord;
+import org.jeecg.modules.device.entity.MasterOperationRecord;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.entity.IotDeviceAuth;
-import org.jeecg.modules.device.mapper.ControllerOperationRecordMapper;
+import org.jeecg.modules.device.mapper.MasterOperationRecordMapper;
 import org.jeecg.modules.device.mapper.IotDeviceAuthMapper;
 import org.jeecg.modules.device.mapper.IotDeviceMapper;
-import org.jeecg.modules.device.service.IControllerUsageStatusService;
+import org.jeecg.modules.device.service.IMasterUsageStatusService;
 import org.jeecg.modules.device.vo.UsageStatusVO;
 import org.springframework.stereotype.Service;
 
@@ -18,14 +18,14 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-public class ControllerUsageStatusServiceImpl implements IControllerUsageStatusService {
+public class MasterUsageStatusServiceImpl implements IMasterUsageStatusService {
 
     private static final int DEVICE_TYPE_CONTROLLER = 2;
     private static final int DEVICE_TYPE_ROBOT = 1;
 
     private final IotDeviceMapper deviceMapper;
     private final IotDeviceAuthMapper deviceAuthMapper;
-    private final ControllerOperationRecordMapper operationRecordMapper;
+    private final MasterOperationRecordMapper operationRecordMapper;
 
     @Override
     public UsageStatusVO getUsageStatusByCode(String controllerCode) {
@@ -62,19 +62,19 @@ public class ControllerUsageStatusServiceImpl implements IControllerUsageStatusS
         vo.setLastLoginTime(controller.getLastLoginTime());
 
         // 最近一次遥操开始时间：该主控下操作记录中 start_time 最大值
-        ControllerOperationRecord lastStart = operationRecordMapper.selectOne(
-                new LambdaQueryWrapper<ControllerOperationRecord>()
-                        .eq(ControllerOperationRecord::getControllerId, cid)
-                        .orderByDesc(ControllerOperationRecord::getStartTime)
+        MasterOperationRecord lastStart = operationRecordMapper.selectOne(
+                new LambdaQueryWrapper<MasterOperationRecord>()
+                        .eq(MasterOperationRecord::getControllerId, cid)
+                        .orderByDesc(MasterOperationRecord::getStartTime)
                         .last("LIMIT 1"));
         vo.setLastRemoteOperationStartTime(lastStart != null ? lastStart.getStartTime() : null);
 
         // 当前设备：该主控下 end_time 为 null 的记录（正在遥操的机器人），取最新一条
-        ControllerOperationRecord currentOp = operationRecordMapper.selectOne(
-                new LambdaQueryWrapper<ControllerOperationRecord>()
-                        .eq(ControllerOperationRecord::getControllerId, cid)
-                        .isNull(ControllerOperationRecord::getEndTime)
-                        .orderByDesc(ControllerOperationRecord::getStartTime)
+        MasterOperationRecord currentOp = operationRecordMapper.selectOne(
+                new LambdaQueryWrapper<MasterOperationRecord>()
+                        .eq(MasterOperationRecord::getControllerId, cid)
+                        .isNull(MasterOperationRecord::getEndTime)
+                        .orderByDesc(MasterOperationRecord::getStartTime)
                         .last("LIMIT 1"));
         if (currentOp != null) {
             IotDevice robot = deviceMapper.selectById(currentOp.getRobotId());

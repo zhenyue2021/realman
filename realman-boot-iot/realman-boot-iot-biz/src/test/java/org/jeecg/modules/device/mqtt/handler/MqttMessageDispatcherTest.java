@@ -26,7 +26,7 @@ public class MqttMessageDispatcherTest {
     private DeviceOperationLogHandler operationLogHandler;
     private DeviceOnlineOfflineHandler onlineOfflineHandler;
     private DeviceCameraStreamResponseHandler deviceCameraStreamResponseHandler;
-    private ControllerAssociatedDeviceResponseHandler controllerAssociatedDeviceResponseHandler;
+    private MasterAssociatedDeviceResponseHandler masterAssociatedDeviceResponseHandler;
 
     private MqttMessageDispatcher dispatcher;
 
@@ -39,7 +39,7 @@ public class MqttMessageDispatcherTest {
         operationLogHandler = Mockito.mock(DeviceOperationLogHandler.class);
         onlineOfflineHandler = Mockito.mock(DeviceOnlineOfflineHandler.class);
         deviceCameraStreamResponseHandler = Mockito.mock(DeviceCameraStreamResponseHandler.class);
-        controllerAssociatedDeviceResponseHandler = Mockito.mock(ControllerAssociatedDeviceResponseHandler.class);
+        masterAssociatedDeviceResponseHandler = Mockito.mock(MasterAssociatedDeviceResponseHandler.class);
 
         dispatcher = new MqttMessageDispatcher(
                 statusHandler,
@@ -49,7 +49,7 @@ public class MqttMessageDispatcherTest {
                 operationLogHandler,
                 onlineOfflineHandler,
                 deviceCameraStreamResponseHandler,
-                controllerAssociatedDeviceResponseHandler
+                masterAssociatedDeviceResponseHandler
         );
     }
 

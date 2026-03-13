@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
  */
 @Data
 @TableName("iot_controller_login_log")
-public class IotControllerLoginLog implements Serializable {
+public class IotMasterLoginLog implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
@@ -52,3 +52,4 @@ public class IotControllerLoginLog implements Serializable {
     @TableField("create_time")
     private LocalDateTime createTime;
 }
+
