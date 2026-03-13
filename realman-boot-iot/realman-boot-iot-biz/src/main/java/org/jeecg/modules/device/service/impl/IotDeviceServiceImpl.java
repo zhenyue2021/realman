@@ -422,6 +422,77 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
     }
 
     /**
+     * 向主控设备下发力反馈参数指令（机械臂/夹爪力度）
+     *
+     * <p>注意：此处仅负责通过 MQTT 下发指令并记录操作日志，不同步等待 ACK。
+     * ACK 由 DeviceCommandAckHandler 统一记录。
+     */
+    public String sendMasterForceFeedbackCommand(IotDevice controller,
+                                                 Integer armLevel,
+                                                 Integer gripperLevel,
+                                                 String operator) {
+        if (DeviceConstant.DeviceStatus.ONLINE != controller.getStatus()) {
+            throw new RuntimeException("主控设备不在线");
+        }
+        String commandId = IdUtil.fastSimpleUUID();
+        long now = System.currentTimeMillis();
+        try {
+            MqttMessageModel.MasterForceFeedbackCommand cmd = MqttMessageModel.MasterForceFeedbackCommand.builder()
+                    .commandId(commandId)
+                    .armLevel(armLevel)
+                    .gripperLevel(gripperLevel)
+                    .timestamp(now)
+                    .build();
+            String payload = objectMapper.writeValueAsString(cmd);
+            String topic = String.format(DeviceConstant.MqttTopic.MASTER_FORCE_FEEDBACK, controller.getDeviceCode());
+            mqttPublisher.publishToDevice(controller.getDeviceCode(), topic, payload, 1);
+
+            String desc = "设置力反馈参数: armLevel=" + armLevel + ", gripperLevel=" + gripperLevel;
+            logService.recordLog(controller.getId(), controller.getDeviceCode(),
+                    DeviceConstant.OperationType.COMMAND_SEND,
+                    desc, "{commandId:" + commandId + "}",
+                    DeviceConstant.OperationSource.PLATFORM, "PENDING", null, operator, null);
+        } catch (Exception e) {
+            throw new RuntimeException("发送力反馈指令失败: " + e.getMessage(), e);
+        }
+        return commandId;
+    }
+
+    /**
+     * 向主控设备下发运动与安全参数指令（底盘速度/升降速度）
+     */
+    public String sendMasterSportSpeedCommand(IotDevice controller,
+                                              Integer moveSpeedLevel,
+                                              Integer liftSpeedLevel,
+                                              String operator) {
+        if (DeviceConstant.DeviceStatus.ONLINE != controller.getStatus()) {
+            throw new RuntimeException("主控设备不在线");
+        }
+        String commandId = IdUtil.fastSimpleUUID();
+        long now = System.currentTimeMillis();
+        try {
+            MqttMessageModel.MasterSportSpeedCommand cmd = MqttMessageModel.MasterSportSpeedCommand.builder()
+                    .commandId(commandId)
+                    .moveSpeedLevel(moveSpeedLevel)
+                    .liftSpeedLevel(liftSpeedLevel)
+                    .timestamp(now)
+                    .build();
+            String payload = objectMapper.writeValueAsString(cmd);
+            String topic = String.format(DeviceConstant.MqttTopic.MASTER_SPORT_SPEED, controller.getDeviceCode());
+            mqttPublisher.publishToDevice(controller.getDeviceCode(), topic, payload, 1);
+
+            String desc = "设置运动与安全参数: moveSpeedLevel=" + moveSpeedLevel + ", liftSpeedLevel=" + liftSpeedLevel;
+            logService.recordLog(controller.getId(), controller.getDeviceCode(),
+                    DeviceConstant.OperationType.COMMAND_SEND,
+                    desc, "{commandId:" + commandId + "}",
+                    DeviceConstant.OperationSource.PLATFORM, "PENDING", null, operator, null);
+        } catch (Exception e) {
+            throw new RuntimeException("发送运动与安全参数指令失败: " + e.getMessage(), e);
+        }
+        return commandId;
+    }
+
+    /**
      * 更改设备启用/禁用状态
      *
      * <p>禁用设备时，立即清除 Redis 中的密钥和 AES Key 缓存，

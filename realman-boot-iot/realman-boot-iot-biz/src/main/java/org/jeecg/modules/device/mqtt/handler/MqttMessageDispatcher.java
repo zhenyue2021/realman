@@ -53,6 +53,7 @@ public class MqttMessageDispatcher {
     private final DeviceStatusHandler                 statusHandler;
     private final DeviceConfigAckHandler              configAckHandler;
     private final DeviceCommandAckHandler             commandAckHandler;
+    private final ControllerCommandAckHandler         controllerCommandAckHandler;
     private final OtaProgressHandler                  otaProgressHandler;
     private final DeviceOperationLogHandler           operationLogHandler;
     private final DeviceOnlineOfflineHandler          onlineOfflineHandler;
@@ -69,7 +70,7 @@ public class MqttMessageDispatcher {
     public void dispatch(String topic, MqttMessage message) {
         String payload = new String(message.getPayload(), StandardCharsets.UTF_8);
         try {
-            // 1. $SYS 系统事件（设备上下线）
+            // 0. $SYS 系统事件（设备上下线）
             if (topic.contains("/clients/") && topic.contains("/connected")) {
                 onlineOfflineHandler.handleOnline(topic, payload);
                 return;
@@ -79,11 +80,21 @@ public class MqttMessageDispatcher {
                 return;
             }
 
-            // 2. 标准业务 Topic：device/{deviceCode}/{path}
+            // 1. 标准业务 Topic：device/{deviceCode}/{path}
             Matcher m = DEVICE_TOPIC.matcher(topic);
             if (m.matches()) {
                 dispatchDeviceTopic(m.group(1), m.group(2), topic, payload);
                 return;
+            }
+            // 2. 主控指令 ACK：master/{controllerCode}/command/{cmd}/ack
+            if (topic.startsWith("master/") && topic.contains("/command/") && topic.endsWith("/ack")) {
+                String[] parts = topic.split("/");
+                if (parts.length == 5) {
+                    String controllerCode = parts[1];
+                    String cmd = parts[3];
+                    controllerCommandAckHandler.handle(controllerCode, cmd, payload);
+                    return;
+                }
             }
 
             // 3. 主控/机器人原始上报 Topic：{deviceCode}/master/{path} 或 {deviceCode}/slave/{path}

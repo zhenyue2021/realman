@@ -48,16 +48,22 @@ public interface DeviceConstant {
         String CONFIG_ACK       = "device/%s/config/ack";
         /** 上行：指令集确认（统一为 device/{code}/command/{cmd}/ack，由平台订阅 device/+/command/+/ack） */
         String COMMAND_ACK      = "device/%s/command/%s/ack";
+        /** 下行：平台向设备发送远程重启指令（加密，QoS=1） */
+        String REMOTE_RESTART   = "device/%s/command/restart";
+        /** 下行：平台向设备发送紧急停机指令（加密，QoS=1） */
+        String EMERGENCY_STOP   = "device/%s/command/emergency-stop";
+        /** 上行：指令集确认（统一为 master/{code}/command/{cmd}/ack，由平台订阅 master/+/command/+/ack） */
+        String MASTER_COMMAND_ACK = "master/%s/command/%s/ack";
+        /** 下行：平台向主控设备发送设置力反馈指令（加密，QoS=1） */
+        String MASTER_FORCE_FEEDBACK   = "master/%s/command/force-feedback";
+        /** 下行：平台向主控设备发送运动与安全参数指令（加密，QoS=1），如底盘/升降速度 */
+        String MASTER_SPORT_SPEED = "master/%s/command/sport-speed";
         /** 上行：OTA 升级进度上报（含下载百分比、已下载字节、成功/失败状态） */
         String OTA_PROGRESS     = "device/%s/ota/progress";
         /** 上行：设备操作日志上报（设备端主动记录的行为日志） */
         String OPERATION_LOG    = "device/%s/log/operation";
         /** 下行：平台向设备推送参数配置（加密，QoS=1） */
         String CONFIG_PUSH      = "device/%s/config/push";
-        /** 下行：平台向设备发送远程重启指令（加密，QoS=1） */
-        String REMOTE_RESTART   = "device/%s/command/restart";
-        /** 下行：平台向设备发送紧急停机指令（加密，QoS=1） */
-        String EMERGENCY_STOP   = "device/%s/command/emergency-stop";
         /** 下行：平台向设备推送 OTA 升级通知（含固件下载 URL、MD5、大小等） */
         String OTA_NOTIFY       = "device/%s/ota/notify";
         /**
@@ -98,7 +104,7 @@ public interface DeviceConstant {
          * 主控收到后即知晓本次遥操任务对应的目标机器人。
          */
         String TELEOP_ROBOT_ASSIGN = "device/%s/teleop/robot/assign";
-// todo 力反馈+底盘速度设置
+
         /** EMQX 系统事件：设备 MQTT 连接建立（clientId 从 topic 路径中提取） */
         String SYS_CONNECTED    = "$SYS/brokers/+/clients/+/connected";
         /** EMQX 系统事件：设备 MQTT 连接断开 */

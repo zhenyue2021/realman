@@ -193,6 +193,44 @@ public class MqttMessageModel {
     }
 
     /**
+     * 下行：平台向主控设备设置力反馈参数（Topic: master/{controllerCode}/command/force-feedback）
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class MasterForceFeedbackCommand {
+        /** 指令唯一 ID（UUID），用于关联 ACK */
+        private String commandId;
+        /** 机械臂力度等级 */
+        private Integer armLevel;
+        /** 夹爪力度等级 */
+        private Integer gripperLevel;
+        /** 平台发送时间戳（毫秒） */
+        private long timestamp;
+    }
+
+    /**
+     * 下行：平台向主控设备设置运动与安全参数（Topic: master/{controllerCode}/command/sport-speed）
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class MasterSportSpeedCommand {
+        /** 指令唯一 ID（UUID），用于关联 ACK */
+        private String commandId;
+        /** 底盘行进速度等级 */
+        private Integer moveSpeedLevel;
+        /** 身体升降速度等级 */
+        private Integer liftSpeedLevel;
+        /** 平台发送时间戳（毫秒） */
+        private long timestamp;
+    }
+
+    /**
      * 下行：平台向设备推送 OTA 升级通知（Topic: device/{deviceCode}/ota/notify）
      *
      * <p>执行升级任务时，平台为每台目标设备发送本消息，携带固件下载地址和校验信息。

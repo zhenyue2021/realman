@@ -113,6 +113,7 @@ public class MqttConfig {
                 "device/+/status/report",           // 设备状态上报
                 "device/+/config/ack",              // 参数配置同步确认
                 "device/+/command/+/ack",           // 指令集执行确认（restart/emergency-stop/poweroff/reset...）
+                "master/+/command/+/ack",           // 主控端指令集执行确认（力反馈/底盘速度，...）
                 "device/+/ota/progress",            // OTA 升级进度上报
                 "device/+/log/operation",           // 设备操作日志上报
                 "device/+/camera/stream/response",  // 机器人上报摄像头视频流地址
