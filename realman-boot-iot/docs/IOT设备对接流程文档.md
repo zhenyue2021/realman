@@ -67,18 +67,18 @@
 
 ---
 
-## 2. 设备鉴权认证
+## 2. 设备鉴权认证（配置）
 
 ### 2.1 MQTT 连接参数
 
 设备连接 EMQX 时须携带以下参数：
 
-| 参数 | 值 | 说明 |
-|------|-----|------|
-| `clientId` | `{deviceCode}` | 设备唯一编码，全局唯一 |
-| `username` | `{deviceCode}` | 与 clientId 相同 |
-| `password` | `MD5(deviceCode)` | 32位小写十六进制字符串 |
-| `cleanSession` | `false` | 保留 QoS1 离线消息 |
+| 参数 | 值 | 说明                              |
+|------|-----|---------------------------------|
+| `clientId` | `{deviceCode}` | 设备唯一编码/主控端防越权可使用“iot-plantform” |
+| `username` | `{deviceCode}` | 设备唯一编码，全局唯一                     |
+| `password` | `MD5(deviceCode)` | 32位小写十六进制字符串                    |
+| `cleanSession` | `false` | 保留 QoS1 离线消息                    |
 
 **密钥生成规则**：
 
@@ -353,6 +353,8 @@ device/{deviceCode}/status/report
 ```
 
 **字段说明**：
+
+字段尚未完全确定
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
