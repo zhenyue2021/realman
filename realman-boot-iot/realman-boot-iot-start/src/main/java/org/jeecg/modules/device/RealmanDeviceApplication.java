@@ -5,6 +5,7 @@ import org.jeecg.config.mybatis.MybatisPlusSaasConfig;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.core.env.ConfigurableEnvironment;
@@ -32,6 +33,7 @@ import java.net.UnknownHostException;
  *   为了复用平台现有的 Shiro + JWT 统一认证能力，这里将扫描范围扩展到 org.jeecg，
  *   以便加载 realman-boot-base-core 中的 ShiroConfig、ShiroRealm 等安全配置。
  */
+@EnableDiscoveryClient
 @SpringBootApplication(exclude = {DynamicDataSourceAutoConfiguration.class})
 @ComponentScan(basePackages = "org.jeecg", excludeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = MybatisPlusSaasConfig.class))
 @MapperScan({"org.jeecg.modules.device.mapper", "org.jeecg.modules.base.mapper"})

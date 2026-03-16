@@ -2,6 +2,12 @@
 spring:
   application:
     name: realman-iot
+  cloud:
+    nacos:
+      discovery:
+        server-addr: 172.16.44.66:8848   # Nacos 地址
+        namespace: public                # 先用 public，后面需要再拆 namespace
+        group: REALMAN_GROUP             # 可自定义，比如 REALMAN_GROUP
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://172.16.44.66:3306/jeecg-boot?characterEncoding=UTF-8&useUnicode=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
