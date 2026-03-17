@@ -1,6 +1,6 @@
 spring:
   application:
-    name: realman-system
+    name: realman-boot
   config:
     import: optional:classpath:config/application-liteflow.yml
   profiles:
