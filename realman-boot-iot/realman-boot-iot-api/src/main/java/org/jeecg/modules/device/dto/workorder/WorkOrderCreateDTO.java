@@ -1,5 +1,7 @@
 package org.jeecg.modules.device.dto.workorder;
 
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.TableField;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -20,9 +22,11 @@ public class WorkOrderCreateDTO {
 
     private String remark;
 
-    private LocalDateTime planStartTime;
+    private String planStartTime;
 
-    private LocalDateTime planEndTime;
+    private String planEndTime;
+
+    private String tenantId;
 
     private List<WorkOrderDeviceDTO> devices;
 }

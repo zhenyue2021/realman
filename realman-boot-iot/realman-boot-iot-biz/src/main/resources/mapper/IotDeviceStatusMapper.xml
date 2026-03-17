@@ -83,5 +83,52 @@
           AND id &lt;&gt; #{keepId}
           </if>
     </delete>
+
+    <!-- 备份 beforeTime 之前的所有记录到历史表，保留 keepId（若为空则不保留） -->
+    <insert id="backupOlderThan">
+        INSERT INTO iot_device_status_history (
+            id,
+            device_id,
+            device_code,
+            temperature,
+            humidity,
+            battery_level,
+            signal_strength,
+            longitude,
+            latitude,
+            run_status,
+            raw_data,
+            report_time,
+            receive_time,
+            backup_time
+        )
+        SELECT
+            id,
+            device_id,
+            device_code,
+            temperature,
+            humidity,
+            battery_level,
+            signal_strength,
+            longitude,
+            latitude,
+            run_status,
+            raw_data,
+            report_time,
+            receive_time,
+            NOW()
+        FROM iot_device_status
+        WHERE device_id = #{deviceId}
+          AND report_time &lt; #{beforeTime}
+          <if test="keepId != null">
+          AND id &lt;&gt; #{keepId}
+          </if>
+    </insert>
+
+    <!-- 删除历史表中 beforeTime 之前的所有记录 -->
+    <delete id="deleteHistoryOlderThan">
+        DELETE FROM iot_device_status_history
+        WHERE report_time &lt; #{beforeTime}
+    </delete>
 </mapper>
 

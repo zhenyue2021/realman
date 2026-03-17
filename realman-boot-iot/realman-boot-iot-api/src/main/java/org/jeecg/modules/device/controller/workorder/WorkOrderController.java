@@ -8,10 +8,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.jeecg.common.exception.JeecgBootException;
 import org.jeecg.common.system.util.JwtUtil;
+import org.jeecg.modules.device.api.WorkOrderApiService;
 import org.jeecg.modules.device.dto.workorder.*;
 import org.jeecg.modules.device.entity.workorder.WorkOrder;
 import org.jeecg.modules.device.entity.workorder.WorkOrderAttachment;
-import org.jeecg.modules.device.entity.workorder.WorkOrderDevice;
 import org.jeecg.modules.device.service.workorder.IWorkOrderService;
 import org.jeecg.modules.device.service.workorder.IWorkOrderAttachmentService;
 import org.jeecg.modules.device.vo.ApiResult;
@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -36,22 +37,31 @@ public class WorkOrderController {
 
     private final IWorkOrderService workOrderService;
     private final IWorkOrderAttachmentService attachmentService;
+    private final WorkOrderApiService workOrderApiService;
 
     @PostMapping("/page")
     @Operation(summary = "分页查询工单")
-    public ApiResult<IPage<WorkOrder>> page(@RequestBody WorkOrderQueryDTO query) {
+    public ApiResult<IPage<WorkOrder>> page(HttpServletRequest request, @RequestBody WorkOrderQueryDTO query) {
         int pageNo = query.getPageNo() != null ? query.getPageNo() : 1;
         int pageSize = query.getPageSize() != null ? query.getPageSize() : 20;
         Page<WorkOrder> page = new Page<>(pageNo, pageSize);
-        IPage<WorkOrder> result = workOrderService.pageWorkOrders(page, query.getAgentId(), query.getStatus());
+        String tenantId = request.getHeader("x-tenant-id");
+        if (tenantId == null || tenantId.isEmpty()) {
+            throw new RuntimeException("缺少租户ID（x-tenant-id）");
+        }
+        IPage<WorkOrder> result = workOrderService.pageWorkOrders(page, tenantId, query.getStatus());
         return ApiResult.ok(result);
     }
 
     @PostMapping("/export")
     @Operation(summary = "导出工单列表Excel")
-    public ResponseEntity<byte[]> export(@RequestBody WorkOrderQueryDTO query) {
+    public ResponseEntity<byte[]> export(HttpServletRequest request, @RequestBody WorkOrderQueryDTO query) {
+        String tenantId = request.getHeader("x-tenant-id");
+        if (tenantId == null || tenantId.isEmpty()) {
+            throw new RuntimeException("缺少租户ID（x-tenant-id）");
+        }
         byte[] bytes = org.jeecg.modules.device.util.WorkOrderExcelExportUtil.exportWorkOrders(
-                workOrderService.listForExport(query.getAgentId(), query.getStatus()));
+                workOrderService.listForExport(tenantId, query.getStatus()));
         String filename = "work_order_" + System.currentTimeMillis() + ".xlsx";
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
@@ -60,51 +70,47 @@ public class WorkOrderController {
                 .body(bytes);
     }
 
-    @PostMapping
+    @PostMapping("/add")
     @Operation(summary = "创建工单")
     public ApiResult<WorkOrder> create(@RequestBody WorkOrderCreateDTO dto, HttpServletRequest request) {
-        WorkOrder order = new WorkOrder();
-        order.setAgentId(dto.getAgentId());
-        order.setAgentName(dto.getAgentName());
-        order.setDepartmentId(dto.getDepartmentId());
-        order.setDepartmentName(dto.getDepartmentName());
-        order.setComplianceId(dto.getComplianceId());
-        order.setRemark(dto.getRemark());
-        order.setPlanStartTime(dto.getPlanStartTime());
-        order.setPlanEndTime(dto.getPlanEndTime());
-        order.setStatus("PENDING");
+        String operator = null;
         try {
-            String username = JwtUtil.getUserNameByToken(request);
-            order.setCreateBy(username);
+            operator = JwtUtil.getUserNameByToken(request);
         } catch (JeecgBootException ignored) {
         }
-        workOrderService.save(order);
+        String tenantId = request.getHeader("x-tenant-id");
+        if (tenantId == null || tenantId.isEmpty()) {
+            throw new RuntimeException("缺少租户ID（x-tenant-id）");
+        }
+        dto.setTenantId(tenantId);
+        WorkOrder created = workOrderApiService.create(dto, operator);
+        return ApiResult.ok(created);
+    }
 
-        List<WorkOrderDevice> devices = dto.getDevices() == null ? List.of() :
-                dto.getDevices().stream().map(d -> {
-                    WorkOrderDevice w = new WorkOrderDevice();
-                    w.setDeviceType(d.getDeviceType());
-                    w.setDeviceId(d.getDeviceId());
-                    w.setDeviceName(d.getDeviceName());
-                    w.setDeviceCode(d.getDeviceCode());
-                    w.setActualDeviceId(d.getActualDeviceId());
-                    w.setActualDeviceName(d.getActualDeviceName());
-                    w.setActualDeviceCode(d.getActualDeviceCode());
-                    return w;
-                }).collect(Collectors.toList());
-        workOrderService.bindDevices(order.getId(), devices);
-        return ApiResult.ok(order);
+    @PostMapping("/{id}/edit")
+    @Operation(summary = "编辑工单（基础信息与绑定设备）")
+    public ApiResult<WorkOrder> edit(@PathVariable String id,
+                                     @RequestBody WorkOrderCreateDTO dto,
+                                     HttpServletRequest request) {
+        String operator = null;
+        try {
+            operator = JwtUtil.getUserNameByToken(request);
+        } catch (JeecgBootException ignored) {
+        }
+        WorkOrder updated = workOrderApiService.edit(id, dto, operator);
+        return ApiResult.ok(updated);
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "工单详情")
-    public ApiResult<WorkOrder> detail(@PathVariable String id) {
-        return ApiResult.ok(workOrderService.getById(id));
+    public ApiResult<WorkOrderDetailDTO> detail(HttpServletRequest request, @PathVariable String id) {
+        WorkOrderDetailDTO workOrder = workOrderApiService.getWorkOrderDetail(id);
+        return ApiResult.ok(workOrder);
     }
 
     @PostMapping("/{id}/start")
     @Operation(summary = "开始工单")
-    public ApiResult<Void> start(@PathVariable String id, @RequestBody WorkOrderStartDTO dto) {
+    public ApiResult<Void> start(HttpServletRequest request, @PathVariable String id, @RequestBody WorkOrderStartDTO dto) {
         workOrderService.startWorkOrder(id, dto.getOperatorId(), dto.getOperatorName(), dto.getOperatorPhone());
         return ApiResult.ok(null);
     }
@@ -118,7 +124,7 @@ public class WorkOrderController {
 
     @PostMapping("/{id}/timeout-reason")
     @Operation(summary = "填写超时原因")
-    public ApiResult<Void> timeoutReason(@PathVariable String id, @RequestBody WorkOrderTimeoutReasonDTO dto) {
+    public ApiResult<Void> timeoutReason(HttpServletRequest request, @PathVariable String id, @RequestBody WorkOrderTimeoutReasonDTO dto) {
         workOrderService.fillTimeoutReason(id, dto.getReason(), dto.getSource());
         return ApiResult.ok(null);
     }
@@ -151,7 +157,7 @@ public class WorkOrderController {
 
     @GetMapping("/pending/controller/{controllerCode}")
     @Operation(summary = "主控端待开始工单列表")
-    public ApiResult<List<WorkOrder>> pendingForController(@PathVariable String controllerCode) {
+    public ApiResult<List<WorkOrder>> pendingForController(HttpServletRequest request, @PathVariable String controllerCode) {
         return ApiResult.ok(workOrderService.listPendingForController(controllerCode));
     }
 

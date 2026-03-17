@@ -46,4 +46,16 @@ public interface IotDeviceStatusMapper extends BaseMapper<IotDeviceStatus> {
     int deleteOlderThan(@Param("deviceId") String deviceId,
                         @Param("beforeTime") LocalDateTime beforeTime,
                         @Param("keepId") String keepId);
+
+    /**
+     * 将指定设备在 beforeTime 之前的所有记录（排除 keepId）备份到 iot_device_status_history 表中。
+     */
+    int backupOlderThan(@Param("deviceId") String deviceId,
+                        @Param("beforeTime") LocalDateTime beforeTime,
+                        @Param("keepId") String keepId);
+
+    /**
+     * 删除 iot_device_status_history 表中 beforeTime 之前的所有记录。
+     */
+    int deleteHistoryOlderThan(@Param("beforeTime") LocalDateTime beforeTime);
 }

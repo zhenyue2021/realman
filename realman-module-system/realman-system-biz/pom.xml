@@ -74,12 +74,7 @@
 			<groupId>org.jeecgframework.jimureport</groupId>
 			<artifactId>jimubi-spring-boot3-starter</artifactId>
 		</dependency>
-		<!-- AI大模型管理 -->
-		<dependency>
-			<groupId>org.jeecgframework.boot3</groupId>
-			<artifactId>realman-boot-module-airag</artifactId>
-			<version>${realman-boot.version}</version>
-		</dependency>
+
 	</dependencies>
 	
 </project>

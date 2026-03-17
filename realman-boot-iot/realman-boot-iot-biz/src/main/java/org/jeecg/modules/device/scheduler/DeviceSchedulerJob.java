@@ -152,12 +152,13 @@ public class DeviceSchedulerJob {
     }
 
     /**
-     * 最近7天及更早的状态历史压缩任务
+     * 设备状态历史压缩 & 归档任务
      *
      * <p>策略：
      * <ol>
-     *   <li>最近7天（不含当天）：每天仅保留最新一条记录</li>
-     *   <li>7天之前：仅保留“窗口开始时间之前”的最后一条记录，其余物理删除</li>
+     *   <li>最近30天（不含当天）：每天仅保留最新一条记录</li>
+     *   <li>30天之前：仅保留“窗口开始时间之前”的最后一条记录，其余先归档到 {@code iot_device_status_history} 表，再从主表物理删除</li>
+     *   <li>对 {@code iot_device_status_history} 表中超过90天的数据，物理删除</li>
      * </ol>
      *
      * <p>XXL-Job Handler Name：{@code compactDeviceStatusJob}，建议 Cron：{@code 0 20 2 * * ?}
@@ -166,19 +167,32 @@ public class DeviceSchedulerJob {
     public void compactDeviceStatusHistory() {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime todayStart = now.toLocalDate().atStartOfDay();
-        LocalDateTime recentStart = todayStart.minusDays(7); // 最近7天窗口起点（不含更早数据）
+        // 最近30天窗口起点（不含更早数据）
+        LocalDateTime recentStart = todayStart.minusDays(30);
+        // 历史表保留90天，删除更早的数据
+        LocalDateTime historyExpireBefore = todayStart.minusDays(90);
 
         List<String> deviceIds = statusMapper.selectAllDeviceIds();
-        int totalDeleted = 0;
-        for (String deviceId : deviceIds) {
-            // 1. 最近7天（不含当天）：每天仅保留最新一条
-            totalDeleted += statusMapper.deleteRecentDailyRedundant(deviceId, recentStart, todayStart);
+        int totalDeletedMain = 0;
+        int totalArchived = 0;
 
-            // 2. 7天之前：保留窗口起点之前的最后一条，其余删除
+        for (String deviceId : deviceIds) {
+            // 1. 最近30天（不含当天）：每天仅保留最新一条
+            totalDeletedMain += statusMapper.deleteRecentDailyRedundant(deviceId, recentStart, todayStart);
+
+            // 2. 30天之前：保留窗口起点之前的最后一条，其余归档+删除
             IotDeviceStatus anchor = statusMapper.selectLatestBefore(deviceId, recentStart);
             String keepId = anchor != null ? anchor.getId() : null;
-            totalDeleted += statusMapper.deleteOlderThan(deviceId, recentStart, keepId);
+            // 先备份到历史表
+            totalArchived += statusMapper.backupOlderThan(deviceId, recentStart, keepId);
+            // 再从主表删除
+            totalDeletedMain += statusMapper.deleteOlderThan(deviceId, recentStart, keepId);
         }
-        log.info("[StatusCompact-History] 本次共压缩最近7天及更早的历史记录 {} 条（设备数={}）", totalDeleted, deviceIds.size());
+
+        // 3. 清理历史表中超过90天的数据
+        int historyDeleted = statusMapper.deleteHistoryOlderThan(historyExpireBefore);
+
+        log.info("[StatusCompact-History] 本次主表压缩/删除 {} 条，归档到历史表 {} 条，历史表清理 {} 条（设备数={}）",
+                totalDeletedMain, totalArchived, historyDeleted, deviceIds.size());
     }
 }

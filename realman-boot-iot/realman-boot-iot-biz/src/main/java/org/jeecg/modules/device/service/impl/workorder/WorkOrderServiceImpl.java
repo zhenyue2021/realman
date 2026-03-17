@@ -60,7 +60,7 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
         }
         // 先查找与该主控相关的工单ID（计划主控或实际主控）
         LambdaQueryWrapper<WorkOrderDevice> deviceWrapper = new LambdaQueryWrapper<WorkOrderDevice>()
-                .eq(WorkOrderDevice::getDeviceType, "CONTROLLER")
+                .eq(WorkOrderDevice::getDeviceType, "2")
                 .eq(WorkOrderDevice::getDeviceCode, controllerCode)
                 .and(w -> w.isNull(WorkOrderDevice::getActualDeviceCode)
                         .or().eq(WorkOrderDevice::getActualDeviceCode, controllerCode));
@@ -99,6 +99,12 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
             d.setCreateTime(now);
             workOrderDeviceMapper.insert(d);
         }
+    }
+
+    @Override
+    public List<WorkOrderDevice> findDevices(String workOrderId) {
+        return workOrderDeviceMapper.selectList(
+                new LambdaQueryWrapper<WorkOrderDevice>().eq(WorkOrderDevice::getWorkOrderId, workOrderId));
     }
 
     @Override
@@ -198,6 +204,38 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
         if (order.getPlanEndTime() != null) {
             operationRecordService.finishByWorkOrder(workOrderId, order.getPlanEndTime());
         }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public WorkOrder createWorkOrderWithDevices(WorkOrder order, List<WorkOrderDevice> devices) {
+        this.save(order);
+        bindDevices(order.getId(), devices);
+        return order;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public WorkOrder editWorkOrderWithDevices(WorkOrder updated, List<WorkOrderDevice> devices) {
+        WorkOrder existing = this.getById(updated.getId());
+        if (existing == null) {
+            throw new IllegalArgumentException("工单不存在: " + updated.getId());
+        }
+        if (!"PENDING".equals(existing.getStatus())) {
+            throw new IllegalStateException("仅允许编辑未开始的工单");
+        }
+        existing.setAgentId(updated.getAgentId());
+        existing.setAgentName(updated.getAgentName());
+        existing.setDepartmentId(updated.getDepartmentId());
+        existing.setDepartmentName(updated.getDepartmentName());
+        existing.setComplianceId(updated.getComplianceId());
+        existing.setRemark(updated.getRemark());
+        existing.setPlanStartTime(updated.getPlanStartTime());
+        existing.setPlanEndTime(updated.getPlanEndTime());
+        existing.setUpdateBy(updated.getUpdateBy());
+        this.updateById(existing);
+        bindDevices(existing.getId(), devices);
+        return existing;
     }
 }
 

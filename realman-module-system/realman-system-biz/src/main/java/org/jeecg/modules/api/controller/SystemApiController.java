@@ -1,6 +1,8 @@
 package org.jeecg.modules.api.controller;
 
 import com.alibaba.fastjson.JSONObject;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.common.api.dto.AiragFlowDTO;
 import org.jeecg.common.api.dto.DataLogDTO;
@@ -30,6 +32,7 @@ import java.util.Set;
 @Slf4j
 @RestController
 @RequestMapping("/sys/api")
+@Tag(name = "SystemApiController对外接口管理")
 public class SystemApiController {
 
     @Autowired
@@ -213,6 +216,7 @@ public class SystemApiController {
      * @return
      */
     @GetMapping("/queryDictItemsByCode")
+    @Operation(summary = "获取数据字典")
     List<DictModel> queryDictItemsByCode(@RequestParam("code") String code){
         return sysBaseApi.queryDictItemsByCode(code);
     }

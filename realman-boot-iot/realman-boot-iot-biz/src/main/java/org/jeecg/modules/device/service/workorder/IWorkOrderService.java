@@ -17,6 +17,7 @@ public interface IWorkOrderService extends IService<WorkOrder> {
     List<WorkOrder> listPendingForController(String controllerCode);
 
     void bindDevices(String workOrderId, List<WorkOrderDevice> devices);
+    List<WorkOrderDevice> findDevices(String workOrderId);
 
     void startWorkOrder(String workOrderId, String operatorId, String operatorName, String operatorPhone);
 
@@ -27,5 +28,9 @@ public interface IWorkOrderService extends IService<WorkOrder> {
     void auditWorkOrder(String workOrderId, String result, String comment, String auditor);
 
     void closeWorkOrder(String workOrderId, String reason, String closer);
+
+    WorkOrder createWorkOrderWithDevices(WorkOrder order, List<WorkOrderDevice> devices);
+
+    WorkOrder editWorkOrderWithDevices(WorkOrder updated, List<WorkOrderDevice> devices);
 }
 

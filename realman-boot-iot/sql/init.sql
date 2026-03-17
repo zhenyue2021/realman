@@ -118,6 +118,28 @@ CREATE TABLE IF NOT EXISTS `iot_device_status` (
   KEY `idx_receive_time` (`receive_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='设备状态上报历史';
 
+-- 3.1 设备状态上报历史归档表（用于长期归档 iot_device_status 旧数据）
+CREATE TABLE IF NOT EXISTS `iot_device_status_history` (
+  `id`              VARCHAR(32)   NOT NULL COMMENT '与主表一致的流水ID',
+  `device_id`       VARCHAR(32)   NOT NULL COMMENT '设备ID',
+  `device_code`     VARCHAR(64)   NOT NULL COMMENT '设备编号',
+  `temperature`     DECIMAL(6,2)  DEFAULT NULL COMMENT '温度',
+  `humidity`        DECIMAL(6,2)  DEFAULT NULL COMMENT '湿度',
+  `battery_level`   DECIMAL(5,2)  DEFAULT NULL COMMENT '电量百分比',
+  `signal_strength` INT           DEFAULT NULL COMMENT '信号强度',
+  `longitude`       DECIMAL(10,7) DEFAULT NULL COMMENT '经度',
+  `latitude`        DECIMAL(10,7) DEFAULT NULL COMMENT '纬度',
+  `run_status`      TINYINT       DEFAULT 1 COMMENT '1-正常 2-告警 3-故障',
+  `raw_data`        TEXT          DEFAULT NULL COMMENT '原始上报数据',
+  `report_time`     DATETIME      NOT NULL COMMENT '设备上报时间',
+  `receive_time`    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '平台接收时间',
+  `backup_time`     DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '归档时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_hist_device_id`    (`device_id`),
+  KEY `idx_hist_device_code`  (`device_code`),
+  KEY `idx_hist_report_time`  (`report_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='设备状态上报历史归档表';
+
 -- 4. 设备操作日志
 CREATE TABLE IF NOT EXISTS `iot_device_operation_log` (
   `id`               VARCHAR(32)  NOT NULL,

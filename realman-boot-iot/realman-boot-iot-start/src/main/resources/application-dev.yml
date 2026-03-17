@@ -1,7 +1,10 @@
 
 spring:
   application:
-    name: realman-iot
+    name: realman-iot-szy
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.quartz.QuartzAutoConfiguration
   cloud:
     nacos:
       discovery:
@@ -49,7 +52,7 @@ mybatis-plus:
 
 # mqtt
 mqtt:
-  enabled: true  # 临时禁用，避免启动失败
+  enabled: false  # 临时禁用，避免启动失败
   broker:
     url: tcp://172.16.44.66:1883
     username: iot-platform

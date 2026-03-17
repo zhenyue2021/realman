@@ -1,6 +1,7 @@
 package org.jeecg.modules.device.dto.workorder;
 
 import lombok.Data;
+import org.jeecg.common.aspect.annotation.Dict;
 
 @Data
 public class WorkOrderDeviceDTO {
@@ -18,5 +19,39 @@ public class WorkOrderDeviceDTO {
     private String actualDeviceName;
 
     private String actualDeviceCode;
+
+    /**
+     * 设备当前状态（0-未激活 1-在线 2-离线 3-禁用）
+     */
+    @Dict(dicCode = "device_status")
+    private Integer status;
+
+    /**
+     * 设备当前状态文本（例如：未激活/在线/离线/禁用）
+     *
+     * <p>说明：由于 IoT 模块使用自定义 ApiResult，未走 Jeecg 默认的字典切面，
+     * 该字段在服务层通过 status 手动填充，方便前端直接展示。
+     */
+    private String statusDictText;
+
+    /**
+     * 设备型号
+     */
+    private String deviceModel;
+
+    /**
+     * 固件版本
+     */
+    private String firmwareVersion;
+
+    /**
+     * 最新经度
+     */
+    private String longitude;
+
+    /**
+     * 最新纬度
+     */
+    private String latitude;
 }
 

@@ -306,7 +306,7 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
         WorkOrderDevice bind = workOrderDeviceMapper.selectOne(
                 new LambdaQueryWrapper<WorkOrderDevice>()
                         .eq(WorkOrderDevice::getWorkOrderId, workOrderId)
-                        .eq(WorkOrderDevice::getDeviceType, "ROBOT")
+                        .eq(WorkOrderDevice::getDeviceType, "1")
                         .last("LIMIT 1")
         );
         if (bind == null) {
