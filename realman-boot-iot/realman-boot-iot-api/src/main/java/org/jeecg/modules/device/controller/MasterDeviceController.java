@@ -15,9 +15,11 @@ import org.jeecg.modules.device.dto.MasterLoginDTO;
 import org.jeecg.modules.device.dto.DeviceAddDTO;
 import org.jeecg.modules.device.dto.OperationRecordQueryDTO;
 import org.jeecg.modules.device.dto.DeviceRequestDTO;
+import org.jeecg.modules.device.dto.MasterDevicePageItemDTO;
 import org.jeecg.modules.device.dto.DeviceRestartDTO;
 import org.jeecg.modules.device.dto.DeviceUpdateDTO;
 import org.jeecg.modules.device.dto.EmergencyStopDTO;
+import org.jeecg.modules.device.api.MasterDeviceApiService;
 import org.jeecg.modules.device.entity.MasterOperationRecord;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.service.IMasterLoginResolveService;
@@ -58,6 +60,7 @@ public class MasterDeviceController {
     private final IMasterLoginResolveService loginResolveService;
     private final IMasterOperationRecordService operationRecordService;
     private final IMasterUsageStatusService usageStatusService;
+    private final MasterDeviceApiService masterDeviceApiService;
 
     /** 新增主控设备 */
     @PostMapping("/add")
@@ -78,13 +81,13 @@ public class MasterDeviceController {
     /** 分页查询主控设备列表 */
     @PostMapping("/list")
     @Operation(summary = "分页查询主控设备列表")
-    public ApiResult<IPage<IotDevice>> list(HttpServletRequest request,
+    public ApiResult<IPage<MasterDevicePageItemDTO>> list(HttpServletRequest request,
                                            @RequestBody DeviceRequestDTO requestDTO) {
         fillAuthContext(request, requestDTO);
         requestDTO.setDeviceType(DEVICE_TYPE_CONTROLLER);
         int pageNo = Objects.nonNull(requestDTO.getPageNo()) ? requestDTO.getPageNo() : 1;
         int pageSize = Objects.nonNull(requestDTO.getPageSize()) ? requestDTO.getPageSize() : 10;
-        return ApiResult.ok(deviceService.queryDevicePage(new Page<>(pageNo, pageSize), requestDTO));
+        return ApiResult.ok(masterDeviceApiService.pageControllers(new Page<>(pageNo, pageSize), requestDTO));
     }
 
 
