@@ -107,6 +107,12 @@ spring:
       matching-strategy: ant_path_matcher
   resource:
     static-locations: classpath:/static/,classpath:/public/
+  cloud:
+    nacos:
+      discovery:
+        server-addr: 172.16.44.66:8848   # Nacos 地址
+        namespace: public                # 先用 public，后面需要再拆 namespace
+        group: REALMAN_GROUP             # 可自定义，比如 REALMAN_GROUP
   autoconfigure:
     exclude:
       - com.alibaba.druid.spring.boot3.autoconfigure.DruidDataSourceAutoConfigure
@@ -302,7 +308,7 @@ jeecg:
     logRetentionDays: 30
   #分布式锁配置
   redisson:
-    address: 127.0.0.1:6379
+    address: 172.16.44.66:6379
     password:
     type: STANDALONE
     enabled: true

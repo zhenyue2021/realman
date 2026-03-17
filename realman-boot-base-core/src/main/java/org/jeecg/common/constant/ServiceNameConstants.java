@@ -28,7 +28,12 @@ public interface ServiceNameConstants {
 	/**
 	 * 微服务名：系统管理模块
 	 */
-	String SERVICE_SYSTEM = "jeecg-system";
+	String SERVICE_SYSTEM = "realman-system";
+
+	/**
+	 * 微服务名：设备管理模块
+	 */
+	String SERVICE_IOT = "realman-iot";
 	/**
 	 * 微服务名： demo模块
 	 */

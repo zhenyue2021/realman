@@ -1,6 +1,6 @@
 spring:
   application:
-    name: jeecg-system
+    name: realman-system
   config:
     import: optional:classpath:config/application-liteflow.yml
   profiles:
