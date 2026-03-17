@@ -68,9 +68,9 @@ class WorkOrderSchedulerJobTest {
 
         config = new WorkOrderComplianceConfig();
         config.setId("cfg-001");
-        config.setSubmitLimitEnabled(1);
+        config.setTaskLimitEnabled(1);
         config.setAutoCloseEnabled(1);
-        config.setAutoCloseSeconds(3600);
+        config.setAutoCloseOffset("01:00:00");
     }
 
     @Test
@@ -144,7 +144,7 @@ class WorkOrderSchedulerJobTest {
     @Test
     @DisplayName("timeoutMark：合规未开启提交时限时不标记")
     void timeoutMark_skipWhenSubmitLimitDisabled() {
-        config.setSubmitLimitEnabled(0);
+        config.setTaskLimitEnabled(0);
         when(workOrderMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(order));
         when(configMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(config));
 
@@ -203,7 +203,7 @@ class WorkOrderSchedulerJobTest {
     void timeoutAlert_doesNotThrow() {
         order.setPlanEndTime(LocalDateTime.now().plusMinutes(10));
         config.setTimeoutAlertEnabled(1);
-        config.setTimeoutAlertSeconds(1800);
+        config.setTimeoutAlertOffset("00:30:00");
         when(workOrderMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(order));
         when(configMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(config));
 

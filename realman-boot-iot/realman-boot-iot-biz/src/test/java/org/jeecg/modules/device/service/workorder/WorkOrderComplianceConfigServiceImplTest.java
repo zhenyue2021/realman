@@ -43,13 +43,12 @@ class WorkOrderComplianceConfigServiceImplTest {
         config.setId("cfg-001");
         config.setAgentId("agent-1");
         config.setAgentName("测试代理商");
-        config.setTaskName("巡检任务");
-        config.setTaskDesc("每日巡检");
-        config.setStatus(0);
+        config.setTaskScene("日常巡检");
+        config.setApplyStatus(0);
         config.setDelFlag(0);
         config.setTimeoutAlertEnabled(1);
-        config.setTimeoutAlertSeconds(1800);
-        config.setSubmitLimitEnabled(1);
+        config.setTimeoutAlertOffset("00:30:00");
+        config.setTaskLimitEnabled(1);
         config.setAutoCloseEnabled(0);
     }
 
@@ -63,8 +62,8 @@ class WorkOrderComplianceConfigServiceImplTest {
 
         ArgumentCaptor<WorkOrderComplianceConfig> captor = ArgumentCaptor.forClass(WorkOrderComplianceConfig.class);
         verify(baseMapper).insert(captor.capture());
-        assertThat(captor.getValue().getTaskName()).isEqualTo("巡检任务");
-        assertThat(captor.getValue().getTimeoutAlertSeconds()).isEqualTo(1800);
+        assertThat(captor.getValue().getTaskScene()).isEqualTo("日常巡检");
+        assertThat(captor.getValue().getTimeoutAlertOffset()).isEqualTo("00:30:00");
     }
 
     @Test
@@ -76,7 +75,7 @@ class WorkOrderComplianceConfigServiceImplTest {
 
         assertThat(result).isNotNull();
         assertThat(result.getId()).isEqualTo("cfg-001");
-        assertThat(result.getTaskName()).isEqualTo("巡检任务");
+        assertThat(result.getTaskScene()).isEqualTo("日常巡检");
         verify(baseMapper).selectById("cfg-001");
     }
 
@@ -100,13 +99,13 @@ class WorkOrderComplianceConfigServiceImplTest {
     void updateById_callsUpdateById() {
         when(baseMapper.updateById(any(WorkOrderComplianceConfig.class))).thenReturn(1);
 
-        config.setTaskDesc("更新后的描述");
+        config.setOvertimeReasonDesc("更新后的描述");
         boolean ok = configService.updateById(config);
 
         assertThat(ok).isTrue();
         ArgumentCaptor<WorkOrderComplianceConfig> captor = ArgumentCaptor.forClass(WorkOrderComplianceConfig.class);
         verify(baseMapper).updateById(captor.capture());
-        assertThat(captor.getValue().getTaskDesc()).isEqualTo("更新后的描述");
+        assertThat(captor.getValue().getOvertimeReasonDesc()).isEqualTo("更新后的描述");
     }
 
     @Test
@@ -126,11 +125,11 @@ class WorkOrderComplianceConfigServiceImplTest {
         when(baseMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(config));
 
         var wrapper = new LambdaQueryWrapper<WorkOrderComplianceConfig>()
-                .eq(WorkOrderComplianceConfig::getStatus, 0)
+                .eq(WorkOrderComplianceConfig::getApplyStatus, 0)
                 .eq(WorkOrderComplianceConfig::getDelFlag, 0);
         List<WorkOrderComplianceConfig> list = configService.list(wrapper);
 
         assertThat(list).hasSize(1);
-        assertThat(list.get(0).getTaskName()).isEqualTo("巡检任务");
+        assertThat(list.get(0).getTaskScene()).isEqualTo("日常巡检");
     }
 }

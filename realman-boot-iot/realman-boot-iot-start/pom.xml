@@ -31,6 +31,17 @@
             <groupId>com.alibaba.cloud</groupId>
             <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
         </dependency>
+        <!-- Feign 通过服务名调用需要 LoadBalancer -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-loadbalancer</artifactId>
+        </dependency>
+        <!-- Feign：IoT 通过 ISysBaseAPI(CommonAPI) 远程调用 system 服务 -->
+        <dependency>
+            <groupId>org.jeecgframework.boot3</groupId>
+            <artifactId>realman-system-cloud-api</artifactId>
+            <version>${realman-boot.version}</version>
+        </dependency>
         <!-- 先做服务注册 -->
         <!--<dependency>
             <groupId>com.alibaba.cloud</groupId>

@@ -1,7 +1,10 @@
 package org.jeecg.modules.device.controller.workorder;
 
-import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import org.jeecg.modules.device.api.WorkOrderApiService;
+import org.jeecg.modules.device.dto.workorder.WorkOrderDetailDTO;
+import org.jeecg.modules.device.dto.workorder.WorkOrderPageItemDTO;
+import org.jeecg.modules.device.dto.workorder.WorkOrderQueryDTO;
 import org.jeecg.modules.device.entity.workorder.WorkOrder;
 import org.jeecg.modules.device.service.workorder.IWorkOrderAttachmentService;
 import org.jeecg.modules.device.service.workorder.IWorkOrderService;
@@ -13,7 +16,6 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.*;
@@ -36,36 +38,43 @@ class WorkOrderControllerTest {
     private IWorkOrderService workOrderService;
     @MockBean
     private IWorkOrderAttachmentService attachmentService;
+    @MockBean
+    private WorkOrderApiService workOrderApiService;
 
     @Test
     @DisplayName("分页查询工单返回 200")
     void page_returnsOk() throws Exception {
-        Page<WorkOrder> page = new Page<>(1, 20);
-        when(workOrderService.pageWorkOrders(any(Page.class), any(), any())).thenReturn(page);
+        Page<WorkOrderPageItemDTO> respPage = new Page<>(1, 20);
+        when(workOrderApiService.pageWorkOrders(org.mockito.ArgumentMatchers.<Page<WorkOrder>>any(),
+                        anyString(),
+                        any(WorkOrderQueryDTO.class)))
+                .thenReturn(respPage);
 
         mockMvc.perform(post("/api/work-order/page")
                         .contentType(MediaType.APPLICATION_JSON)
+                        .header("x-tenant-id", "t-1")
                         .content("{\"pageNo\":1,\"pageSize\":20}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200));
 
-        verify(workOrderService).pageWorkOrders(any(Page.class), any(), any());
+        verify(workOrderApiService).pageWorkOrders(org.mockito.ArgumentMatchers.<Page<WorkOrder>>any(),
+                anyString(),
+                any(WorkOrderQueryDTO.class));
     }
 
     @Test
     @DisplayName("工单详情返回 200")
     void detail_returnsOk() throws Exception {
-        WorkOrder order = new WorkOrder();
-        order.setId("wo-1");
-        order.setStatus("PENDING");
-        when(workOrderService.getById("wo-1")).thenReturn(order);
+        WorkOrderDetailDTO detail = new WorkOrderDetailDTO();
+        detail.setTenantId("t-1");
+        when(workOrderApiService.getWorkOrderDetail("wo-1")).thenReturn(detail);
 
         mockMvc.perform(get("/api/work-order/wo-1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.data.id").value("wo-1"));
+                .andExpect(jsonPath("$.data.tenantId").value("t-1"));
 
-        verify(workOrderService).getById("wo-1");
+        verify(workOrderApiService).getWorkOrderDetail("wo-1");
     }
 
     @Test

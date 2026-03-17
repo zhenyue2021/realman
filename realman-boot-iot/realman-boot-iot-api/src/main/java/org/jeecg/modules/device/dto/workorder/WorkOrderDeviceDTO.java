@@ -27,14 +27,6 @@ public class WorkOrderDeviceDTO {
     private Integer status;
 
     /**
-     * 设备当前状态文本（例如：未激活/在线/离线/禁用）
-     *
-     * <p>说明：由于 IoT 模块使用自定义 ApiResult，未走 Jeecg 默认的字典切面，
-     * 该字段在服务层通过 status 手动填充，方便前端直接展示。
-     */
-    private String statusDictText;
-
-    /**
      * 设备型号
      */
     private String deviceModel;

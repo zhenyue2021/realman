@@ -34,7 +34,13 @@ import java.util.Set;
  * @author: jeecg-boot
  */
 @Component
-@FeignClient(contextId = "sysBaseRemoteApi", value = ServiceNameConstants.SERVICE_SYSTEM, fallbackFactory = SysBaseAPIFallbackFactory.class)
+@FeignClient(
+        contextId = "sysBaseRemoteApi",
+        value = ServiceNameConstants.SERVICE_SYSTEM,
+        // system 服务设置了 server.servlet.context-path=/realman-boot 时，需要给所有 Feign 调用统一加前缀
+        path = "${realman.system.context-path:/realman-boot}",
+        fallbackFactory = SysBaseAPIFallbackFactory.class
+)
 @ConditionalOnMissingClass("org.jeecg.modules.system.service.impl.SysBaseApiImpl")
 public interface ISysBaseAPI extends CommonAPI {
 

@@ -1,8 +1,7 @@
 package org.jeecg.modules.device.controller.workorder;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import org.jeecg.modules.device.entity.workorder.WorkOrderComplianceConfig;
-import org.jeecg.modules.device.service.workorder.IWorkOrderComplianceConfigService;
+import org.jeecg.modules.device.api.WorkOrderComplianceApiService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -25,25 +24,26 @@ class WorkOrderComplianceControllerTest {
     private MockMvc mockMvc;
 
     @MockBean
-    private IWorkOrderComplianceConfigService configService;
+    private WorkOrderComplianceApiService apiService;
 
     @Test
     void page_returnsOk() throws Exception {
-        when(configService.page(any(Page.class), any())).thenReturn(new Page<>(1, 20));
+        when(apiService.pageConfigs(org.mockito.ArgumentMatchers.<Page<org.jeecg.modules.device.entity.workorder.WorkOrderComplianceConfig>>any(), any()))
+                .thenReturn(new Page<>(1, 20));
         mockMvc.perform(post("/api/work-order/compliance/page")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"pageNo\":1,\"pageSize\":20}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200));
-        verify(configService).page(any(Page.class), any());
+        verify(apiService).pageConfigs(org.mockito.ArgumentMatchers.<Page<org.jeecg.modules.device.entity.workorder.WorkOrderComplianceConfig>>any(), any());
     }
 
     @Test
     void delete_returnsOk() throws Exception {
-        when(configService.removeById("cfg-1")).thenReturn(true);
+        // delete 返回 200 即可（controller 调用 apiService.delete）
         mockMvc.perform(delete("/api/work-order/compliance/cfg-1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200));
-        verify(configService).removeById("cfg-1");
+        verify(apiService).delete("cfg-1");
     }
 }

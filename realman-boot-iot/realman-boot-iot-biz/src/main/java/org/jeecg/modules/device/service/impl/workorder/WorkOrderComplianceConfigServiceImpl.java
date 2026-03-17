@@ -11,6 +11,7 @@ import org.jeecg.modules.device.mapper.workorder.WorkOrderComplianceConfigMapper
 import org.jeecg.modules.device.service.workorder.IWorkOrderComplianceConfigService;
 
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -19,15 +20,17 @@ public class WorkOrderComplianceConfigServiceImpl
         implements IWorkOrderComplianceConfigService {
 
     @Override
-    public IPage<WorkOrderComplianceConfig> pageConfigs(Page<WorkOrderComplianceConfig> page, String agentId, Integer status) {
+    public IPage<WorkOrderComplianceConfig> pageConfigs(Page<WorkOrderComplianceConfig> page,
+                                                        String agentId,
+                                                        String enterpriseId,
+                                                        Integer applyStatus) {
         LambdaQueryWrapper<WorkOrderComplianceConfig> wrapper = new LambdaQueryWrapper<>();
         if (agentId != null && !agentId.isEmpty()) {
             wrapper.eq(WorkOrderComplianceConfig::getAgentId, agentId);
         }
-        if (status != null) {
-            wrapper.eq(WorkOrderComplianceConfig::getStatus, status);
+        if (enterpriseId != null && !enterpriseId.isEmpty()) {
+            wrapper.eq(WorkOrderComplianceConfig::getEnterpriseId, enterpriseId);
         }
-        wrapper.eq(WorkOrderComplianceConfig::getDelFlag, 0);
         wrapper.orderByDesc(WorkOrderComplianceConfig::getCreateTime);
         return this.page(page, wrapper);
     }
@@ -41,8 +44,8 @@ public class WorkOrderComplianceConfigServiceImpl
     @Override
     public WorkOrderComplianceConfig updateConfig(String id, WorkOrderComplianceConfig config) {
         WorkOrderComplianceConfig db = this.getById(id);
-        if (db != null && db.getStatus() != null && db.getStatus() == 1) {
-            throw new IllegalStateException("已启用的合规配置不允许编辑");
+        if (db != null && db.getApplyStatus() != null && db.getApplyStatus() == 1) {
+            throw new IllegalStateException("已应用的合规配置不允许编辑");
         }
         config.setId(id);
         this.updateById(config);
@@ -52,20 +55,23 @@ public class WorkOrderComplianceConfigServiceImpl
     @Override
     public void deleteConfig(String id) {
         WorkOrderComplianceConfig db = this.getById(id);
-        if (db != null && db.getStatus() != null && db.getStatus() == 1) {
-            throw new IllegalStateException("已启用的合规配置不允许删除");
+        if (db != null && db.getApplyStatus() != null && db.getApplyStatus() == 1) {
+            throw new IllegalStateException("已应用的合规配置不允许删除");
         }
         this.removeById(id);
     }
 
     @Override
-    public List<WorkOrderComplianceConfig> listForExport(String agentId, Integer status) {
+    public List<WorkOrderComplianceConfig> listForExport(String agentId, String enterpriseId, Integer applyStatus) {
         LambdaQueryWrapper<WorkOrderComplianceConfig> wrapper = new LambdaQueryWrapper<>();
         if (agentId != null && !agentId.isEmpty()) {
             wrapper.eq(WorkOrderComplianceConfig::getAgentId, agentId);
         }
-        if (status != null) {
-            wrapper.eq(WorkOrderComplianceConfig::getStatus, status);
+        if (enterpriseId != null && !enterpriseId.isEmpty()) {
+            wrapper.eq(WorkOrderComplianceConfig::getEnterpriseId, enterpriseId);
+        }
+        if (applyStatus != null) {
+            wrapper.eq(WorkOrderComplianceConfig::getApplyStatus, applyStatus);
         }
         wrapper.eq(WorkOrderComplianceConfig::getDelFlag, 0);
         wrapper.orderByDesc(WorkOrderComplianceConfig::getCreateTime);

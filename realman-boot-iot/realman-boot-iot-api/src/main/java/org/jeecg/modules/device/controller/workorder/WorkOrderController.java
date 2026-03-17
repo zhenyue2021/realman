@@ -23,7 +23,6 @@ import org.springframework.web.bind.annotation.*;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -41,7 +40,7 @@ public class WorkOrderController {
 
     @PostMapping("/page")
     @Operation(summary = "分页查询工单")
-    public ApiResult<IPage<WorkOrder>> page(HttpServletRequest request, @RequestBody WorkOrderQueryDTO query) {
+    public ApiResult<IPage<WorkOrderPageItemDTO>> page(HttpServletRequest request, @RequestBody WorkOrderQueryDTO query) {
         int pageNo = query.getPageNo() != null ? query.getPageNo() : 1;
         int pageSize = query.getPageSize() != null ? query.getPageSize() : 20;
         Page<WorkOrder> page = new Page<>(pageNo, pageSize);
@@ -49,7 +48,8 @@ public class WorkOrderController {
         if (tenantId == null || tenantId.isEmpty()) {
             throw new RuntimeException("缺少租户ID（x-tenant-id）");
         }
-        IPage<WorkOrder> result = workOrderService.pageWorkOrders(page, tenantId, query.getStatus());
+
+        IPage<WorkOrderPageItemDTO> result = workOrderApiService.pageWorkOrders(page, tenantId, query);
         return ApiResult.ok(result);
     }
 

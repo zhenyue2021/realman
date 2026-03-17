@@ -32,50 +32,35 @@ public class WorkOrderComplianceConfig implements Serializable {
     @TableField("enterprise_name")
     private String enterpriseName;
 
-    @TableField("task_name")
-    private String taskName;
-
-    @TableField("task_desc")
-    private String taskDesc;
-
-    @TableField("task_type")
-    private String taskType;
-
-    @TableField("task_level")
-    private String taskLevel;
+    @TableField("task_scene")
+    private String taskScene;
 
     @TableField("timeout_alert_enabled")
     private Integer timeoutAlertEnabled;
 
-    @TableField("timeout_alert_seconds")
-    private Integer timeoutAlertSeconds;
+    @TableField("timeout_alert_offset")
+    private String timeoutAlertOffset;
 
-    @TableField("submit_limit_enabled")
-    private Integer submitLimitEnabled;
+    @TableField("task_limit_enabled")
+    private Integer taskLimitEnabled;
 
     @TableField("acceptance_enabled")
     private Integer acceptanceEnabled;
 
-    @TableField("acceptance_image_required")
-    private Integer acceptanceImageRequired;
+    @TableField("overtime_reason_enum")
+    private String overtimeReasonEnum;
 
-    @TableField("acceptance_image_desc")
-    private String acceptanceImageDesc;
-
-    @TableField("overtime_submit_enabled")
-    private Integer overtimeSubmitEnabled;
-
-    @TableField("overtime_reason_max_len")
-    private Integer overtimeReasonMaxLen;
+    @TableField("overtime_reason_desc")
+    private String overtimeReasonDesc;
 
     @TableField("auto_close_enabled")
     private Integer autoCloseEnabled;
 
-    @TableField("auto_close_seconds")
-    private Integer autoCloseSeconds;
+    @TableField("auto_close_offset")
+    private String autoCloseOffset;
 
-    @TableField("status")
-    private Integer status;
+    @TableField("apply_status")
+    private Integer applyStatus;
 
     @TableField("create_by")
     private String createBy;

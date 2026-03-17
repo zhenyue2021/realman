@@ -71,7 +71,7 @@ public class WorkOrderSchedulerJob {
             if (cfg == null || cfg.getTimeoutAlertEnabled() == null || cfg.getTimeoutAlertEnabled() != 1) {
                 continue;
             }
-            int seconds = cfg.getTimeoutAlertSeconds() != null ? cfg.getTimeoutAlertSeconds() : 1800;
+            int seconds = parseHmsSeconds(cfg.getTimeoutAlertOffset(), 1800);
             long diff = Duration.between(now, o.getPlanEndTime()).getSeconds();
             if (diff <= 0 || diff > seconds) {
                 continue;
@@ -109,7 +109,7 @@ public class WorkOrderSchedulerJob {
         int updated = 0;
         for (WorkOrder o : candidates) {
             WorkOrderComplianceConfig cfg = configMap.get(o.getComplianceId());
-            if (cfg == null || cfg.getSubmitLimitEnabled() == null || cfg.getSubmitLimitEnabled() != 1) {
+            if (cfg == null || cfg.getTaskLimitEnabled() == null || cfg.getTaskLimitEnabled() != 1) {
                 continue;
             }
             o.setStatus("TIMEOUT");
@@ -150,7 +150,7 @@ public class WorkOrderSchedulerJob {
             if (cfg == null || cfg.getAutoCloseEnabled() == null || cfg.getAutoCloseEnabled() != 1) {
                 continue;
             }
-            int seconds = cfg.getAutoCloseSeconds() != null ? cfg.getAutoCloseSeconds() : 0;
+            int seconds = parseHmsSeconds(cfg.getAutoCloseOffset(), 0);
             if (seconds <= 0) {
                 continue;
             }
@@ -275,6 +275,27 @@ public class WorkOrderSchedulerJob {
                         .eq(WorkOrderComplianceConfig::getDelFlag, 0)
         );
         return cfgs.stream().collect(Collectors.toMap(WorkOrderComplianceConfig::getId, c -> c));
+    }
+
+    private static int parseHmsSeconds(String hms, int defaultSeconds) {
+        if (hms == null || hms.isBlank()) {
+            return defaultSeconds;
+        }
+        String[] parts = hms.trim().split(":");
+        if (parts.length != 3) {
+            return defaultSeconds;
+        }
+        try {
+            int h = Integer.parseInt(parts[0].trim());
+            int m = Integer.parseInt(parts[1].trim());
+            int s = Integer.parseInt(parts[2].trim());
+            if (h < 0 || m < 0 || s < 0) {
+                return defaultSeconds;
+            }
+            return h * 3600 + m * 60 + s;
+        } catch (Exception e) {
+            return defaultSeconds;
+        }
     }
 }
 

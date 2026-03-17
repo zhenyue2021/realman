@@ -1,6 +1,7 @@
 package org.jeecg.common.aspect;
 
 import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.parser.Feature;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -39,7 +40,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class DictAspect {
     @Lazy
-    @Autowired
+    @Autowired(required = false)
     private CommonAPI commonApi;
     @Autowired
     public RedisTemplate redisTemplate;
@@ -49,12 +50,33 @@ public class DictAspect {
 
     private static final String JAVA_UTIL_DATE = "java.util.Date";
 
+    /** 递归翻译时记录在哪个 JSON 节点、哪个字段名回填字典文本 */
+    private static class FillBackItem {
+        final JSONObject node;
+        final String fieldName;
+        final String dictCode;
+        final String value;
+
+        FillBackItem(JSONObject node, String fieldName, String dictCode, String value) {
+            this.node = node;
+            this.fieldName = fieldName;
+            this.dictCode = dictCode;
+            this.value = value;
+        }
+    }
+
     /**
      * 定义切点Pointcut
+     *
+     * 说明：
+     * 1. 保持对原有 Result 返回值的兼容（旧系统逻辑不变）
+     * 2. 额外拦截 org.jeecg.modules.device 包下所有 Controller 方法，
+     *    以便对 IoT 模块中使用自定义 ApiResult 的接口做字典翻译（在 parseDictText 中通过反射判断 ApiResult）
      */
     @Pointcut("(@within(org.springframework.web.bind.annotation.RestController) || " +
             "@within(org.springframework.stereotype.Controller) || @annotation(org.jeecg.common.aspect.annotation.AutoDict)) " +
-            "&& execution(public org.jeecg.common.api.vo.Result org.jeecg..*.*(..))")
+            "&& (execution(public org.jeecg.common.api.vo.Result org.jeecg..*.*(..)) " +
+            "|| execution(public * org.jeecg.modules.device..*.*(..)))")
     public void excudeService() {
     }
 
@@ -94,113 +116,145 @@ public class DictAspect {
      * @param result
      */
     private Object parseDictText(Object result) {
-        //if (result instanceof Result) {
-        if (true) {
-            if (((Result) result).getResult() instanceof IPage) {
-                List<JSONObject> items = new ArrayList<>();
-
-                //step.1 筛选出加了 Dict 注解的字段列表
-                List<Field> dictFieldList = new ArrayList<>();
-                // 字典数据列表， key = 字典code，value=数据列表
-                Map<String, List<String>> dataListMap = new HashMap<>(5);
-                //取出结果集
-                List<Object> records=((IPage) ((Result) result).getResult()).getRecords();
-                // 代码逻辑说明: 【VUEN-1230】 判断是否含有字典注解,没有注解返回-----
-                Boolean hasDict= checkHasDict(records);
-                if(!hasDict){
-                    return result;
-                }
-
-                log.debug(" __ 进入字典翻译切面 DictAspect —— " );
-                for (Object record : records) {
-                    String json="{}";
-                    try {
-                        //解决@JsonFormat注解解析不了的问题详见SysAnnouncement类的@JsonFormat
-                         json = objectMapper.writeValueAsString(record);
-                    } catch (JsonProcessingException e) {
-                        log.error("json解析失败"+e.getMessage(),e);
-                    }
-                    // 代码逻辑说明: 【issues/3303】restcontroller返回json数据后key顺序错乱 -----
-                    JSONObject item = JSONObject.parseObject(json, Feature.OrderedField);
-
-                    //for (Field field : record.getClass().getDeclaredFields()) {
-                    // 遍历所有字段，把字典Code取出来，放到 map 里
-                    for (Field field : oConvertUtils.getAllFields(record)) {
-                        String value = item.getString(field.getName());
-                        if (oConvertUtils.isEmpty(value)) {
-                            continue;
-                        }
-                        if (field.getAnnotation(Dict.class) != null) {
-                            if (!dictFieldList.contains(field)) {
-                                dictFieldList.add(field);
-                            }
-                            String code = field.getAnnotation(Dict.class).dicCode();
-                            String text = field.getAnnotation(Dict.class).dicText();
-                            String table = field.getAnnotation(Dict.class).dictTable();
-                            // 代码逻辑说明: [issues/#5643]解决分布式下表字典跨库无法查询问题------------
-                            String dataSource = field.getAnnotation(Dict.class).ds();
-                            List<String> dataList;
-                            String dictCode = code;
-                            if (!StringUtils.isEmpty(table)) {
-                                // 代码逻辑说明: [issues/#5643]解决分布式下表字典跨库无法查询问题------------
-                                dictCode = String.format("%s,%s,%s,%s", table, text, code, dataSource);
-                            }
-                            dataList = dataListMap.computeIfAbsent(dictCode, k -> new ArrayList<>());
-                            this.listAddAllDeduplicate(dataList, Arrays.asList(value.split(",")));
-                        }
-                        //date类型默认转换string格式化日期
-                        //if (JAVA_UTIL_DATE.equals(field.getType().getName())&&field.getAnnotation(JsonFormat.class)==null&&item.get(field.getName())!=null){
-                            //SimpleDateFormat aDate=new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-                            // item.put(field.getName(), aDate.format(new Date((Long) item.get(field.getName()))));
-                        //}
-                    }
-                    items.add(item);
-                }
-
-                //step.2 调用翻译方法，一次性翻译
-                Map<String, List<DictModel>> translText = this.translateAllDict(dataListMap);
-
-                //step.3 将翻译结果填充到返回结果里
-                for (JSONObject record : items) {
-                    for (Field field : dictFieldList) {
-                        String code = field.getAnnotation(Dict.class).dicCode();
-                        String text = field.getAnnotation(Dict.class).dicText();
-                        String table = field.getAnnotation(Dict.class).dictTable();
-                        // 自定义的字典表数据源
-                        String dataSource = field.getAnnotation(Dict.class).ds();
-                        String fieldDictCode = code;
-                        if (!StringUtils.isEmpty(table)) {
-                            // 代码逻辑说明: [issues/#5643]解决分布式下表字典跨库无法查询问题------------
-                            fieldDictCode = String.format("%s,%s,%s,%s", table, text, code, dataSource);
-                        }
-
-                        String value = record.getString(field.getName());
-                        if (oConvertUtils.isNotEmpty(value)) {
-                            List<DictModel> dictModels = translText.get(fieldDictCode);
-                            if(dictModels==null || dictModels.size()==0){
-                                continue;
-                            }
-
-                            String textValue = this.translDictText(dictModels, value);
-                            log.debug(" 字典Val : " + textValue);
-                            log.debug(" __翻译字典字段__ " + field.getName() + CommonConstant.DICT_TEXT_SUFFIX + "： " + textValue);
-
-                            // TODO-sun 测试输出，待删
-                            log.debug(" ---- dictCode: " + fieldDictCode);
-                            log.debug(" ---- value: " + value);
-                            log.debug(" ----- text: " + textValue);
-                            log.debug(" ---- dictModels: " + JSON.toJSONString(dictModels));
-
-                            record.put(field.getName() + CommonConstant.DICT_TEXT_SUFFIX, textValue);
-                        }
-                    }
-                }
-
-                ((IPage) ((Result) result).getResult()).setRecords(items);
-            }
-
+        if (result == null) {
+            return null;
         }
+
+        // 1. 旧逻辑：Result<T>（分页/列表/单对象）
+        if (result instanceof Result<?> r) {
+            Object inner = r.getResult();
+            @SuppressWarnings("unchecked")
+            Result<Object> cast = (Result<Object>) r;
+            cast.setResult(translateAny(inner));
+            return cast;
+        }
+
+        // 2. 适配 IoT 模块的 ApiResult<T>（通过反射避免直接依赖）
+        try {
+            Class<?> clazz = result.getClass();
+            if ("org.jeecg.modules.device.vo.ApiResult".equals(clazz.getName())) {
+                java.lang.reflect.Method getData = clazz.getMethod("getData");
+                Object data = getData.invoke(result);
+                Object translated = translateAny(data);
+                java.lang.reflect.Method setData = clazz.getMethod("setData", Object.class);
+                setData.invoke(result, translated);
+            }
+        } catch (Exception e) {
+            log.warn("DictAspect parse ApiResult failed: {}", e.getMessage());
+        }
+
         return result;
+    }
+
+    /**
+     * 对任意返回数据进行字典翻译：
+     * - IPage：分页记录
+     * - List：列表
+     * - 其它：单对象
+     */
+    private Object translateAny(Object data) {
+        if (data == null) {
+            return null;
+        }
+        if (data instanceof IPage<?> page) {
+            translatePage(page);
+            return page;
+        }
+        if (data instanceof List<?> list) {
+            translateList(list);
+            return list;
+        }
+        // 普通单对象
+        return translateBean(data);
+    }
+
+    /**
+     * 对分页数据中的记录做字典翻译
+     */
+    private void translatePage(IPage<?> page) {
+        List<?> records = page.getRecords();
+        List<JSONObject> items = translateRecords(records);
+        if (items != null) {
+            // raw type 警告可以忽略，底层序列化支持 JSONObject
+            ((IPage) page).setRecords(items);
+        }
+    }
+
+    /**
+     * 对列表中的每个元素做字典翻译
+     */
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private void translateList(List list) {
+        if (list == null || list.isEmpty()) {
+            return;
+        }
+        List<JSONObject> items = translateRecords(list);
+        if (items == null) {
+            return;
+        }
+        list.clear();
+        list.addAll(items);
+    }
+
+    /**
+     * 对单个对象做字典翻译
+     */
+    private Object translateBean(Object bean) {
+        List<Object> single = new ArrayList<>();
+        single.add(bean);
+        List<JSONObject> items = translateRecords(single);
+        if (items == null || items.isEmpty()) {
+            return bean;
+        }
+        return items.get(0);
+    }
+
+    /**
+     * 核心翻译逻辑：将记录列表中的 @Dict 字段（含嵌套对象、嵌套 List）翻译为 *_dictText
+     */
+    @SuppressWarnings("unchecked")
+    private List<JSONObject> translateRecords(List<?> records) {
+        if (records == null || records.isEmpty()) {
+            return null;
+        }
+
+        // 【VUEN-1230】 判断是否含有字典注解（含嵌套），没有注解返回 null
+        Boolean hasDict = checkHasDictRecursive((List<Object>) records);
+        if (!hasDict) {
+            return null;
+        }
+
+        List<JSONObject> items = new ArrayList<>();
+        Map<String, List<String>> dataListMap = new HashMap<>(5);
+        List<FillBackItem> fillBackList = new ArrayList<>();
+        Set<Object> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+
+        log.debug(" __ 进入字典翻译切面 DictAspect —— " );
+        for (Object record : records) {
+            String json = "{}";
+            try {
+                json = objectMapper.writeValueAsString(record);
+            } catch (JsonProcessingException e) {
+                log.error("json解析失败" + e.getMessage(), e);
+            }
+            JSONObject item = JSONObject.parseObject(json, Feature.OrderedField);
+            items.add(item);
+            collectDictFromBean(record, item, dataListMap, fillBackList, visited);
+        }
+
+        Map<String, List<DictModel>> translText = this.translateAllDict(dataListMap);
+
+        for (FillBackItem fb : fillBackList) {
+            List<DictModel> dictModels = translText.get(fb.dictCode);
+            if (dictModels == null || dictModels.isEmpty()) {
+                continue;
+            }
+            String textValue = this.translDictText(dictModels, fb.value);
+            log.debug(" __翻译字典字段__ " + fb.fieldName + CommonConstant.DICT_TEXT_SUFFIX + "： " + textValue);
+            fb.node.put(fb.fieldName + CommonConstant.DICT_TEXT_SUFFIX, textValue);
+        }
+
+        return items;
     }
 
     /**
@@ -210,6 +264,115 @@ public class DictAspect {
         // 筛选出dataList中没有的数据
         List<String> filterList = addList.stream().filter(i -> !dataList.contains(i)).collect(Collectors.toList());
         dataList.addAll(filterList);
+    }
+
+    /** 从 JSON 或 Java 取值转为字符串（兼容数字等非字符串类型） */
+    private static String getDictValueString(Object jsonVal, Object fieldVal) {
+        if (jsonVal != null) {
+            return String.valueOf(jsonVal);
+        }
+        return fieldVal != null ? String.valueOf(fieldVal) : null;
+    }
+
+    /** 是否为需要递归扫描的 bean 类型（排除基本类型、String、数字、日期、Map、List 等） */
+    private static boolean isBeanType(Object obj) {
+        if (obj == null) {
+            return false;
+        }
+        Class<?> c = obj.getClass();
+        if (c.isPrimitive() || c.isEnum()) {
+            return false;
+        }
+        if (c == String.class || c == Boolean.class || Boolean.TYPE == c) {
+            return false;
+        }
+        if (Number.class.isAssignableFrom(c) || Integer.TYPE == c || Long.TYPE == c || Double.TYPE == c || Float.TYPE == c) {
+            return false;
+        }
+        if (Date.class.isAssignableFrom(c)) {
+            return false;
+        }
+        if (Map.class.isAssignableFrom(c) || List.class.isAssignableFrom(c)) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * 递归收集当前 bean 及嵌套对象、列表中的 @Dict 字段，并回填到对应 JSON 节点
+     */
+    private void collectDictFromBean(Object bean, JSONObject jsonNode,
+                                     Map<String, List<String>> dataListMap,
+                                     List<FillBackItem> fillBackList,
+                                     Set<Object> visited) {
+        if (bean == null || jsonNode == null || visited.contains(bean)) {
+            return;
+        }
+        visited.add(bean);
+        try {
+            for (Field field : oConvertUtils.getAllFields(bean)) {
+                field.setAccessible(true);
+                Object fv;
+                try {
+                    fv = field.get(bean);
+                } catch (Exception e) {
+                    log.trace("get field {} failed: {}", field.getName(), e.getMessage());
+                    continue;
+                }
+                Object jv = jsonNode.get(field.getName());
+                Dict dict = field.getAnnotation(Dict.class);
+                if (dict != null) {
+                    String value = getDictValueString(jv, fv);
+                    if (oConvertUtils.isNotEmpty(value)) {
+                        String code = dict.dicCode();
+                        String text = dict.dicText();
+                        String table = dict.dictTable();
+                        String dataSource = dict.ds();
+                        String dictCode = StringUtils.isEmpty(table) ? code : String.format("%s,%s,%s,%s", table, text, code, dataSource);
+                        List<String> dataList = dataListMap.computeIfAbsent(dictCode, k -> new ArrayList<>());
+                        listAddAllDeduplicate(dataList, Arrays.asList(value.split(",")));
+                        fillBackList.add(new FillBackItem(jsonNode, field.getName(), dictCode, value));
+                    }
+                    continue;
+                }
+                if (fv instanceof List && jv instanceof JSONArray) {
+                    List<?> list = (List<?>) fv;
+                    JSONArray arr = (JSONArray) jv;
+                    for (int i = 0; i < list.size() && i < arr.size(); i++) {
+                        processValue(list.get(i), arr.get(i), dataListMap, fillBackList, visited);
+                    }
+                    continue;
+                }
+                if (isBeanType(fv) && jv instanceof JSONObject) {
+                    collectDictFromBean(fv, (JSONObject) jv, dataListMap, fillBackList, visited);
+                }
+            }
+        } finally {
+            visited.remove(bean);
+        }
+    }
+
+    /**
+     * 处理单个值：可能是 bean 或 list，递归收集 @Dict 并回填
+     */
+    private void processValue(Object javaVal, Object jsonVal,
+                              Map<String, List<String>> dataListMap,
+                              List<FillBackItem> fillBackList,
+                              Set<Object> visited) {
+        if (javaVal == null) {
+            return;
+        }
+        if (javaVal instanceof List && jsonVal instanceof JSONArray) {
+            List<?> list = (List<?>) javaVal;
+            JSONArray arr = (JSONArray) jsonVal;
+            for (int i = 0; i < list.size() && i < arr.size(); i++) {
+                processValue(list.get(i), arr.get(i), dataListMap, fillBackList, visited);
+            }
+            return;
+        }
+        if (isBeanType(javaVal) && jsonVal instanceof JSONObject) {
+            collectDictFromBean(javaVal, (JSONObject) jsonVal, dataListMap, fillBackList, visited);
+        }
     }
 
     /**
@@ -222,6 +385,10 @@ public class DictAspect {
     private Map<String, List<DictModel>> translateAllDict(Map<String, List<String>> dataListMap) {
         // 翻译后的字典文本，key=dictCode
         Map<String, List<DictModel>> translText = new HashMap<>(5);
+        // 当前服务未引入系统字典服务（CommonAPI）时，直接跳过翻译，避免启动/运行报错
+        if (commonApi == null) {
+            return translText;
+        }
         // 需要翻译的数据（有些可以从redis缓存中获取，就不走数据库查询）
         List<String> needTranslData = new ArrayList<>();
         //step.1 先通过redis中获取缓存字典数据
@@ -418,19 +585,63 @@ public class DictAspect {
     }
 
     /**
-     * 检测返回结果集中是否包含Dict注解
-     * @param records
-     * @return
+     * 检测返回结果集中是否包含 Dict 注解（含嵌套对象、嵌套 List）
      */
-    private Boolean checkHasDict(List<Object> records){
-        if(oConvertUtils.isNotEmpty(records) && records.size()>0){
-            for (Field field : oConvertUtils.getAllFields(records.get(0))) {
-                if (oConvertUtils.isNotEmpty(field.getAnnotation(Dict.class))) {
-                    return true;
-                }
+    private Boolean checkHasDictRecursive(List<Object> records) {
+        if (records == null || records.isEmpty()) {
+            return false;
+        }
+        Set<Object> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (Object record : records) {
+            if (checkHasDictInObject(record, visited)) {
+                return true;
             }
         }
         return false;
+    }
+
+    private Boolean checkHasDictInObject(Object obj, Set<Object> visited) {
+        if (obj == null || visited.contains(obj)) {
+            return false;
+        }
+        visited.add(obj);
+        try {
+            if (obj instanceof List) {
+                for (Object e : (List<?>) obj) {
+                    if (checkHasDictInObject(e, visited)) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+            if (!isBeanType(obj)) {
+                return false;
+            }
+            for (Field field : oConvertUtils.getAllFields(obj)) {
+                if (field.getAnnotation(Dict.class) != null) {
+                    return true;
+                }
+                field.setAccessible(true);
+                Object fv;
+                try {
+                    fv = field.get(obj);
+                } catch (Exception e) {
+                    continue;
+                }
+                if (fv instanceof List) {
+                    for (Object e : (List<?>) fv) {
+                        if (checkHasDictInObject(e, visited)) {
+                            return true;
+                        }
+                    }
+                } else if (isBeanType(fv) && checkHasDictInObject(fv, visited)) {
+                    return true;
+                }
+            }
+            return false;
+        } finally {
+            visited.remove(obj);
+        }
     }
 
 }

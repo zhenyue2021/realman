@@ -1,11 +1,32 @@
 package org.jeecg.modules.device.dto.workorder;
 
 import lombok.Data;
+import org.jeecg.common.aspect.annotation.Dict;
 
 import java.util.List;
 
 @Data
 public class WorkOrderDetailDTO {
+
+    /**
+     * 工单任务名称
+     */
+    private String taskName;
+
+    /**
+     * 币种（如 CNY / USD）
+     */
+    private String currency;
+
+    /**
+     * 单价
+     */
+    private String unitPrice;
+
+    /**
+     * 总价
+     */
+    private String totalPrice;
 
     private String agentId;
 
@@ -23,6 +44,7 @@ public class WorkOrderDetailDTO {
 
     private String planEndTime;
 
+    @Dict(dicCode = "order_status")
     private String status;
 
     private String auditResult;

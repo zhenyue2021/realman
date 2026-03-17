@@ -6,6 +6,7 @@ import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
+import org.springframework.cloud.openfeign.EnableFeignClients;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.core.env.ConfigurableEnvironment;
@@ -34,6 +35,7 @@ import java.net.UnknownHostException;
  *   以便加载 realman-boot-base-core 中的 ShiroConfig、ShiroRealm 等安全配置。
  */
 @EnableDiscoveryClient
+@EnableFeignClients(basePackages = "org.jeecg.common.system.api")
 @SpringBootApplication(exclude = {DynamicDataSourceAutoConfiguration.class})
 @ComponentScan(basePackages = "org.jeecg", excludeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = MybatisPlusSaasConfig.class))
 @MapperScan({"org.jeecg.modules.device.mapper", "org.jeecg.modules.base.mapper"})

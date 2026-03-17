@@ -8,6 +8,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
@@ -19,6 +20,9 @@ public class WorkOrder implements Serializable {
 
     @TableId
     private String id;
+
+    @TableField("task_name")
+    private String taskName;
 
     @TableField("agent_id")
     private String agentId;
@@ -34,6 +38,15 @@ public class WorkOrder implements Serializable {
 
     @TableField("compliance_id")
     private String complianceId;
+
+    @TableField("currency")
+    private String currency;
+
+    @TableField("unit_price")
+    private BigDecimal unitPrice;
+
+    @TableField("total_price")
+    private BigDecimal totalPrice;
 
     @TableField("remark")
     private String remark;

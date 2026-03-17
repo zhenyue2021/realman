@@ -9,6 +9,8 @@ import lombok.RequiredArgsConstructor;
 import org.jeecg.common.exception.JeecgBootException;
 import org.jeecg.common.system.util.JwtUtil;
 import org.jeecg.modules.device.api.WorkOrderComplianceApiService;
+import org.jeecg.modules.device.dto.workorder.WorkOrderComplianceConfigDetailDTO;
+import org.jeecg.modules.device.dto.workorder.WorkOrderComplianceConfigPageVo;
 import org.jeecg.modules.device.dto.workorder.WorkOrderComplianceQueryDTO;
 import org.jeecg.modules.device.entity.workorder.WorkOrderComplianceConfig;
 import org.jeecg.modules.device.vo.ApiResult;
@@ -34,10 +36,10 @@ public class WorkOrderComplianceController {
 
     @PostMapping("/page")
     @Operation(summary = "分页查询工单合规配置")
-    public ApiResult<IPage<WorkOrderComplianceConfig>> page(@RequestBody WorkOrderComplianceQueryDTO query) {
+    public ApiResult<IPage<WorkOrderComplianceConfigPageVo>> page(@RequestBody WorkOrderComplianceQueryDTO query) {
         int pageNo = query.getPageNo() != null ? query.getPageNo() : 1;
         int pageSize = query.getPageSize() != null ? query.getPageSize() : 20;
-        Page<WorkOrderComplianceConfig> page = new Page<>(pageNo, pageSize);
+        Page<WorkOrderComplianceConfigPageVo> page = new Page<>(pageNo, pageSize);
         return ApiResult.ok(apiService.pageConfigs(page, query));
     }
 
@@ -52,6 +54,12 @@ public class WorkOrderComplianceController {
         }
         WorkOrderComplianceConfig created = apiService.create(config, operator);
         return ApiResult.ok(created);
+    }
+
+    @GetMapping("/{id}")
+    @Operation(summary = "工单合规配置详情")
+    public ApiResult<WorkOrderComplianceConfigDetailDTO> detail(@PathVariable String id) {
+        return ApiResult.ok(apiService.detail(id));
     }
 
     @PutMapping("/{id}")

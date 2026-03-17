@@ -23,13 +23,17 @@ public final class WorkOrderExcelExportUtil {
             Sheet sheet = wb.createSheet("工单合规配置");
             CellStyle headerStyle = headerStyle(wb);
             String[] headers = {
-                    "配置ID", "代理商", "企业", "任务名称", "任务描述", "任务类型", "任务级别",
-                    "超时提醒启用", "提前秒数",
-                    "提交时限启用",
-                    "验收启用", "必须图片", "图片说明",
-                    "超时提交启用", "超时原因最大字数",
-                    "自动关闭启用", "自动关闭秒数",
-                    "状态", "创建时间", "更新时间"
+                    "规则ID",
+                    "代理商ID", "代理商名称",
+                    "企业ID", "企业名称",
+                    "任务场景",
+                    "是否自动预警", "自动预警配置时间(H:M:S)",
+                    "是否有任务时限",
+                    "工单是否需要验收",
+                    "超时提交原因(枚举)", "超时提交描述",
+                    "超时未提交策略", "超时未提交策略时长(H:M:S)",
+                    "应用状态",
+                    "创建时间", "更新时间"
             };
             writeHeader(sheet, headers, headerStyle);
 
@@ -37,25 +41,22 @@ public final class WorkOrderExcelExportUtil {
             for (WorkOrderComplianceConfig c : list) {
                 Row row = sheet.createRow(rowNum++);
                 setCell(row, 0, c.getId());
-                setCell(row, 1, c.getAgentName());
-                setCell(row, 2, c.getEnterpriseName());
-                setCell(row, 3, c.getTaskName());
-                setCell(row, 4, c.getTaskDesc());
-                setCell(row, 5, c.getTaskType());
-                setCell(row, 6, c.getTaskLevel());
-                setCell(row, 7, flagStr(c.getTimeoutAlertEnabled()));
-                setCell(row, 8, intStr(c.getTimeoutAlertSeconds()));
-                setCell(row, 9, flagStr(c.getSubmitLimitEnabled()));
-                setCell(row, 10, flagStr(c.getAcceptanceEnabled()));
-                setCell(row, 11, flagStr(c.getAcceptanceImageRequired()));
-                setCell(row, 12, c.getAcceptanceImageDesc());
-                setCell(row, 13, flagStr(c.getOvertimeSubmitEnabled()));
-                setCell(row, 14, intStr(c.getOvertimeReasonMaxLen()));
-                setCell(row, 15, flagStr(c.getAutoCloseEnabled()));
-                setCell(row, 16, intStr(c.getAutoCloseSeconds()));
-                setCell(row, 17, c.getStatus() != null && c.getStatus() == 1 ? "已启用" : "未启用");
-                setCell(row, 18, format(c.getCreateTime()));
-                setCell(row, 19, format(c.getUpdateTime()));
+                setCell(row, 1, c.getAgentId());
+                setCell(row, 2, c.getAgentName());
+                setCell(row, 3, c.getEnterpriseId());
+                setCell(row, 4, c.getEnterpriseName());
+                setCell(row, 5, c.getTaskScene());
+                setCell(row, 6, flagStr(c.getTimeoutAlertEnabled()));
+                setCell(row, 7, c.getTimeoutAlertOffset());
+                setCell(row, 8, flagStr(c.getTaskLimitEnabled()));
+                setCell(row, 9, flagStr(c.getAcceptanceEnabled()));
+                setCell(row, 10, c.getOvertimeReasonEnum());
+                setCell(row, 11, c.getOvertimeReasonDesc());
+                setCell(row, 12, flagStr(c.getAutoCloseEnabled()));
+                setCell(row, 13, c.getAutoCloseOffset());
+                setCell(row, 14, c.getApplyStatus() != null && c.getApplyStatus() == 1 ? "已应用" : "未应用");
+                setCell(row, 15, format(c.getCreateTime()));
+                setCell(row, 16, format(c.getUpdateTime()));
             }
             autoSizeColumns(sheet, headers.length);
             wb.write(out);
@@ -71,7 +72,8 @@ public final class WorkOrderExcelExportUtil {
             Sheet sheet = wb.createSheet("工单列表");
             CellStyle headerStyle = headerStyle(wb);
             String[] headers = {
-                    "工单ID", "代理商", "部门", "合规配置ID",
+                    "工单ID", "工单任务名称", "代理商", "部门", "合规配置ID",
+                    "币种", "单价", "总价",
                     "计划开始时间", "计划结束时间", "状态", "审核结果",
                     "操作员", "操作员电话",
                     "实际开始时间", "提交时间",
@@ -86,27 +88,31 @@ public final class WorkOrderExcelExportUtil {
             for (WorkOrder o : list) {
                 Row row = sheet.createRow(rowNum++);
                 setCell(row, 0, o.getId());
-                setCell(row, 1, o.getAgentName());
-                setCell(row, 2, o.getDepartmentName());
-                setCell(row, 3, o.getComplianceId());
-                setCell(row, 4, format(o.getPlanStartTime()));
-                setCell(row, 5, format(o.getPlanEndTime()));
-                setCell(row, 6, o.getStatus());
-                setCell(row, 7, o.getAuditResult());
-                setCell(row, 8, o.getOperatorName());
-                setCell(row, 9, o.getOperatorPhone());
-                setCell(row, 10, format(o.getActualStartTime()));
-                setCell(row, 11, format(o.getSubmitTime()));
-                setCell(row, 12, o.getTimeoutReasonSource());
-                setCell(row, 13, o.getTimeoutReason());
-                setCell(row, 14, o.getAuditBy());
-                setCell(row, 15, format(o.getAuditTime()));
-                setCell(row, 16, o.getAuditComment());
-                setCell(row, 17, o.getCloseBy());
-                setCell(row, 18, format(o.getCloseTime()));
-                setCell(row, 19, o.getCloseReason());
-                setCell(row, 20, o.getCreateBy());
-                setCell(row, 21, format(o.getCreateTime()));
+                setCell(row, 1, o.getTaskName());
+                setCell(row, 2, o.getAgentName());
+                setCell(row, 3, o.getDepartmentName());
+                setCell(row, 4, o.getComplianceId());
+                setCell(row, 5, o.getCurrency());
+                setCell(row, 6, o.getUnitPrice() != null ? o.getUnitPrice().toPlainString() : null);
+                setCell(row, 7, o.getTotalPrice() != null ? o.getTotalPrice().toPlainString() : null);
+                setCell(row, 8, format(o.getPlanStartTime()));
+                setCell(row, 9, format(o.getPlanEndTime()));
+                setCell(row, 10, o.getStatus());
+                setCell(row, 11, o.getAuditResult());
+                setCell(row, 12, o.getOperatorName());
+                setCell(row, 13, o.getOperatorPhone());
+                setCell(row, 14, format(o.getActualStartTime()));
+                setCell(row, 15, format(o.getSubmitTime()));
+                setCell(row, 16, o.getTimeoutReasonSource());
+                setCell(row, 17, o.getTimeoutReason());
+                setCell(row, 18, o.getAuditBy());
+                setCell(row, 19, format(o.getAuditTime()));
+                setCell(row, 20, o.getAuditComment());
+                setCell(row, 21, o.getCloseBy());
+                setCell(row, 22, format(o.getCloseTime()));
+                setCell(row, 23, o.getCloseReason());
+                setCell(row, 24, o.getCreateBy());
+                setCell(row, 25, format(o.getCreateTime()));
             }
             autoSizeColumns(sheet, headers.length);
             wb.write(out);
@@ -145,10 +151,6 @@ public final class WorkOrderExcelExportUtil {
     private static String flagStr(Integer v) {
         if (v == null) return "";
         return v == 1 ? "是" : "否";
-    }
-
-    private static String intStr(Integer v) {
-        return v != null ? String.valueOf(v) : "";
     }
 
     private static void autoSizeColumns(Sheet sheet, int colCount) {

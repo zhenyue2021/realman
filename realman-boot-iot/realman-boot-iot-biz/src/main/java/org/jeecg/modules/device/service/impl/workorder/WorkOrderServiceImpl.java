@@ -226,9 +226,13 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
         }
         existing.setAgentId(updated.getAgentId());
         existing.setAgentName(updated.getAgentName());
+        existing.setTaskName(updated.getTaskName());
         existing.setDepartmentId(updated.getDepartmentId());
         existing.setDepartmentName(updated.getDepartmentName());
         existing.setComplianceId(updated.getComplianceId());
+        existing.setCurrency(updated.getCurrency());
+        existing.setUnitPrice(updated.getUnitPrice());
+        existing.setTotalPrice(updated.getTotalPrice());
         existing.setRemark(updated.getRemark());
         existing.setPlanStartTime(updated.getPlanStartTime());
         existing.setPlanEndTime(updated.getPlanEndTime());

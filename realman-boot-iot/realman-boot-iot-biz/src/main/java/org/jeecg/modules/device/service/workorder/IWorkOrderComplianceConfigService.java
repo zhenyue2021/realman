@@ -9,7 +9,10 @@ import java.util.List;
 
 public interface IWorkOrderComplianceConfigService extends IService<WorkOrderComplianceConfig> {
 
-    IPage<WorkOrderComplianceConfig> pageConfigs(Page<WorkOrderComplianceConfig> page, String agentId, Integer status);
+    IPage<WorkOrderComplianceConfig> pageConfigs(Page<WorkOrderComplianceConfig> page,
+                                                 String agentId,
+                                                 String enterpriseId,
+                                                 Integer applyStatus);
 
     WorkOrderComplianceConfig createConfig(WorkOrderComplianceConfig config);
 
@@ -17,6 +20,6 @@ public interface IWorkOrderComplianceConfigService extends IService<WorkOrderCom
 
     void deleteConfig(String id);
 
-    List<WorkOrderComplianceConfig> listForExport(String agentId, Integer status);
+    List<WorkOrderComplianceConfig> listForExport(String agentId, String enterpriseId, Integer applyStatus);
 }
 

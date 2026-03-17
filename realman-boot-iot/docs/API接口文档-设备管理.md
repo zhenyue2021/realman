@@ -436,8 +436,8 @@ MasterLoginResolveVO：loginLogId、controller（IotDevice）、currentRobot（R
 ### 7.1 分页查询工单
 
 - **接口**: `POST /api/work-order/page`
-- **请求体**: `WorkOrderQueryDTO` — pageNo、pageSize、agentId、status
-- **响应**: `ApiResult<IPage<WorkOrder>>`
+- **请求体**: `WorkOrderQueryDTO` — pageNo、pageSize、agentId、status、workOrderId、taskName、operatorId、operatorName、controllerCode、robotCode、planStartTimeBegin/End、planEndTimeBegin/End、currency
+- **响应**: `ApiResult<IPage<WorkOrderPageItemDTO>>`
 
 ### 7.2 导出工单列表 Excel
 
@@ -448,14 +448,14 @@ MasterLoginResolveVO：loginLogId、controller（IotDevice）、currentRobot（R
 ### 7.3 创建工单
 
 - **接口**: `POST /api/work-order`
-- **请求体**: `WorkOrderCreateDTO` — agentId、agentName、departmentId、departmentName、complianceId、remark、planStartTime、planEndTime、devices（List<WorkOrderDeviceDTO>）
+- **请求体**: `WorkOrderCreateDTO` — taskName、agentId、agentName、departmentId、departmentName、complianceId、currency、unitPrice、totalPrice、remark、planStartTime、planEndTime、devices（List<WorkOrderDeviceDTO>）
 - **WorkOrderDeviceDTO**: deviceType、deviceId、deviceName、deviceCode、actualDeviceId、actualDeviceName、actualDeviceCode
 - **响应**: `ApiResult<WorkOrder>`
 
 ### 7.4 工单详情
 
 - **接口**: `GET /api/work-order/{id}`
-- **响应**: `ApiResult<WorkOrder>`
+- **响应**: `ApiResult<WorkOrderDetailDTO>`
 
 ### 7.5 开始工单
 
@@ -506,7 +506,7 @@ MasterLoginResolveVO：loginLogId、controller（IotDevice）、currentRobot（R
 ### 8.1 分页查询工单合规配置
 
 - **接口**: `POST /api/work-order/compliance/page`
-- **请求体**: `WorkOrderComplianceQueryDTO` — pageNo、pageSize、agentId、status
+- **请求体**: `WorkOrderComplianceQueryDTO` — pageNo、pageSize、agentId、enterpriseId、applyStatus
 - **响应**: `ApiResult<IPage<WorkOrderComplianceConfig>>`
 
 ### 8.2 新增工单合规配置
@@ -518,12 +518,12 @@ MasterLoginResolveVO：loginLogId、controller（IotDevice）、currentRobot（R
 ### 8.3 修改工单合规配置
 
 - **接口**: `PUT /api/work-order/compliance/{id}`
-- **请求体**: `WorkOrderComplianceConfig`（已启用的不允许编辑）
+- **请求体**: `WorkOrderComplianceConfig`（已应用的不允许编辑）
 - **响应**: `ApiResult<WorkOrderComplianceConfig>`
 
 ### 8.4 删除工单合规配置（逻辑删除）
 
-- **接口**: `DELETE /api/work-order/compliance/{id}`（已启用的不允许删除）
+- **接口**: `DELETE /api/work-order/compliance/{id}`（已应用的不允许删除）
 - **响应**: `ApiResult<Void>`
 
 ### 8.5 导出工单合规配置 Excel
@@ -566,7 +566,7 @@ MasterLoginResolveVO：loginLogId、controller（IotDevice）、currentRobot（R
 
 ### WorkOrder（工单）常用字段
 
-id、agentId、agentName、departmentId、departmentName、complianceId、remark、planStartTime、planEndTime、status（如 PENDING/IN_PROGRESS/SUBMITTED 等）、auditResult、operatorId、operatorName、operatorPhone、actualStartTime、submitTime、timeoutReason、auditBy、auditTime、auditComment、closeBy、closeTime、closeReason、createTime、updateTime。
+id、taskName、agentId、agentName、departmentId、departmentName、complianceId、currency、unitPrice、totalPrice、remark、planStartTime、planEndTime、status（如 PENDING/STARTED/SUBMITTED/COMPLETED/TIMEOUT/CLOSED）、auditResult、operatorId、operatorName、operatorPhone、actualStartTime、submitTime、timeoutReason、auditBy、auditTime、auditComment、closeBy、closeTime、closeReason、createTime、updateTime。
 
 ### IotDeviceAuth（设备授权）常用字段
 

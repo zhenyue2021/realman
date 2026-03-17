@@ -11,6 +11,11 @@ public class WorkOrderComplianceQueryDTO {
 
     private String agentId;
 
-    private Integer status;
+    private String enterpriseId;
+
+    /**
+     * 应用状态：0-未应用 1-已应用
+     */
+    private Integer applyStatus;
 }
 
