@@ -87,16 +87,6 @@ public class MasterDeviceController {
         return ApiResult.ok(deviceService.queryDevicePage(new Page<>(pageNo, pageSize), requestDTO));
     }
 
-    /** 查询主控设备详情 */
-    @GetMapping("/{controllerId}")
-    @Operation(summary = "查询主控设备详情")
-    public ApiResult<IotDevice> detail(@PathVariable String controllerId) {
-        IotDevice d = deviceService.getById(controllerId);
-        if (d != null && !Objects.equals(d.getDeviceType(), DEVICE_TYPE_CONTROLLER)) {
-            throw new RuntimeException("设备类型不匹配：该ID不是主控设备");
-        }
-        return ApiResult.ok(d);
-    }
 
     /** 查询主控设备详情（聚合） */
     @GetMapping("/{controllerId}/detail")
