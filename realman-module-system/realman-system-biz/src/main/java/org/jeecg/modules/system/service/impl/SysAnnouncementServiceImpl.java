@@ -12,6 +12,7 @@ import org.apache.shiro.SecurityUtils;
 import org.jeecg.common.constant.CommonConstant;
 import org.jeecg.common.system.vo.LoginUser;
 import org.jeecg.common.util.FileDownloadUtils;
+import org.jeecg.common.util.ContentDispositionUtil;
 import org.jeecg.common.util.filter.SsrfFileTypeFilter;
 import org.jeecg.common.util.oConvertUtils;
 import org.jeecg.config.JeecgBaseConfig;
@@ -32,7 +33,6 @@ import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.*;
-import java.net.URLEncoder;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.SynchronousQueue;
@@ -289,9 +289,8 @@ public class SysAnnouncementServiceImpl extends ServiceImpl<SysAnnouncementMappe
 		ZipArchiveOutputStream zous = null;
 		try {
 			// 生成ZIP文件名：使用文章标题+时间戳避免重名
-			String title = sysAnnouncement.getTitile() + new Date().getTime();
-			String zipName = URLEncoder.encode( title + ".zip", "UTF-8").replaceAll("\\+", "%20");
-			response.setHeader("Content-Disposition", "attachment;filename*=utf-8''" + zipName);
+			String title = sysAnnouncement.getTitile() + new Date().getTime() + ".zip";
+			response.setHeader("Content-Disposition", ContentDispositionUtil.attachment(title));
 			// 创建ZIP输出流：直接输出到HTTP响应流
 			zous = new ZipArchiveOutputStream(response.getOutputStream());
 			zous.setUseZip64(Zip64Mode.AsNeeded);// 支持大文件

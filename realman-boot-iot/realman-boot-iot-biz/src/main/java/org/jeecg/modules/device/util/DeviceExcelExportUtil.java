@@ -1,6 +1,7 @@
 package org.jeecg.modules.device.util;
 
 import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.streaming.SXSSFSheet;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
 import org.jeecg.modules.device.entity.MasterOperationRecord;
 import org.jeecg.modules.device.entity.IotDevice;
@@ -71,7 +72,7 @@ public final class DeviceExcelExportUtil {
 
             String[] headers = {"授权ID", "租户ID", "租户名称", "企业ID", "企业名称",
                     "主控端ID", "主控端编码", "机器人ID", "机器人编码",
-                    "管理账号ID", "管理账号",
+                    "管理账号ID", "管理账号名称",
                     "生效时间", "失效时间", "状态", "创建时间"};
             writeHeader(sheet, headers, headerStyle);
 
@@ -191,6 +192,10 @@ public final class DeviceExcelExportUtil {
     }
 
     private static void autoSizeColumns(Sheet sheet, int colCount) {
+        // SXSSF 需要先显式开启列跟踪，否则 autoSizeColumn 会抛 IllegalStateException
+        if (sheet instanceof SXSSFSheet sxssfSheet) {
+            sxssfSheet.trackAllColumnsForAutoSizing();
+        }
         for (int i = 0; i < colCount; i++) {
             sheet.autoSizeColumn(i);
         }

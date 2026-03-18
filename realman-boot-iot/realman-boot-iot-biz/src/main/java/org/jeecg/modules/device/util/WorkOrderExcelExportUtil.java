@@ -1,6 +1,7 @@
 package org.jeecg.modules.device.util;
 
 import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.streaming.SXSSFSheet;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
 import org.jeecg.modules.device.entity.workorder.WorkOrder;
 import org.jeecg.modules.device.entity.workorder.WorkOrderComplianceConfig;
@@ -154,6 +155,10 @@ public final class WorkOrderExcelExportUtil {
     }
 
     private static void autoSizeColumns(Sheet sheet, int colCount) {
+        // SXSSF 需要先显式开启列跟踪，否则 autoSizeColumn 会抛 IllegalStateException
+        if (sheet instanceof SXSSFSheet sxssfSheet) {
+            sxssfSheet.trackAllColumnsForAutoSizing();
+        }
         for (int i = 0; i < colCount; i++) {
             sheet.autoSizeColumn(i);
         }

@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.jeecg.common.exception.JeecgBootException;
 import org.jeecg.common.system.util.JwtUtil;
+import org.jeecg.common.util.ContentDispositionUtil;
 import org.jeecg.modules.device.api.WorkOrderApiService;
 import org.jeecg.modules.device.dto.workorder.*;
 import org.jeecg.modules.device.entity.workorder.WorkOrder;
@@ -20,8 +21,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -65,8 +64,7 @@ public class WorkOrderController {
         String filename = "work_order_" + System.currentTimeMillis() + ".xlsx";
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .header(HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename*=UTF-8''" + URLEncoder.encode(filename, StandardCharsets.UTF_8))
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDispositionUtil.attachment(filename))
                 .body(bytes);
     }
 

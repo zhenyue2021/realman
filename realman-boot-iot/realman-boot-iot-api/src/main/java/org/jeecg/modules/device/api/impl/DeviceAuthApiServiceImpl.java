@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.common.exception.JeecgBootException;
+import org.jeecg.common.util.ContentDispositionUtil;
 import org.jeecg.common.system.util.JwtUtil;
 import org.jeecg.modules.device.api.DeviceAuthApiService;
 import org.jeecg.modules.device.dto.DeviceAuthDTO;
@@ -28,8 +29,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -141,11 +140,10 @@ public class DeviceAuthApiServiceImpl implements DeviceAuthApiService {
         String username = safeUsername(request);
         boolean superAdmin = "admin".equalsIgnoreCase(username);
         byte[] bytes = authService.exportAuthList(query, username, superAdmin);
-        String filename = "device_auth_" + System.currentTimeMillis() + ".xlsx";
+        String filename = "设备授权管理_" + System.currentTimeMillis() + ".xlsx";
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .header(HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename*=UTF-8''" + URLEncoder.encode(filename, StandardCharsets.UTF_8))
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDispositionUtil.attachment(filename))
                 .body(bytes);
     }
 

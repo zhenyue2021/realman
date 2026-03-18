@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.jeecg.common.exception.JeecgBootException;
 import org.jeecg.common.system.util.JwtUtil;
+import org.jeecg.common.util.ContentDispositionUtil;
 import org.jeecg.modules.device.api.WorkOrderComplianceApiService;
 import org.jeecg.modules.device.dto.workorder.WorkOrderComplianceConfigDetailDTO;
 import org.jeecg.modules.device.dto.workorder.WorkOrderComplianceConfigPageVo;
@@ -19,8 +20,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 /**
@@ -43,7 +42,7 @@ public class WorkOrderComplianceController {
         return ApiResult.ok(apiService.pageConfigs(page, query));
     }
 
-    @PostMapping
+    @PostMapping("/add")
     @Operation(summary = "新增工单合规配置")
     public ApiResult<WorkOrderComplianceConfig> create(@RequestBody WorkOrderComplianceConfig config,
                                                        HttpServletRequest request) {
@@ -91,8 +90,7 @@ public class WorkOrderComplianceController {
         String filename = "work_order_compliance_" + System.currentTimeMillis() + ".xlsx";
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .header(HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename*=UTF-8''" + URLEncoder.encode(filename, StandardCharsets.UTF_8))
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDispositionUtil.attachment(filename))
                 .body(bytes);
     }
 }
