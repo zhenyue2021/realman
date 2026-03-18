@@ -1,6 +1,8 @@
 package org.jeecg.modules.device.controller;
 
+import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -19,6 +21,7 @@ import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.service.IIotDeviceService;
 import org.jeecg.modules.device.vo.ApiResult;
 import org.jeecg.modules.device.vo.DeviceDetailVO;
+import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -43,6 +46,7 @@ public class RobotDeviceController {
     private static final int DEVICE_TYPE_ROBOT = 1;
 
     private final IIotDeviceService deviceService;
+    private final DeviceWebSocketServer webSocketServer;
 
     /** 新增机器人设备 */
     @PostMapping("/add")
@@ -202,6 +206,18 @@ public class RobotDeviceController {
         IotDevice d = deviceService.getById(deviceId);
         if (d == null) throw new RuntimeException("设备不存在: " + deviceId);
         if (!Objects.equals(d.getDeviceType(), expectType)) throw new RuntimeException("设备类型不匹配");
+    }
+
+
+    @PostMapping("/mock/device-status")
+    public void mockDeviceStatusJob() {
+        List<IotDevice> devices = deviceService.list(Wrappers.lambdaQuery(IotDevice.class));
+
+        for (IotDevice device : devices) {
+            webSocketServer.pushDeviceStatus(device.getDeviceCode(), JSONUtil.toJsonStr(device));
+        }
+
+        log.info("[mockDeviceStatusJob] 模拟推送数据 {} 条（设备数={}）", devices.size(), devices.size());
     }
 }
 

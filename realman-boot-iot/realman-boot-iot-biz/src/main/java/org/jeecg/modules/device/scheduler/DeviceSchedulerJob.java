@@ -1,19 +1,23 @@
 package org.jeecg.modules.device.scheduler;
 
+import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.xxl.job.core.handler.annotation.XxlJob;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.constant.DeviceConstant;
 import org.jeecg.modules.device.entity.IotDevice;
-import org.jeecg.modules.device.entity.IotOtaUpgradeRecord;
 import org.jeecg.modules.device.entity.IotDeviceStatus;
+import org.jeecg.modules.device.entity.IotOtaUpgradeRecord;
 import org.jeecg.modules.device.mapper.IotDeviceMapper;
 import org.jeecg.modules.device.mapper.IotDeviceStatusMapper;
 import org.jeecg.modules.device.mapper.IotOtaUpgradeRecordMapper;
 import org.jeecg.modules.device.mapper.IotOtaUpgradeTaskMapper;
+import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -46,6 +50,7 @@ public class DeviceSchedulerJob {
     private final IotOtaUpgradeRecordMapper recordMapper;
     private final IotOtaUpgradeTaskMapper   taskMapper;
     private final StringRedisTemplate       redisTemplate;
+    private final DeviceWebSocketServer webSocketServer;
 
     /**
      * 设备离线检测任务
@@ -194,5 +199,17 @@ public class DeviceSchedulerJob {
 
         log.info("[StatusCompact-History] 本次主表压缩/删除 {} 条，归档到历史表 {} 条，历史表清理 {} 条（设备数={}）",
                 totalDeletedMain, totalArchived, historyDeleted, deviceIds.size());
+    }
+
+    @XxlJob("mockDeviceStatusJob")
+    public void mockDeviceStatusJob() {
+        List<IotDevice> devices = deviceMapper.selectList(Wrappers.lambdaQuery(IotDevice.class));
+
+        for (IotDevice device : devices) {
+            String msg = "{\"type\":\"STATUS\",\"deviceCode\":\"" + device.getDeviceCode() + "\",\"data\":" + JSONUtil.toJsonStr(device) + "}";
+            webSocketServer.pushDeviceStatus(device.getDeviceCode(), msg);
+        }
+
+        log.info("[mockDeviceStatusJob] 模拟推送数据 {} 条（设备数={}）", devices.size(), devices.size());
     }
 }
