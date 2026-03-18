@@ -71,7 +71,7 @@ public class LoginController {
 	@Autowired
 	private JeecgBaseConfig jeecgBaseConfig;
 	
-	private final String BASE_CHECK_CODES = "qwertyuiplkjhgfdsazxcvbnmQWERTYUPLKJHGFDSAZXCVBNM1234567890";
+	private final String BASE_CHECK_CODES = "qwertyuipkjhgfdsazxcvbnmQWERTYUPLKJHGFDSAZXCVBNM123456789";
 	/**
 	 * 线程池用于异步发送纪要
 	 */
