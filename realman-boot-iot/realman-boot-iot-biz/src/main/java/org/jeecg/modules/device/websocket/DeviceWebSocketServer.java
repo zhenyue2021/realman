@@ -174,6 +174,9 @@ public class DeviceWebSocketServer {
         sessions.forEach((key, session) -> {
             if (key.startsWith(deviceCode + ":") && session.isOpen()) {
                 try {
+                    // 在 send() 方法里，session.isOpen() 通过后
+                    String preview = message != null && message.length() > 500 ? message.substring(0, 500) + "..." : message;
+                    log.debug("[WS] send key={}, preview={}", key, preview);
                     session.getBasicRemote().sendText(message);
                 } catch (IOException e) {
                     log.warn("[WS] 推送失败 key={}", key);

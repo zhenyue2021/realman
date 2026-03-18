@@ -87,7 +87,7 @@ public class DeviceStatusHandler {
         deviceMapper.updateById(device);
 
         // 6. WebSocket 实时推送给前端监控页面
-//        webSocketServer.pushDeviceStatus(deviceCode, decrypted);
+        webSocketServer.pushDeviceStatus(deviceCode, decrypted);
 
         // 7. 异步写入历史状态 DB（使用独立线程池，不占用 MQTT 消费线程）
         persistAsync(device, r, decrypted);
