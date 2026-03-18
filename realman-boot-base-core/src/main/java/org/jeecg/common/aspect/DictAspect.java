@@ -280,6 +280,10 @@ public class DictAspect {
             return false;
         }
         Class<?> c = obj.getClass();
+        // JDK17+ 强封装：java.time.* 内部字段不可反射访问，且无需做字典递归扫描
+        if (c.getName().startsWith("java.time.")) {
+            return false;
+        }
         if (c.isPrimitive() || c.isEnum()) {
             return false;
         }
@@ -621,7 +625,12 @@ public class DictAspect {
                 if (field.getAnnotation(Dict.class) != null) {
                     return true;
                 }
-                field.setAccessible(true);
+                try {
+                    field.setAccessible(true);
+                } catch (Exception ex) {
+                    // JDK17+ 部分 JDK 类字段禁止反射访问（InaccessibleObjectException），直接跳过
+                    continue;
+                }
                 Object fv;
                 try {
                     fv = field.get(obj);

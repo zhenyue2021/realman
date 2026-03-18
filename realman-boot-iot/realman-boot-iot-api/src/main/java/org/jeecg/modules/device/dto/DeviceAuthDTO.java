@@ -1,6 +1,7 @@
 package org.jeecg.modules.device.dto;
 
 import lombok.Data;
+import org.jeecg.common.aspect.annotation.Dict;
 
 import java.time.LocalDateTime;
 
@@ -49,6 +50,7 @@ public class DeviceAuthDTO {
     private LocalDateTime expireTime;
 
     /** 授权状态：1 启用 0 禁用 */
+    @Dict(dicCode = "device_auth_status")
     private Integer status;
 
     private String createBy;
