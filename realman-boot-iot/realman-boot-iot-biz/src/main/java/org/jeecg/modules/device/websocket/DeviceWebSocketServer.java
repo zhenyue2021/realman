@@ -5,6 +5,8 @@ import jakarta.websocket.server.PathParam;
 import jakarta.websocket.server.ServerEndpoint;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+
+import java.io.EOFException;
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -72,7 +74,12 @@ public class DeviceWebSocketServer {
      */
     @OnError
     public void onError(Session session, Throwable e) {
-        log.error("[WS] 错误 sessionId={}", session.getId(), e);
+        if (e instanceof EOFException) {
+            // 客户端非正常断开，通常无需关心
+            log.info("[WS] 客户端中断连接 sessionId={}", session.getId());
+            return;
+        }
+        log.error("[WS] 错误 sessionId={}", session != null ? session.getId() : "null", e);
     }
 
     /**
