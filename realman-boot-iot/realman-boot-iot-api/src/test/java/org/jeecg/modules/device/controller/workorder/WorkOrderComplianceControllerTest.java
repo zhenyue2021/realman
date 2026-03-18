@@ -2,6 +2,7 @@ package org.jeecg.modules.device.controller.workorder;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.jeecg.modules.device.api.WorkOrderComplianceApiService;
+import org.jeecg.modules.device.dto.workorder.WorkOrderComplianceConfigPageVo;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -28,14 +29,14 @@ class WorkOrderComplianceControllerTest {
 
     @Test
     void page_returnsOk() throws Exception {
-        when(apiService.pageConfigs(org.mockito.ArgumentMatchers.<Page<org.jeecg.modules.device.entity.workorder.WorkOrderComplianceConfig>>any(), any()))
+        when(apiService.pageConfigs(org.mockito.ArgumentMatchers.<Page<WorkOrderComplianceConfigPageVo>>any(), any()))
                 .thenReturn(new Page<>(1, 20));
         mockMvc.perform(post("/api/work-order/compliance/page")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"pageNo\":1,\"pageSize\":20}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200));
-        verify(apiService).pageConfigs(org.mockito.ArgumentMatchers.<Page<org.jeecg.modules.device.entity.workorder.WorkOrderComplianceConfig>>any(), any());
+        verify(apiService).pageConfigs(org.mockito.ArgumentMatchers.<Page<WorkOrderComplianceConfigPageVo>>any(), any());
     }
 
     @Test
