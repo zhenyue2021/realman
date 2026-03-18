@@ -119,8 +119,7 @@ public class MasterDeviceApiServiceImpl implements MasterDeviceApiService {
         }
         LocalDateTime now = LocalDateTime.now();
         List<IotDeviceAuth> auths = deviceAuthMapper.selectList(new LambdaQueryWrapper<IotDeviceAuth>()
-                .eq(IotDeviceAuth::getSubjectType, "TENANT")
-                .eq(IotDeviceAuth::getSubjectId, tenantId)
+                .eq(IotDeviceAuth::getTenantId, tenantId)
                 .in(IotDeviceAuth::getControllerId, controllerIds)
                 .eq(IotDeviceAuth::getStatus, 1)
                 .eq(IotDeviceAuth::getDelFlag, 0)

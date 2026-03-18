@@ -119,7 +119,6 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
                 new LambdaQueryWrapper<IotDevice>()
                         .eq(IotDevice::getMacAddress, mac)
                         .eq(IotDevice::getDeviceType, DEVICE_TYPE_CONTROLLER)
-                        .eq(IotDevice::getDelFlag, 0)
         );
         if (controller == null) {
             throw new RuntimeException("主控设备不存在或非主控设备: mac=" + mac);
@@ -133,11 +132,9 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
         LambdaQueryWrapper<IotDeviceAuth> authWrapper = new LambdaQueryWrapper<IotDeviceAuth>()
                 .eq(IotDeviceAuth::getControllerId, controller.getId())
                 .eq(IotDeviceAuth::getStatus, 1)
-                .eq(IotDeviceAuth::getDelFlag, 0)
                 .and(w -> w.isNull(IotDeviceAuth::getEffectiveTime).or().le(IotDeviceAuth::getEffectiveTime, now))
                 .and(w -> w.isNull(IotDeviceAuth::getExpireTime).or().ge(IotDeviceAuth::getExpireTime, now))
-                .eq(IotDeviceAuth::getSubjectType, "TENANT")
-                .eq(IotDeviceAuth::getSubjectId, tenantId);
+                .eq(IotDeviceAuth::getTenantId, tenantId);
         List<IotDeviceAuth> auths = deviceAuthMapper.selectList(authWrapper);
         if (auths == null || auths.isEmpty()) {
             throw new RuntimeException("无权限：主控设备未授权给当前用户");

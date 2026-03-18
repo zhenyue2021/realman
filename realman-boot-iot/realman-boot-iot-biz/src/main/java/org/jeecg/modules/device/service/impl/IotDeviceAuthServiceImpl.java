@@ -25,14 +25,18 @@ public class IotDeviceAuthServiceImpl
         LambdaQueryWrapper<IotDeviceAuth> wrapper = new LambdaQueryWrapper<>();
 
         if (query != null) {
-            wrapper.eq(query.getSubjectType() != null && !query.getSubjectType().isEmpty(),
-                    IotDeviceAuth::getSubjectType, query.getSubjectType());
-            wrapper.eq(query.getSubjectId() != null && !query.getSubjectId().isEmpty(),
-                    IotDeviceAuth::getSubjectId, query.getSubjectId());
+            wrapper.eq(query.getTenantId() != null && !query.getTenantId().isEmpty(),
+                    IotDeviceAuth::getTenantId, query.getTenantId());
+            wrapper.eq(query.getEnterpriseId() != null && !query.getEnterpriseId().isEmpty(),
+                    IotDeviceAuth::getEnterpriseId, query.getEnterpriseId());
             wrapper.eq(query.getControllerId() != null && !query.getControllerId().isEmpty(),
                     IotDeviceAuth::getControllerId, query.getControllerId());
+            wrapper.eq(query.getControllerCode() != null && !query.getControllerCode().isEmpty(),
+                    IotDeviceAuth::getControllerCode, query.getControllerCode());
             wrapper.eq(query.getDeviceId() != null && !query.getDeviceId().isEmpty(),
                     IotDeviceAuth::getDeviceId, query.getDeviceId());
+            wrapper.eq(query.getDeviceCode() != null && !query.getDeviceCode().isEmpty(),
+                    IotDeviceAuth::getDeviceCode, query.getDeviceCode());
             wrapper.eq(query.getStatus() != null,
                     IotDeviceAuth::getStatus, query.getStatus());
             if (query.getStartEffectiveTime() != null) {
@@ -41,12 +45,6 @@ public class IotDeviceAuthServiceImpl
             if (query.getEndEffectiveTime() != null) {
                 wrapper.le(IotDeviceAuth::getExpireTime, query.getEndEffectiveTime());
             }
-        }
-
-        // 数据权限：非超管只看自己作为主体（USER/username）的授权
-        if (!superAdmin && currentUsername != null && !currentUsername.isEmpty()) {
-            wrapper.eq(IotDeviceAuth::getSubjectType, "USER")
-                   .eq(IotDeviceAuth::getSubjectId, currentUsername);
         }
 
         wrapper.orderByDesc(IotDeviceAuth::getCreateTime);

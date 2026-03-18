@@ -10,17 +10,23 @@ import java.time.LocalDateTime;
  */
 @Data
 public class DeviceAuthQueryDTO {
-    /** 授权主体类型：USER / TENANT 等 */
-    private String subjectType;
+    /** 租户ID */
+    private String tenantId;
 
-    /** 授权主体ID（如 username 或 tenantId） */
-    private String subjectId;
+    /** 企业ID */
+    private String enterpriseId;
 
     /** 主控端ID */
     private String controllerId;
 
+    /** 主控端编码 */
+    private String controllerCode;
+
     /** 机器人/设备ID */
     private String deviceId;
+
+    /** 机器人编码 */
+    private String deviceCode;
 
     /** 生效时间范围 */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")

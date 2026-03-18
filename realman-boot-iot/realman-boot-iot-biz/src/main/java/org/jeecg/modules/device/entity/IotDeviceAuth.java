@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 
 /**
  * 设备授权关系表（ACL）
- * 一条记录代表：某个主体(subject) 在某时间段内对某台设备拥有权限
+ * 一条记录代表：某个租户/企业在某时间段内对某台设备拥有权限
  */
 @Data
 @TableName("iot_device_auth")
@@ -20,27 +20,36 @@ public class IotDeviceAuth implements Serializable {
     private String id;
 
     /**
-     * 授权主体类型：
-     * USER  - 按用户账号授权（subjectId = username 或 userId）
-     * TENANT- 按租户授权（subjectId = sys_tenant.id）
-     * 预留：COMPANY 等
+     * 租户信息（冗余）
      */
-    @TableField("subject_type")
-    private String subjectType;
+    @TableField("tenant_id")
+    private String tenantId;
 
-    /** 授权主体ID（与 subjectType 搭配使用） */
-    @TableField("subject_id")
-    private String subjectId;
+    @TableField("tenant_name")
+    private String tenantName;
+
+    /**
+     * 企业信息（冗余，sys_depart）
+     */
+    @TableField("enterprise_id")
+    private String enterpriseId;
+
+    @TableField("enterprise_name")
+    private String enterpriseName;
 
     /** 主控端ID（控制端标识，可与deviceCode对应） */
     @TableField("controller_id")
     private String controllerId;
 
+    /** 主控端设备编码（冗余） */
+    @TableField("controller_code")
+    private String controllerCode;
+
     /** 设备ID（iot_device.id） */
     @TableField("device_id")
     private String deviceId;
 
-    /** 设备编码（冗余） */
+    /** 设备编码（机器人编码冗余） */
     @TableField("device_code")
     private String deviceCode;
 

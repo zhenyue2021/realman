@@ -35,17 +35,9 @@
                       AND a.status = 1
                       AND (a.effective_time IS NULL OR a.effective_time &lt;= NOW())
                       AND (a.expire_time IS NULL OR a.expire_time &gt;= NOW())
-                      AND (
-                          <if test="currentUsername != null and currentUsername != ''">
-                              (a.subject_type = 'USER' AND a.subject_id = #{currentUsername})
-                          </if>
-                          <if test="(currentUsername != null and currentUsername != '' ) and (currentTenantId != null and currentTenantId != '' )">
-                              OR
-                          </if>
-                          <if test="currentTenantId != null and currentTenantId != ''">
-                              (a.subject_type = 'TENANT' AND a.subject_id = #{currentTenantId})
-                          </if>
-                      )
+                      <if test="currentTenantId != null and currentTenantId != ''">
+                          AND a.tenant_id = #{currentTenantId}
+                      </if>
                 )
             </if>
         </where>

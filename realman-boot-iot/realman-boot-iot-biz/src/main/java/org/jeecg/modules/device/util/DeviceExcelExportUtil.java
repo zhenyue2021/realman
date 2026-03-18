@@ -69,7 +69,9 @@ public final class DeviceExcelExportUtil {
             CellStyle headerStyle = headerStyle(wb);
             CellStyle dateStyle = dateStyle(wb);
 
-            String[] headers = {"授权ID", "主体类型", "主体ID", "主控端ID", "设备ID", "设备编码", "管理账号ID", "管理账号",
+            String[] headers = {"授权ID", "租户ID", "租户名称", "企业ID", "企业名称",
+                    "主控端ID", "主控端编码", "机器人ID", "机器人编码",
+                    "管理账号ID", "管理账号",
                     "生效时间", "失效时间", "状态", "创建时间"};
             writeHeader(sheet, headers, headerStyle);
 
@@ -77,17 +79,20 @@ public final class DeviceExcelExportUtil {
             for (IotDeviceAuth a : list) {
                 Row row = sheet.createRow(rowNum++);
                 setCell(row, 0, a.getId());
-                setCell(row, 1, a.getSubjectType());
-                setCell(row, 2, a.getSubjectId());
-                setCell(row, 3, a.getControllerId());
-                setCell(row, 4, a.getDeviceId());
-                setCell(row, 5, a.getDeviceCode());
-                setCell(row, 6, a.getAdminUserId());
-                setCell(row, 7, a.getAdminUsername());
-                setCell(row, 8, format(a.getEffectiveTime()), dateStyle);
-                setCell(row, 9, format(a.getExpireTime()), dateStyle);
-                setCell(row, 10, a.getStatus() != null && a.getStatus() == 1 ? "启用" : "禁用");
-                setCell(row, 11, format(a.getCreateTime()), dateStyle);
+                setCell(row, 1, a.getTenantId());
+                setCell(row, 2, a.getTenantName());
+                setCell(row, 3, a.getEnterpriseId());
+                setCell(row, 4, a.getEnterpriseName());
+                setCell(row, 5, a.getControllerId());
+                setCell(row, 6, a.getControllerCode());
+                setCell(row, 7, a.getDeviceId());
+                setCell(row, 8, a.getDeviceCode());
+                setCell(row, 9, a.getAdminUserId());
+                setCell(row, 10, a.getAdminUsername());
+                setCell(row, 11, format(a.getEffectiveTime()), dateStyle);
+                setCell(row, 12, format(a.getExpireTime()), dateStyle);
+                setCell(row, 13, a.getStatus() != null && a.getStatus() == 1 ? "启用" : "禁用");
+                setCell(row, 14, format(a.getCreateTime()), dateStyle);
             }
             autoSizeColumns(sheet, headers.length);
             wb.write(out);

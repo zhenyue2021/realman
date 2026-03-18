@@ -5,47 +5,35 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 /**
- * 设备授权 DTO（用于分页、创建、编辑返回）
+ * 设备授权详情 DTO
  */
 @Data
-public class DeviceAuthDTO {
+public class DeviceAuthDetailDTO {
 
     private String id;
 
-    /** 租户ID */
+    /** 租户ID/名称（冗余） */
     private String tenantId;
-
-    /** 租户名称 */
     private String tenantName;
 
-    /** 企业ID */
+    /** 企业ID/名称（冗余） */
     private String enterpriseId;
-
-    /** 企业名称 */
     private String enterpriseName;
 
-    /** 主控端ID */
+    /** 主控设备 */
     private String controllerId;
-
-    /** 主控端设备编码（冗余） */
     private String controllerCode;
 
-    /** 设备ID */
+    /** 机器人设备 */
     private String deviceId;
-
-    /** 设备编码（机器人编码冗余） */
     private String deviceCode;
 
-    /** 管理后台账号ID */
+    /** 管理后台账号信息 */
     private String adminUserId;
-
-    /** 管理后台账号用户名 */
     private String adminUsername;
 
-    /** 生效时间 */
+    /** 生效/失效 */
     private LocalDateTime effectiveTime;
-
-    /** 失效时间 */
     private LocalDateTime expireTime;
 
     /** 授权状态：1 启用 0 禁用 */
