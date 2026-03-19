@@ -29,6 +29,8 @@ public interface DeviceConstant {
         int OFFLINE   = 2;
         /** 已禁用（禁用后立即清除密钥缓存，EMQX 将拒绝该设备连接） */
         int DISABLED  = 3;
+        /** 使用中（遥操中） */
+        int IN_USE    = 4;
     }
 
     /**
@@ -52,12 +54,16 @@ public interface DeviceConstant {
         String REMOTE_RESTART   = "device/%s/command/restart";
         /** 下行：平台向设备发送紧急停机指令（加密，QoS=1） */
         String EMERGENCY_STOP   = "device/%s/command/emergency-stop";
+        /** 下行：平台向设备发送停止遥操指令（加密，QoS=1） */
+        String DEVICE_STOP_CONTROL   = "device/%s/command/stop-control";
         /** 上行：指令集确认（统一为 master/{code}/command/{cmd}/ack，由平台订阅 master/+/command/+/ack） */
         String MASTER_COMMAND_ACK = "master/%s/command/%s/ack";
         /** 下行：平台向主控设备发送设置力反馈指令（加密，QoS=1） */
         String MASTER_FORCE_FEEDBACK   = "master/%s/command/force-feedback";
         /** 下行：平台向主控设备发送运动与安全参数指令（加密，QoS=1），如底盘/升降速度 */
         String MASTER_SPORT_SPEED = "master/%s/command/sport-speed";
+        /** 下行：平台向主控设备发送停止遥操指令（加密，QoS=1） */
+        String MASTER_STOP_CONTROL = "master/%s/command/stop-control";
         /** 上行：OTA 升级进度上报（含下载百分比、已下载字节、成功/失败状态） */
         String OTA_PROGRESS     = "device/%s/ota/progress";
         /** 上行：设备操作日志上报（设备端主动记录的行为日志） */
@@ -104,6 +110,16 @@ public interface DeviceConstant {
          * 主控收到后即知晓本次遥操任务对应的目标机器人。
          */
         String TELEOP_ROBOT_ASSIGN = "master/%s/teleop/robot/assign";
+        /** 上行：机器人请求 SLAM 上传许可 */
+        String SLAM_UPLOAD_REQUEST = "device/%s/slam/upload/request";
+        /** 下行：平台下发 SLAM 上传许可（包含预签名 PUT URL） */
+        String SLAM_UPLOAD_PERMIT = "device/%s/slam/upload/permit";
+        /** 上行：机器人通知 SLAM 上传完成 */
+        String SLAM_UPLOAD_COMPLETE = "device/%s/slam/upload/complete";
+        /** 下行：平台下发 SLAM 同步指令（包含预签名 GET URL） */
+        String SLAM_SYNC_COMMAND = "device/%s/slam/sync/command";
+        /** 上行：机器人回传 SLAM 同步结果 */
+        String SLAM_SYNC_ACK = "device/%s/slam/sync/ack";
 
         /** EMQX 系统事件：设备 MQTT 连接建立（clientId 从 topic 路径中提取） */
         String SYS_CONNECTED    = "$SYS/brokers/+/clients/+/connected";
@@ -210,6 +226,8 @@ public interface DeviceConstant {
         String CONFIG_SYNC_PREFIX   = "iot:config:sync:";
         /** 固件分片上传进度 Key：iot:upload:chunk:{uploadId}，值为 Set<chunkIndex> */
         String UPLOAD_CHUNK_PREFIX  = "iot:upload:chunk:";
+        /** SLAM 上传会话缓存：iot:slam:upload:session:{deviceCode}:{requestId} */
+        String SLAM_UPLOAD_SESSION_PREFIX = "iot:slam:upload:session:";
     }
 
     /**
@@ -222,5 +240,27 @@ public interface DeviceConstant {
         long CONFIG_SYNC_TIMEOUT_SECONDS      = 30L;
         /** 设备离线判定阈值（分钟）：状态 Redis Key 的 TTL，Key 消失即视为设备离线 */
         long DEVICE_OFFLINE_THRESHOLD_MINUTES = 5L;
+        /** SLAM 上传许可有效期（分钟） */
+        long SLAM_UPLOAD_PERMIT_MINUTES = 30L;
+    }
+
+    interface SlamMapStatus {
+        int UPLOADING = 0;
+        int READY = 1;
+        int DELETED = 2;
+    }
+
+    interface SlamBindingState {
+        int PENDING = 0;
+        int ACTIVE = 1;
+        int OBSOLETE = 2;
+        int FAILED = 3;
+    }
+
+    interface SlamSyncTaskStatus {
+        int RUNNING = 0;
+        int SUCCESS = 1;
+        int PARTIAL_FAIL = 2;
+        int FAIL = 3;
     }
 }

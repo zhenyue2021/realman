@@ -36,6 +36,16 @@ public interface IIotDeviceService extends IService<IotDevice> {
 
     void emergencyStop(String deviceId, String reason, String operator);
 
+    /**
+     * 开始遥操：通知主控关联目标机器人，不等待ACK。
+     */
+    void startTeleop(String controllerId, String robotId, String operator);
+
+    /**
+     * 停止遥操：通知主控与机器人停止遥操，不等待ACK。
+     */
+    void stopTeleop(String controllerId, String robotId, String robotCode, String operator);
+
     void changeDeviceStatus(String deviceId, Integer status, String operator);
 
 

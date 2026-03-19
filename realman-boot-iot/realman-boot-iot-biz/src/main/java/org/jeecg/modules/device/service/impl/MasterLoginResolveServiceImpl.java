@@ -23,6 +23,7 @@ import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.mqtt.publisher.MqttPublisher;
 import org.jeecg.modules.device.service.MasterAssociatedDevicePendingService;
 import org.jeecg.modules.device.service.IMasterLoginResolveService;
+import org.jeecg.modules.device.service.IIotDeviceService;
 import org.jeecg.modules.device.service.workorder.IWorkOrderService;
 import org.jeecg.modules.device.util.MacResolveUtil;
 import org.jeecg.modules.device.vo.MasterLoginResolveVO;
@@ -217,24 +218,6 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
             deviceWebSocketServer.pushWorkOrderStart(controller.getDeviceCode(), workOrderJson);
         } catch (Exception e) {
             log.warn("[ControllerLogin] WebSocket 推送工单失败: workOrderId={}, err={}", firstOrder.getId(), e.getMessage());
-        }
-
-        // 通过 MQTT 通知主控应操作的机器人
-        if (robot != null) {
-            try {
-                MqttMessageModel.RobotAssignCommand assignCmd = MqttMessageModel.RobotAssignCommand.builder()
-                        .commandId(UUID.randomUUID().toString())
-                        .robotCode(robot.getDeviceCode())
-//                        .workOrderId(firstOrder.getId())
-                        .timestamp(System.currentTimeMillis())
-                        .build();
-                String topic = String.format(DeviceConstant.MqttTopic.TELEOP_ROBOT_ASSIGN, controller.getDeviceCode());
-                mqttPublisher.publishToDevice(controller.getDeviceCode(), topic,
-                        objectMapper.writeValueAsString(assignCmd), 1);
-            } catch (Exception e) {
-                log.warn("[ControllerLogin] MQTT 推送机器人分配指令失败: robotCode={}, err={}",
-                        robot.getDeviceCode(), e.getMessage());
-            }
         }
 
         // 组装返回 VO

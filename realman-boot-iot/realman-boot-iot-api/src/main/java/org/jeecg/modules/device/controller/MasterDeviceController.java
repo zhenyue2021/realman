@@ -18,6 +18,8 @@ import org.jeecg.modules.device.dto.OperationRecordQueryDTO;
 import org.jeecg.modules.device.dto.DeviceRequestDTO;
 import org.jeecg.modules.device.dto.MasterDevicePageItemDTO;
 import org.jeecg.modules.device.dto.DeviceRestartDTO;
+import org.jeecg.modules.device.dto.TeleopStartDTO;
+import org.jeecg.modules.device.dto.TeleopStopDTO;
 import org.jeecg.modules.device.dto.DeviceUpdateDTO;
 import org.jeecg.modules.device.dto.EmergencyStopDTO;
 import org.jeecg.modules.device.api.MasterDeviceApiService;
@@ -223,6 +225,26 @@ public class MasterDeviceController {
                                                         @RequestBody MasterLoginDTO dto) {
         MasterLoginResolveVO vo = loginResolveService.resolve(request, dto);
         return ApiResult.ok(vo);
+    }
+
+    /** 开始遥操（通知主控关联目标机器人，不等待ACK） */
+    @PostMapping("/{controllerId}/teleop/start")
+    @Operation(summary = "开始遥操")
+    public ApiResult<Void> startTeleop(@PathVariable String controllerId,
+                                       @RequestBody TeleopStartDTO dto) {
+        ensureDeviceType(controllerId, DEVICE_TYPE_CONTROLLER);
+        deviceService.startTeleop(controllerId, dto.getDeviceId(), dto.getOperator());
+        return ApiResult.ok(null, "开始遥操指令已下发");
+    }
+
+    /** 停止遥操（通知主控与机器人，不等待ACK） */
+    @PostMapping("/{controllerId}/teleop/stop")
+    @Operation(summary = "停止遥操")
+    public ApiResult<Void> stopTeleop(@PathVariable String controllerId,
+                                      @RequestBody TeleopStopDTO dto) {
+        ensureDeviceType(controllerId, DEVICE_TYPE_CONTROLLER);
+        deviceService.stopTeleop(controllerId, dto.getDeviceId(), dto.getDeviceCode(), dto.getOperator());
+        return ApiResult.ok(null, "停止遥操指令已下发");
     }
 
     /** 操作记录分页（遥操员使用主控操控机器人完成工单的时间） */

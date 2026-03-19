@@ -421,6 +421,115 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
         sendCommand(deviceId, "emergency-stop", reason, operator);
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void startTeleop(String controllerId, String robotId, String operator) {
+        IotDevice controller = require(controllerId);
+        if (!Objects.equals(controller.getDeviceType(), 2)) {
+            throw new RuntimeException("设备类型不匹配：不是主控设备");
+        }
+        IotDevice robot = require(robotId);
+        if (!Objects.equals(robot.getDeviceType(), 1)) {
+            throw new RuntimeException("设备类型不匹配：不是机器人设备");
+        }
+
+        String commandId = IdUtil.fastSimpleUUID();
+        long now = System.currentTimeMillis();
+        try {
+            // 复用主控端当前应操作机器人 topic，不等待 ACK
+            String topic = String.format(DeviceConstant.MqttTopic.TELEOP_ROBOT_ASSIGN, controller.getDeviceCode());
+            MqttMessageModel.RobotAssignCommand assignCmd = MqttMessageModel.RobotAssignCommand.builder()
+                    .commandId(commandId)
+                    .robotCode(robot.getDeviceCode())
+                    .timestamp(now)
+                    .build();
+            mqttPublisher.publishToDevice(controller.getDeviceCode(), topic,
+                    objectMapper.writeValueAsString(assignCmd), 1);
+
+            // 机器人状态置为使用中
+            robot.setStatus(DeviceConstant.DeviceStatus.IN_USE);
+            deviceMapper.updateById(robot);
+
+            logService.recordLog(controller.getId(), controller.getDeviceCode(),
+                    DeviceConstant.OperationType.COMMAND_SEND,
+                    "开始遥操：通知主控关联机器人", "{commandId:" + commandId + ",robotCode:" + robot.getDeviceCode() + "}",
+                    DeviceConstant.OperationSource.PLATFORM, "PENDING", null, operator, null);
+            logService.recordLog(robot.getId(), robot.getDeviceCode(),
+                    DeviceConstant.OperationType.COMMAND_SEND,
+                    "开始遥操：设备状态置为使用中", "{commandId:" + commandId + "}",
+                    DeviceConstant.OperationSource.PLATFORM, "SUCCESS", null, operator, null);
+        } catch (Exception e) {
+            throw new RuntimeException("开始遥操失败: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void stopTeleop(String controllerId, String robotId, String robotCode, String operator) {
+        IotDevice controller = require(controllerId);
+        if (!Objects.equals(controller.getDeviceType(), 2)) {
+            throw new RuntimeException("设备类型不匹配：不是主控设备");
+        }
+        String controllerDeviceCode = controller.getDeviceCode();
+
+        IotDevice robot;
+        if (robotId != null && !robotId.isBlank()) {
+            robot = require(robotId);
+        } else if (robotCode != null && !robotCode.isBlank()) {
+            robot = deviceMapper.selectOne(new LambdaQueryWrapper<IotDevice>()
+                    .eq(IotDevice::getDeviceCode, robotCode)
+                    .eq(IotDevice::getDelFlag, 0)
+                    .last("LIMIT 1"));
+        } else {
+            throw new RuntimeException("deviceId 或 deviceCode 至少传一个");
+        }
+        if (robot == null || !Objects.equals(robot.getDeviceType(), 1)) {
+            throw new RuntimeException("设备类型不匹配：不是机器人设备");
+        }
+        String robotDeviceCode = robot.getDeviceCode();
+
+        String commandId = IdUtil.fastSimpleUUID();
+        long now = System.currentTimeMillis();
+        try {
+            // 1) 通知主控停止遥操（ 传 STOP 标识）
+            String controllerTopic = String.format(DeviceConstant.MqttTopic.DEVICE_STOP_CONTROL, controllerDeviceCode);
+            MqttMessageModel.RobotAssignCommand stopForController = MqttMessageModel.RobotAssignCommand.builder()
+                    .commandId(commandId)
+                    .robotCode(controllerDeviceCode)
+                    .workOrderId("STOP")
+                    .timestamp(now)
+                    .build();
+            mqttPublisher.publishToDevice(controllerDeviceCode, controllerTopic,
+                    objectMapper.writeValueAsString(stopForController), 1);
+
+            // 2) 通知机器人停止遥操
+            String robotTopic = String.format(DeviceConstant.MqttTopic.MASTER_STOP_CONTROL, robotDeviceCode);
+            MqttMessageModel.RobotAssignCommand stopForRobot = MqttMessageModel.RobotAssignCommand.builder()
+                    .commandId(commandId)
+                    .robotCode(robotDeviceCode)
+                    .workOrderId("stop_teleop")
+                    .timestamp(now)
+                    .build();
+            mqttPublisher.publishToDevice(robotDeviceCode, robotTopic,
+                    objectMapper.writeValueAsString(stopForRobot), 1);
+
+            // 3) 不等待ACK，直接将机器人状态置为在线
+            robot.setStatus(DeviceConstant.DeviceStatus.ONLINE);
+            deviceMapper.updateById(robot);
+
+            logService.recordLog(controller.getId(), controllerDeviceCode,
+                    DeviceConstant.OperationType.COMMAND_SEND,
+                    "停止遥操：通知主控与机器人", "{commandId:" + commandId + ",robotCode:" + robotDeviceCode + "}",
+                    DeviceConstant.OperationSource.PLATFORM, "PENDING", null, operator, null);
+            logService.recordLog(robot.getId(), robotDeviceCode,
+                    DeviceConstant.OperationType.COMMAND_SEND,
+                    "停止遥操：设备状态置为在线", "{commandId:" + commandId + "}",
+                    DeviceConstant.OperationSource.PLATFORM, "SUCCESS", null, operator, null);
+        } catch (Exception e) {
+            throw new RuntimeException("停止遥操失败: " + e.getMessage(), e);
+        }
+    }
+
     /**
      * 向主控设备下发力反馈参数指令（机械臂/夹爪力度）
      *
