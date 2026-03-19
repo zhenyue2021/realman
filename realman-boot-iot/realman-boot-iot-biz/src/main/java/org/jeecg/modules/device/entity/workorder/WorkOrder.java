@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
+import org.jeecg.common.aspect.annotation.Dict;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
@@ -58,6 +59,7 @@ public class WorkOrder implements Serializable {
     private LocalDateTime planEndTime;
 
     @TableField("status")
+    @Dict(dicCode = "order_status")
     private String status;
 
     @TableField("audit_result")

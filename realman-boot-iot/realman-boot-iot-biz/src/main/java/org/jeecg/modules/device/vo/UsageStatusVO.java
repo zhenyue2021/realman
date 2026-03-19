@@ -1,6 +1,7 @@
 package org.jeecg.modules.device.vo;
 
 import lombok.Data;
+import org.jeecg.common.aspect.annotation.Dict;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -34,8 +35,8 @@ public class UsageStatusVO {
         private String robotCode;
         private String robotName;
         /** 状态：1-在线 2-离线 等 */
+        @Dict(dicCode = "device_status")
         private Integer status;
-        private String statusText;
         /** 电量等可从实时状态取，这里简单用字段 */
         private String batteryLevel;
         private String deviceModel;

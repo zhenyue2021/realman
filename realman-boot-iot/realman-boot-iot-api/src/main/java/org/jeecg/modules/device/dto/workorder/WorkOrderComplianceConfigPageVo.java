@@ -2,6 +2,7 @@ package org.jeecg.modules.device.dto.workorder;
 
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
+import org.jeecg.common.aspect.annotation.Dict;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
@@ -40,6 +41,7 @@ public class WorkOrderComplianceConfigPageVo implements Serializable {
 
     private String autoCloseOffset;
 
+    @Dict(dicCode = "apply_status")
     private Integer applyStatus;
 
     private String createBy;

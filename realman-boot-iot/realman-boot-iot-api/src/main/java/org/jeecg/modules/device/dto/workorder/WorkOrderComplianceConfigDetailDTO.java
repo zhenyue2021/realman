@@ -1,6 +1,7 @@
 package org.jeecg.modules.device.dto.workorder;
 
 import lombok.Data;
+import org.jeecg.common.aspect.annotation.Dict;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
@@ -34,6 +35,7 @@ public class WorkOrderComplianceConfigDetailDTO implements Serializable {
     private Integer autoCloseEnabled;
     private String autoCloseOffset;
 
+    @Dict(dicCode = "apply_status")
     private Integer applyStatus;
 
     private String createBy;
