@@ -117,6 +117,9 @@ public class MqttConfig {
                 "device/+/log/operation",           // 设备操作日志上报
                 "device/+/camera/stream/ack",  // 机器人上报摄像头视频流地址
                 "master/+/teleop/associated-device/ack", // 主控上报当前关联设备信息
+                "device/+/slam/upload/request",     // 机器人请求SLAM上传许可
+                "device/+/slam/upload/complete",    // 机器人通知SLAM上传完成
+                "device/+/slam/sync/ack",           // 机器人回传SLAM同步结果
                 "$SYS/brokers/+/clients/+/connected",    // EMQX 设备上线事件
                 "$SYS/brokers/+/clients/+/disconnected",  // EMQX 设备下线事件
                 // ========== 订阅主控设备主动上报的数据 ==========

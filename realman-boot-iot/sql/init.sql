@@ -343,6 +343,73 @@ CREATE TABLE IF NOT EXISTS `controller_operation_record` (
   KEY `idx_start_time`   (`start_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='主控遥操操作记录';
 
+-- 13. SLAM地图元数据
+CREATE TABLE IF NOT EXISTS `iot_slam_map` (
+  `id`                VARCHAR(32)   NOT NULL COMMENT '地图ID',
+  `tenant_id`         VARCHAR(36)   DEFAULT NULL COMMENT '租户ID',
+  `enterprise_id`     VARCHAR(36)   DEFAULT NULL COMMENT '企业/部门ID',
+  `map_name`          VARCHAR(128)  NOT NULL COMMENT '地图名称',
+  `map_version`       VARCHAR(64)   DEFAULT NULL COMMENT '地图版本号',
+  `source_robot_id`   VARCHAR(36)   NOT NULL COMMENT '来源机器人ID',
+  `source_robot_code` VARCHAR(64)   NOT NULL COMMENT '来源机器人编码',
+  `file_object_key`   VARCHAR(512)  NOT NULL COMMENT 'MinIO对象路径',
+  `file_md5`          VARCHAR(64)   DEFAULT NULL COMMENT '文件MD5',
+  `file_size`         BIGINT        DEFAULT NULL COMMENT '文件大小（字节）',
+  `status`            TINYINT       NOT NULL DEFAULT 0 COMMENT '0-UPLOADING 1-READY 2-DELETED',
+  `create_by`         VARCHAR(64)   DEFAULT NULL COMMENT '创建人',
+  `create_time`       DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `update_time`       DATETIME      DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  `del_flag`          TINYINT       NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`),
+  KEY `idx_source_robot` (`source_robot_id`),
+  KEY `idx_tenant_enterprise` (`tenant_id`,`enterprise_id`),
+  KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='SLAM地图元数据';
+
+-- 14. 机器人与SLAM地图绑定关系
+CREATE TABLE IF NOT EXISTS `iot_robot_slam_binding` (
+  `id`               VARCHAR(32)   NOT NULL COMMENT '绑定ID',
+  `tenant_id`        VARCHAR(36)   DEFAULT NULL COMMENT '租户ID',
+  `enterprise_id`    VARCHAR(36)   DEFAULT NULL COMMENT '企业/部门ID',
+  `robot_id`         VARCHAR(36)   NOT NULL COMMENT '机器人ID',
+  `robot_code`       VARCHAR(64)   NOT NULL COMMENT '机器人编码',
+  `slam_map_id`      VARCHAR(32)   NOT NULL COMMENT 'SLAM地图ID',
+  `state`            TINYINT       NOT NULL DEFAULT 0 COMMENT '0-PENDING 1-ACTIVE 2-OBSOLETE 3-FAILED',
+  `pending_task_id`  VARCHAR(32)   DEFAULT NULL COMMENT '同步任务ID',
+  `effective_time`   DATETIME      DEFAULT NULL COMMENT '生效时间',
+  `obsolete_time`    DATETIME      DEFAULT NULL COMMENT '作废时间',
+  `fail_reason`      VARCHAR(512)  DEFAULT NULL COMMENT '失败原因',
+  `create_by`        VARCHAR(64)   DEFAULT NULL,
+  `create_time`      DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `update_time`      DATETIME      DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  `del_flag`         TINYINT       NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`),
+  KEY `idx_robot_state` (`robot_id`,`state`),
+  KEY `idx_slam_map` (`slam_map_id`),
+  KEY `idx_pending_task` (`pending_task_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='机器人SLAM绑定关系';
+
+-- 15. SLAM同步任务
+CREATE TABLE IF NOT EXISTS `iot_slam_sync_task` (
+  `id`                VARCHAR(32)   NOT NULL COMMENT '任务ID',
+  `tenant_id`         VARCHAR(36)   DEFAULT NULL COMMENT '租户ID',
+  `enterprise_id`     VARCHAR(36)   DEFAULT NULL COMMENT '企业/部门ID',
+  `source_robot_id`   VARCHAR(36)   NOT NULL COMMENT '来源机器人ID',
+  `source_robot_code` VARCHAR(64)   NOT NULL COMMENT '来源机器人编码',
+  `slam_map_id`       VARCHAR(32)   NOT NULL COMMENT 'SLAM地图ID',
+  `target_robot_ids`  TEXT          DEFAULT NULL COMMENT '目标机器人ID列表(JSON)',
+  `total_count`       INT           NOT NULL DEFAULT 0 COMMENT '目标总数',
+  `success_count`     INT           NOT NULL DEFAULT 0 COMMENT '成功数',
+  `fail_count`        INT           NOT NULL DEFAULT 0 COMMENT '失败数',
+  `status`            TINYINT       NOT NULL DEFAULT 0 COMMENT '0-RUNNING 1-SUCCESS 2-PARTIAL_FAIL 3-FAIL',
+  `create_by`         VARCHAR(64)   DEFAULT NULL COMMENT '创建人',
+  `create_time`       DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `update_time`       DATETIME      DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_source_robot` (`source_robot_id`),
+  KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='SLAM同步任务';
+
 -- 测试数据（device_secret需在平台控制台生成后下发给设备端）
 INSERT INTO `iot_device` (id,device_code,device_name,device_type,product_id,device_model,firmware_version,status,device_secret,secret_create_time,description,create_by,tenant_id,create_time)
 VALUES

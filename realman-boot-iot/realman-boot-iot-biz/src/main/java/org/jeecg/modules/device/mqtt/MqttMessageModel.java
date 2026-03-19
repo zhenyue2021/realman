@@ -453,4 +453,95 @@ public class MqttMessageModel {
         /** 设备回复时间戳（毫秒） */
         private long timestamp;
     }
+
+    /**
+     * 上行：机器人请求 SLAM 上传许可（Topic: device/{robotCode}/slam/upload/request）
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class SlamUploadRequest {
+        private String requestId;
+        private String mapName;
+        private String mapVersion;
+        private String md5;
+        private Long size;
+        private String ext;
+        private long timestamp;
+    }
+
+    /**
+     * 下行：平台下发 SLAM 上传许可（Topic: device/{robotCode}/slam/upload/permit）
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class SlamUploadPermit {
+        private String requestId;
+        private String mapId;
+        private String objectKey;
+        private String putUrl;
+        private Long expireAt;
+        private long timestamp;
+    }
+
+    /**
+     * 上行：机器人通知 SLAM 上传完成（Topic: device/{robotCode}/slam/upload/complete）
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class SlamUploadComplete {
+        private String requestId;
+        private String mapId;
+        private String objectKey;
+        private String md5;
+        private Long size;
+        private Integer code;
+        private String message;
+        private long timestamp;
+    }
+
+    /**
+     * 下行：平台通知机器人同步 SLAM（Topic: device/{robotCode}/slam/sync/command）
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class SlamSyncCommand {
+        private String taskId;
+        private String bindingId;
+        private String slamMapId;
+        private String sourceRobotCode;
+        private String objectKey;
+        private String getUrl;
+        private String md5;
+        private Long size;
+        private long timestamp;
+    }
+
+    /**
+     * 上行：机器人回传 SLAM 同步结果（Topic: device/{robotCode}/slam/sync/ack）
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class SlamSyncAck {
+        private String taskId;
+        private String bindingId;
+        private String slamMapId;
+        private Integer code;
+        private String message;
+        private long timestamp;
+    }
 }

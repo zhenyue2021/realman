@@ -9,6 +9,7 @@ import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.mapper.IotDeviceMapper;
 import org.jeecg.modules.device.service.IDeviceOperationLogService;
 import org.jeecg.modules.device.service.PendingSyncService;
+import org.jeecg.modules.device.service.SlamPendingSyncService;
 import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -58,6 +59,7 @@ public class DeviceOnlineOfflineHandler {
     private final ObjectMapper objectMapper;
     private final IDeviceOperationLogService logService;
     private final PendingSyncService pendingSyncService;
+    private final SlamPendingSyncService slamPendingSyncService;
 
     /**
      * 处理设备上线事件
@@ -94,8 +96,9 @@ public class DeviceOnlineOfflineHandler {
                     "设备MQTT连接建立，上线", null, DeviceConstant.OperationSource.DEVICE,
                     "SUCCESS", null, null, null);
 
-            // TODO: 设备上线后补推离线期间待同步的配置和 OTA 通知
-            // pendingSyncService.flushPendingMessages(deviceCode);
+            // 设备上线后补推离线期间待同步的配置/OTA/SLAM 指令
+            pendingSyncService.flushPendingMessages(deviceCode);
+//            slamPendingSyncService.flushPendingSyncCommands(deviceCode);
         } catch (Exception e) {
             log.error("[Online] 处理异常", e);
         }

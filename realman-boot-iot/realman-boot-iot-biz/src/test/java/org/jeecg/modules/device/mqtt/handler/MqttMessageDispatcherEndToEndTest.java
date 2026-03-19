@@ -150,6 +150,9 @@ public class MqttMessageDispatcherEndToEndTest {
                 Mockito.mock(MasterAssociatedDeviceResponseHandler.class);
 
         RobotSlaveStatusHandler robotSlaveStatusHandler = Mockito.mock(RobotSlaveStatusHandler.class);
+        SlamUploadRequestHandler slamUploadRequestHandler = Mockito.mock(SlamUploadRequestHandler.class);
+        SlamUploadCompleteHandler slamUploadCompleteHandler = Mockito.mock(SlamUploadCompleteHandler.class);
+        SlamSyncAckHandler slamSyncAckHandler = Mockito.mock(SlamSyncAckHandler.class);
 
         // 分发器使用真实实例
         dispatcher = new MqttMessageDispatcher(
@@ -162,7 +165,10 @@ public class MqttMessageDispatcherEndToEndTest {
                 onlineOfflineHandler,
                 deviceCameraStreamResponseHandler,
                 masterAssociatedDeviceResponseHandler,
-                robotSlaveStatusHandler
+                robotSlaveStatusHandler,
+                slamUploadRequestHandler,
+                slamUploadCompleteHandler,
+                slamSyncAckHandler
         );
     }
 

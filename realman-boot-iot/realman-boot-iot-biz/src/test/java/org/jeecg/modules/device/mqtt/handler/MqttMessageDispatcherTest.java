@@ -29,6 +29,9 @@ public class MqttMessageDispatcherTest {
     private DeviceCameraStreamResponseHandler deviceCameraStreamResponseHandler;
     private MasterAssociatedDeviceResponseHandler masterAssociatedDeviceResponseHandler;
     private RobotSlaveStatusHandler robotSlaveStatusHandler;
+    private SlamUploadRequestHandler slamUploadRequestHandler;
+    private SlamUploadCompleteHandler slamUploadCompleteHandler;
+    private SlamSyncAckHandler slamSyncAckHandler;
 
     private MqttMessageDispatcher dispatcher;
 
@@ -44,6 +47,9 @@ public class MqttMessageDispatcherTest {
         deviceCameraStreamResponseHandler = Mockito.mock(DeviceCameraStreamResponseHandler.class);
         masterAssociatedDeviceResponseHandler = Mockito.mock(MasterAssociatedDeviceResponseHandler.class);
         robotSlaveStatusHandler = Mockito.mock(RobotSlaveStatusHandler.class);
+        slamUploadRequestHandler = Mockito.mock(SlamUploadRequestHandler.class);
+        slamUploadCompleteHandler = Mockito.mock(SlamUploadCompleteHandler.class);
+        slamSyncAckHandler = Mockito.mock(SlamSyncAckHandler.class);
 
         dispatcher = new MqttMessageDispatcher(
                 statusHandler,
@@ -55,7 +61,10 @@ public class MqttMessageDispatcherTest {
                 onlineOfflineHandler,
                 deviceCameraStreamResponseHandler,
                 masterAssociatedDeviceResponseHandler,
-                robotSlaveStatusHandler
+                robotSlaveStatusHandler,
+                slamUploadRequestHandler,
+                slamUploadCompleteHandler,
+                slamSyncAckHandler
         );
     }
 
@@ -238,6 +247,15 @@ public class MqttMessageDispatcherTest {
                 operationLogHandler,
                 onlineOfflineHandler
         );
+    }
+
+    @Test
+    void testSlamUploadRequest() throws Exception {
+        String deviceCode = "ROBOT001";
+        String topic = "device/" + deviceCode + "/slam/upload/request";
+        String payload = "{\"requestId\":\"req1\"}";
+        dispatcher.dispatch(topic, mqttMsg(payload));
+        Mockito.verify(slamUploadRequestHandler).handle(deviceCode, payload);
     }
 }
 
