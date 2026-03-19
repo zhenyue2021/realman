@@ -80,6 +80,10 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.jeecgframework.boot3</groupId>
+            <artifactId>realman-boot-base-core</artifactId>
+        </dependency>
     </dependencies>
 
     <build>

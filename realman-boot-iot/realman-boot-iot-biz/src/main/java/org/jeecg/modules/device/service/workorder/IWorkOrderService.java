@@ -16,6 +16,11 @@ public interface IWorkOrderService extends IService<WorkOrder> {
 
     List<WorkOrder> listPendingForController(String controllerCode);
 
+    /**
+     * 查询指定主控 + 指定部门范围内待开启且生效的工单（按计划开始时间升序）。
+     */
+    List<WorkOrder> listPendingForControllerAndDepartments(String controllerCode, List<String> departmentIds);
+
     void bindDevices(String workOrderId, List<WorkOrderDevice> devices);
     List<WorkOrderDevice> findDevices(String workOrderId);
 

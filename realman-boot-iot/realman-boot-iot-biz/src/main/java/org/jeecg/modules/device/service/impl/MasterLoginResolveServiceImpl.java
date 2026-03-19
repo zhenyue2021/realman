@@ -1,5 +1,6 @@
 package org.jeecg.modules.device.service.impl;
 
+import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -16,6 +17,7 @@ import org.jeecg.modules.device.entity.workorder.WorkOrderDevice;
 import org.jeecg.modules.device.mapper.IotMasterLoginLogMapper;
 import org.jeecg.modules.device.mapper.IotDeviceAuthMapper;
 import org.jeecg.modules.device.mapper.IotDeviceMapper;
+import org.jeecg.modules.device.mapper.SysUserDepartLiteMapper;
 import org.jeecg.modules.device.mapper.workorder.WorkOrderDeviceMapper;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.mqtt.publisher.MqttPublisher;
@@ -26,6 +28,7 @@ import org.jeecg.modules.device.util.MacResolveUtil;
 import org.jeecg.modules.device.vo.MasterLoginResolveVO;
 import org.jeecg.modules.device.vo.UsageStatusVO;
 import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,11 +53,14 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
     private final ObjectMapper objectMapper;
     private final IotDeviceMapper deviceMapper;
     private final IotDeviceAuthMapper deviceAuthMapper;
+    private final SysUserDepartLiteMapper sysUserDepartLiteMapper;
     private final WorkOrderDeviceMapper workOrderDeviceMapper;
     private final IWorkOrderService workOrderService;
     private final DeviceWebSocketServer deviceWebSocketServer;
     private final MasterAssociatedDevicePendingService masterAssociatedDevicePendingService;
-
+    /** 配置中心配置的master的Mac地址 */
+    @Value("${device.master.mac:10:7c:61:d5:99:16}")
+    private String masterMac;
     @Override
     @Transactional(rollbackFor = Exception.class)
     public IotMasterLoginLog recordLogin(MasterLoginDTO dto) {
@@ -111,7 +117,9 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
         // 解析客户端 MAC（前端不传时，尝试通过 ARP 在内网反查）
         String mac = MacResolveUtil.resolveClientMac(request, dto.getMacAddress());
         if (mac == null || mac.isEmpty()) {
-            throw new RuntimeException("无法获取主控设备 MAC 地址");
+//            throw new RuntimeException("无法获取主控设备 MAC 地址");
+            log.error("无法获取主控设备 MAC 地址");
+            mac = masterMac;
         }
 
         // 通过 MAC 反查主控设备
@@ -127,14 +135,22 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
         // 通过 MQTT 与主控做一次在线 & MAC 一致性校验（如不通过会直接抛异常）
         verifyControllerOnlineAndMac(controller, mac, dto);
 
-        // 租户授权：当前租户对该主控的有效授权
+        // 部门/企业授权：当前用户所属部门对该主控的有效授权
+        String operatorId = dto.getOperatorId();
+        if (operatorId == null || operatorId.isEmpty()) {
+            throw new RuntimeException("缺少操作员ID（operatorId）");
+        }
+        List<String> departIds = sysUserDepartLiteMapper.listDepartIdsByUserId(operatorId);
+        if (departIds == null || departIds.isEmpty()) {
+            throw new RuntimeException("无权限：当前用户未绑定部门");
+        }
         LocalDateTime now = LocalDateTime.now();
         LambdaQueryWrapper<IotDeviceAuth> authWrapper = new LambdaQueryWrapper<IotDeviceAuth>()
                 .eq(IotDeviceAuth::getControllerId, controller.getId())
                 .eq(IotDeviceAuth::getStatus, 1)
                 .and(w -> w.isNull(IotDeviceAuth::getEffectiveTime).or().le(IotDeviceAuth::getEffectiveTime, now))
                 .and(w -> w.isNull(IotDeviceAuth::getExpireTime).or().ge(IotDeviceAuth::getExpireTime, now))
-                .eq(IotDeviceAuth::getTenantId, tenantId);
+                .in(IotDeviceAuth::getEnterpriseId, departIds);
         List<IotDeviceAuth> auths = deviceAuthMapper.selectList(authWrapper);
         if (auths == null || auths.isEmpty()) {
             throw new RuntimeException("无权限：主控设备未授权给当前用户");
@@ -172,8 +188,8 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
         vo.setController(controller);
         vo.setAvailableRobots(available);
 
-        // 查询该主控待开启且生效中的工单（已按计划开始时间升序）
-        List<WorkOrder> pendingOrders = workOrderService.listPendingForController(controller.getDeviceCode());
+        // 查询该主控及当前用户所绑定部门待开启且生效中的工单（已按计划开始时间升序）
+        List<WorkOrder> pendingOrders = workOrderService.listPendingForControllerAndDepartments(controller.getDeviceCode(), departIds);
         if (pendingOrders == null || pendingOrders.isEmpty()) {
             // 无待开启工单，仅写登录日志，不推送工单/机器人信息给前端
             var loginLog = recordLogin(logDto);
@@ -297,7 +313,6 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
 
     /**
      * 从工单设备绑定记录中查找对应的机器人实体。
-     * 优先取 actual_device，回退到计划 device。
      */
     private IotDevice resolveWorkOrderRobot(String workOrderId) {
         WorkOrderDevice bind = workOrderDeviceMapper.selectOne(
@@ -310,19 +325,9 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
             return null;
         }
         // 优先使用实际设备 ID
-        String deviceId = bind.getActualDeviceId() != null ? bind.getActualDeviceId() : bind.getDeviceId();
+        String deviceId = StrUtil.isNotBlank(bind.getActualDeviceId()) ? bind.getActualDeviceId() : bind.getDeviceId();
         if (deviceId != null) {
-            IotDevice robot = deviceMapper.selectById(deviceId);
-            if (robot != null) {
-                return robot;
-            }
-        }
-        // 回退：用实际设备 code 查
-        String deviceCode = bind.getActualDeviceCode() != null ? bind.getActualDeviceCode() : bind.getDeviceCode();
-        if (deviceCode != null) {
-            return deviceMapper.selectOne(new LambdaQueryWrapper<IotDevice>()
-                    .eq(IotDevice::getDeviceCode, deviceCode)
-                    .eq(IotDevice::getDeviceType, DEVICE_TYPE_ROBOT));
+            return deviceMapper.selectById(deviceId);
         }
         return null;
     }

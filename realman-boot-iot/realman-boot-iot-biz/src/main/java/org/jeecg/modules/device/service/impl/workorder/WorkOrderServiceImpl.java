@@ -55,15 +55,18 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
 
     @Override
     public List<WorkOrder> listPendingForController(String controllerCode) {
+        return listPendingForControllerAndDepartments(controllerCode, null);
+    }
+
+    @Override
+    public List<WorkOrder> listPendingForControllerAndDepartments(String controllerCode, List<String> departmentIds) {
         if (controllerCode == null || controllerCode.isEmpty()) {
             return List.of();
         }
         // 先查找与该主控相关的工单ID（计划主控或实际主控）
         LambdaQueryWrapper<WorkOrderDevice> deviceWrapper = new LambdaQueryWrapper<WorkOrderDevice>()
                 .eq(WorkOrderDevice::getDeviceType, "2")
-                .eq(WorkOrderDevice::getDeviceCode, controllerCode)
-                .and(w -> w.isNull(WorkOrderDevice::getActualDeviceCode)
-                        .or().eq(WorkOrderDevice::getActualDeviceCode, controllerCode));
+                .eq(WorkOrderDevice::getDeviceCode, controllerCode);
         List<WorkOrderDevice> binds = workOrderDeviceMapper.selectList(deviceWrapper);
         if (binds.isEmpty()) {
             return List.of();
@@ -75,13 +78,17 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
 
         LocalDateTime now = LocalDateTime.now();
         // 返回当前时间窗口内且未开始的工单，按计划开始时间升序
-        return this.baseMapper.selectList(new LambdaQueryWrapper<WorkOrder>()
+        LambdaQueryWrapper<WorkOrder> wrapper = new LambdaQueryWrapper<WorkOrder>()
                 .in(WorkOrder::getId, orderIds)
                 .eq(WorkOrder::getStatus, "PENDING")
                 .eq(WorkOrder::getDelFlag, 0)
                 .le(WorkOrder::getPlanStartTime, now)
                 .gt(WorkOrder::getPlanEndTime, now)
-                .orderByAsc(WorkOrder::getPlanStartTime));
+                .orderByAsc(WorkOrder::getPlanStartTime);
+        if (departmentIds != null && !departmentIds.isEmpty()) {
+            wrapper.in(WorkOrder::getDepartmentId, departmentIds);
+        }
+        return this.baseMapper.selectList(wrapper);
     }
 
     @Override

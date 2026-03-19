@@ -109,21 +109,10 @@ public class MasterUsageStatusServiceImpl implements IMasterUsageStatusService {
         vo.setRobotCode(d.getDeviceCode());
         vo.setRobotName(d.getDeviceName());
         vo.setStatus(d.getStatus());
-        vo.setStatusText(statusText(d.getStatus()));
         vo.setDeviceModel(d.getDeviceModel());
         vo.setFirmwareVersion(d.getFirmwareVersion());
         vo.setBatteryLevel(null); // 可从 Redis/iot_device_status 扩展
         return vo;
     }
 
-    private static String statusText(Integer status) {
-        if (status == null) return "";
-        switch (status) {
-            case 0: return "未激活";
-            case 1: return "运行中";
-            case 2: return "离线";
-            case 3: return "禁用";
-            default: return String.valueOf(status);
-        }
-    }
 }

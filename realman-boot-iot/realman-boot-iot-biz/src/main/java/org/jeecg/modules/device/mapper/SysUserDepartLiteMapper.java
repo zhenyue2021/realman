@@ -11,6 +11,16 @@ import java.util.List;
 public interface SysUserDepartLiteMapper {
 
     /**
+     * 查询用户所属部门/企业 ID 列表（sys_user_depart.dep_id）。
+     */
+    @Select("""
+            SELECT sud.dep_id
+            FROM sys_user_depart sud
+            WHERE sud.user_id = #{userId}
+            """)
+    List<String> listDepartIdsByUserId(@Param("userId") String userId);
+
+    /**
      * 查询指定企业/部门下用户列表。
      * 返回用户 id + realname。
      */
