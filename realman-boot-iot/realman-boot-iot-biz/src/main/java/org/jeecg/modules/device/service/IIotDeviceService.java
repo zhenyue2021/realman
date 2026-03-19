@@ -38,8 +38,10 @@ public interface IIotDeviceService extends IService<IotDevice> {
 
     /**
      * 开始遥操：通知主控关联目标机器人，不等待ACK。
+     *
+     * @return 全部摄像头流信息列表
      */
-    void startTeleop(String controllerId, String robotId, String operator);
+    List<DeviceCameraStreamVO> startTeleop(String controllerId, String robotId, String operator);
 
     /**
      * 停止遥操：通知主控与机器人停止遥操，不等待ACK。

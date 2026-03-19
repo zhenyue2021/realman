@@ -423,7 +423,7 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void startTeleop(String controllerId, String robotId, String operator) {
+    public List<DeviceCameraStreamVO> startTeleop(String controllerId, String robotId, String operator) {
         IotDevice controller = require(controllerId);
         if (!Objects.equals(controller.getDeviceType(), 2)) {
             throw new RuntimeException("设备类型不匹配：不是主控设备");
@@ -458,6 +458,8 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
                     DeviceConstant.OperationType.COMMAND_SEND,
                     "开始遥操：设备状态置为使用中", "{commandId:" + commandId + "}",
                     DeviceConstant.OperationSource.PLATFORM, "SUCCESS", null, operator, null);
+            // 获取机器人的摄像头视频流
+            return getCameraStreams(robot.getId(), null);
         } catch (Exception e) {
             throw new RuntimeException("开始遥操失败: " + e.getMessage(), e);
         }

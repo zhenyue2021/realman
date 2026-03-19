@@ -230,11 +230,11 @@ public class MasterDeviceController {
     /** 开始遥操（通知主控关联目标机器人，不等待ACK） */
     @PostMapping("/{controllerId}/teleop/start")
     @Operation(summary = "开始遥操")
-    public ApiResult<Void> startTeleop(@PathVariable String controllerId,
+    public ApiResult<List<DeviceCameraStreamVO>> startTeleop(@PathVariable String controllerId,
                                        @RequestBody TeleopStartDTO dto) {
         ensureDeviceType(controllerId, DEVICE_TYPE_CONTROLLER);
-        deviceService.startTeleop(controllerId, dto.getDeviceId(), dto.getOperator());
-        return ApiResult.ok(null, "开始遥操指令已下发");
+        List<DeviceCameraStreamVO> cameraStreams = deviceService.startTeleop(controllerId, dto.getDeviceId(), dto.getOperator());
+        return ApiResult.ok(cameraStreams, "开始遥操指令已下发，并尝试获取视频流");
     }
 
     /** 停止遥操（通知主控与机器人，不等待ACK） */
