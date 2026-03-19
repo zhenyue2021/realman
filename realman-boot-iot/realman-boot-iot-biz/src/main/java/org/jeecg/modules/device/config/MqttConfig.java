@@ -115,8 +115,8 @@ public class MqttConfig {
                 "master/+/command/+/ack",           // 主控端指令集执行确认（力反馈/底盘速度，...）
                 "device/+/ota/progress",            // OTA 升级进度上报
                 "device/+/log/operation",           // 设备操作日志上报
-                "device/+/camera/stream/response",  // 机器人上报摄像头视频流地址
-                "master/+/teleop/associated-device/response", // 主控上报当前关联设备信息
+                "device/+/camera/stream/ack",  // 机器人上报摄像头视频流地址
+                "master/+/teleop/associated-device/ack", // 主控上报当前关联设备信息
                 "$SYS/brokers/+/clients/+/connected",    // EMQX 设备上线事件
                 "$SYS/brokers/+/clients/+/disconnected",  // EMQX 设备下线事件
                 // ========== 订阅主控设备主动上报的数据 ==========

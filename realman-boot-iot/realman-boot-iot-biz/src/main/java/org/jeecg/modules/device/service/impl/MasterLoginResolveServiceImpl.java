@@ -225,7 +225,7 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
                 MqttMessageModel.RobotAssignCommand assignCmd = MqttMessageModel.RobotAssignCommand.builder()
                         .commandId(UUID.randomUUID().toString())
                         .robotCode(robot.getDeviceCode())
-                        .workOrderId(firstOrder.getId())
+//                        .workOrderId(firstOrder.getId())
                         .timestamp(System.currentTimeMillis())
                         .build();
                 String topic = String.format(DeviceConstant.MqttTopic.TELEOP_ROBOT_ASSIGN, controller.getDeviceCode());
