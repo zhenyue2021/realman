@@ -72,8 +72,7 @@ public class MqttConfig {
      */
     @Bean
     public MqttClient mqttClient() throws MqttException {
-        MqttClient client = new MqttClient(brokerUrl,
-                clientId + "-" + System.currentTimeMillis(), new MemoryPersistence());
+        MqttClient client = new MqttClient(brokerUrl, clientId, new MemoryPersistence());
 
         MqttConnectOptions opts = new MqttConnectOptions();
         opts.setCleanSession(false);           // 非 cleanSession：QoS1 消息在断线重连后可恢复
