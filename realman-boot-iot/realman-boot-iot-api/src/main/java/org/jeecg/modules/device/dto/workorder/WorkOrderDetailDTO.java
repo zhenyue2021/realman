@@ -47,6 +47,7 @@ public class WorkOrderDetailDTO {
     @Dict(dicCode = "order_status")
     private String status;
 
+    @Dict(dicCode = "audit_result")
     private String auditResult;
 
     private String operatorId;
