@@ -36,7 +36,7 @@ public class SlamPendingSyncService {
     private final MinioClient minioClient;
     private final ObjectMapper objectMapper;
 
-    @Value("${minio.bucket-name:iot-firmware}")
+    @Value("${minio.bucket-name.slam:iot-slam}")
     private String bucketName;
 
     public void flushPendingSyncCommands(String deviceCode) {

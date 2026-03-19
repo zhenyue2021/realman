@@ -51,13 +51,13 @@ public class IotSlamServiceImpl implements IIotSlamService {
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
 
-    @Value("${minio.bucket-name:iot-firmware}")
+    @Value("${minio.bucket-name.slam:iot-slam}")
     private String bucketName;
 
     @Override
     public IPage<IotSlamMap> pageMaps(String tenantId, SlamMapPageQueryDTO query) {
         int pageNo = query.getPageNo() == null ? 1 : query.getPageNo();
-        int pageSize = query.getPageSize() == null ? 20 : query.getPageSize();
+        int pageSize = query.getPageSize() == null ? 10 : query.getPageSize();
         LambdaQueryWrapper<IotSlamMap> wrapper = new LambdaQueryWrapper<>();
         if (tenantId != null && !tenantId.isBlank()) {
             wrapper.eq(IotSlamMap::getTenantId, tenantId);

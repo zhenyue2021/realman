@@ -63,7 +63,7 @@ public class IotOtaServiceImpl extends ServiceImpl<IotOtaFirmwareMapper, IotOtaF
     private final IDeviceOperationLogService logService;
 
     /** MinIO 存储桶名称 */
-    @Value("${minio.bucket-name:iot-firmware}")
+    @Value("${minio.bucket-name.firmware:iot-firmware}")
     private String bucketName;
 
     /** 预签名下载 URL 有效期（天） */
