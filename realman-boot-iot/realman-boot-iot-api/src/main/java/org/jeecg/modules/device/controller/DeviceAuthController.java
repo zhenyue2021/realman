@@ -100,12 +100,6 @@ public class DeviceAuthController {
         return ApiResult.ok(deviceAuthApiService.availableDevices(request, 1));
     }
 
-    @GetMapping("/options/devices/available")
-    @Operation(summary = "可授权设备下拉列表（deviceType=1机器人/2主控）")
-    public ApiResult<List<OptionDTO>> availableDevices(@RequestParam("deviceType") Integer deviceType,
-                                                       HttpServletRequest request) {
-        return ApiResult.ok(deviceAuthApiService.availableDevices(request, deviceType));
-    }
 
     @PostMapping("/export")
     @Operation(summary = "导出授权列表Excel")
