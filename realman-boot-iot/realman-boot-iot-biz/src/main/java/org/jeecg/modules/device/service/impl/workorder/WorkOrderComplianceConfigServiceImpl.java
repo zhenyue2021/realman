@@ -31,6 +31,7 @@ public class WorkOrderComplianceConfigServiceImpl
         if (enterpriseId != null && !enterpriseId.isEmpty()) {
             wrapper.eq(WorkOrderComplianceConfig::getEnterpriseId, enterpriseId);
         }
+        wrapper.eq(WorkOrderComplianceConfig::getApplyStatus, applyStatus);
         wrapper.orderByDesc(WorkOrderComplianceConfig::getCreateTime);
         return this.page(page, wrapper);
     }
