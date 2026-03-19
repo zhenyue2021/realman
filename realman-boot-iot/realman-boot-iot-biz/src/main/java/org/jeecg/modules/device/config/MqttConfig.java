@@ -117,7 +117,7 @@ public class MqttConfig {
                 "device/+/ota/progress",            // OTA 升级进度上报
                 "device/+/log/operation",           // 设备操作日志上报
                 "device/+/camera/stream/response",  // 机器人上报摄像头视频流地址
-                "device/+/teleop/associated-device/response", // 主控上报当前关联设备信息
+                "master/+/teleop/associated-device/response", // 主控上报当前关联设备信息
                 "$SYS/brokers/+/clients/+/connected",    // EMQX 设备上线事件
                 "$SYS/brokers/+/clients/+/disconnected",  // EMQX 设备下线事件
                 // ========== 订阅主控设备主动上报的数据 ==========

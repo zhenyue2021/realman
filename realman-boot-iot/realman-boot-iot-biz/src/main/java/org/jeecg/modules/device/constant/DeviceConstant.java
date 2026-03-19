@@ -89,13 +89,13 @@ public interface DeviceConstant {
          * <p>配合 {@link org.jeecg.modules.device.mqtt.MqttMessageModel.AssociatedDeviceQuery} 使用，
          * 主控收到后应回复 {@link org.jeecg.modules.device.mqtt.MqttMessageModel.AssociatedDeviceResponse}。
          */
-        String ASSOCIATED_DEVICE_QUERY    = "device/%s/teleop/associated-device/query";
+        String ASSOCIATED_DEVICE_QUERY    = "master/%s/teleop/associated-device/query";
         /**
          * 上行：主控上报“当前关联的机器人/设备信息”
          *
          * <p>Topic: device/{controllerCode}/teleop/associated-device/response
          */
-        String ASSOCIATED_DEVICE_RESPONSE = "device/%s/teleop/associated-device/response";
+        String ASSOCIATED_DEVICE_RESPONSE = "master/%s/teleop/associated-device/response";
 
         /**
          * 下行：平台通知主控当前应操作的机器人（Topic: device/{controllerCode}/teleop/robot/assign）
@@ -103,7 +103,7 @@ public interface DeviceConstant {
          * <p>配合 {@link org.jeecg.modules.device.mqtt.MqttMessageModel.RobotAssignCommand} 使用，
          * 主控收到后即知晓本次遥操任务对应的目标机器人。
          */
-        String TELEOP_ROBOT_ASSIGN = "device/%s/teleop/robot/assign";
+        String TELEOP_ROBOT_ASSIGN = "master/%s/teleop/robot/assign";
 
         /** EMQX 系统事件：设备 MQTT 连接建立（clientId 从 topic 路径中提取） */
         String SYS_CONNECTED    = "$SYS/brokers/+/clients/+/connected";

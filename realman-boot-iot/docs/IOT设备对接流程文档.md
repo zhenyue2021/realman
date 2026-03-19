@@ -239,30 +239,30 @@ def decrypt_message(device_code: str, encrypted: str) -> str:
 
 ### 4.1 上行 Topic（设备发布 → 平台订阅）
 
-| Topic | QoS | 说明 | 联调情况   |
-|-------|-----|------|--------|
-| `device/{deviceCode}/status/report` | 1 | 设备周期性状态上报 | 联调完成   |
-| `device/{deviceCode}/config/ack` | 1 | 参数配置执行确认 | 未联调    |
-| `device/{deviceCode}/command/{cmd}/ack` | 1 | 指令集执行确认（如 `restart`、`emergency-stop` 等） | 重启联调完成 |
-| `device/{deviceCode}/ota/progress` | 1 | OTA 升级进度上报 | 未联调    |
-| `device/{deviceCode}/log/operation` | 1 | 设备操作日志上报 | 联调完成   |
-| `device/{deviceCode}/camera/stream/response` | 1 | 机器人上报摄像头视频流地址（见第 12 章） | 未联调    |
-| `device/{controllerCode}/teleop/associated-device/response` | 1 | 主控上报当前关联的机器人/设备信息 | 未联调    |
-| `master/{controllerCode}/command/{cmd}/ack` | 1 | 主控设备指令 ACK（力反馈/运动与安全参数等） | 未联调    |
+| Topic | QoS | 说明                                        | 联调情况   |
+|-------|-----|-------------------------------------------|--------|
+| `device/{deviceCode}/status/report` | 1 | 设备周期性状态上报                                 | 联调完成   |
+| `device/{deviceCode}/config/ack` | 1 | 参数配置执行确认                                  | 未联调    |
+| `device/{deviceCode}/command/{cmd}/ack` | 1 | 指令集执行确认（如 `restart`、`emergency-stop` 等）   | 重启联调完成 |
+| `device/{deviceCode}/ota/progress` | 1 | OTA 升级进度上报                                | 未联调    |
+| `device/{deviceCode}/log/operation` | 1 | 设备操作日志上报                                  | 联调完成   |
+| `device/{deviceCode}/camera/stream/response` | 1 | 机器人上报摄像头视频流地址（见第 12 章）                    | 未联调    |
+| `master/{controllerCode}/teleop/associated-device/response` | 1 | 主控上报当前设备Mac信息                             | 未联调    |
+| `master/{controllerCode}/command/{cmd}/ack` | 1 | 主控设备指令 ACK（力反馈/运动与安全参数等）                  | 未联调    |
 | `{robotCode}/slave/status` | 1 | 机器人原始状态上报（遥操作场景，明文 JSON，由平台透传至 WebSocket） | 未联调    |
 
 ### 4.2 下行 Topic（平台发布 → 设备订阅）
 
-| Topic                                                    | QoS | 说明 | 联调情况 |
-|----------------------------------------------------------|-----|------|------|
-| `device/{deviceCode}/config/push`                        | 1 | 参数配置下发 | 未联调  |
-| `device/{deviceCode}/command/restart`                    | 1 | 远程重启指令 | 联调完成 |
-| `device/{deviceCode}/command/emergency-stop`             | 1 | 紧急停机指令 | 未联调  |
-| `device/{deviceCode}/ota/notify`                         | 1 | OTA 升级通知 | 未联调  |
-| `device/{deviceCode}/camera/stream/query`                | 1 | 查询摄像头视频流地址（见第 12 章） | 未联调  |
-| `device/{controllerCode}/teleop/associated-device/query` | 1 | 平台向主控查询“当前关联机器人/设备信息” | 未联调  |
-| `device/{controllerCode}/teleop/robot/assign`            | 1 | 平台通知主控当前应操作的机器人 | 未联调  |
-| `master/{controllerCode}/command/force-feedback`         | 1 | 平台向主控设置力反馈参数（机械臂/夹爪力度） | 未联调  |
+| Topic                                                    | QoS | 说明                      | 联调情况 |
+|----------------------------------------------------------|-----|-------------------------|------|
+| `device/{deviceCode}/config/push`                        | 1 | 参数配置下发                  | 未联调  |
+| `device/{deviceCode}/command/restart`                    | 1 | 远程重启指令                  | 联调完成 |
+| `device/{deviceCode}/command/emergency-stop`             | 1 | 紧急停机指令                  | 未联调  |
+| `device/{deviceCode}/ota/notify`                         | 1 | OTA 升级通知                | 未联调  |
+| `device/{deviceCode}/camera/stream/query`                | 1 | 查询摄像头视频流地址（见第 12 章）     | 未联调  |
+| `master/{controllerCode}/teleop/associated-device/query` | 1 | 平台向主控查询“当前设备Mac信息”      | 未联调  |
+| `master/{controllerCode}/teleop/robot/assign`            | 1 | 平台通知主控当前应操作的机器人         | 未联调  |
+| `master/{controllerCode}/command/force-feedback`         | 1 | 平台向主控设置力反馈参数（机械臂/夹爪力度）  | 未联调  |
 | `master/{controllerCode}/command/sport-speed`            | 1 | 平台向主控设置运动与安全参数（底盘/升降速度） | 未联调  |
 
 ### 4.3 系统事件 Topic（EMQX 内部，平台订阅）
