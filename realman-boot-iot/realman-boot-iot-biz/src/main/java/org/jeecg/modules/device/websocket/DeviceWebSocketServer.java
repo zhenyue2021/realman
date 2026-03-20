@@ -111,6 +111,19 @@ public class DeviceWebSocketServer {
     }
 
     /**
+     * 推送“主控设备原始状态”数据（由 RobotSlaveStatusHandler.handleMasterStatus 在收到 {controllerCode}/master/states 后调用）
+     *
+     *
+     * @param robotCode  机器人设备编码
+     * @param statusJson 机器人状态 JSON（原始上报数据）
+     */
+    public void pushMasterStatus(String robotCode, String statusJson) {
+        String msg = "{\"type\":\"MASTER_STATUS\",\"deviceCode\":\"" + robotCode + "\",\"data\":" + statusJson + "}";
+        send(robotCode, msg);
+        send("all", msg);
+    }
+
+    /**
      * 推送设备上线/下线事件（由 DeviceOnlineOfflineHandler 在处理 $SYS 事件后调用）
      *
      * <p>同时推送给该设备的订阅者和 "all" 全局订阅者。

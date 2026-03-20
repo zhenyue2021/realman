@@ -34,5 +34,16 @@ public class RobotSlaveStatusHandler {
         // 直接通过 WebSocket 转发给订阅该机器人的前端（以及全局订阅者）
         deviceWebSocketServer.pushRobotStatus(robotCode, payload);
     }
+    /**
+     * 处理主控设备原始状态上报
+     *
+     * @param robotCode 主控设备编码（来自 Topic 前缀）
+     * @param payload   原始 JSON 文本（非加密）
+     */
+    public void handleMasterStatus(String robotCode, String payload) {
+        log.info("[RobotSlaveStatusHandler] 收到主控状态上报 robotCode={}, payload={}", robotCode, payload);
+        // 直接通过 WebSocket 转发给订阅该主控设备的前端（以及全局订阅者）
+        deviceWebSocketServer.pushMasterStatus(robotCode, payload);
+    }
 }
 

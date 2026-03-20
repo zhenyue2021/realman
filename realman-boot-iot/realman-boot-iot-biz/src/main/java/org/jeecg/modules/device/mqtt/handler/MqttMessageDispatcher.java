@@ -153,8 +153,13 @@ public class MqttMessageDispatcher {
     private void dispatchRawTopic(String deviceCode, String role, String path, String payload) {
         // TODO: 按需注入对应 Handler 并路由
         // 机器人原始状态上报：{robotCode}/slave/status
-        if ("slave".equals(role) && "status".equals(path)) {
+        if ("slave".equals(role) && "states".equals(path)) {
             robotSlaveStatusHandler.handle(deviceCode, payload);
+            return;
+        }
+        // 主控设备原始状态上报：{robotCode}/master/states
+        if ("master".equals(role) && "states".equals(path)) {
+            robotSlaveStatusHandler.handleMasterStatus(deviceCode, payload);
             return;
         }
         log.debug("[Dispatcher] 原始上报 deviceCode={} role={} path={}", deviceCode, role, path);
