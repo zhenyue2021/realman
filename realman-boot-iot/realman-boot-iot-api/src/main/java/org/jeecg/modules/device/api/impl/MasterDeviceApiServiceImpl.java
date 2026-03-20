@@ -1,5 +1,6 @@
 package org.jeecg.modules.device.api.impl;
 
+import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -69,7 +70,7 @@ public class MasterDeviceApiServiceImpl implements MasterDeviceApiService {
 
         List<MasterDevicePageItemDTO> records = devices.stream().map(d -> {
             MasterDevicePageItemDTO item = new MasterDevicePageItemDTO();
-            item.setDevice(d);
+            BeanUtil.copyProperties(d, item);
             item.setRunningStatus(d.getStatus());
 
             IotMasterLoginLog last = lastLoginByControllerId.get(d.getId());
