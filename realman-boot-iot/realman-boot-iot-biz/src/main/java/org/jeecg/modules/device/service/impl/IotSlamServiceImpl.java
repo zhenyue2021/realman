@@ -27,6 +27,7 @@ import org.jeecg.modules.device.mapper.IotSlamSyncTaskMapper;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.mqtt.publisher.MqttPublisher;
 import org.jeecg.modules.device.service.IIotSlamService;
+import org.jeecg.modules.device.util.MinioUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -50,6 +51,7 @@ public class IotSlamServiceImpl implements IIotSlamService {
     private final MqttPublisher mqttPublisher;
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
+    private final MinioUtil minioUtil;
 
     @Value("${minio.bucket-name.slam:iot-slam}")
     private String bucketName;
@@ -361,6 +363,7 @@ public class IotSlamServiceImpl implements IIotSlamService {
 
     private String presignPutUrl(String objectKey, long minutes) {
         try {
+            minioUtil.ensureBucketExists(bucketName);
             return minioClient.getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder()
                     .method(Method.PUT)
                     .bucket(bucketName)
@@ -374,6 +377,7 @@ public class IotSlamServiceImpl implements IIotSlamService {
 
     private String presignGetUrl(String objectKey, long minutes) {
         try {
+            minioUtil.ensureBucketExists(bucketName);
             return minioClient.getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder()
                     .method(Method.GET)
                     .bucket(bucketName)

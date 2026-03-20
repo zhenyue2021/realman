@@ -19,6 +19,7 @@ import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.mqtt.publisher.MqttPublisher;
 import org.jeecg.modules.device.service.IDeviceOperationLogService;
 import org.jeecg.modules.device.service.IIotOtaService;
+import org.jeecg.modules.device.util.MinioUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -60,6 +61,7 @@ public class IotOtaServiceImpl extends ServiceImpl<IotOtaFirmwareMapper, IotOtaF
     private final StringRedisTemplate        redisTemplate;
     private final ObjectMapper               objectMapper;
     private final MinioClient                minioClient;
+    private final MinioUtil minioUtil;
     private final IDeviceOperationLogService logService;
 
     /** MinIO 存储桶名称 */
@@ -167,6 +169,7 @@ public class IotOtaServiceImpl extends ServiceImpl<IotOtaFirmwareMapper, IotOtaF
         String md5  = DigestUtil.md5Hex(merged);
         long   size = merged.length();
         String obj  = "firmware/" + productId + "/" + version + "/" + mergedName;
+        minioUtil.ensureBucketExists(bucketName);
 
         // 4. 上传到 MinIO
         try (FileInputStream fis = new FileInputStream(merged)) {

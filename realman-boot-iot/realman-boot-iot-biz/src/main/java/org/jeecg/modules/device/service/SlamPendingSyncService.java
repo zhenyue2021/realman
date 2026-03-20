@@ -14,6 +14,7 @@ import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.mqtt.publisher.MqttPublisher;
 import org.jeecg.modules.device.mapper.IotRobotSlamBindingMapper;
 import org.jeecg.modules.device.mapper.IotSlamMapMapper;
+import org.jeecg.modules.device.util.MinioUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
@@ -34,6 +35,7 @@ public class SlamPendingSyncService {
     @Lazy
     private final MqttPublisher mqttPublisher;
     private final MinioClient minioClient;
+    private final MinioUtil minioUtil;
     private final ObjectMapper objectMapper;
 
     @Value("${minio.bucket-name.slam:iot-slam}")
@@ -89,6 +91,7 @@ public class SlamPendingSyncService {
 
     private String presignGetUrl(String objectKey, long minutes) {
         try {
+            minioUtil.ensureBucketExists(bucketName);
             return minioClient.getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder()
                     .method(Method.GET)
                     .bucket(bucketName)

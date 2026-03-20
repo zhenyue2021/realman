@@ -19,6 +19,7 @@ import org.jeecg.modules.device.mapper.IotSlamSyncTaskMapper;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.mqtt.publisher.MqttPublisher;
 import org.jeecg.modules.device.service.impl.IotSlamServiceImpl;
+import org.jeecg.modules.device.util.MinioUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -38,6 +39,7 @@ public class IotSlamServiceImplTest {
     private IotSlamSyncTaskMapper taskMapper;
     private IotDeviceMapper deviceMapper;
     private MinioClient minioClient;
+    private MinioUtil minioUtil;
     private MqttPublisher mqttPublisher;
     private StringRedisTemplate redisTemplate;
 
@@ -54,6 +56,7 @@ public class IotSlamServiceImplTest {
         taskMapper = Mockito.mock(IotSlamSyncTaskMapper.class);
         deviceMapper = Mockito.mock(IotDeviceMapper.class);
         minioClient = Mockito.mock(MinioClient.class);
+        minioUtil = Mockito.mock(MinioUtil.class);
         mqttPublisher = Mockito.mock(MqttPublisher.class);
         redisTemplate = Mockito.mock(StringRedisTemplate.class);
         @SuppressWarnings("unchecked")
@@ -62,7 +65,7 @@ public class IotSlamServiceImplTest {
 
         service = new IotSlamServiceImpl(
                 slamMapMapper, bindingMapper, taskMapper, deviceMapper,
-                minioClient, mqttPublisher, redisTemplate, new ObjectMapper());
+                minioClient, mqttPublisher, redisTemplate, new ObjectMapper(), minioUtil);
         ReflectionTestUtils.setField(service, "bucketName", "iot-firmware");
     }
 
