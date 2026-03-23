@@ -13,15 +13,18 @@ import lombok.extern.slf4j.Slf4j;
 import org.jeecg.common.exception.JeecgBootException;
 import org.jeecg.common.system.util.JwtUtil;
 import org.jeecg.common.util.ContentDispositionUtil;
+import org.jeecg.modules.device.api.RobotDeviceApiService;
 import org.jeecg.modules.device.dto.DeviceAddDTO;
 import org.jeecg.modules.device.dto.EmergencyStopDTO;
 import org.jeecg.modules.device.dto.DeviceRequestDTO;
 import org.jeecg.modules.device.dto.DeviceRestartDTO;
 import org.jeecg.modules.device.dto.DeviceUpdateDTO;
+import org.jeecg.modules.device.dto.RobotDevicePageItemDTO;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.service.IIotDeviceService;
 import org.jeecg.modules.device.vo.ApiResult;
 import org.jeecg.modules.device.vo.DeviceDetailVO;
+import org.jeecg.modules.device.vo.RobotDeviceDetailVO;
 import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -45,12 +48,13 @@ public class RobotDeviceController {
     private static final int DEVICE_TYPE_ROBOT = 1;
 
     private final IIotDeviceService deviceService;
+    private final RobotDeviceApiService robotDeviceApiService;
     private final DeviceWebSocketServer webSocketServer;
 
     /** 新增机器人设备 */
     @PostMapping("/add")
     @Operation(summary = "新增机器人设备")
-    public ApiResult<IotDevice> addDevice(@Valid @RequestBody DeviceAddDTO dto) {
+    public ApiResult<RobotDevicePageItemDTO> addDevice(@Valid @RequestBody DeviceAddDTO dto) {
         IotDevice d = new IotDevice();
         d.setDeviceCode(dto.getDeviceCode());
         d.setDeviceName(dto.getDeviceName());
@@ -60,30 +64,27 @@ public class RobotDeviceController {
         d.setSerialNumber(dto.getSerialNumber());
         d.setMacAddress(dto.getMacAddress());
         d.setDescription(dto.getDescription());
-        return ApiResult.ok(deviceService.addDevice(d), "设备添加成功");
+        IotDevice saved = deviceService.addDevice(d);
+        return ApiResult.ok(robotDeviceApiService.toPageItem(saved), "设备添加成功");
     }
 
     /** 分页查询机器人设备列表 */
     @PostMapping("/list")
     @Operation(summary = "分页查询机器人设备列表")
-    public ApiResult<IPage<IotDevice>> list(HttpServletRequest request,
-                                           @RequestBody DeviceRequestDTO requestDTO) {
+    public ApiResult<IPage<RobotDevicePageItemDTO>> list(HttpServletRequest request,
+                                                         @RequestBody DeviceRequestDTO requestDTO) {
         fillAuthContext(request, requestDTO);
         requestDTO.setDeviceType(DEVICE_TYPE_ROBOT);
         int pageNo = Objects.nonNull(requestDTO.getPageNo()) ? requestDTO.getPageNo() : 1;
         int pageSize = Objects.nonNull(requestDTO.getPageSize()) ? requestDTO.getPageSize() : 10;
-        return ApiResult.ok(deviceService.queryDevicePage(new Page<>(pageNo, pageSize), requestDTO));
+        return ApiResult.ok(robotDeviceApiService.pageRobots(new Page<>(pageNo, pageSize), requestDTO));
     }
 
     /** 查询机器人设备详情 */
     @GetMapping("/{deviceId}")
     @Operation(summary = "查询机器人设备详情")
-    public ApiResult<IotDevice> detail(@PathVariable String deviceId) {
-        IotDevice d = deviceService.getById(deviceId);
-        if (d != null && !Objects.equals(d.getDeviceType(), DEVICE_TYPE_ROBOT)) {
-            throw new RuntimeException("设备类型不匹配：该ID不是机器人设备");
-        }
-        return ApiResult.ok(d);
+    public ApiResult<RobotDevicePageItemDTO> detail(@PathVariable String deviceId) {
+        return ApiResult.ok(robotDeviceApiService.getRobotDeviceView(deviceId));
     }
 
     /** 查询机器人设备详情（聚合） */
@@ -172,8 +173,6 @@ public class RobotDeviceController {
         return ApiResult.ok(deviceService.batchGetOnlineStatus(deviceIds));
     }
 
-
-
     /** 导出机器人设备列表为 Excel（条件与 list 一致，逻辑删除的不导出） */
     @PostMapping("/export")
     @Operation(summary = "导出机器人设备列表Excel")
@@ -206,7 +205,6 @@ public class RobotDeviceController {
         if (!Objects.equals(d.getDeviceType(), expectType)) throw new RuntimeException("设备类型不匹配");
     }
 
-
     @PostMapping("/mock/device-status")
     public void mockDeviceStatusJob() {
         List<IotDevice> devices = deviceService.list(Wrappers.lambdaQuery(IotDevice.class));
@@ -218,4 +216,3 @@ public class RobotDeviceController {
         log.info("[mockDeviceStatusJob] 模拟推送数据 {} 条（设备数={}）", devices.size(), devices.size());
     }
 }
-

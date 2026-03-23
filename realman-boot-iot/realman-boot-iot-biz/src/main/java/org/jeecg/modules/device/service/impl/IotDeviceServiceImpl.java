@@ -68,6 +68,7 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
     private final StringRedisTemplate        redisTemplate;
     private final ObjectMapper               objectMapper;
     private final IDeviceOperationLogService logService;
+    private final IotDeviceAuthMapper deviceAuthMapper;
     private final DeviceCameraStreamPendingService deviceCameraStreamPendingService;
 
     /**
@@ -735,5 +736,35 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
         IotDevice d = deviceMapper.selectById(deviceId);
         if (d == null) throw new RuntimeException("设备不存在: " + deviceId);
         return d;
+    }
+
+
+    @Override
+    public Map<String, IotDeviceAuth> loadTenantAuth(List<String> deviceIds, String tenantId, String deviceType) {
+        if (deviceIds == null || deviceIds.isEmpty() || tenantId == null || tenantId.isBlank()) {
+            return Map.of();
+        }
+        LocalDateTime now = LocalDateTime.now();
+        LambdaQueryWrapper<IotDeviceAuth> iotDeviceAuthLambdaQueryWrapper = new LambdaQueryWrapper<IotDeviceAuth>()
+                .eq(IotDeviceAuth::getTenantId, tenantId)
+                .eq(IotDeviceAuth::getStatus, 1)
+                .eq(IotDeviceAuth::getDelFlag, 0)
+                .and(w -> w.isNull(IotDeviceAuth::getEffectiveTime).or().le(IotDeviceAuth::getEffectiveTime, now))
+                .and(w -> w.isNull(IotDeviceAuth::getExpireTime).or().ge(IotDeviceAuth::getExpireTime, now))
+                .orderByDesc(IotDeviceAuth::getEffectiveTime);
+        if (Objects.equals(deviceType, DeviceConstant.DeviceType.CONTROLLER)) {
+            iotDeviceAuthLambdaQueryWrapper.in(IotDeviceAuth::getControllerId, deviceIds);
+        }
+        if (Objects.equals(deviceType, DeviceConstant.DeviceType.ROBOT)) {
+            iotDeviceAuthLambdaQueryWrapper.in(IotDeviceAuth::getDeviceId, deviceIds);
+        }
+        List<IotDeviceAuth> auths = deviceAuthMapper.selectList(iotDeviceAuthLambdaQueryWrapper);
+        if (auths == null || auths.isEmpty()) {
+            return Map.of();
+        }
+        // 多条时取 effective_time 最新的一条
+        return auths.stream()
+                .filter(a -> a.getControllerId() != null)
+                .collect(Collectors.toMap(IotDeviceAuth::getControllerId, a -> a, (a, b) -> a));
     }
 }

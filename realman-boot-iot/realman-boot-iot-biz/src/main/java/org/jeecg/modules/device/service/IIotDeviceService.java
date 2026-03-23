@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import org.jeecg.modules.device.dto.DeviceRequestDTO;
 import org.jeecg.modules.device.dto.DeviceUpdateDTO;
 import org.jeecg.modules.device.entity.IotDevice;
+import org.jeecg.modules.device.entity.IotDeviceAuth;
 import org.jeecg.modules.device.vo.DeviceCameraStreamVO;
 import org.jeecg.modules.device.vo.DeviceDetailVO;
 
@@ -66,4 +67,13 @@ public interface IIotDeviceService extends IService<IotDevice> {
      * @return 摄像头流信息列表（cameraIndex 为空时为全部，非空时通常只包含单路）
      */
     List<DeviceCameraStreamVO> getCameraStreams(String deviceId, Integer cameraIndex);
+
+    /**
+     * 查询设备授权信息
+     * @param deviceIds
+     * @param tenantId
+     * @param deviceTyp
+     * @return
+     */
+    Map<String, IotDeviceAuth> loadTenantAuth(List<String> deviceIds, String tenantId, String deviceTyp);
 }

@@ -99,9 +99,9 @@ public interface DeviceConstant {
         /**
          * 上行：主控上报“当前关联的机器人/设备信息”
          *
-         * <p>Topic: device/{controllerCode}/teleop/associated-device/response
+         * <p>Topic: device/{controllerCode}/teleop/associated-device/ack
          */
-        String ASSOCIATED_DEVICE_RESPONSE = "master/%s/teleop/associated-device/response";
+        String ASSOCIATED_DEVICE_ACK = "master/%s/teleop/associated-device/ack";
 
         /**
          * 下行：平台通知主控当前应操作的机器人（Topic: device/{controllerCode}/teleop/robot/assign）
@@ -208,6 +208,19 @@ public interface DeviceConstant {
         String PLATFORM = "PLATFORM";
         /** 由设备端主动上报的事件（MQTT 消息） */
         String DEVICE   = "DEVICE";
+    }
+    /**
+     * 设备类型
+     */
+    interface DeviceType {
+        /**
+         * 主控设备
+         */
+        String CONTROLLER = "2";
+        /**
+         * 机器人设备
+         */
+        String ROBOT = "1";
     }
 
     /**

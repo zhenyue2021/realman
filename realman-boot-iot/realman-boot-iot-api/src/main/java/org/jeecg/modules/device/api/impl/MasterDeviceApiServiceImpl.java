@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import org.jeecg.modules.device.api.MasterDeviceApiService;
+import org.jeecg.modules.device.constant.DeviceConstant;
 import org.jeecg.modules.device.dto.DeviceRequestDTO;
 import org.jeecg.modules.device.dto.MasterDevicePageItemDTO;
 import org.jeecg.modules.device.entity.IotDevice;
@@ -63,7 +64,7 @@ public class MasterDeviceApiServiceImpl implements MasterDeviceApiService {
         Map<String, IotMasterLoginLog> lastLoginByControllerId = loadLastLogin(controllerIds);
 
         // 3) 授权生效/失效时间（按当前租户）
-        Map<String, IotDeviceAuth> authByControllerId = loadTenantAuth(controllerIds, dto.getCurrentTenantId());
+        Map<String, IotDeviceAuth> authByControllerId = deviceService.loadTenantAuth(controllerIds, dto.getCurrentTenantId(), DeviceConstant.DeviceType.CONTROLLER);
 
         // 4) 经纬度反解地址（尽力而为）
         Map<String, String> addressCache = new HashMap<>();
@@ -114,27 +115,6 @@ public class MasterDeviceApiServiceImpl implements MasterDeviceApiService {
         return map;
     }
 
-    private Map<String, IotDeviceAuth> loadTenantAuth(List<String> controllerIds, String tenantId) {
-        if (controllerIds == null || controllerIds.isEmpty() || tenantId == null || tenantId.isBlank()) {
-            return Map.of();
-        }
-        LocalDateTime now = LocalDateTime.now();
-        List<IotDeviceAuth> auths = deviceAuthMapper.selectList(new LambdaQueryWrapper<IotDeviceAuth>()
-                .eq(IotDeviceAuth::getTenantId, tenantId)
-                .in(IotDeviceAuth::getControllerId, controllerIds)
-                .eq(IotDeviceAuth::getStatus, 1)
-                .eq(IotDeviceAuth::getDelFlag, 0)
-                .and(w -> w.isNull(IotDeviceAuth::getEffectiveTime).or().le(IotDeviceAuth::getEffectiveTime, now))
-                .and(w -> w.isNull(IotDeviceAuth::getExpireTime).or().ge(IotDeviceAuth::getExpireTime, now))
-                .orderByDesc(IotDeviceAuth::getEffectiveTime));
-        if (auths == null || auths.isEmpty()) {
-            return Map.of();
-        }
-        // 多条时取 effective_time 最新的一条
-        return auths.stream()
-                .filter(a -> a.getControllerId() != null)
-                .collect(Collectors.toMap(IotDeviceAuth::getControllerId, a -> a, (a, b) -> a));
-    }
 
     private String reverseGeocodeCached(BigDecimal latitude, BigDecimal longitude, Map<String, String> cache) {
         if (latitude == null || longitude == null) {

@@ -40,15 +40,13 @@
                 AND d.status = #{status}
             </if>
 
-            <!--
-              授权关联与生效/失效时间过滤（超管与非超管共用同一套时间条件）：
-              - 非超管：必须存在当前有效授权，且租户匹配（若有 currentTenantId）；若传了 authEffectiveTime/authExpireTime 再叠加时间条件。
-              - 超管：默认不按授权表收窄；若传了 authEffectiveTime 或 authExpireTime，则必须存在满足相同时间条件的当前有效授权（可选按 currentTenantId 收窄）。
-            -->
-            AND EXISTS (
-            SELECT 1 FROM iot_device_auth a
-            <include refid="deviceListAuthExistsWhere"/>
-            )
+            <!-- 仅当传入授权时间查询条件时，才关联 iot_device_auth 表进行过滤 -->
+            <if test="authEffectiveTime != null or authExpireTime != null">
+                AND EXISTS (
+                SELECT 1 FROM iot_device_auth a
+                <include refid="deviceListAuthExistsWhere"/>
+                )
+            </if>
         </where>
         ORDER BY d.create_time DESC
     </select>
