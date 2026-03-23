@@ -272,4 +272,9 @@ public class SysUser implements Serializable {
      */
     @TableField(exist = false)
     private String belongDepIds;
+    /**
+     * 所属部门的名称
+     */
+    @TableField(exist = false)
+    private String belongDepName;
 }

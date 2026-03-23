@@ -463,9 +463,14 @@
         order by su.sort,su.create_time desc
     </select>
 
-    <!-- 查询系统用户 listAll（支持：realname模糊 + departId/roleId/tenantId可空条件） -->
+    <!-- 查询系统用户 listAll（支持：realname模糊 + departId/roleId/tenantId可空条件）；belongDepName：用户所属部门名称（单部门，多关联时取一条） -->
     <select id="queryAllPageList" resultType="org.jeecg.modules.system.entity.SysUser">
-        SELECT DISTINCT su.*
+        SELECT su.*,
+        (SELECT sd.depart_name
+         FROM sys_user_depart sud
+         INNER JOIN sys_depart sd ON sd.id = sud.dep_id AND sd.del_flag = '0'
+         WHERE sud.user_id = su.id
+         LIMIT 1) AS belongDepName
         FROM sys_user su
         WHERE su.del_flag = 0
           AND su.username <![CDATA[ != ]]> '_reserve_user_external'
