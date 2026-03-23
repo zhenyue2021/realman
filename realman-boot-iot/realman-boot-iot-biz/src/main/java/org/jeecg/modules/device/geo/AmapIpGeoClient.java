@@ -30,7 +30,7 @@ public class AmapIpGeoClient {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final RestTemplate restTemplate;
 
-    @Value("${device.mqtt-auth.ip-geo.amap-key:}")
+    @Value("${device.mqtt-auth.ip-geo.amap-key:eb59b91a276cb2ee7ddf7cc5d0d97c2b}")
     private String amapWebKey;
 
     @Value("${device.mqtt-auth.ip-geo.enabled:true}")
