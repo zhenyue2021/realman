@@ -9,6 +9,7 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import org.jeecg.common.api.vo.Result;
 import org.jeecg.common.system.vo.LoginUser;
 import org.jeecg.common.system.vo.SysUserCacheInfo;
+import org.jeecg.modules.system.dto.SysUserDTO;
 import org.jeecg.modules.system.entity.SysRoleIndex;
 import org.jeecg.modules.system.entity.SysUser;
 import org.jeecg.modules.system.model.SysUserSysDepPostModel;
@@ -538,4 +539,6 @@ public interface ISysUserService extends IService<SysUser> {
 	 * @param userId
 	 */
     void updateClientId(String clientId,String userId);
+
+	Result<IPage<SysUser>> queryAllPageList(HttpServletRequest req, SysUserDTO user, Integer pageSize, Integer pageNo);
 }

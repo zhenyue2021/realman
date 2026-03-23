@@ -11,6 +11,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.jeecg.modules.system.model.SysUserSysDepPostModel;
 import org.jeecg.modules.system.model.SysUserSysDepartModel;
 import org.jeecg.modules.system.vo.SysUserDepVo;
+import org.jeecg.modules.system.dto.SysUserDTO;
 
 import java.util.List;
 
@@ -271,4 +272,14 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
      * @return
      */
     List<SysUserSysDepPostModel> queryDepartUserByOrgCode(@Param("page") IPage page, @Param("orgCode") String orgCode, @Param("userParams") SysUser userParams);
+
+    /**
+     * 查询系统用户列表（listAll）
+     *
+     * <p>超管/运维：tenantId 传 null（不做租户过滤）；
+     * 非超管/运维：tenantId 传当前租户 id（做租户过滤）。</p>
+     */
+    IPage<SysUser> queryAllPageList(@Param("page") Page<SysUser> page,
+                                      @Param("user") SysUserDTO user,
+                                      @Param("tenantId") String tenantId);
 }

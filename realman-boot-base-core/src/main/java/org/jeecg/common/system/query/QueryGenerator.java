@@ -93,7 +93,7 @@ public class QueryGenerator {
 		long start = System.currentTimeMillis();
 		QueryWrapper<T> queryWrapper = new QueryWrapper<T>();
 		installMplus(queryWrapper, searchObj, parameterMap, null);
-		log.debug("---查询条件构造器初始化完成,耗时:"+(System.currentTimeMillis()-start)+"毫秒----");
+		log.info("---查询条件构造器初始化完成,耗时:"+(System.currentTimeMillis()-start)+"毫秒----");
 		return queryWrapper;
 	}
 	
@@ -108,7 +108,7 @@ public class QueryGenerator {
 		long start = System.currentTimeMillis();
 		QueryWrapper<T> queryWrapper = new QueryWrapper<T>();
 		installMplus(queryWrapper, searchObj, parameterMap, customRuleMap);
-		log.debug("---查询条件构造器初始化完成,耗时:"+(System.currentTimeMillis()-start)+"毫秒----");
+		log.info("---查询条件构造器初始化完成,耗时:"+(System.currentTimeMillis()-start)+"毫秒----");
 		return queryWrapper;
 	}
 

@@ -325,7 +325,7 @@ logging:
   level:
     org.springframework.context.support.PostProcessorRegistrationDelegate: error
     org.flywaydb: debug
-    org.jeecg.modules.system.mapper: info
+    org.jeecg.modules.system.mapper: debug
     org.jeecg.modules.demo.test.mapper: info
 #swagger
 knife4j:

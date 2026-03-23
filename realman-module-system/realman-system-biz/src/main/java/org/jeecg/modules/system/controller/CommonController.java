@@ -1,6 +1,8 @@
 package org.jeecg.modules.system.controller;
 
 import com.alibaba.fastjson.JSONObject;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.common.api.vo.Result;
 import org.jeecg.common.constant.CommonConstant;
@@ -37,6 +39,7 @@ import java.io.*;
 @Slf4j
 @RestController
 @RequestMapping("/sys/common")
+@Tag(name = "通用接口")
 public class CommonController {
 
     @Value(value = "${jeecg.path.upload}")
@@ -63,6 +66,7 @@ public class CommonController {
      * @param response
      * @return
      */
+    @Operation(summary = "上传文件")
     @PostMapping(value = "/upload")
     public Result<?> upload(HttpServletRequest request, HttpServletResponse response) throws Exception {
         Result<?> result = new Result<>();

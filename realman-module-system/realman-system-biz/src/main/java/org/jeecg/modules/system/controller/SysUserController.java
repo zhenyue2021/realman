@@ -32,6 +32,7 @@ import org.jeecg.common.util.*;
 import org.jeecg.config.JeecgBaseConfig;
 import org.jeecg.config.mybatis.MybatisPlusSaasConfig;
 import org.jeecg.modules.base.service.BaseCommonService;
+import org.jeecg.modules.system.dto.SysUserDTO;
 import org.jeecg.modules.system.entity.*;
 import org.jeecg.modules.system.excelstyle.ExcelExportSysUserStyle;
 import org.jeecg.modules.system.model.DepartIdModel;
@@ -152,13 +153,12 @@ public class SysUserController {
      * @return
      */
 
-    @Operation(summary="获取系统用户数据-查询全部用户，不做租户隔离")
+    @Operation(summary="获取系统用户数据-查询全部用户")
     @RequiresPermissions("system:user:listAll")
     @RequestMapping(value = "/listAll", method = RequestMethod.GET)
-    public Result<IPage<SysUser>> queryAllPageList(SysUser user, @RequestParam(name = "pageNo", defaultValue = "1") Integer pageNo,
+    public Result<IPage<SysUser>> queryAllPageList(SysUserDTO user, @RequestParam(name = "pageNo", defaultValue = "1") Integer pageNo,
                                                    @RequestParam(name = "pageSize", defaultValue = "10") Integer pageSize, HttpServletRequest req) {
-        QueryWrapper<SysUser> queryWrapper = QueryGenerator.initQueryWrapper(user, req.getParameterMap());
-        return sysUserService.queryPageList(req, queryWrapper, pageSize, pageNo);
+        return sysUserService.queryAllPageList(req, user, pageSize, pageNo);
     }
 
     @RequiresPermissions("system:user:add")

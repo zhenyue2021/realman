@@ -175,6 +175,10 @@ public class TokenUtils {
             } catch (IllegalAccessException e) {
                 e.printStackTrace();
             }
+            // 容错：如果缓存对象不完整（例如 id 为空），回源数据库兜底，避免 Shiro 使用 principalId 时直接抛异常
+            if (loginUser == null || loginUser.getId() == null) {
+                loginUser = commonApi.getUserByName(username);
+            }
         } else {
             // 查询用户信息
             loginUser = commonApi.getUserByName(username);

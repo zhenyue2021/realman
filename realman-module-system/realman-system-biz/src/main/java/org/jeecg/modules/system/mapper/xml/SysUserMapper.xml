@@ -462,4 +462,49 @@
         </if>
         order by su.sort,su.create_time desc
     </select>
+
+    <!-- 查询系统用户 listAll（支持：realname模糊 + departId/roleId/tenantId可空条件） -->
+    <select id="queryAllPageList" resultType="org.jeecg.modules.system.entity.SysUser">
+        SELECT DISTINCT su.*
+        FROM sys_user su
+        WHERE su.del_flag = 0
+          AND su.username <![CDATA[ != ]]> '_reserve_user_external'
+
+        <if test="user != null and user.realname != null and user.realname != ''">
+            AND su.realname LIKE CONCAT('%', #{user.realname}, '%')
+        </if>
+
+        <!-- 部门条件：departId 可为逗号分隔 -->
+        <if test="user != null and user.departId != null and user.departId != ''">
+            AND EXISTS (
+                SELECT 1
+                FROM sys_user_depart sud
+                WHERE sud.user_id = su.id
+                  AND FIND_IN_SET(sud.dep_id, #{user.departId})
+            )
+        </if>
+
+        <!-- 角色条件：selectedroles 可为逗号分隔 -->
+        <if test="user != null and user.selectedroles != null and user.selectedroles != ''">
+            AND EXISTS (
+                SELECT 1
+                FROM sys_user_role sur
+                WHERE sur.user_id = su.id
+                  AND FIND_IN_SET(sur.role_id, #{user.selectedroles})
+            )
+        </if>
+
+        <!-- 租户条件：tenantId 由 service 决定；超管/运维传 null 则不做租户过滤 -->
+        <if test="tenantId != null and tenantId != ''">
+            AND EXISTS (
+                SELECT 1
+                FROM sys_user_tenant sut
+                WHERE sut.user_id = su.id
+                  AND sut.tenant_id = #{tenantId}
+                  AND sut.status = '1'
+            )
+        </if>
+
+        ORDER BY su.sort ASC, su.create_time DESC
+    </select>
 </mapper>

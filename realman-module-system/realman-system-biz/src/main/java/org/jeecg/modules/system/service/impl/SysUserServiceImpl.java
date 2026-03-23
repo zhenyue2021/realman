@@ -2,6 +2,7 @@ package org.jeecg.modules.system.service.impl;
 
 import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.util.RandomUtil;
+import cn.hutool.core.util.StrUtil;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.aliyuncs.exceptions.ClientException;
@@ -30,6 +31,7 @@ import org.jeecg.common.constant.enums.*;
 import org.jeecg.common.desensitization.annotation.SensitiveEncode;
 import org.jeecg.common.exception.JeecgBootBizTipException;
 import org.jeecg.common.exception.JeecgBootException;
+import org.jeecg.common.system.util.JwtUtil;
 import org.jeecg.common.system.vo.LoginUser;
 import org.jeecg.common.system.vo.SysUserCacheInfo;
 import org.jeecg.common.util.*;
@@ -38,12 +40,14 @@ import org.jeecg.config.JeecgBaseConfig;
 import org.jeecg.config.mybatis.MybatisPlusSaasConfig;
 import org.jeecg.modules.base.service.BaseCommonService;
 import org.jeecg.modules.message.handle.impl.SystemSendMsgHandle;
+import org.jeecg.modules.system.dto.SysUserDTO;
 import org.jeecg.modules.system.entity.*;
 import org.jeecg.modules.system.mapper.*;
 import org.jeecg.modules.system.model.SysLoginModel;
 import org.jeecg.modules.system.model.SysUserSysDepPostModel;
 import org.jeecg.modules.system.model.SysUserSysDepartModel;
 import org.jeecg.modules.system.service.*;
+import org.jeecg.modules.system.service.security.ISystemSecurityService;
 import org.jeecg.modules.system.util.ImportSysUserCache;
 import org.jeecg.modules.system.vo.*;
 import org.jeecg.modules.system.vo.lowapp.AppExportUserVo;
@@ -139,6 +143,8 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
 
 	@Autowired
 	private JeecgBaseConfig jeecgBaseConfig;
+	@Autowired
+	private ISystemSecurityService systemSecurityService;
 
 	/**
 	 * 管理员账号
@@ -3106,4 +3112,36 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         }
         return userOrgCodeMap;
     }
+
+	@Override
+	public Result<IPage<SysUser>> queryAllPageList(HttpServletRequest req, SysUserDTO user, Integer pageSize, Integer pageNo) {
+		Page<SysUser> page = new Page<>(pageNo, pageSize);
+		Result<IPage<SysUser>> result = new Result<IPage<SysUser>>();
+
+		// 1) 判断是否超管/运维：username=admin 或角色包含 yunwei
+		String username = JwtUtil.getUserNameByToken(req);
+
+		boolean isAdminOrOps = systemSecurityService.assertAdminOrOps(username);
+
+		// 2) 决定是否做租户过滤：超管/运维 => 不过滤；否则 => 仅当前租户
+		String tenantIdForSql = null;
+		if (!isAdminOrOps) {
+			String tenantId = req.getHeader("x-tenant-id");
+			if (tenantId == null || tenantId.isEmpty()) {
+				throw new RuntimeException("缺少租户ID（x-tenant-id）");
+			}
+			tenantIdForSql = tenantId;
+		}
+        if (Objects.nonNull(user) && StrUtil.isNotBlank(user.getRealname())) {
+			user.setRealname(user.getRealname().replace("*",""));
+        }
+
+		IPage<SysUser> pageList = userMapper.queryAllPageList(page, user, tenantIdForSql);
+
+
+		result.setSuccess(true);
+		result.setResult(pageList);
+		return result;
+	}
+
 }
