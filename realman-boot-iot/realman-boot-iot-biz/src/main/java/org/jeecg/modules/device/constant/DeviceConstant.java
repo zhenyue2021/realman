@@ -80,12 +80,12 @@ public interface DeviceConstant {
          */
         String CAMERA_STREAM_QUERY    = "device/%s/camera/stream/query";
         /**
-         * 上行：机器人上报摄像头视频流地址列表（Topic: device/{deviceCode}/camera/stream/response）
+         * 上行：机器人上报摄像头视频流地址列表（Topic: device/{deviceCode}/camera/stream/ack）
          *
          * <p>配合 {@link org.jeecg.modules.device.mqtt.MqttMessageModel.CameraStreamResponse} 使用，
          * 由 {@link org.jeecg.modules.device.mqtt.handler.DeviceCameraStreamResponseHandler} 处理。
          */
-        String CAMERA_STREAM_RESPONSE = "device/%s/camera/stream/response";
+        String CAMERA_STREAM_RESPONSE = "device/%s/camera/stream/ack";
 
         /**
          * 下行：平台向主控查询“当前关联的机器人/设备信息”

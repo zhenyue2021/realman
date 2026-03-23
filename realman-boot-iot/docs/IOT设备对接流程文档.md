@@ -246,7 +246,7 @@ def decrypt_message(device_code: str, encrypted: str) -> str:
 | `device/{deviceCode}/command/{cmd}/ack` | 1 | 指令集执行确认（如 `restart`、`emergency-stop` 等）   | 重启联调完成 |
 | `device/{deviceCode}/ota/progress` | 1 | OTA 升级进度上报                                | 未联调    |
 | `device/{deviceCode}/log/operation` | 1 | 设备操作日志上报                                  | 联调完成   |
-| `device/{deviceCode}/camera/stream/response` | 1 | 机器人上报摄像头视频流地址（见第 12 章）                    | 未联调    |
+| `device/{deviceCode}/camera/stream/ack` | 1 | 机器人上报摄像头视频流地址（见第 12 章）                    | 未联调    |
 | `master/{controllerCode}/teleop/associated-device/response` | 1 | 主控上报当前设备Mac信息                             | 未联调    |
 | `master/{controllerCode}/command/{cmd}/ack` | 1 | 主控设备指令 ACK（力反馈/运动与安全参数等）                  | 未联调    |
 | `{robotCode}/slave/status` | 1 | 机器人原始状态上报（遥操作场景，明文 JSON，由平台透传至 WebSocket） | 未联调    |
@@ -719,7 +719,7 @@ Web                         IOT平台                            机器人
  │                            │                                   │ 5. 解密并解析 Query
  │                            │                                   │ 6. 查询指定/全部摄像头流地址
  │                            │                                   │ 7. 上报 CameraStreamResponse
- │                            │             device/{code}/camera/stream/response ←────│
+ │                            │             device/{code}/camera/stream/ack ←────│
  │ 8. 处理响应，完成 Future     │                                   │
  │ 9. 将流地址列表返回给 Web    │──────────────────────────────────→│
 ```
@@ -754,7 +754,7 @@ Payload: AES-256-CBC 加密后的 JSON 字符串
 ### 12.3 上行消息：CameraStreamResponse（机器人 → 平台）
 
 ```
-Topic: device/{deviceCode}/camera/stream/response
+Topic: device/{deviceCode}/camera/stream/ack
 QoS: 1
 Payload: AES-256-CBC 加密后的 JSON 字符串
 ```
@@ -817,7 +817,7 @@ Payload: AES-256-CBC 加密后的 JSON 字符串
   - 若为 `null`，枚举设备上所有摄像头，构建 `cameras` 数组；
   - 若为非负整数，仅返回对应路数（若不存在该路，可返回 `code!=0` 并在 `message` 中说明）。
 - 构造 `CameraStreamResponse`，加密后发布到：
-  - `device/{deviceCode}/camera/stream/response`，QoS=1。
+  - `device/{deviceCode}/camera/stream/ack`，QoS=1。
 
 ---
 
@@ -860,6 +860,6 @@ Payload: AES-256-CBC 加密后的 JSON 字符串
 - [ ] 收到 ConfigPush 后应用配置并回复 ConfigAck（携带相同 `commandId`）
 - [ ] 收到 RemoteRestartCommand 后**先回复 RestartAck** 再执行重启
 - [ ] OTA 升级过程中定期上报 progress，终态（SUCCESS/FAILED）必须上报
-- [ ] 若支持摄像头：订阅 `device/{deviceCode}/camera/stream/query`，收到 CameraStreamQuery 后按 `commandId`、`cameraIndex` 查询流地址，加密后上报到 `device/{deviceCode}/camera/stream/response`（响应中必须带回相同 `commandId`）
+- [ ] 若支持摄像头：订阅 `device/{deviceCode}/camera/stream/query`，收到 CameraStreamQuery 后按 `commandId`、`cameraIndex` 查询流地址，加密后上报到 `device/{deviceCode}/camera/stream/ack`（响应中必须带回相同 `commandId`）
 - [ ] `cleanSession = false`，确保离线期间下行消息不丢失
 

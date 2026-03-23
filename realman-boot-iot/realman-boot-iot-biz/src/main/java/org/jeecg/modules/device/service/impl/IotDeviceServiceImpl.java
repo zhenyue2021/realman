@@ -674,7 +674,8 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
      *   <li>生成 commandId，调用 {@link DeviceCameraStreamPendingService#register(String)} 注册 Future</li>
      *   <li>构造 {@link MqttMessageModel.CameraStreamQuery}，通过 {@link MqttPublisher#publishToDevice} 发送到
      *       {@code device/{deviceCode}/camera/stream/query}（AES 加密）</li>
-     *   <li>阻塞等待机器人响应（最长 10 秒），由 {@link DeviceCameraStreamResponseHandler} 完成 Future</li>
+     *   <li>阻塞等待机器人响应（最长 10 秒），由 {@link DeviceCameraStreamResponseHandler} 处理
+     *       {@code device/{deviceCode}/camera/stream/ack} 并完成 Future</li>
      *   <li>将响应中的 {@link MqttMessageModel.CameraInfo} 列表转换为 {@link DeviceCameraStreamVO} 列表返回</li>
      * </ol>
      *

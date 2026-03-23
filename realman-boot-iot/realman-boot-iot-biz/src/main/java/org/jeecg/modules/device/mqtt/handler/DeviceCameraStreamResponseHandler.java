@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 import java.util.Collections;
 
 /**
- * 摄像头视频流地址响应处理器（Topic: device/{deviceCode}/camera/stream/response）
+ * 摄像头视频流地址响应处理器（Topic: device/{deviceCode}/camera/stream/ack）
  *
  * <p>职责：
  * <ul>
@@ -25,7 +25,7 @@ import java.util.Collections;
  * <pre>
  *   Web → RobotDeviceController → IotDeviceServiceImpl.getCameraStreams()
  *        → 下发 CameraStreamQuery 并在 DeviceCameraStreamPendingService 中注册 Future
- *   机器人 → device/{code}/camera/stream/response → 本 Handler
+ *   机器人 → device/{code}/camera/stream/ack → 本 Handler
  *        → 完成 Future，getCameraStreams() 得到摄像头流列表后返回给 Web
  * </pre>
  */

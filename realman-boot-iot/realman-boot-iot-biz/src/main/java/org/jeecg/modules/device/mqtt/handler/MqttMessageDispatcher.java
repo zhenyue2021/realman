@@ -26,7 +26,7 @@ import java.util.regex.Pattern;
  *   device/{code}/command/{cmd}/ack      → DeviceCommandAckHandler.handle()
  *   device/{code}/ota/progress           → OtaProgressHandler.handle()
  *   device/{code}/log/operation          → DeviceOperationLogHandler.handle()
- *   device/{code}/camera/stream/response → DeviceCameraStreamResponseHandler.handle()
+ *   device/{code}/camera/stream/ack → DeviceCameraStreamResponseHandler.handle()
  *   master/{code}/teleop/associated-device/ack → MasterAssociatedDeviceResponseHandler.handle()
  *   device/{code}/teleop/associated-device/ack → MasterAssociatedDeviceResponseHandler.handle()（同上业务，备用 Topic）
  *
@@ -142,7 +142,7 @@ public class MqttMessageDispatcher {
             case "config/ack"                         -> configAckHandler.handle(deviceCode, payload);
             case "ota/progress"                       -> otaProgressHandler.handle(deviceCode, payload);
             case "log/operation"                      -> operationLogHandler.handle(deviceCode, payload);
-            case "camera/stream/response"             -> deviceCameraStreamResponseHandler.handle(deviceCode, payload);
+            case "camera/stream/ack"                  -> deviceCameraStreamResponseHandler.handle(deviceCode, payload);
             case "teleop/associated-device/ack"  -> masterAssociatedDeviceResponseHandler.handle(deviceCode, payload);
             case "slam/upload/request"                -> slamUploadRequestHandler.handle(deviceCode, payload);
             case "slam/upload/complete"               -> slamUploadCompleteHandler.handle(deviceCode, payload);

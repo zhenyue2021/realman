@@ -362,7 +362,7 @@ public class MqttMessageModel {
     }
 
     /**
-     * 上行：机器人上报摄像头视频流地址列表（Topic: device/{deviceCode}/camera/stream/response）
+     * 上行：机器人上报摄像头视频流地址列表（Topic: device/{deviceCode}/camera/stream/ack）
      *
      * <p>机器人收到 {@link CameraStreamQuery} 后上报本消息，携带所有（或指定路）摄像头的流地址。
      */
@@ -403,7 +403,7 @@ public class MqttMessageModel {
     }
 
     /**
-     * 下行：平台通知主控当前应操作的机器人（Topic: device/{controllerCode}/teleop/robot/assign）
+     * 下行：平台通知主控当前应操作的机器人（Topic: master/{controllerCode}/teleop/robot/assign）
      *
      * <p>主控登录后，平台根据工单派发本消息，主控收到后即知晓本次遥操目标机器人。
      */
