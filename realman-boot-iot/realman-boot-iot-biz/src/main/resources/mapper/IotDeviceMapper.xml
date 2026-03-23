@@ -41,9 +41,7 @@
             <if test="status != null">
                 AND d.status = #{status}
             </if>
-            <if test="productId != null and productId != ''">
-                AND d.product_id = #{productId}
-            </if>
+
             <!--
               授权关联与生效/失效时间过滤（超管与非超管共用同一套时间条件）：
               - 非超管：必须存在当前有效授权，且租户匹配（若有 currentTenantId）；若传了 authEffectiveTime/authExpireTime 再叠加时间条件。
