@@ -2,6 +2,7 @@ package org.jeecg.modules.device.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
+import org.jeecg.common.aspect.annotation.Dict;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
@@ -20,6 +21,7 @@ public class IotDevice implements Serializable {
     /**
      * 1-机器人设备 2-主控设备
      */
+    @Dict(dicCode = "device_type")
     @TableField("device_type")
     private Integer deviceType;
     @TableField("product_id")

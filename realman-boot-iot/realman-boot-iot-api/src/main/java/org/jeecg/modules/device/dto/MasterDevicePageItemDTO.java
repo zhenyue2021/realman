@@ -22,6 +22,7 @@ public class MasterDevicePageItemDTO {
     private String id;
     private String deviceCode;
     private String deviceName;
+    @Dict(dicCode = "device_type")
     private Integer deviceType;
     private String productId;
     private String deviceModel;

@@ -19,8 +19,6 @@ public interface IotDeviceMapper extends BaseMapper<IotDevice> {
         @Param("deviceType") Integer deviceType,
         @Param("status")     Integer status,
         @Param("productId")  String productId,
-        @Param("startTime") LocalDateTime startTime,
-        @Param("endTime") LocalDateTime endTime,
         @Param("authEffectiveTime") LocalDateTime authEffectiveTime,
         @Param("authExpireTime") LocalDateTime authExpireTime,
         @Param("currentUsername") String currentUsername,

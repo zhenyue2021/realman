@@ -10,18 +10,12 @@ public class DeviceRequestDTO {
     private Integer pageNo;
     private Integer pageSize;
     private String deviceName;
+    private String deviceCode;
     private Integer deviceType;
     private Integer status;
     private String productId;
 
-    /**
-     * 条件查询（按时间）：创建时间开始/结束
-     * 前端传：yyyy-MM-dd HH:mm:ss
-     */
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    private LocalDateTime startTime;
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    private LocalDateTime endTime;
+
 
     /**
      * 条件查询（按时间）：设备生效时间及结束时间
