@@ -135,6 +135,18 @@ public class DeviceAuthApiServiceImpl implements DeviceAuthApiService {
     }
 
     @Override
+    public List<OptionDTO> authQueryRobotOptions(HttpServletRequest request) {
+        assertAdminOrOps(request);
+        return iotDeviceMapper.listDevicesForAuthQuery(1);
+    }
+
+    @Override
+    public List<OptionDTO> authQueryControllerOptions(HttpServletRequest request) {
+        assertAdminOrOps(request);
+        return iotDeviceMapper.listDevicesForAuthQuery(2);
+    }
+
+    @Override
     public ResponseEntity<byte[]> export(HttpServletRequest request, DeviceAuthQueryDTO query) {
         assertAdminOrOps(request);
         String username = safeUsername(request);

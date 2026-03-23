@@ -24,6 +24,16 @@ public class DeviceRequestDTO {
     private LocalDateTime endTime;
 
     /**
+     * 条件查询（按时间）：设备生效时间及结束时间
+     * 前端传：yyyy-MM-dd HH:mm:ss
+     */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime authEffectiveTime;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime authExpireTime;
+
+
+    /**
      * 内部使用：当前登录用户名 / 是否超级管理员，用于数据权限控制
      * 这两个字段无需前端传入，由控制层根据登录态填充
      */

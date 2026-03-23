@@ -100,6 +100,17 @@ public class DeviceAuthController {
         return ApiResult.ok(deviceAuthApiService.availableDevices(request, 1));
     }
 
+    @GetMapping("/options/query/robots")
+    @Operation(summary = "授权记录查询-机器人设备下拉列表")
+    public ApiResult<List<OptionDTO>> authQueryRobotOptions(HttpServletRequest request) {
+        return ApiResult.ok(deviceAuthApiService.authQueryRobotOptions(request));
+    }
+
+    @GetMapping("/options/query/controllers")
+    @Operation(summary = "授权记录查询-主控设备下拉列表")
+    public ApiResult<List<OptionDTO>> authQueryControllerOptions(HttpServletRequest request) {
+        return ApiResult.ok(deviceAuthApiService.authQueryControllerOptions(request));
+    }
 
     @PostMapping("/export")
     @Operation(summary = "导出授权列表Excel")

@@ -33,6 +33,12 @@ public interface DeviceAuthApiService {
 
     List<OptionDTO> availableDevices(HttpServletRequest request, Integer deviceType);
 
+    /** 授权记录查询：机器人设备下拉（全部未删除机器人，非「仅可授权」） */
+    List<OptionDTO> authQueryRobotOptions(HttpServletRequest request);
+
+    /** 授权记录查询：主控设备下拉（全部未删除主控，非「仅可授权」） */
+    List<OptionDTO> authQueryControllerOptions(HttpServletRequest request);
+
     ResponseEntity<byte[]> export(HttpServletRequest request, DeviceAuthQueryDTO query);
 }
 
