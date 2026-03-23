@@ -41,11 +41,11 @@
 		</dependency>
 
 		<!-- AI大模型管理-->
-		<dependency>
+		<!--<dependency>
 			<groupId>org.jeecgframework.boot3</groupId>
 			<artifactId>realman-boot-module-airag</artifactId>
 			<version>${realman-boot.version}</version>
-		</dependency>
+		</dependency>-->
 		<!-- 企业微信/钉钉 api -->
 		<dependency>
 			<groupId>org.jeecgframework</groupId>
