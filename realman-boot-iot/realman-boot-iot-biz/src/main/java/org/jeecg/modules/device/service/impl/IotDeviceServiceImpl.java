@@ -780,8 +780,15 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
             return Map.of();
         }
         // 多条时取 effective_time 最新的一条
-        return auths.stream()
-                .filter(a -> a.getControllerId() != null)
-                .collect(Collectors.toMap(IotDeviceAuth::getControllerId, a -> a, (a, b) -> a));
+        if (Objects.equals(deviceType, DeviceConstant.DeviceType.CONTROLLER)) {
+            return auths.stream()
+                    .filter(a -> a.getControllerId() != null)
+                    .collect(Collectors.toMap(IotDeviceAuth::getControllerId, a -> a, (a, b) -> a));
+        } else if (Objects.equals(deviceType, DeviceConstant.DeviceType.ROBOT)) {
+            return auths.stream()
+                    .filter(a -> a.getDeviceId() != null)
+                    .collect(Collectors.toMap(IotDeviceAuth::getDeviceId, a -> a, (a, b) -> a));
+        }
+        return Map.of();
     }
 }

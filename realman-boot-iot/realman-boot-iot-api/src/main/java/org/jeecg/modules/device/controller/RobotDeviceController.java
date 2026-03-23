@@ -195,7 +195,7 @@ public class RobotDeviceController {
             log.warn("获取登录用户失败: {}", e.getMessage());
         }
         requestDTO.setCurrentUsername(username);
-        requestDTO.setCurrentTenantId(request.getHeader("tenant-id"));
+        requestDTO.setCurrentTenantId(request.getHeader("x-tenant-id"));
         requestDTO.setSuperAdmin("admin".equalsIgnoreCase(username));
     }
 

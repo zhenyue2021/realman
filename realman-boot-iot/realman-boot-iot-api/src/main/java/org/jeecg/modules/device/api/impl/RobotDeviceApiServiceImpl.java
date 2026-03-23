@@ -7,11 +7,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import org.jeecg.modules.device.api.RobotDeviceApiService;
 import org.jeecg.modules.device.constant.DeviceConstant;
-import org.jeecg.modules.device.dto.DeviceConfigViewDTO;
-import org.jeecg.modules.device.dto.DeviceOperationLogViewDTO;
-import org.jeecg.modules.device.dto.DeviceRequestDTO;
-import org.jeecg.modules.device.dto.DeviceStatusViewDTO;
-import org.jeecg.modules.device.dto.RobotDevicePageItemDTO;
+import org.jeecg.modules.device.dto.*;
 import org.jeecg.modules.device.entity.*;
 import org.jeecg.modules.device.service.IIotDeviceService;
 import org.jeecg.modules.device.vo.DeviceDetailVO;
@@ -51,10 +47,20 @@ public class RobotDeviceApiServiceImpl implements RobotDeviceApiService {
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
-        List<RobotDevicePageItemDTO> records = devices.stream().map(this::toPageItem).toList();
         //  授权生效/失效时间（按当前租户）
         Map<String, IotDeviceAuth> authByControllerId = deviceService.loadTenantAuth(deviceIds, dto.getCurrentTenantId(), DeviceConstant.DeviceType.ROBOT);
+        List<RobotDevicePageItemDTO> records = devices.stream().map(d -> {
+            RobotDevicePageItemDTO item = new RobotDevicePageItemDTO();
+            BeanUtil.copyProperties(d, item);
+            item.setRunningStatus(d.getStatus());
 
+            IotDeviceAuth auth = authByControllerId.get(d.getId());
+            if (auth != null) {
+                item.setAuthEffectiveTime(auth.getEffectiveTime());
+                item.setAuthExpireTime(auth.getExpireTime());
+            }
+            return item;
+        }).toList();
         Page<RobotDevicePageItemDTO> out = new Page<>(devicePage.getCurrent(), devicePage.getSize(), devicePage.getTotal());
         out.setRecords(records);
         return out;

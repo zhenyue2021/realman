@@ -39,4 +39,11 @@ public class RobotDevicePageItemDTO {
      * 设备当前运行状态（与 iot_device.status 语义一致，便于前端列表展示）
      */
     private Integer runningStatus;
+
+
+    /**
+     * 授权生效/失效时间（来自 iot_device_auth，按当前租户筛选）
+     */
+    private LocalDateTime authEffectiveTime;
+    private LocalDateTime authExpireTime;
 }
