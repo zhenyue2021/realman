@@ -60,6 +60,9 @@ public class IotDevice implements Serializable {
     private BigDecimal longitude;
     @TableField("latitude")
     private BigDecimal latitude;
+    /** MQTT 最近一次连接鉴权后解析的行政区划文案（高德 IP+逆地理），内网为「内网IP」；未配置 Key 时为纯 IP */
+    @TableField("address")
+    private String address;
     @TableField("create_by")
     private String createBy;
     @TableField("tenant_id")

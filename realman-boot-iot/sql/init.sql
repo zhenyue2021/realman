@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS `iot_device` (
   `last_login_time`     DATETIME       DEFAULT NULL COMMENT '主控设备最后一次登录时间',
   `longitude`           DECIMAL(10,7)  DEFAULT NULL,
   `latitude`            DECIMAL(10,7)  DEFAULT NULL,
+  `address`             VARCHAR(256)   DEFAULT NULL COMMENT 'MQTT连接源地址(高德IP定位+逆地理后的行政区划文案；内网为内网IP)',
   `create_by`           VARCHAR(64)    DEFAULT NULL,
   `tenant_id`           INT            DEFAULT 0,
   `create_time`         DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -416,3 +417,6 @@ VALUES
   ('d001','DEV_001','温湿度传感器-01',2,'PROD_SENSOR_001','TH-200','1.0.0',0,'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2',NOW(),'仓库A区','admin',1,NOW()),
   ('d002','DEV_002','网关设备-01',1,'PROD_GW_001','GW-100','2.1.0',0,'b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3',NOW(),'楼层1主网关','admin',1,NOW()),
   ('d003','DEV_003','控制器-01',3,'PROD_CTRL_001','CT-300','1.5.0',0,'c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4',NOW(),'A区空调控制器','admin',1,NOW());
+
+-- 已有库升级：若表已存在但无 address 列，可执行（重复执行会报错，需自行判断）
+-- ALTER TABLE `iot_device` ADD COLUMN `address` VARCHAR(256) DEFAULT NULL COMMENT 'MQTT连接行政区划(高德IP定位)' AFTER `latitude`;

@@ -11,6 +11,8 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -48,7 +50,7 @@ public class MqttAuthControllerTest {
         String deviceCode = "DEV001";
         String password = DigestUtil.md5Hex(deviceCode);
 
-        when(secretService.validateSecret(deviceCode, password)).thenReturn(true);
+        when(secretService.validateSecret(eq(deviceCode), eq(password), any())).thenReturn(true);
 
         String body = """
                 {
@@ -74,7 +76,7 @@ public class MqttAuthControllerTest {
         String deviceCode = "DEV001";
         String wrongPassword = "wrong-secret";
 
-        when(secretService.validateSecret(deviceCode, wrongPassword)).thenReturn(false);
+        when(secretService.validateSecret(eq(deviceCode), eq(wrongPassword), any())).thenReturn(false);
 
         String body = """
                 {

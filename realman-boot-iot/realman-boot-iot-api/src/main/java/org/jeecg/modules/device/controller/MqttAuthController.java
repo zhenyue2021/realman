@@ -60,8 +60,8 @@ public class MqttAuthController {
             return allow();
         }
 
-        boolean ok = secretService.validateSecret(username, password);
-        log.info("[MqttAuth] clientId={} ip={} ipAndPort={} result={}", clientId, peerHost, peername, ok ? allow() : deny());
+        boolean ok = secretService.validateSecret(username, password, peerHost);
+        log.info("[MqttAuth] clientId={} peerhost={} peername={} allow={}", clientId, peerHost, peername, ok);
         return ok ? allow() :deny();
     }
 

@@ -8,6 +8,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.jeecg.modules.device.constant.DeviceConstant;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.mapper.IotDeviceMapper;
+import org.jeecg.modules.device.service.DeviceMqttConnectionAddressService;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
@@ -28,6 +29,7 @@ public class DeviceSecretService {
 
     private final StringRedisTemplate redisTemplate;
     private final IotDeviceMapper deviceMapper;
+    private final DeviceMqttConnectionAddressService mqttConnectionAddressService;
     private static final long CACHE_HOURS = 24L;
 
     /**
@@ -42,14 +44,19 @@ public class DeviceSecretService {
 
 
     /**
-     * EMQX HTTP Auth 回调时调用
+     * EMQX HTTP Auth 回调时调用（无连接地址信息）
      */
     public boolean validateSecret(String deviceCode, String secret) {
+        return validateSecret(deviceCode, secret, null);
+    }
+
+    /**
+     * EMQX HTTP Auth 回调时调用
+     *
+     * @param mqttPeerHost EMQX 请求体中的 {@code peerhost}，鉴权成功后会异步写入 {@code iot_device.address}，不阻塞本方法
+     */
+    public boolean validateSecret(String deviceCode, String secret, String mqttPeerHost) {
         if (deviceCode == null || secret == null) return false;
-        // 优先查Redis缓存
-        String cached = redisTemplate.opsForValue().get(
-                DeviceConstant.RedisKey.DEVICE_SECRET_PREFIX + deviceCode);
-        if (cached != null) return cached.equals(secret);
         // 查询设备是否存在或被禁用
         IotDevice device = deviceMapper.selectOne(new LambdaQueryWrapper<IotDevice>()
                 .eq(IotDevice::getDeviceCode, deviceCode)
@@ -60,8 +67,12 @@ public class DeviceSecretService {
         }
         // 计算期望密码比对
         boolean ok = secret.equals(device.getDeviceSecret());
-        if (ok) cache(deviceCode, secret);
-        else log.warn("[Secret] 设备[{}]密钥不匹配", deviceCode);
+        if (ok) {
+            cache(deviceCode, secret);
+            mqttConnectionAddressService.updateAddressAfterAuthSuccess(device.getId(), mqttPeerHost);
+        } else {
+            log.warn("[Secret] 设备[{}]密钥不匹配", deviceCode);
+        }
         return ok;
     }
 
