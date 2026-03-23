@@ -34,6 +34,7 @@ public class RealmanSystemApplication extends SpringBootServletInitializer {
     }
 
     public static void main(String[] args) throws UnknownHostException {
+        long start = System.currentTimeMillis();
         SpringApplication app = new SpringApplication(RealmanSystemApplication.class);
         Map<String, Object> defaultProperties = new HashMap<>();
         defaultProperties.put("management.health.elasticsearch.enabled", false);
@@ -51,6 +52,7 @@ public class RealmanSystemApplication extends SpringBootServletInitializer {
                 "External: \thttp://" + ip + ":" + port + path + "/doc.html\n\t" +
                 "Swagger文档: \thttp://" + ip + ":" + port + path + "/doc.html\n" +
                 "----------------------------------------------------------");
+        log.info("启动耗时：{} ms", System.currentTimeMillis() - start);
 
     }
 

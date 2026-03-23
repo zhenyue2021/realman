@@ -117,8 +117,8 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
-                    <!-- 使用 @{argLine} 保留父 POM/JaCoCo 的 argLine，并追加 Mockito 所需的 javaagent，消除 self-attaching 警告 -->
-                    <argLine>@{argLine} -javaagent:${project.build.directory}/byte-buddy-agent.jar</argLine>
+                    <!-- ${argLine} 由 JaCoCo prepare-agent 注入；无 JaCoCo 时父 POM 默认为空 -->
+                    <argLine>${argLine} -javaagent:${project.build.directory}/byte-buddy-agent.jar</argLine>
                 </configuration>
             </plugin>
         </plugins>

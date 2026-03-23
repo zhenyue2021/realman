@@ -140,26 +140,8 @@ public class ShiroConfig {
 
         filterChainDefinitionMap.put("/sys/annountCement/show/**", "anon");
 
-        //积木报表排除
-        filterChainDefinitionMap.put("/jmreport/**", "anon");
         filterChainDefinitionMap.put("/**/*.js.map", "anon");
         filterChainDefinitionMap.put("/**/*.css.map", "anon");
-        
-        //积木BI大屏和仪表盘排除
-        filterChainDefinitionMap.put("/drag/view", "anon");
-        filterChainDefinitionMap.put("/drag/page/queryById", "anon");
-        filterChainDefinitionMap.put("/drag/page/addVisitsNumber", "anon");
-        filterChainDefinitionMap.put("/drag/page/queryTemplateList", "anon");
-        filterChainDefinitionMap.put("/drag/share/view/**", "anon");
-        filterChainDefinitionMap.put("/drag/onlDragDatasetHead/getAllChartData", "anon");
-        filterChainDefinitionMap.put("/drag/onlDragDatasetHead/getTotalData", "anon");
-        filterChainDefinitionMap.put("/drag/onlDragDatasetHead/getMapDataByCode", "anon");
-        filterChainDefinitionMap.put("/drag/onlDragDatasetHead/getTotalDataByCompId", "anon");
-        filterChainDefinitionMap.put("/drag/mock/json/**", "anon");
-        filterChainDefinitionMap.put("/drag/onlDragDatasetHead/getDictByCodes", "anon");
-        filterChainDefinitionMap.put("/drag/onlDragDatasetHead/queryAllById", "anon");
-        filterChainDefinitionMap.put("/jimubi/view", "anon");
-        filterChainDefinitionMap.put("/jimubi/share/view/**", "anon");
 
         //大屏模板例子
         filterChainDefinitionMap.put("/test/bigScreen/**", "anon");

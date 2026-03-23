@@ -3,7 +3,6 @@ package org.jeecg.common.system.api.fallback;
 import com.alibaba.fastjson.JSONObject;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
-import org.jeecg.common.api.dto.AiragFlowDTO;
 import org.jeecg.common.api.dto.DataLogDTO;
 import org.jeecg.common.api.dto.OnlineAuthDTO;
 import org.jeecg.common.api.dto.PushMessageDTO;
@@ -12,7 +11,6 @@ import org.jeecg.common.constant.enums.DySmsEnum;
 import org.jeecg.common.constant.enums.EmailTemplateEnum;
 import org.jeecg.common.system.api.ISysBaseAPI;
 import org.jeecg.common.system.vo.*;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 import java.util.Map;
@@ -499,16 +497,6 @@ public class SysBaseAPIFallback implements ISysBaseAPI {
 
     @Override
     public SysDepartModel queryCompByOrgCodeAndLevel(String orgCode, Integer level) {
-        return null;
-    }
-
-    @Override
-    public Object runAiragFlow(AiragFlowDTO airagFlowDTO) {
-        return null;
-    }
-
-    @Override
-    public SseEmitter runAiragFlowStream(AiragFlowDTO airagFlowDTO) {
         return null;
     }
 

@@ -21,7 +21,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.shiro.SecurityUtils;
-import org.jeecg.common.api.dto.AiragFlowDTO;
 import org.jeecg.common.api.dto.DataLogDTO;
 import org.jeecg.common.api.dto.OnlineAuthDTO;
 import org.jeecg.common.api.dto.PushMessageDTO;
@@ -41,7 +40,6 @@ import org.jeecg.common.util.*;
 import org.jeecg.common.util.dynamic.db.FreemarkerParseFactory;
 import org.jeecg.config.firewall.SqlInjection.IDictTableWhiteListHandler;
 import org.jeecg.config.mybatis.MybatisPlusSaasConfig;
-import org.jeecg.modules.airag.flow.service.IAiragFlowService;
 import org.jeecg.modules.message.entity.SysMessageTemplate;
 import org.jeecg.modules.message.handle.impl.DdSendMsgHandle;
 import org.jeecg.modules.message.handle.impl.EmailSendMsgHandle;
@@ -71,8 +69,6 @@ import org.springframework.util.PathMatcher;
 import jakarta.annotation.Resource;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-
 import javax.sql.DataSource;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -160,9 +156,6 @@ public class SysBaseApiImpl implements ISysBaseAPI {
 
 	@Autowired
 	private ISysAnnouncementService sysAnnouncementService;
-
-    @Autowired
-    IAiragFlowService airagFlowService;
 
 	@Override
 	//@SensitiveDecode
@@ -2110,23 +2103,6 @@ public class SysBaseApiImpl implements ISysBaseAPI {
         }
         return null;
     }
-
-    @Override
-    public Object runAiragFlow(AiragFlowDTO airagFlowDTO) {
-        if(oConvertUtils.isEmpty(airagFlowDTO.getFlowId())) {
-            throw new JeecgBootException("流程ID不能为空");
-        }
-        Result<Object> o = (Result<Object>)airagFlowService.runFlow(airagFlowDTO);
-        return o.getResult();
-    }
-
-	@Override
-	public SseEmitter runAiragFlowStream(AiragFlowDTO airagFlowDTO) {
-		if (oConvertUtils.isEmpty(airagFlowDTO.getFlowId())) {
-			throw new JeecgBootException("流程ID不能为空");
-		}
-		return airagFlowService.runFlowStream(airagFlowDTO);
-	}
 
 	/**
 	 * uniPush推送消息给APP用户

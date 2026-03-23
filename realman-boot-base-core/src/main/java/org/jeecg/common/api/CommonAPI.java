@@ -1,6 +1,5 @@
 package org.jeecg.common.api;
 
-import org.jeecg.common.api.dto.AiragFlowDTO;
 import org.jeecg.common.system.vo.*;
 
 import java.util.List;
@@ -142,16 +141,5 @@ public interface CommonAPI {
      * @return
      */
     List<DictModel> translateDictFromTableByKeys(String table, String text, String code, String keys, String dataSource);
-
-    /**
-     * 16 运行AIRag流程
-     * for  [QQYUN-13634]在baseapi里面封装方法，方便其他模块调用
-     *
-     * @param airagFlowDTO
-     * @return 流程执行结果,可能是String或者Map
-     * @author chenrui
-     * @date 2025/9/2 11:43
-     */
-    Object runAiragFlow(AiragFlowDTO airagFlowDTO);
 
 }

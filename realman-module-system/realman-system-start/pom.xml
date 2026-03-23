@@ -18,12 +18,13 @@
             <artifactId>realman-system-biz</artifactId>
             <version>${realman-boot.version}</version>
         </dependency>
-        <!-- DEMO 示例模块 -->
-        <!--<dependency>
+        <!-- DEMO 示例模块（仅测试编译/运行需要；正式打包不纳入 fat jar） -->
+        <dependency>
             <groupId>org.jeecgframework.boot3</groupId>
             <artifactId>realman-module-demo</artifactId>
             <version>${realman-boot.version}</version>
-        </dependency>-->
+            <scope>test</scope>
+        </dependency>
         
         <!-- flyway 数据库自动升级 -->
         <dependency>

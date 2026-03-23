@@ -40,41 +40,11 @@
 			<artifactId>hibernate-re</artifactId>
 		</dependency>
 
-		<!-- AI大模型管理-->
-		<dependency>
-			<groupId>org.jeecgframework.boot3</groupId>
-			<artifactId>realman-boot-module-airag</artifactId>
-			<version>${realman-boot.version}</version>
-		</dependency>
 		<!-- 企业微信/钉钉 api -->
 		<dependency>
 			<groupId>org.jeecgframework</groupId>
 			<artifactId>weixin4j</artifactId>
 		</dependency>
-		<!-- 积木报表 -->
-		<dependency>
-			<groupId>org.jeecgframework.jimureport</groupId>
-			<artifactId>jimureport-spring-boot3-starter</artifactId>
-			<version>${jimureport-spring-boot-starter.version}</version>
-		</dependency>
-		<!-- 积木报表 csv excel ES JSON mongodbSQL redis支持包-->
-		<dependency>
-			<groupId>org.jeecgframework.jimureport</groupId>
-			<artifactId>jimureport-nosql-starter</artifactId>
-			<version>2.1.0</version>
-		</dependency>
-		<!-- 后台导出接口Echart图表支持包，按需引入 -->
-		<dependency>
-			<groupId>org.jeecgframework.jimureport</groupId>
-			<artifactId>jimureport-echarts-starter</artifactId>
-			<version>2.2.0</version>
-		</dependency>
-		<!-- 积木BI -->
-		<dependency>
-			<groupId>org.jeecgframework.jimureport</groupId>
-			<artifactId>jimubi-spring-boot3-starter</artifactId>
-		</dependency>
-
 	</dependencies>
 	
 </project>

@@ -498,8 +498,6 @@ public class SysDictController {
 		redisUtil.removeAll(CacheConstant.SYS_DICT_TABLE_BY_KEYS_CACHE);
 		redisUtil.removeAll(CacheConstant.SYS_DEPARTS_CACHE);
 		redisUtil.removeAll(CacheConstant.SYS_DEPART_IDS_CACHE);
-		redisUtil.removeAll("jmreport:cache:dict");
-		redisUtil.removeAll("jmreport:cache:dictTable");
 		
 		// 清除当前用户的授权缓存信息
 		Subject currentUser = SecurityUtils.getSubject();

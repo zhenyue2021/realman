@@ -2,7 +2,6 @@ package org.jeecg.common.system.api;
 
 import com.alibaba.fastjson.JSONObject;
 import org.jeecg.common.api.CommonAPI;
-import org.jeecg.common.api.dto.AiragFlowDTO;
 import org.jeecg.common.api.dto.DataLogDTO;
 import org.jeecg.common.api.dto.OnlineAuthDTO;
 import org.jeecg.common.api.dto.PushMessageDTO;
@@ -11,7 +10,6 @@ import org.jeecg.common.constant.enums.DySmsEnum;
 import org.jeecg.common.constant.enums.EmailTemplateEnum;
 import org.jeecg.common.system.vo.*;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 import java.util.Map;
@@ -607,28 +605,6 @@ public interface ISysBaseAPI extends CommonAPI {
      * @return
      */
     SysDepartModel queryCompByOrgCodeAndLevel(String orgCode, Integer level);
-
-    /**
-     * 16 运行AIRag流程
-     * for [QQYUN-13634]在baseapi里面封装方法，方便其他模块调用
-     *
-     * @param airagFlowDTO
-     * @return 流程执行结果,可能是String或者Map
-     * @author chenrui
-     * @date 2025/9/2 11:43
-     */
-    Object runAiragFlow(AiragFlowDTO airagFlowDTO);
-
-    /**
-     * 流式运行AIRag流程
-     * for [QQYUN-13634]在baseapi里面封装方法，方便其他模块调用
-     *
-     * @param airagFlowDTO
-     * @return 流程执行结果,可能是String或者Map
-     * @author chenrui
-     * @date 2025/9/2 11:43
-     */
-    SseEmitter runAiragFlowStream(AiragFlowDTO airagFlowDTO);
 
     /**
      * 根据部门code或部门id获取部门名称(当前和上级部门)
