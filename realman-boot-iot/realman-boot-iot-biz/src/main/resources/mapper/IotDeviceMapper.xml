@@ -6,8 +6,6 @@
     <sql id="deviceListAuthExistsWhere">
         WHERE a.del_flag = 0
           AND a.status = 1
-          AND (a.effective_time IS NULL OR a.effective_time &lt;= NOW())
-          AND (a.expire_time IS NULL OR a.expire_time &gt;= NOW())
         <choose>
             <when test="deviceType != null and deviceType == 2">
                 AND a.controller_id = d.id
