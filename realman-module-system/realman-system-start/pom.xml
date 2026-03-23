@@ -19,11 +19,11 @@
             <version>${realman-boot.version}</version>
         </dependency>
         <!-- DEMO 示例模块 -->
-        <dependency>
+        <!--<dependency>
             <groupId>org.jeecgframework.boot3</groupId>
             <artifactId>realman-module-demo</artifactId>
             <version>${realman-boot.version}</version>
-        </dependency>
+        </dependency>-->
         
         <!-- flyway 数据库自动升级 -->
         <dependency>
