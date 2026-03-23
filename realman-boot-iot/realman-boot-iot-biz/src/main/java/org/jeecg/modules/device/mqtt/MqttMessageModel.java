@@ -385,7 +385,7 @@ public class MqttMessageModel {
     }
 
     /**
-     * 下行：平台向主控查询“当前关联的机器人/设备信息”（Topic: device/{controllerCode}/teleop/associated-device/query）
+     * 下行：平台向主控查询“当前关联的机器人/设备信息”（Topic: master/{controllerCode}/teleop/associated-device/query）
      */
     @Data
     @Builder
@@ -423,7 +423,7 @@ public class MqttMessageModel {
     }
 
     /**
-     * 上行：主控上报”当前关联的机器人/设备信息”（Topic: device/{controllerCode}/teleop/associated-device/response）
+     * 上行：主控上报“当前关联的机器人/设备信息”（Topic: master/{controllerCode}/teleop/associated-device/ack）
      */
     @Data
     @Builder

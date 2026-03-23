@@ -90,16 +90,18 @@ public interface DeviceConstant {
         /**
          * 下行：平台向主控查询“当前关联的机器人/设备信息”
          *
-         * <p>Topic: device/{controllerCode}/teleop/associated-device/query
+         * <p>Topic: master/{controllerCode}/teleop/associated-device/query
          *
          * <p>配合 {@link org.jeecg.modules.device.mqtt.MqttMessageModel.AssociatedDeviceQuery} 使用，
-         * 主控收到后应回复 {@link org.jeecg.modules.device.mqtt.MqttMessageModel.AssociatedDeviceResponse}。
+         * 主控收到后应回复 {@link org.jeecg.modules.device.mqtt.MqttMessageModel.AssociatedDeviceResponse}（见 {@link #ASSOCIATED_DEVICE_ACK}）。
+         *
+         * <p>联调说明见 {@code docs/mqtt-associated-device-debug.md}。
          */
         String ASSOCIATED_DEVICE_QUERY    = "master/%s/teleop/associated-device/query";
         /**
          * 上行：主控上报“当前关联的机器人/设备信息”
          *
-         * <p>Topic: device/{controllerCode}/teleop/associated-device/ack
+         * <p>Topic: master/{controllerCode}/teleop/associated-device/ack（与平台 {@code MqttConfig} 订阅一致）
          */
         String ASSOCIATED_DEVICE_ACK = "master/%s/teleop/associated-device/ack";
 

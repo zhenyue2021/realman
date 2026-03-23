@@ -27,7 +27,8 @@ import java.util.regex.Pattern;
  *   device/{code}/ota/progress           → OtaProgressHandler.handle()
  *   device/{code}/log/operation          → DeviceOperationLogHandler.handle()
  *   device/{code}/camera/stream/response → DeviceCameraStreamResponseHandler.handle()
- *   device/{code}/teleop/associated-device/response → MasterAssociatedDeviceResponseHandler.handle()
+ *   master/{code}/teleop/associated-device/ack → MasterAssociatedDeviceResponseHandler.handle()
+ *   device/{code}/teleop/associated-device/ack → MasterAssociatedDeviceResponseHandler.handle()（同上业务，备用 Topic）
  *
  *   {code}/master/{action}               → 主控设备原始上报（cmd/states/rtsp/ctrl 等）
  *   {code}/slave/{action}                → 机器人设备原始上报（cmd/states 等）
@@ -99,6 +100,14 @@ public class MqttMessageDispatcher {
                     return;
                 }
             }
+            // 2b. 主控关联设备响应（与 {@link org.jeecg.modules.device.config.MqttConfig} 订阅 master/+/teleop/associated-device/ack 一致）
+            if (topic.startsWith("master/") && topic.endsWith("/teleop/associated-device/ack")) {
+                String[] parts = topic.split("/");
+                if (parts.length == 5) {
+                    masterAssociatedDeviceResponseHandler.handle(parts[1], payload);
+                    return;
+                }
+            }
 
             // 3. 主控/机器人原始上报 Topic：{deviceCode}/master/{path} 或 {deviceCode}/slave/{path}
             Matcher raw = RAW_DEVICE_TOPIC.matcher(topic);
@@ -134,7 +143,7 @@ public class MqttMessageDispatcher {
             case "ota/progress"                       -> otaProgressHandler.handle(deviceCode, payload);
             case "log/operation"                      -> operationLogHandler.handle(deviceCode, payload);
             case "camera/stream/response"             -> deviceCameraStreamResponseHandler.handle(deviceCode, payload);
-            case "teleop/associated-device/response"  -> masterAssociatedDeviceResponseHandler.handle(deviceCode, payload);
+            case "teleop/associated-device/ack"  -> masterAssociatedDeviceResponseHandler.handle(deviceCode, payload);
             case "slam/upload/request"                -> slamUploadRequestHandler.handle(deviceCode, payload);
             case "slam/upload/complete"               -> slamUploadCompleteHandler.handle(deviceCode, payload);
             case "slam/sync/ack"                      -> slamSyncAckHandler.handle(deviceCode, payload);

@@ -10,7 +10,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
- * 主控关联设备信息响应处理器（Topic: device/{controllerCode}/teleop/associated-device/response）
+ * 主控关联设备信息响应处理器（Topic: master/{controllerCode}/teleop/associated-device/ack）
  *
  * <p>职责：
  * <ul>
