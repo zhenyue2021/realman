@@ -355,6 +355,18 @@ public class MqttMessageModel {
     public static class CameraStreamQuery {
         /** 指令唯一 ID（UUID），用于关联 CameraStreamResponse */
         private String commandId;
+        //    host: 172.16.44.66
+        //    port: 554
+        //    app: live
+        //    secret: DvNBLZ961zAIqWrdjgkdcZ9ZJVGJuhhu
+        /** 流媒体用到的host，用于关联 CameraStreamResponse */
+        private String host;
+        /** 流媒体用到的port，用于关联 CameraStreamResponse */
+        private String port;
+        /** 流媒体用到的app，用于关联 CameraStreamResponse */
+        private String app;
+        /** 流媒体用到的secret，用于关联 CameraStreamResponse */
+        private String secret;
         /** 指定摄像头路数索引，null 表示查询全部 */
         private Integer cameraIndex;
         /** 平台发送时间戳（毫秒） */

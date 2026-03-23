@@ -28,6 +28,7 @@ import org.jeecg.modules.device.vo.DeviceDetailVO;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -70,6 +71,17 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
     private final IDeviceOperationLogService logService;
     private final IotDeviceAuthMapper deviceAuthMapper;
     private final DeviceCameraStreamPendingService deviceCameraStreamPendingService;
+
+
+    //    流媒体需要使用到的host，port，app，secret
+    @Value("${device.stream..host:172.16.44.66}")
+    private String host;
+    @Value("${device.stream.port:554}")
+    private String port;
+    @Value("${device.stream.app:live}")
+    private String app;
+    @Value("${device.stream.secret:DvNBLZ961zAIqWrdjgkdcZ9ZJVGJuhhu}")
+    private String secret;
 
     /**
      * 注册新设备
@@ -698,6 +710,10 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
             MqttMessageModel.CameraStreamQuery query = MqttMessageModel.CameraStreamQuery.builder()
                     .commandId(commandId)
                     .cameraIndex(cameraIndex)
+                    .host(host)
+                    .port(port)
+                    .app(app)
+                    .secret(secret)
                     .timestamp(System.currentTimeMillis())
                     .build();
             String payload = objectMapper.writeValueAsString(query);
