@@ -1,6 +1,32 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="org.jeecg.modules.device.mapper.IotDeviceMapper">
+
+    <!-- 设备列表：与授权表关联 + 可选授权生效/失效时间（超管/非超管共用同一套条件） -->
+    <sql id="deviceListAuthExistsWhere">
+        WHERE a.del_flag = 0
+          AND a.status = 1
+          AND (a.effective_time IS NULL OR a.effective_time &lt;= NOW())
+          AND (a.expire_time IS NULL OR a.expire_time &gt;= NOW())
+        <choose>
+            <when test="deviceType != null and deviceType == 2">
+                AND a.controller_id = d.id
+            </when>
+            <otherwise>
+                AND a.device_id = d.id
+            </otherwise>
+        </choose>
+        <if test="currentTenantId != null and currentTenantId != ''">
+            AND a.tenant_id = #{currentTenantId}
+        </if>
+        <if test="authEffectiveTime != null">
+            AND (a.effective_time IS NULL OR a.effective_time &gt;= #{authEffectiveTime})
+        </if>
+        <if test="authExpireTime != null">
+            AND (a.expire_time IS NOT NULL AND a.expire_time &lt;= #{authExpireTime})
+        </if>
+    </sql>
+
     <select id="selectDeviceList" resultType="org.jeecg.modules.device.entity.IotDevice">
         SELECT d.*
         FROM iot_device d
@@ -25,21 +51,15 @@
                 AND d.create_time &lt;= #{endTime}
             </if>
 
-            <!-- 数据权限：非超级管理员时，只能看到自己或所在租户被授权的设备 -->
-            <if test="superAdmin == null or superAdmin == false">
-                AND EXISTS (
-                    SELECT 1
-                    FROM iot_device_auth a
-                    WHERE a.device_id = d.id
-                      AND a.del_flag = 0
-                      AND a.status = 1
-                      AND (a.effective_time IS NULL OR a.effective_time &lt;= NOW())
-                      AND (a.expire_time IS NULL OR a.expire_time &gt;= NOW())
-                      <if test="currentTenantId != null and currentTenantId != ''">
-                          AND a.tenant_id = #{currentTenantId}
-                      </if>
-                )
-            </if>
+            <!--
+              授权关联与生效/失效时间过滤（超管与非超管共用同一套时间条件）：
+              - 非超管：必须存在当前有效授权，且租户匹配（若有 currentTenantId）；若传了 authEffectiveTime/authExpireTime 再叠加时间条件。
+              - 超管：默认不按授权表收窄；若传了 authEffectiveTime 或 authExpireTime，则必须存在满足相同时间条件的当前有效授权（可选按 currentTenantId 收窄）。
+            -->
+            AND EXISTS (
+            SELECT 1 FROM iot_device_auth a
+            <include refid="deviceListAuthExistsWhere"/>
+            )
         </where>
         ORDER BY d.create_time DESC
     </select>

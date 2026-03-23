@@ -9,6 +9,7 @@ import org.apache.ibatis.annotations.Select;
 import org.jeecg.modules.device.dto.OptionDTO;
 import org.jeecg.modules.device.entity.IotDevice;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Mapper
@@ -18,8 +19,10 @@ public interface IotDeviceMapper extends BaseMapper<IotDevice> {
         @Param("deviceType") Integer deviceType,
         @Param("status")     Integer status,
         @Param("productId")  String productId,
-        @Param("startTime")  java.time.LocalDateTime startTime,
-        @Param("endTime")    java.time.LocalDateTime endTime,
+        @Param("startTime") LocalDateTime startTime,
+        @Param("endTime") LocalDateTime endTime,
+        @Param("authEffectiveTime") LocalDateTime authEffectiveTime,
+        @Param("authExpireTime") LocalDateTime authExpireTime,
         @Param("currentUsername") String currentUsername,
         @Param("currentTenantId") String currentTenantId,
         @Param("superAdmin")      Boolean superAdmin);
@@ -54,4 +57,18 @@ public interface IotDeviceMapper extends BaseMapper<IotDevice> {
             </script>
             """)
     List<OptionDTO> listAvailableDevices(@Param("deviceType") Integer deviceType);
+
+    /**
+     * 授权记录查询条件下拉：返回指定类型的全部未删除设备（含已有授权记录的设备）。
+     * deviceType：1 机器人，2 主控。
+     */
+    @Select("""
+            SELECT d.id AS id,
+                   d.device_code AS name
+            FROM iot_device d
+            WHERE d.del_flag = 0
+              AND d.device_type = #{deviceType}
+            ORDER BY d.device_code ASC
+            """)
+    List<OptionDTO> listDevicesForAuthQuery(@Param("deviceType") Integer deviceType);
 }

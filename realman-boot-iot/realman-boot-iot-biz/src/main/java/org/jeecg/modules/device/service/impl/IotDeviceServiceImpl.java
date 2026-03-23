@@ -137,6 +137,8 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
                 request.getProductId(),
                 request.getStartTime(),
                 request.getEndTime(),
+                request.getAuthEffectiveTime(),
+                request.getAuthExpireTime(),
                 request.getCurrentUsername(),
                 request.getCurrentTenantId(),
                 request.getSuperAdmin()
@@ -170,6 +172,8 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
                 requestDTO.getProductId(),
                 requestDTO.getStartTime(),
                 requestDTO.getEndTime(),
+                requestDTO.getAuthEffectiveTime(),
+                requestDTO.getAuthExpireTime(),
                 requestDTO.getCurrentUsername(),
                 requestDTO.getCurrentTenantId(),
                 requestDTO.getSuperAdmin()
