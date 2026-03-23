@@ -112,6 +112,12 @@ public class DeviceAuthController {
         return ApiResult.ok(deviceAuthApiService.authQueryControllerOptions(request));
     }
 
+    @GetMapping("/options/query/authUsers")
+    @Operation(summary = "授权记录查询-用户下拉列表")
+    public ApiResult<List<OptionDTO>> authQueryAuthUsers(HttpServletRequest request) {
+        return ApiResult.ok(deviceAuthApiService.authQueryAuthUsers(request));
+    }
+
     @PostMapping("/export")
     @Operation(summary = "导出授权列表Excel")
     public ResponseEntity<byte[]> export(HttpServletRequest request, @RequestBody DeviceAuthQueryDTO query) {

@@ -69,4 +69,13 @@ public interface IotDeviceMapper extends BaseMapper<IotDevice> {
             ORDER BY d.device_code ASC
             """)
     List<OptionDTO> listDevicesForAuthQuery(@Param("deviceType") Integer deviceType);
+
+    @Select("""
+            SELECT d.admin_user_id AS id,
+                   d.admin_username AS name
+            FROM iot_device_auth d
+            WHERE d.del_flag = 0
+            ORDER BY d.create_time ASC
+            """)
+    List<OptionDTO> listAuthUsers();
 }

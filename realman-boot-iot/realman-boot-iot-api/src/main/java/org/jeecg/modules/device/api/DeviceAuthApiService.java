@@ -40,5 +40,7 @@ public interface DeviceAuthApiService {
     List<OptionDTO> authQueryControllerOptions(HttpServletRequest request);
 
     ResponseEntity<byte[]> export(HttpServletRequest request, DeviceAuthQueryDTO query);
+
+    List<OptionDTO> authQueryAuthUsers(HttpServletRequest request);
 }
 
