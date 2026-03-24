@@ -25,6 +25,7 @@ public class RobotDevicePageItemDTO {
     @Dict(dicCode = "device_status")
     private Integer status;
     private String description;
+    private String address;
     private LocalDateTime lastOnlineTime;
     private LocalDateTime lastOfflineTime;
     private LocalDateTime lastLoginTime;
