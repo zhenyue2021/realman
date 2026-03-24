@@ -21,6 +21,7 @@ import org.jeecg.modules.device.dto.DeviceRestartDTO;
 import org.jeecg.modules.device.dto.DeviceUpdateDTO;
 import org.jeecg.modules.device.dto.RobotDevicePageItemDTO;
 import org.jeecg.modules.device.entity.IotDevice;
+import org.jeecg.modules.device.service.DeviceMqttConnectionAddressService;
 import org.jeecg.modules.device.service.IIotDeviceService;
 import org.jeecg.modules.device.vo.ApiResult;
 import org.jeecg.modules.device.vo.DeviceDetailVO;
@@ -214,5 +215,14 @@ public class RobotDeviceController {
         }
 
         log.info("[mockDeviceStatusJob] 模拟推送数据 {} 条（设备数={}）", devices.size(), devices.size());
+    }
+
+
+    private final DeviceMqttConnectionAddressService mqttConnectionAddressService;
+    @PostMapping("/test/resolve-address")
+    public void resolveIpAddress(HttpServletRequest request) {
+        String deviceId = request.getHeader("deviceId");
+        String rawPeerHost = request.getHeader("rawPeerHost");
+        mqttConnectionAddressService.updateAddressAfterAuthSuccess(deviceId, rawPeerHost);
     }
 }

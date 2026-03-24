@@ -13,6 +13,7 @@ public class DeviceUpdateDTO {
     private String deviceModel;
     private String serialNumber;
     private String description;
+    private String macAddress;
     private BigDecimal longitude;
     private BigDecimal latitude;
 }

@@ -3,7 +3,7 @@ package org.jeecg.modules.device.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.entity.IotDevice;
-import org.jeecg.modules.device.geo.AmapIpGeoClient;
+import org.jeecg.modules.device.geo.DeviceIpGeoResolver;
 import org.jeecg.modules.device.mapper.IotDeviceMapper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -17,11 +17,11 @@ import org.springframework.stereotype.Service;
 public class DeviceMqttConnectionAddressService {
 
     private final IotDeviceMapper deviceMapper;
-    private final AmapIpGeoClient amapIpGeoClient;
+    private final DeviceIpGeoResolver deviceIpGeoResolver;
 
     /**
-     * 将 EMQX {@code peerhost} 规范为 IP，再解析为行政区划文案（需配置高德 Key），写入 {@code iot_device.address}；
-     * 解析失败或未配置 Key 时写入纯 IP；内网 IP 写入「内网IP」。
+     * 将 EMQX {@code peerhost} 规范为 IP，再解析为行政区划文案（{@code device.mqtt-auth.ip-geo.provider}=amap|qqwry），写入 {@code iot_device.address}；
+     * 解析失败或未配置数据源时写入纯 IP；内网 IP 写入「内网IP-{ip}」。
      */
     @Async
     public void updateAddressAfterAuthSuccess(String deviceId, String rawPeerHost) {
@@ -32,7 +32,7 @@ public class DeviceMqttConnectionAddressService {
         if (normalized == null || normalized.isBlank()) {
             return;
         }
-        String addressText = amapIpGeoClient.resolveAdministrativeAddress(normalized);
+        String addressText = deviceIpGeoResolver.resolveAdministrativeAddress(normalized);
         if (addressText == null || addressText.isBlank()) {
             addressText = normalized;
         }

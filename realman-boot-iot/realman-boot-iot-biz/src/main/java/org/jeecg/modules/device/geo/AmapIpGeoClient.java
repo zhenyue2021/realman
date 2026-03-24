@@ -131,7 +131,7 @@ public class AmapIpGeoClient {
             String province = jsonText(comp, "province");
             String city = jsonTextCity(comp.get("city"));
             String district = jsonText(comp, "district");
-            return formatProvinceCityDistrict(province, city, district);
+            return AdministrativeAddressFormatter.formatProvinceCityDistrict(province, city, district);
         } catch (Exception e) {
             log.debug("[IpGeo] regeo 失败 rectangle={}", rectangle, e);
             return null;
@@ -142,28 +142,7 @@ public class AmapIpGeoClient {
     private String formatFromIpEndpoint(JsonNode ipRoot) {
         String province = text(ipRoot, "province");
         String city = jsonTextCity(ipRoot.get("city"));
-        return formatProvinceCityDistrict(province, city, null);
-    }
-
-    /**
-     * 直辖市常见：city 为空数组，展示为「省 + 省 + 区」与业务示例「北京市北京市门头沟区」一致
-     */
-    static String formatProvinceCityDistrict(String province, String city, String district) {
-        if (isEmpty(province)) {
-            return null;
-        }
-        String prov = province.trim();
-        String cit = isEmpty(city) ? prov : city.trim();
-        String dist = district == null ? "" : district.trim();
-        StringBuilder sb = new StringBuilder();
-        sb.append(prov);
-        if (!cit.isEmpty()) {
-            sb.append(cit);
-        }
-        if (!dist.isEmpty()) {
-            sb.append(dist);
-        }
-        return sb.toString();
+        return AdministrativeAddressFormatter.formatProvinceCityDistrict(province, city, null);
     }
 
     private static String jsonText(JsonNode node, String field) {
