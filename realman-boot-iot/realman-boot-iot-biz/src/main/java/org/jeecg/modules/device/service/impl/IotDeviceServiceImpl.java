@@ -164,6 +164,7 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
     public void updateDevice(String deviceId, DeviceUpdateDTO dto) {
         IotDevice device = require(deviceId);
         if (dto.getDeviceName() != null) device.setDeviceName(dto.getDeviceName());
+        if (dto.getDeviceName() != null) device.setMacAddress(dto.getMacAddress());
         if (dto.getDeviceModel() != null) device.setDeviceModel(dto.getDeviceModel());
         if (dto.getSerialNumber() != null) device.setSerialNumber(dto.getSerialNumber());
         if (dto.getDescription() != null) device.setDescription(dto.getDescription());
