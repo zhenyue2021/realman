@@ -536,7 +536,9 @@
 						<nonFilteredFileExtension>bcmap</nonFilteredFileExtension>
 						<nonFilteredFileExtension>cmap</nonFilteredFileExtension>
 						<nonFilteredFileExtension>cur</nonFilteredFileExtension>
-						<nonFilteredFileExtension>zip</nonFilteredFileExtension>
+                        <nonFilteredFileExtension>zip</nonFilteredFileExtension>
+                        <!-- 纯真 qqwry.dat 等为二进制，不可参与 ${} 过滤 -->
+                        <nonFilteredFileExtension>dat</nonFilteredFileExtension>
                     </nonFilteredFileExtensions>
                 </configuration>
             </plugin>
