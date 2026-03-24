@@ -23,6 +23,7 @@ import org.jeecg.modules.device.dto.RobotDevicePageItemDTO;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.service.DeviceMqttConnectionAddressService;
 import org.jeecg.modules.device.service.IIotDeviceService;
+import org.jeecg.modules.device.stream.ZlMediaKitPlayUrlClient;
 import org.jeecg.modules.device.vo.ApiResult;
 import org.jeecg.modules.device.vo.DeviceDetailVO;
 import org.jeecg.modules.device.vo.RobotDeviceDetailVO;
@@ -224,5 +225,14 @@ public class RobotDeviceController {
         String deviceId = request.getHeader("deviceId");
         String rawPeerHost = request.getHeader("rawPeerHost");
         mqttConnectionAddressService.updateAddressAfterAuthSuccess(deviceId, rawPeerHost);
+    }
+
+
+    private final ZlMediaKitPlayUrlClient zlMediaKitPlayUrlClient;
+    @PostMapping("/test/resolvePlayUrl")
+    public ApiResult<String> resolveHlsPlayUrlIfStreamOnline(HttpServletRequest request) {
+        String stream = request.getHeader("stream");
+        String resolved = zlMediaKitPlayUrlClient.resolveHlsPlayUrlIfStreamOnline(stream);
+        return ApiResult.ok(resolved);
     }
 }

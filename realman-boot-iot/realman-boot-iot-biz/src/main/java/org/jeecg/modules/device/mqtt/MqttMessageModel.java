@@ -337,7 +337,7 @@ public class MqttMessageModel {
         /** 摄像头名称/标识，可为 null */
         private String cameraName;
         /** 视频流地址（RTSP/RTMP/HLS 等） */
-        private String streamUrl;
+        private String stream;
         /** 流类型（如 rtsp、rtmp、hls），可为 null */
         private String streamType;
     }
@@ -365,8 +365,6 @@ public class MqttMessageModel {
         private String port;
         /** 流媒体用到的app，用于关联 CameraStreamResponse */
         private String app;
-        /** 流媒体用到的secret，用于关联 CameraStreamResponse */
-        private String secret;
         /** 指定摄像头路数索引，null 表示查询全部 */
         private Integer cameraIndex;
         /** 平台发送时间戳（毫秒） */

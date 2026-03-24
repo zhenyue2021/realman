@@ -1,6 +1,9 @@
 package org.jeecg.modules.device.service.impl;
 
+import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.util.IdUtil;
+import cn.hutool.core.util.StrUtil;
+import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -20,6 +23,7 @@ import org.jeecg.modules.device.mqtt.publisher.MqttPublisher;
 import org.jeecg.modules.device.security.CommandEncryptService;
 import org.jeecg.modules.device.security.DeviceSecretService;
 import org.jeecg.modules.device.service.DeviceCameraStreamPendingService;
+import org.jeecg.modules.device.stream.ZlMediaKitPlayUrlClient;
 import org.jeecg.modules.device.service.IDeviceOperationLogService;
 import org.jeecg.modules.device.service.IIotDeviceService;
 import org.jeecg.modules.device.util.DeviceExcelExportUtil;
@@ -71,17 +75,16 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
     private final IDeviceOperationLogService logService;
     private final IotDeviceAuthMapper deviceAuthMapper;
     private final DeviceCameraStreamPendingService deviceCameraStreamPendingService;
+    private final ZlMediaKitPlayUrlClient      zlMediaKitPlayUrlClient;
 
 
-    //    流媒体需要使用到的host，port，app，secret
-    @Value("${device.stream..host:172.16.44.66}")
+    //    流媒体 MQTT 查询下发：host、push port、app（拉流 HTTPS 见 {@link ZlMediaKitPlayUrlClient}）
+    @Value("${device.stream.host:172.16.44.66}")
     private String host;
-    @Value("${device.stream.port:554}")
-    private String port;
+    @Value("${device.stream.port.push:554}")
+    private String pushPort;
     @Value("${device.stream.app:live}")
     private String app;
-    @Value("${device.stream.secret:DvNBLZ961zAIqWrdjgkdcZ9ZJVGJuhhu}")
-    private String secret;
 
     /**
      * 注册新设备
@@ -698,6 +701,8 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
      */
     @Override
     public List<DeviceCameraStreamVO> getCameraStreams(String deviceId, Integer cameraIndex) {
+        List<DeviceCameraStreamVO> result = new ArrayList<>();
+        List<DeviceCameraStreamVO> sourceResult = new ArrayList<>();
         IotDevice device = require(deviceId);
         if (DeviceConstant.DeviceStatus.ONLINE != device.getStatus()) {
             throw new RuntimeException("设备不在线");
@@ -712,9 +717,8 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
                     .commandId(commandId)
                     .cameraIndex(cameraIndex)
                     .host(host)
-                    .port(port)
+                    .port(pushPort)
                     .app(app)
-                    .secret(secret)
                     .timestamp(System.currentTimeMillis())
                     .build();
             String payload = objectMapper.writeValueAsString(query);
@@ -727,12 +731,12 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
 
         try {
             List<MqttMessageModel.CameraInfo> cameras = future.get(10, TimeUnit.SECONDS);
-            return cameras.stream()
+            log.info("设备 {} 摄像头流查询结果：{}", deviceId, JSON.toJSONString(cameras));
+            sourceResult =  cameras.stream()
                     .map(c -> DeviceCameraStreamVO.builder()
                             .cameraIndex(c.getCameraIndex())
                             .cameraName(c.getCameraName())
-                            .streamUrl(c.getStreamUrl())
-                            .streamType(c.getStreamType())
+                            .streamUrl(c.getStream())
                             .build())
                     .collect(Collectors.toList());
         } catch (java.util.concurrent.TimeoutException e) {
@@ -741,6 +745,21 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
         } catch (Exception e) {
             throw new RuntimeException("获取摄像头流地址失败: " + e.getMessage(), e);
         }
+        if (CollectionUtil.isNotEmpty(sourceResult)) {
+            sourceResult.forEach(c -> {
+                if (StrUtil.isNotBlank(c.getStreamUrl())) {
+                    String playUrl = zlMediaKitPlayUrlClient.resolveHlsPlayUrlIfStreamOnline(c.getStreamUrl());
+                    result.add(DeviceCameraStreamVO.builder()
+                            .cameraIndex(c.getCameraIndex())
+                            .cameraName(c.getCameraName())
+                            .streamUrl(playUrl != null ? playUrl : c.getStreamUrl())
+                            .build());
+                } else {
+                    result.add(c);
+                }
+            });
+        }
+        return result;
     }
 
     /**
