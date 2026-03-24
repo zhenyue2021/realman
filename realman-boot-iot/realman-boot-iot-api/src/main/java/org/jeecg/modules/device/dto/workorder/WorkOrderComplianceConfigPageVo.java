@@ -25,21 +25,26 @@ public class WorkOrderComplianceConfigPageVo implements Serializable {
 
     private String taskScene;
 
+    @Dict(dicCode = "enabled_status")
     private Integer timeoutAlertEnabled;
 
     private String timeoutAlertOffset;
 
+    @Dict(dicCode = "enabled_status")
     private Integer taskLimitEnabled;
 
+    @Dict(dicCode = "enabled_status")
     private Integer acceptanceEnabled;
 
     /** 是否启用超时提交：0-禁用 1-启用 */
+    @Dict(dicCode = "enabled_status")
     private Integer overtimeEnabled;
 
     private String overtimeReasonEnum;
 
     private String overtimeReasonDesc;
 
+    @Dict(dicCode = "enabled_status")
     private Integer autoCloseEnabled;
 
     private String autoCloseOffset;
