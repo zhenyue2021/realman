@@ -248,6 +248,7 @@ CREATE TABLE IF NOT EXISTS `work_order_compliance_config` (
   `timeout_alert_offset`      VARCHAR(8)            COMMENT '自动预警配置时间（距任务结束前X，H:M:S）',
   `task_limit_enabled`        TINYINT(1)   NOT NULL DEFAULT 1 COMMENT '是否有任务时限:0-否 1-是（默认启动）',
   `acceptance_enabled`        TINYINT(1)   NOT NULL DEFAULT 0 COMMENT '工单是否需要验收:0-禁用 1-启用',
+  `overtime_enabled`          TINYINT(1)   NOT NULL DEFAULT 0 COMMENT '是否启用超时提交:0-禁用 1-启用',
   `overtime_reason_enum`      VARCHAR(20)          COMMENT '超时提交原因枚举（用户原因/节假日/设备故障）',
   `overtime_reason_desc`      VARCHAR(500)          COMMENT '超时提交描述',
   `auto_close_enabled`        TINYINT(1)   NOT NULL DEFAULT 0 COMMENT '超时未提交策略:0-禁用 1-启用',

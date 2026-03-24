@@ -33,6 +33,9 @@ public class WorkOrderComplianceConfigPageVo implements Serializable {
 
     private Integer acceptanceEnabled;
 
+    /** 是否启用超时提交：0-禁用 1-启用 */
+    private Integer overtimeEnabled;
+
     private String overtimeReasonEnum;
 
     private String overtimeReasonDesc;

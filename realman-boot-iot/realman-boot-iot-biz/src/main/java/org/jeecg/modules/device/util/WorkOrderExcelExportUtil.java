@@ -31,6 +31,7 @@ public final class WorkOrderExcelExportUtil {
                     "是否自动预警", "自动预警配置时间(H:M:S)",
                     "是否有任务时限",
                     "工单是否需要验收",
+                    "是否启用超时提交",
                     "超时提交原因(枚举)", "超时提交描述",
                     "超时未提交策略", "超时未提交策略时长(H:M:S)",
                     "应用状态",
@@ -51,13 +52,14 @@ public final class WorkOrderExcelExportUtil {
                 setCell(row, 7, c.getTimeoutAlertOffset());
                 setCell(row, 8, flagStr(c.getTaskLimitEnabled()));
                 setCell(row, 9, flagStr(c.getAcceptanceEnabled()));
-                setCell(row, 10, c.getOvertimeReasonEnum());
-                setCell(row, 11, c.getOvertimeReasonDesc());
-                setCell(row, 12, flagStr(c.getAutoCloseEnabled()));
-                setCell(row, 13, c.getAutoCloseOffset());
-                setCell(row, 14, c.getApplyStatus() != null && c.getApplyStatus() == 1 ? "已应用" : "未应用");
-                setCell(row, 15, format(c.getCreateTime()));
-                setCell(row, 16, format(c.getUpdateTime()));
+                setCell(row, 10, flagStr(c.getOvertimeEnabled()));
+                setCell(row, 11, c.getOvertimeReasonEnum());
+                setCell(row, 12, c.getOvertimeReasonDesc());
+                setCell(row, 13, flagStr(c.getAutoCloseEnabled()));
+                setCell(row, 14, c.getAutoCloseOffset());
+                setCell(row, 15, c.getApplyStatus() != null && c.getApplyStatus() == 1 ? "已应用" : "未应用");
+                setCell(row, 16, format(c.getCreateTime()));
+                setCell(row, 17, format(c.getUpdateTime()));
             }
             autoSizeColumns(sheet, headers.length);
             wb.write(out);

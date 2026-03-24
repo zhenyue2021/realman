@@ -89,6 +89,8 @@ public class WorkOrderSchedulerJob {
     /**
      * 超时标记任务：将已过期且未提交的工单标记为 TIMEOUT
      *
+     * <p>合规配置 {@code overtime_enabled=1}（启用超时提交）时不自动打 TIMEOUT，由提交接口在超时时校验原因等。
+     *
      * <p>XXL-Job Handler Name：workOrderTimeoutMarkJob
      * 建议 Cron：0 0/1 * * * ? （每分钟）
      */
@@ -110,6 +112,9 @@ public class WorkOrderSchedulerJob {
         for (WorkOrder o : candidates) {
             WorkOrderComplianceConfig cfg = configMap.get(o.getComplianceId());
             if (cfg == null || cfg.getTaskLimitEnabled() == null || cfg.getTaskLimitEnabled() != 1) {
+                continue;
+            }
+            if (cfg.getOvertimeEnabled() != null && cfg.getOvertimeEnabled() == 1) {
                 continue;
             }
             o.setStatus("TIMEOUT");

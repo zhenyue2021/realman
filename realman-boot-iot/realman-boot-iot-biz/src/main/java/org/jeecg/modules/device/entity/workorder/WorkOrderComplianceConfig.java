@@ -47,6 +47,10 @@ public class WorkOrderComplianceConfig implements Serializable {
     @TableField("acceptance_enabled")
     private Integer acceptanceEnabled;
 
+    /** 是否启用超时提交：0-禁用 1-启用 */
+    @TableField("overtime_enabled")
+    private Integer overtimeEnabled;
+
     @TableField("overtime_reason_enum")
     private String overtimeReasonEnum;
 

@@ -263,6 +263,7 @@ public class WorkOrderApiServiceImpl implements WorkOrderApiService {
                 dto.setTimeoutAlertOffset(cfg.getTimeoutAlertOffset());
                 dto.setTaskLimitEnabled(cfg.getTaskLimitEnabled());
                 dto.setAcceptanceEnabled(cfg.getAcceptanceEnabled());
+                dto.setOvertimeEnabled(cfg.getOvertimeEnabled());
                 dto.setOvertimeReasonEnum(cfg.getOvertimeReasonEnum());
                 dto.setOvertimeReasonDesc(cfg.getOvertimeReasonDesc());
                 dto.setAutoCloseEnabled(cfg.getAutoCloseEnabled());

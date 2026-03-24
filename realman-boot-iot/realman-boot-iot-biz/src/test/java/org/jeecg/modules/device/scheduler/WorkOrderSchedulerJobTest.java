@@ -170,6 +170,19 @@ class WorkOrderSchedulerJobTest {
     }
 
     @Test
+    @DisplayName("timeoutMark：启用超时提交时不自动标记 TIMEOUT")
+    void timeoutMark_skipWhenOvertimeSubmitEnabled() {
+        config.setOvertimeEnabled(1);
+        when(workOrderMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(order));
+        when(configMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(config));
+
+        schedulerJob.timeoutMark();
+
+        verify(workOrderMapper, never()).updateById(any(WorkOrder.class));
+        verifyNoInteractions(operationRecordService);
+    }
+
+    @Test
     @DisplayName("autoClose：无候选不更新")
     void autoClose_noCandidates_noUpdate() {
         when(workOrderMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
