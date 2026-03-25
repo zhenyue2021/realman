@@ -2,6 +2,7 @@ package org.jeecg.modules.device.geo;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.stereotype.Component;
 
 /**
@@ -9,6 +10,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
+@RefreshScope
 public class DeviceIpGeoResolver {
 
     private final AmapIpGeoClient amapIpGeoClient;

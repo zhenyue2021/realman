@@ -16,6 +16,7 @@ import org.jeecg.modules.device.mapper.IotRobotSlamBindingMapper;
 import org.jeecg.modules.device.mapper.IotSlamMapMapper;
 import org.jeecg.modules.device.util.MinioUtil;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
@@ -28,6 +29,7 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@RefreshScope
 public class SlamPendingSyncService {
 
     private final IotRobotSlamBindingMapper bindingMapper;

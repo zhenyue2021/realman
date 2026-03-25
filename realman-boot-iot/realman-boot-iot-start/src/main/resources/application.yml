@@ -6,7 +6,17 @@ server:
 spring:
   application:
     name: realman-iot
+  cloud:
+    nacos:
+      config:
+        # 与 Nacos 控制台「Group」一致；DataId 一般为 ${spring.application.name}.yaml
+        group: REALMAN_GROUP
+        refresh-enabled: true
   config:
-    import: optional:classpath:config/application-liteflow.yml
+    import:
+      # liteflow 等本地片段
+      - optional:classpath:config/application-liteflow.yml
+      # 远程配置变更会触发 Refresh；消费 @Value 的类需配合 @RefreshScope 才拿到新值
+      - optional:nacos:${spring.application.name}.yaml?refreshEnabled=true
   profiles:
     active: '@profile.name@'

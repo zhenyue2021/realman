@@ -42,11 +42,11 @@
             <artifactId>realman-system-cloud-api</artifactId>
             <version>${realman-boot.version}</version>
         </dependency>
-        <!-- 先做服务注册 -->
-        <!--<dependency>
+        <!-- Nacos 配置中心：支持配置变更后刷新（需 refreshEnabled + 消费侧 @RefreshScope 等） -->
+        <dependency>
             <groupId>com.alibaba.cloud</groupId>
             <artifactId>spring-cloud-starter-alibaba-nacos-config</artifactId>
-        </dependency>-->
+        </dependency>
     </dependencies>
     <build>
         <plugins>

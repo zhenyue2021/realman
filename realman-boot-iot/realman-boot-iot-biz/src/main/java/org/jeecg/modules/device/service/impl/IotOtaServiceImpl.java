@@ -21,6 +21,7 @@ import org.jeecg.modules.device.service.IDeviceOperationLogService;
 import org.jeecg.modules.device.service.IIotOtaService;
 import org.jeecg.modules.device.util.MinioUtil;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,6 +51,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@RefreshScope
 public class IotOtaServiceImpl extends ServiceImpl<IotOtaFirmwareMapper, IotOtaFirmware>
         implements IIotOtaService {
 

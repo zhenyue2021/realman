@@ -5,6 +5,7 @@ import com.github.jarod.qqwry.QQWry;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -26,6 +27,7 @@ import java.util.regex.Pattern;
  */
 @Slf4j
 @Component
+@RefreshScope
 public class QqWryIpGeoClient {
 
     private static final String[] MUNICIPALITIES = {"北京市", "上海市", "天津市", "重庆市"};

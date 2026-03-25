@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.mapper.IotDeviceMapper;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import javax.crypto.spec.IvParameterSpec;
@@ -39,6 +40,7 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@RefreshScope
 public class CommandEncryptService {
 
 

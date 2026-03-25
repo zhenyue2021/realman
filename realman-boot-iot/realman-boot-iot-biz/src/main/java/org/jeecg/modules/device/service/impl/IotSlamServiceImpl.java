@@ -29,6 +29,7 @@ import org.jeecg.modules.device.mqtt.publisher.MqttPublisher;
 import org.jeecg.modules.device.service.IIotSlamService;
 import org.jeecg.modules.device.util.MinioUtil;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,6 +42,7 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@RefreshScope
 public class IotSlamServiceImpl implements IIotSlamService {
 
     private final IotSlamMapMapper slamMapMapper;

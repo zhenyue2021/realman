@@ -30,6 +30,7 @@ import org.jeecg.modules.device.vo.MasterLoginResolveVO;
 import org.jeecg.modules.device.vo.UsageStatusVO;
 import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,6 +46,7 @@ import java.util.concurrent.TimeoutException;
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@RefreshScope
 public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLogMapper, IotMasterLoginLog>
         implements IMasterLoginResolveService {
     private static final int DEVICE_TYPE_CONTROLLER = 2;
@@ -60,8 +62,8 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
     private final DeviceWebSocketServer deviceWebSocketServer;
     private final MasterAssociatedDevicePendingService masterAssociatedDevicePendingService;
     /** 配置中心配置的master的Mac地址 */
-    @Value("${device.master.mac:30:50:f1:01:cc:5f}")
-    private String masterMac;
+    @Value("${device.master.id:30:50:f1:01:cc:5f}")
+    private String masterId;
     @Override
     @Transactional(rollbackFor = Exception.class)
     public IotMasterLoginLog recordLogin(MasterLoginDTO dto) {
@@ -109,36 +111,29 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
         if (dto == null) {
             throw new RuntimeException("请求体不能为空");
         }
-
-        /*String tenantId = request.getHeader("x-tenant-id");
-        if (tenantId == null || tenantId.isEmpty()) {
-            throw new RuntimeException("缺少租户ID（x-tenant-id）");
-        }*/
-
-        // 解析客户端 MAC：优先用客户端传来的 macAddress，传不了时走 ARP 兜底
-        String mac = MacResolveUtil.resolveClientMac(request, dto.getMacAddress());
-//        String mac = DeviceMacUtil.getPrimaryMacAddress();
-        if (mac == null || mac.isEmpty()) {
-//            throw new RuntimeException("无法获取主控设备 MAC 地址");
-            log.error("无法获取主控设备 MAC 地址");
-            mac = masterMac;
+        if (dto.getDeviceId() == null) {
+            dto.setDeviceId(masterId);
         }
-        log.info("主控设备MAC: {}", mac);
-        mac = mac.toLowerCase();
+        String deviceId = dto.getDeviceId();
+        log.info("请求体：{} 主控ID: {}", dto, deviceId);
 
-        // 通过 MAC 反查主控设备
+        // 通过 设备ID 查询主控设备
         IotDevice controller = deviceMapper.selectOne(
                 new LambdaQueryWrapper<IotDevice>()
-                        .eq(IotDevice::getMacAddress, mac)
+                        .eq(IotDevice::getId, deviceId)
                         .eq(IotDevice::getDeviceType, DEVICE_TYPE_CONTROLLER)
         );
         if (controller == null) {
-            throw new RuntimeException("主控设备不存在或非主控设备: mac=" + mac);
+            throw new RuntimeException("主控设备不存在或非主控设备: deviceId=" + deviceId);
         }
 
         // 通过 MQTT 与主控做一次在线 & MAC 一致性校验（如不通过会直接抛异常）
-        verifyControllerOnlineAndMac(controller, mac, dto);
-
+//        verifyControllerOnlineAndMac(controller, mac, dto);
+        // 设备是否在线
+        boolean online = Objects.equals(controller.getStatus(), DeviceConstant.DeviceStatus.ONLINE);
+        if ((!online)) {
+            throw new RuntimeException("当前主控设备不在线");
+        }
         // 部门/企业授权：当前用户所属部门对该主控的有效授权
         String operatorId = dto.getOperatorId();
         if (operatorId == null || operatorId.isEmpty()) {
@@ -146,7 +141,7 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
         }
         List<String> departIds = sysUserDepartLiteMapper.listDepartIdsByUserId(operatorId);
         if (departIds == null || departIds.isEmpty()) {
-            throw new RuntimeException("无权限：当前用户未绑定部门");
+            throw new RuntimeException("无权限：当前用户未绑定企业");
         }
         LocalDateTime now = LocalDateTime.now();
         LambdaQueryWrapper<IotDeviceAuth> authWrapper = new LambdaQueryWrapper<IotDeviceAuth>()
@@ -157,7 +152,7 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
                 .in(IotDeviceAuth::getEnterpriseId, departIds);
         List<IotDeviceAuth> auths = deviceAuthMapper.selectList(authWrapper);
         if (auths == null || auths.isEmpty()) {
-            throw new RuntimeException("无权限：主控设备未授权给当前用户");
+            throw new RuntimeException("无权限：主控设备未授权给当前用户所在企业");
         }
 
         // 可用机器人列表（授权绑定）
@@ -212,7 +207,7 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
             logDto.setAssociatedRobotId(robot.getId());
             logDto.setAssociatedRobotCode(robot.getDeviceCode());
             // 通知设备操作的是哪台机器人
-            notifyControllerWhichRobot(robot);
+//            notifyControllerWhichRobot(robot);
         }
         var loginLog = this.recordLogin(logDto);
         vo.setLoginLogId(loginLog != null ? loginLog.getId() : null);

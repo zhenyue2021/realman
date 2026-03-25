@@ -10,6 +10,7 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.stereotype.Component;
 
 import javax.net.ssl.SSLContext;
@@ -28,6 +29,7 @@ import java.util.concurrent.TimeUnit;
  */
 @Slf4j
 @Component
+@RefreshScope
 public class ZlMediaKitPlayUrlClient {
 
     @Value("${device.stream.host:172.16.44.66}")

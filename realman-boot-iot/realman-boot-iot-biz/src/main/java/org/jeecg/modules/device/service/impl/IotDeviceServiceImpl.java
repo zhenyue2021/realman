@@ -29,6 +29,7 @@ import org.jeecg.modules.device.service.IIotDeviceService;
 import org.jeecg.modules.device.util.DeviceExcelExportUtil;
 import org.jeecg.modules.device.vo.DeviceCameraStreamVO;
 import org.jeecg.modules.device.vo.DeviceDetailVO;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -61,6 +62,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@RefreshScope
 public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice>
         implements IIotDeviceService {
 
@@ -448,6 +450,9 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
         IotDevice robot = require(robotId);
         if (!Objects.equals(robot.getDeviceType(), 1)) {
             throw new RuntimeException("设备类型不匹配：不是机器人设备");
+        }
+        if (!Objects.equals(robot.getStatus(), DeviceConstant.DeviceStatus.ONLINE)) {
+            throw new RuntimeException("当前机器人不在线");
         }
 
         String commandId = IdUtil.fastSimpleUUID();

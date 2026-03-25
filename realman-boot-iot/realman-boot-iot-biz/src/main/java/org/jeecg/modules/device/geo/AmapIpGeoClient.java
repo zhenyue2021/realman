@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
@@ -22,6 +23,7 @@ import java.nio.charset.StandardCharsets;
  */
 @Slf4j
 @Component
+@RefreshScope
 public class AmapIpGeoClient {
 
     private static final String IP_URL = "https://restapi.amap.com/v3/ip";
