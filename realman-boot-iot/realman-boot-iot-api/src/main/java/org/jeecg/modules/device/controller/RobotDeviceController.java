@@ -26,7 +26,6 @@ import org.jeecg.modules.device.service.IIotDeviceService;
 import org.jeecg.modules.device.stream.ZlMediaKitPlayUrlClient;
 import org.jeecg.modules.device.vo.ApiResult;
 import org.jeecg.modules.device.vo.DeviceDetailVO;
-import org.jeecg.modules.device.vo.RobotDeviceDetailVO;
 import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -207,14 +206,6 @@ public class RobotDeviceController {
         if (!Objects.equals(d.getDeviceType(), deviceType)) throw new RuntimeException("设备类型不匹配");
     }
 
-    /** 向机器人下发力反馈查询指令（设备 ACK 后数据由 MQTT Handler 异步处理） */
-    @GetMapping("/{deviceId}/force-feedback")
-    @Operation(summary = "查询机器人力反馈参数")
-    public ApiResult<Void> getForceFeedback(@PathVariable String deviceId) {
-        ensureDeviceType(deviceId, DEVICE_TYPE_ROBOT);
-        deviceService.queryRobotForceFeedback(deviceId);
-        return ApiResult.ok(null, "查询指令已下发");
-    }
 
     @PostMapping("/mock/device-status")
     public void mockDeviceStatusJob() {

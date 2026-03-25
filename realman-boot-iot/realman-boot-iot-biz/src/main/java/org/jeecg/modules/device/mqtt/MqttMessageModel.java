@@ -200,7 +200,7 @@ public class MqttMessageModel {
     @NoArgsConstructor
     @AllArgsConstructor
     @JsonInclude(JsonInclude.Include.NON_NULL)
-    public static class DeviceForceFeedbackCommand {
+    public static class MasterForceFeedbackCommand {
         /** 指令唯一 ID（UUID），用于关联 ACK */
         private String commandId;
         /** 机械臂力度等级 */

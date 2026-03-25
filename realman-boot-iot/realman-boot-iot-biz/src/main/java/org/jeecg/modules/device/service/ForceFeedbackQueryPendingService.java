@@ -10,7 +10,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * 力反馈参数查询等待服务
  *
  * <p>以 commandId 为 key，在平台发出查询指令后挂起请求，
- * 待设备通过 device/{deviceCode}/command/force-feedback/ack 回复后完成 Future。
+ * 待设备通过 master/{controllerCode}/command/force-feedback/ack 回复后完成 Future。
  */
 @Service
 public class ForceFeedbackQueryPendingService {

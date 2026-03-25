@@ -67,7 +67,6 @@
 | 下行 | `device/{deviceCode}/command/restart` | 远程重启 | `RemoteRestartCommand` |
 | 下行 | `device/{deviceCode}/command/emergency-stop` | 紧急停机 | `EmergencyStopCommand` |
 | 下行 | `device/{deviceCode}/command/stop-control` | 停止遥操等（平台实现里与 `RobotAssignCommand` 同结构） | `RobotAssignCommand` |
-| 下行 | `device/{deviceCode}/command/force-feedback` | 力反馈等级 | `MasterForceFeedbackCommand` |
 | 下行 | `device/{deviceCode}/ota/notify` | OTA 通知 | `OtaNotify` |
 | 下行 | `device/{deviceCode}/camera/stream/query` | 查询摄像头流 | `CameraStreamQuery` |
 | 下行 | `device/{deviceCode}/slam/upload/permit` | 上传许可 | `SlamUploadPermit` |
@@ -84,6 +83,7 @@
 | 下行 | `master/{controllerCode}/teleop/associated-device/query` | 查询当前关联设备 | `AssociatedDeviceQuery` |
 | 下行 | `master/{controllerCode}/teleop/robot/assign` | 指派遥操目标机器人 | `RobotAssignCommand` |
 | 下行 | `master/{controllerCode}/command/sport-speed` | 运动速度等级 | `MasterSportSpeedCommand` |
+| 下行 | `master/{controllerCode}/command/force-feedback` | 力反馈等级 | `MasterForceFeedbackCommand` |
 | 下行 | `master/{controllerCode}/command/stop-control` | 停止遥操（机器人侧同路径前缀为 `master/{robotCode}/...`，见平台代码） | `RobotAssignCommand` |
 
 **订阅建议（主控）**：`master/{controllerCode}/teleop/associated-device/query`、`master/{controllerCode}/teleop/robot/assign`、`master/{controllerCode}/command/+`。
@@ -186,7 +186,7 @@
 {"commandId":"...","robotCode":"ROBOT_001","workOrderId":"WO-10086","timestamp":1710000000000}
 ```
 
-**下行 `device/{code}/command/force-feedback`**
+**下行 `master/{code}/command/force-feedback`**
 
 ```json
 {"commandId":"...","armLevel":3,"gripperLevel":2,"timestamp":1710000000000}

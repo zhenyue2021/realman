@@ -59,7 +59,7 @@ public interface DeviceConstant {
         /** 上行：指令集确认（统一为 master/{code}/command/{cmd}/ack，由平台订阅 master/+/command/+/ack） */
         String MASTER_COMMAND_ACK = "master/%s/command/%s/ack";
         /** 下行：平台向机器人设备发送设置力反馈指令（加密，QoS=1） */
-        String DEVICE_FORCE_FEEDBACK = "device/%s/command/force-feedback";
+        String MASTER_FORCE_FEEDBACK = "master/%s/command/force-feedback";
         /** 下行：平台向主控设备发送运动与安全参数指令（加密，QoS=1），如底盘/升降速度 */
         String MASTER_SPORT_SPEED = "master/%s/command/sport-speed";
         /** 下行：平台向主控设备发送停止遥操指令（加密，QoS=1） */

@@ -146,22 +146,20 @@ public class MasterDeviceController {
      * 设置主控端力反馈 + 运动与安全参数（一次性提交）
      *
      * <p>对应设备侧 Topic：
-     * device/{deviceCode}/command/force-feedback
+     * master/{controllerCode}/command/force-feedback
      * master/{controllerCode}/command/sport-speed
      */
     @PostMapping("/control-params")
     @Operation(summary = "设置主控设备力反馈及运动参数")
     public ApiResult<Void> setControlParams(@RequestBody MasterControlParamsDTO dto) {
         String controllerId = dto.getControllerId();
-        String deviceId = dto.getDeviceId();
-        if (StrUtil.isEmpty(controllerId) || StrUtil.isEmpty(deviceId)) {
-            return ApiResult.fail("参数错误：controllerId/deviceId 不能为空");
+        if (StrUtil.isEmpty(controllerId)) {
+            return ApiResult.fail("参数错误：controllerId 不能为空");
         }
         IotDevice controller = ensureDeviceType(controllerId, DEVICE_TYPE_CONTROLLER);
-        IotDevice robot = ensureDeviceType(deviceId, DEVICE_TYPE_ROBOT);
         org.jeecg.modules.device.service.impl.IotDeviceServiceImpl impl =
                 (org.jeecg.modules.device.service.impl.IotDeviceServiceImpl) deviceService;
-        impl.sendRobotForceFeedbackCommand(robot, dto.getArmLevel(), dto.getGripperLevel(), dto.getOperator());
+        impl.sendMasterForceFeedbackCommand(controller, dto.getArmLevel(), dto.getGripperLevel(), dto.getOperator());
         impl.sendMasterSportSpeedCommand(controller, dto.getMoveSpeedLevel(), dto.getLiftSpeedLevel(), dto.getOperator());
         return ApiResult.ok(null, "参数已下发，等待主控设备确认");
     }
@@ -341,6 +339,7 @@ public class MasterDeviceController {
     public ApiResult<Void> getSportSpeed(@PathVariable String controllerId) {
         ensureDeviceType(controllerId, DEVICE_TYPE_CONTROLLER);
         deviceService.queryMasterSportSpeed(controllerId);
+        deviceService.queryMasterForceFeedback(controllerId);
         return ApiResult.ok(null, "查询指令已下发");
     }
 

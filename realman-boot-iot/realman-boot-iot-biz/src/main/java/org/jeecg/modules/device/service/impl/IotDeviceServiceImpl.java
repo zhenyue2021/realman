@@ -550,42 +550,42 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
     }
 
     /**
-     * 向机器人设备下发力反馈参数指令（机械臂/夹爪力度）
+     * 向主控设备下发力反馈参数指令（机械臂/夹爪力度）
      *
      * <p>注意：此处仅负责通过 MQTT 下发指令并记录操作日志，不同步等待 ACK。
      * ACK 由 DeviceCommandAckHandler 统一记录。
      */
-    public String sendRobotForceFeedbackCommand(IotDevice robot,
-                                                Integer armLevel,
-                                                Integer gripperLevel,
-                                                String operator) {
-        if (DeviceConstant.DeviceStatus.ONLINE != robot.getStatus()) {
-            throw new RuntimeException("机器人设备不在线");
+    public String sendMasterForceFeedbackCommand(IotDevice master,
+                                                 Integer armLevel,
+                                                 Integer gripperLevel,
+                                                 String operator) {
+        if (DeviceConstant.DeviceStatus.ONLINE != master.getStatus()) {
+            throw new RuntimeException("主控设备不在线");
         }
         String commandId = IdUtil.fastSimpleUUID();
         long now = System.currentTimeMillis();
         try {
-            MqttMessageModel.DeviceForceFeedbackCommand cmd = MqttMessageModel.DeviceForceFeedbackCommand.builder()
+            MqttMessageModel.MasterForceFeedbackCommand cmd = MqttMessageModel.MasterForceFeedbackCommand.builder()
                     .commandId(commandId)
                     .armLevel(armLevel)
                     .gripperLevel(gripperLevel)
                     .timestamp(now)
                     .build();
             String payload = objectMapper.writeValueAsString(cmd);
-            String topic = String.format(DeviceConstant.MqttTopic.DEVICE_FORCE_FEEDBACK, robot.getDeviceCode());
-            mqttPublisher.publishToDevice(robot.getDeviceCode(), topic, payload, 1);
+            String topic = String.format(DeviceConstant.MqttTopic.MASTER_FORCE_FEEDBACK, master.getDeviceCode());
+            mqttPublisher.publishToDevice(master.getDeviceCode(), topic, payload, 1);
 
             String desc = "设置力反馈参数: armLevel=" + armLevel + ", gripperLevel=" + gripperLevel;
-            logService.recordLog(robot.getId(), robot.getDeviceCode(),
+            logService.recordLog(master.getId(), master.getDeviceCode(),
                     DeviceConstant.OperationType.COMMAND_SEND,
                     desc, "{commandId:" + commandId + "}",
                     DeviceConstant.OperationSource.PLATFORM, "PENDING", null, operator, null);
 
             // 记录到 iot_device_config（指令已下发，syncStatus=0 待设备 ACK）
-            upsertDeviceConfig(robot.getId(), robot.getDeviceCode(), "arm_level",
+            upsertDeviceConfig(master.getId(), master.getDeviceCode(), "arm_level",
                     armLevel == null ? null : armLevel.toString(), "force_feedback");
-            upsertDeviceConfig(robot.getId(), robot.getDeviceCode(), "gripper_level",
-                    gripperLevel == null ? null : gripperLevel.toString(), "force_feedback");
+//            upsertDeviceConfig(master.getId(), master.getDeviceCode(), "gripper_level",
+//                    gripperLevel == null ? null : gripperLevel.toString(), "force_feedback");
         } catch (Exception e) {
             throw new RuntimeException("发送力反馈指令失败: " + e.getMessage(), e);
         }
@@ -775,20 +775,20 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
     }
 
     @Override
-    public void queryRobotForceFeedback(String robotId) {
-        IotDevice device = require(robotId);
+    public void queryMasterForceFeedback(String deviceId) {
+        IotDevice device = require(deviceId);
         if (DeviceConstant.DeviceStatus.ONLINE != device.getStatus()) {
-            throw new RuntimeException("机器人设备不在线");
+            throw new RuntimeException("主控设备不在线");
         }
         try {
-            MqttMessageModel.DeviceForceFeedbackCommand cmd = MqttMessageModel.DeviceForceFeedbackCommand.builder()
+            MqttMessageModel.MasterForceFeedbackCommand cmd = MqttMessageModel.MasterForceFeedbackCommand.builder()
                     .commandId(IdUtil.fastSimpleUUID())
                     .armLevel(null)
                     .gripperLevel(null)
                     .timestamp(System.currentTimeMillis())
                     .build();
             String payload = objectMapper.writeValueAsString(cmd);
-            String topic = String.format(DeviceConstant.MqttTopic.DEVICE_FORCE_FEEDBACK, device.getDeviceCode());
+            String topic = String.format(DeviceConstant.MqttTopic.MASTER_FORCE_FEEDBACK, device.getDeviceCode());
             mqttPublisher.publishToDevice(device.getDeviceCode(), topic, payload, 1);
         } catch (Exception e) {
             throw new RuntimeException("发送力反馈查询指令失败: " + e.getMessage(), e);
