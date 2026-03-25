@@ -3,7 +3,6 @@ package org.jeecg.modules.device.service.impl;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +24,6 @@ import org.jeecg.modules.device.mqtt.publisher.MqttPublisher;
 import org.jeecg.modules.device.service.IMasterLoginResolveService;
 import org.jeecg.modules.device.service.MasterAssociatedDevicePendingService;
 import org.jeecg.modules.device.service.workorder.IWorkOrderService;
-import org.jeecg.modules.device.util.MacResolveUtil;
 import org.jeecg.modules.device.vo.MasterLoginResolveVO;
 import org.jeecg.modules.device.vo.UsageStatusVO;
 import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
@@ -62,8 +60,8 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
     private final DeviceWebSocketServer deviceWebSocketServer;
     private final MasterAssociatedDevicePendingService masterAssociatedDevicePendingService;
     /** 配置中心配置的master的Mac地址 */
-    @Value("${device.master.id:30:50:f1:01:cc:5f}")
-    private String masterId;
+    @Value("${device.master.device_code:master_develop001_30-50-f1-01-cc-5f}")
+    private String masterCode;
     @Override
     @Transactional(rollbackFor = Exception.class)
     public IotMasterLoginLog recordLogin(MasterLoginDTO dto) {
@@ -111,20 +109,20 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
         if (dto == null) {
             throw new RuntimeException("请求体不能为空");
         }
-        if (dto.getDeviceId() == null) {
-            dto.setDeviceId(masterId);
+        if (dto.getDeviceCode() == null) {
+            dto.setDeviceCode(masterCode);
         }
-        String deviceId = dto.getDeviceId();
-        log.info("请求体：{} 主控ID: {}", dto, deviceId);
+        String deviceCode = dto.getDeviceCode();
+        log.info("请求体：{} 主控设备编码: {}", dto, deviceCode);
 
         // 通过 设备ID 查询主控设备
         IotDevice controller = deviceMapper.selectOne(
                 new LambdaQueryWrapper<IotDevice>()
-                        .eq(IotDevice::getId, deviceId)
+                        .eq(IotDevice::getDeviceCode, deviceCode)
                         .eq(IotDevice::getDeviceType, DEVICE_TYPE_CONTROLLER)
         );
         if (controller == null) {
-            throw new RuntimeException("主控设备不存在或非主控设备: deviceId=" + deviceId);
+            throw new RuntimeException("主控设备不存在或非主控设备: deviceCode:" + deviceCode);
         }
 
         // 通过 MQTT 与主控做一次在线 & MAC 一致性校验（如不通过会直接抛异常）

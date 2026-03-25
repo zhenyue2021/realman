@@ -233,7 +233,7 @@ public class MasterDeviceController {
 
     /** 开始遥操（通知主控关联目标机器人，不等待ACK） */
     @PostMapping("/{controllerId}/teleop/start")
-    @Operation(summary = "开始遥操")
+    @Operation(summary = "主控关联目标机器人")
     public ApiResult<List<DeviceCameraStreamVO>> startTeleop(@PathVariable String controllerId,
                                        @RequestBody TeleopStartDTO dto) {
         ensureDeviceType(controllerId, DEVICE_TYPE_CONTROLLER);
@@ -367,8 +367,8 @@ public class MasterDeviceController {
     public ApiResult<DeviceCameraStreamVO> getCameraStreamByIndex(@PathVariable String deviceId,
                                                                   @PathVariable Integer cameraIndex) {
         ensureDeviceType(deviceId, DEVICE_TYPE_ROBOT);
-        if (cameraIndex == null || cameraIndex < 0) {
-            throw new RuntimeException("cameraIndex 必须为非负整数");
+        if (cameraIndex == null || cameraIndex < 0 || cameraIndex > 3) {
+            throw new RuntimeException("cameraIndex 越域 => [0-3]");
         }
         List<DeviceCameraStreamVO> list = deviceService.getCameraStreams(deviceId, cameraIndex);
         DeviceCameraStreamVO vo = list.isEmpty() ? null : list.get(0);
