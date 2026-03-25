@@ -13,6 +13,8 @@ import org.jeecg.modules.device.mapper.IotDeviceConfigMapper;
 import org.jeecg.modules.device.mapper.IotDeviceMapper;
 import org.jeecg.modules.device.security.CommandEncryptService;
 import org.jeecg.modules.device.service.IDeviceOperationLogService;
+import org.jeecg.modules.device.service.SportSpeedQueryPendingService;
+import org.jeecg.modules.device.vo.SportSpeedVO;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -31,8 +33,9 @@ public class MasterCommandAckHandler {
     private final CommandEncryptService      encryptService;
     private final ObjectMapper               objectMapper;
     private final IDeviceOperationLogService logService;
-    private final IotDeviceConfigMapper      configMapper;
-    private final IotDeviceMapper            deviceMapper;
+    private final IotDeviceConfigMapper        configMapper;
+    private final IotDeviceMapper              deviceMapper;
+    private final SportSpeedQueryPendingService sportSpeedPending;
 
     public void handle(String controllerCode, String cmd, String payload) throws Exception {
         String decrypted = encryptService.decryptFromDevice(controllerCode, payload);
@@ -78,11 +81,19 @@ public class MasterCommandAckHandler {
                 String deviceId = device != null ? device.getId() : null;
                 insertConfigIfAbsent(deviceId, controllerCode, "move_speed_level",
                         intValue(node, "moveSpeedLevel"), "sport_speed", syncStatus, now);
-                insertConfigIfAbsent(deviceId, controllerCode, "lift_speed_level",
-                        intValue(node, "liftSpeedLevel"), "sport_speed", syncStatus, now);
+                // 目前仅可设置移动速度
+//                insertConfigIfAbsent(deviceId, controllerCode, "lift_speed_level",
+//                        intValue(node, "liftSpeedLevel"), "sport_speed", syncStatus, now);
                 log.info("[MasterCommandAck] sport-speed 无PENDING记录，已按设备上报插入配置: controller={}", controllerCode);
             } else {
                 log.info("[MasterCommandAck] sport-speed 配置同步状态已更新: controller={} updated={} status={}", controllerCode, updated, syncStatus);
+            }
+
+            // 若是查询指令（moveSpeedLevel/liftSpeedLevel 由设备回填），完成挂起的 Future
+            if (code == 0 && commandId != null) {
+                Integer moveSpeedLevel = node.has("moveSpeedLevel") && !node.get("moveSpeedLevel").isNull() ? node.get("moveSpeedLevel").asInt() : null;
+                Integer liftSpeedLevel = node.has("liftSpeedLevel") && !node.get("liftSpeedLevel").isNull() ? node.get("liftSpeedLevel").asInt() : null;
+                sportSpeedPending.complete(commandId, new SportSpeedVO(moveSpeedLevel, liftSpeedLevel));
             }
         }
     }

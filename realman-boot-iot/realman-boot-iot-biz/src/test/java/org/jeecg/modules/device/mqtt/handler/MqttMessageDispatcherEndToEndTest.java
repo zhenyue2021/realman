@@ -14,6 +14,7 @@ import org.jeecg.modules.device.mapper.*;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.security.CommandEncryptService;
 import org.jeecg.modules.device.service.DeviceCameraStreamPendingService;
+import org.jeecg.modules.device.service.ForceFeedbackQueryPendingService;
 import org.jeecg.modules.device.service.IDeviceOperationLogService;
 import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
 import org.junit.jupiter.api.BeforeEach;
@@ -52,6 +53,7 @@ public class MqttMessageDispatcherEndToEndTest {
     private DeviceWebSocketServer webSocketServer;
     private IDeviceOperationLogService logService;
     private DeviceOnlineOfflineHandler onlineOfflineHandler;
+    private ForceFeedbackQueryPendingService forceFeedbackPending;
 
     // 被测 Handler
     private DeviceStatusHandler statusHandler;
@@ -118,7 +120,10 @@ public class MqttMessageDispatcherEndToEndTest {
         commandAckHandler = new DeviceCommandAckHandler(
                 encryptService,
                 objectMapper,
-                logService
+                logService,
+                configMapper,
+                deviceMapper,
+                forceFeedbackPending
         );
         masterCommandAckHandler = Mockito.mock(MasterCommandAckHandler.class);
 

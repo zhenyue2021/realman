@@ -511,22 +511,22 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
         long now = System.currentTimeMillis();
         try {
             // 1) 通知主控停止遥操（ 传 STOP 标识）
-            String controllerTopic = String.format(DeviceConstant.MqttTopic.DEVICE_STOP_CONTROL, controllerDeviceCode);
+            String controllerTopic = String.format(DeviceConstant.MqttTopic.MASTER_STOP_CONTROL, controllerDeviceCode);
             MqttMessageModel.RobotAssignCommand stopForController = MqttMessageModel.RobotAssignCommand.builder()
                     .commandId(commandId)
                     .robotCode(controllerDeviceCode)
-                    .workOrderId("STOP")
+                    .workOrderId("STOP_MASTER")
                     .timestamp(now)
                     .build();
             mqttPublisher.publishToDevice(controllerDeviceCode, controllerTopic,
                     objectMapper.writeValueAsString(stopForController), 1);
 
             // 2) 通知机器人停止遥操
-            String robotTopic = String.format(DeviceConstant.MqttTopic.MASTER_STOP_CONTROL, robotDeviceCode);
+            String robotTopic = String.format(DeviceConstant.MqttTopic.DEVICE_STOP_CONTROL, robotDeviceCode);
             MqttMessageModel.RobotAssignCommand stopForRobot = MqttMessageModel.RobotAssignCommand.builder()
                     .commandId(commandId)
                     .robotCode(robotDeviceCode)
-                    .workOrderId("stop_teleop")
+                    .workOrderId("STOP_SLAVE")
                     .timestamp(now)
                     .build();
             mqttPublisher.publishToDevice(robotDeviceCode, robotTopic,
@@ -772,6 +772,48 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
             });
         }
         return result;
+    }
+
+    @Override
+    public void queryRobotForceFeedback(String robotId) {
+        IotDevice device = require(robotId);
+        if (DeviceConstant.DeviceStatus.ONLINE != device.getStatus()) {
+            throw new RuntimeException("机器人设备不在线");
+        }
+        try {
+            MqttMessageModel.DeviceForceFeedbackCommand cmd = MqttMessageModel.DeviceForceFeedbackCommand.builder()
+                    .commandId(IdUtil.fastSimpleUUID())
+                    .armLevel(null)
+                    .gripperLevel(null)
+                    .timestamp(System.currentTimeMillis())
+                    .build();
+            String payload = objectMapper.writeValueAsString(cmd);
+            String topic = String.format(DeviceConstant.MqttTopic.DEVICE_FORCE_FEEDBACK, device.getDeviceCode());
+            mqttPublisher.publishToDevice(device.getDeviceCode(), topic, payload, 1);
+        } catch (Exception e) {
+            throw new RuntimeException("发送力反馈查询指令失败: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public void queryMasterSportSpeed(String controllerId) {
+        IotDevice device = require(controllerId);
+        if (DeviceConstant.DeviceStatus.ONLINE != device.getStatus()) {
+            throw new RuntimeException("主控设备不在线");
+        }
+        try {
+            MqttMessageModel.MasterSportSpeedCommand cmd = MqttMessageModel.MasterSportSpeedCommand.builder()
+                    .commandId(IdUtil.fastSimpleUUID())
+                    .moveSpeedLevel(null)
+                    .liftSpeedLevel(null)
+                    .timestamp(System.currentTimeMillis())
+                    .build();
+            String payload = objectMapper.writeValueAsString(cmd);
+            String topic = String.format(DeviceConstant.MqttTopic.MASTER_SPORT_SPEED, device.getDeviceCode());
+            mqttPublisher.publishToDevice(device.getDeviceCode(), topic, payload, 1);
+        } catch (Exception e) {
+            throw new RuntimeException("发送运动速度查询指令失败: " + e.getMessage(), e);
+        }
     }
 
     /**

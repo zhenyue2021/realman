@@ -335,6 +335,15 @@ public class MasterDeviceController {
         return d;
     }
 
+    /** 向主控下发运动速度查询指令（设备 ACK 后数据由 MQTT Handler 异步处理） */
+    @GetMapping("/{controllerId}/sport-speed")
+    @Operation(summary = "查询主控运动速度参数")
+    public ApiResult<Void> getSportSpeed(@PathVariable String controllerId) {
+        ensureDeviceType(controllerId, DEVICE_TYPE_CONTROLLER);
+        deviceService.queryMasterSportSpeed(controllerId);
+        return ApiResult.ok(null, "查询指令已下发");
+    }
+
     /**
      * 获取机器人全部摄像头视频流地址
      *

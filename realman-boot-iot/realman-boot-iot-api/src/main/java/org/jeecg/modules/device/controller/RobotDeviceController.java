@@ -201,10 +201,19 @@ public class RobotDeviceController {
         requestDTO.setSuperAdmin("admin".equalsIgnoreCase(username));
     }
 
-    private void ensureDeviceType(String deviceId, int expectType) {
+    private void ensureDeviceType(String deviceId, int deviceType) {
         IotDevice d = deviceService.getById(deviceId);
         if (d == null) throw new RuntimeException("设备不存在: " + deviceId);
-        if (!Objects.equals(d.getDeviceType(), expectType)) throw new RuntimeException("设备类型不匹配");
+        if (!Objects.equals(d.getDeviceType(), deviceType)) throw new RuntimeException("设备类型不匹配");
+    }
+
+    /** 向机器人下发力反馈查询指令（设备 ACK 后数据由 MQTT Handler 异步处理） */
+    @GetMapping("/{deviceId}/force-feedback")
+    @Operation(summary = "查询机器人力反馈参数")
+    public ApiResult<Void> getForceFeedback(@PathVariable String deviceId) {
+        ensureDeviceType(deviceId, DEVICE_TYPE_ROBOT);
+        deviceService.queryRobotForceFeedback(deviceId);
+        return ApiResult.ok(null, "查询指令已下发");
     }
 
     @PostMapping("/mock/device-status")

@@ -3,6 +3,7 @@ package org.jeecg.modules.device.service.impl;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -24,8 +25,6 @@ import org.jeecg.modules.device.mqtt.publisher.MqttPublisher;
 import org.jeecg.modules.device.service.IMasterLoginResolveService;
 import org.jeecg.modules.device.service.MasterAssociatedDevicePendingService;
 import org.jeecg.modules.device.service.workorder.IWorkOrderService;
-import org.jeecg.modules.device.util.DeviceMacUtil;
-import org.jeecg.modules.device.util.IpToMacResolver;
 import org.jeecg.modules.device.util.MacResolveUtil;
 import org.jeecg.modules.device.vo.MasterLoginResolveVO;
 import org.jeecg.modules.device.vo.UsageStatusVO;
@@ -61,7 +60,7 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
     private final DeviceWebSocketServer deviceWebSocketServer;
     private final MasterAssociatedDevicePendingService masterAssociatedDevicePendingService;
     /** 配置中心配置的master的Mac地址 */
-    @Value("${device.master.mac:10:7c:61:d5:99:16}")
+    @Value("${device.master.mac:30:50:f1:01:cc:5f}")
     private String masterMac;
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -212,6 +211,8 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
         if (robot != null) {
             logDto.setAssociatedRobotId(robot.getId());
             logDto.setAssociatedRobotCode(robot.getDeviceCode());
+            // 通知设备操作的是哪台机器人
+            notifyControllerWhichRobot(robot);
         }
         var loginLog = this.recordLogin(logDto);
         vo.setLoginLogId(loginLog != null ? loginLog.getId() : null);
@@ -296,6 +297,28 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
         }
 
         return resp;
+    }
+
+    /**
+     * 通过 MQTT 通知主控设备操作的是哪台机器人
+     */
+    private void notifyControllerWhichRobot(IotDevice robot) {
+        String commandId = UUID.randomUUID().toString();
+
+        String topic = String.format(DeviceConstant.MqttTopic.TELEOP_ROBOT_ASSIGN, robot.getDeviceCode());
+        MqttMessageModel.RobotAssignCommand assignCmd = MqttMessageModel.RobotAssignCommand.builder()
+                .commandId(commandId)
+                .robotCode(robot.getDeviceCode())
+                .timestamp(System.currentTimeMillis())
+                .build();
+
+        try {
+            mqttPublisher.publishToDevice(robot.getDeviceCode(), topic,
+                    objectMapper.writeValueAsString(assignCmd), 1);
+        } catch (Exception e) {
+            throw new RuntimeException("通过 MQTT 通知主控设备操作的是哪台机器人失败，请稍后重试", e);
+        }
+
     }
 
     /**

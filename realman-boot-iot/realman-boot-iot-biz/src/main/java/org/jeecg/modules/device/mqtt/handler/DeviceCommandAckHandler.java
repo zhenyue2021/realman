@@ -12,7 +12,9 @@ import org.jeecg.modules.device.entity.IotDeviceConfig;
 import org.jeecg.modules.device.mapper.IotDeviceConfigMapper;
 import org.jeecg.modules.device.mapper.IotDeviceMapper;
 import org.jeecg.modules.device.security.CommandEncryptService;
+import org.jeecg.modules.device.service.ForceFeedbackQueryPendingService;
 import org.jeecg.modules.device.service.IDeviceOperationLogService;
+import org.jeecg.modules.device.vo.ForceFeedbackVO;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -31,8 +33,9 @@ public class DeviceCommandAckHandler {
     private final CommandEncryptService      encryptService;
     private final ObjectMapper               objectMapper;
     private final IDeviceOperationLogService logService;
-    private final IotDeviceConfigMapper      configMapper;
-    private final IotDeviceMapper            deviceMapper;
+    private final IotDeviceConfigMapper           configMapper;
+    private final IotDeviceMapper                 deviceMapper;
+    private final ForceFeedbackQueryPendingService forceFeedbackPending;
 
     public void handle(String deviceCode, String cmd, String payload) throws Exception {
         String decrypted = encryptService.decryptFromDevice(deviceCode, payload);
@@ -77,11 +80,19 @@ public class DeviceCommandAckHandler {
                 // 从 ACK payload 中尝试解析设备上报的参数值（设备可选择附带）
                 insertConfigIfAbsent(deviceId, deviceCode, "arm_level",
                         intValue(node, "armLevel"), "force_feedback", syncStatus, now);
-                insertConfigIfAbsent(deviceId, deviceCode, "gripper_level",
-                        intValue(node, "gripperLevel"), "force_feedback", syncStatus, now);
+                // 目前仅可设置力
+//                insertConfigIfAbsent(deviceId, deviceCode, "gripper_level",
+//                        intValue(node, "gripperLevel"), "force_feedback", syncStatus, now);
                 log.info("[CommandAck] force-feedback 无PENDING记录，已按设备上报插入配置: device={}", deviceCode);
             } else {
                 log.info("[CommandAck] force-feedback 配置同步状态已更新: device={} updated={} status={}", deviceCode, updated, syncStatus);
+            }
+
+            // 若是查询指令（armLevel/gripperLevel 由设备回填），完成挂起的 Future
+            if (code == 0 && commandId != null) {
+                Integer armLevel   = node.has("armLevel")    && !node.get("armLevel").isNull()    ? node.get("armLevel").asInt()    : null;
+                Integer gripperLevel = node.has("gripperLevel") && !node.get("gripperLevel").isNull() ? node.get("gripperLevel").asInt() : null;
+                forceFeedbackPending.complete(commandId, new ForceFeedbackVO(armLevel, gripperLevel));
             }
         }
     }

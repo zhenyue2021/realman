@@ -69,6 +69,16 @@ public interface IIotDeviceService extends IService<IotDevice> {
     List<DeviceCameraStreamVO> getCameraStreams(String deviceId, Integer cameraIndex);
 
     /**
+     * 向机器人下发力反馈查询指令（值置为 null 表示查询），不等待响应
+     */
+    void queryRobotForceFeedback(String robotId);
+
+    /**
+     * 向主控下发运动速度查询指令（值置为 null 表示查询），不等待响应
+     */
+    void queryMasterSportSpeed(String controllerId);
+
+    /**
      * 查询设备授权信息
      * @param deviceIds
      * @param tenantId
