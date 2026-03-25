@@ -193,14 +193,14 @@ public class MqttMessageModel {
     }
 
     /**
-     * 下行：平台向主控设备设置力反馈参数（Topic: master/{controllerCode}/command/force-feedback）
+     * 下行：平台向机器人设备设置力反馈参数（Topic: master/{controllerCode}/command/force-feedback）
      */
     @Data
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
     @JsonInclude(JsonInclude.Include.NON_NULL)
-    public static class MasterForceFeedbackCommand {
+    public static class DeviceForceFeedbackCommand {
         /** 指令唯一 ID（UUID），用于关联 ACK */
         private String commandId;
         /** 机械臂力度等级 */

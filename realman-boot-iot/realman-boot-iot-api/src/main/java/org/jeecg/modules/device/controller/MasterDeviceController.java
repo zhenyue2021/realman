@@ -1,5 +1,6 @@
 package org.jeecg.modules.device.controller;
 
+import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.swagger.v3.oas.annotations.Operation;
@@ -145,17 +146,22 @@ public class MasterDeviceController {
      * 设置主控端力反馈 + 运动与安全参数（一次性提交）
      *
      * <p>对应设备侧 Topic：
-     * master/{controllerCode}/command/force-feedback
+     * device/{deviceCode}/command/force-feedback
      * master/{controllerCode}/command/sport-speed
      */
-    @PostMapping("/{controllerId}/control-params")
+    @PostMapping("/control-params")
     @Operation(summary = "设置主控设备力反馈及运动参数")
-    public ApiResult<Void> setControlParams(@PathVariable String controllerId,
-                                            @RequestBody MasterControlParamsDTO dto) {
+    public ApiResult<Void> setControlParams(@RequestBody MasterControlParamsDTO dto) {
+        String controllerId = dto.getControllerId();
+        String deviceId = dto.getDeviceId();
+        if (StrUtil.isEmpty(controllerId) || StrUtil.isEmpty(deviceId)) {
+            return ApiResult.fail("参数错误：controllerId/deviceId 不能为空");
+        }
         IotDevice controller = ensureDeviceType(controllerId, DEVICE_TYPE_CONTROLLER);
+        IotDevice robot = ensureDeviceType(deviceId, DEVICE_TYPE_ROBOT);
         org.jeecg.modules.device.service.impl.IotDeviceServiceImpl impl =
                 (org.jeecg.modules.device.service.impl.IotDeviceServiceImpl) deviceService;
-        impl.sendMasterForceFeedbackCommand(controller, dto.getArmLevel(), dto.getGripperLevel(), dto.getOperator());
+        impl.sendRobotForceFeedbackCommand(robot, dto.getArmLevel(), dto.getGripperLevel(), dto.getOperator());
         impl.sendMasterSportSpeedCommand(controller, dto.getMoveSpeedLevel(), dto.getLiftSpeedLevel(), dto.getOperator());
         return ApiResult.ok(null, "参数已下发，等待主控设备确认");
     }

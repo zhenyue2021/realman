@@ -258,11 +258,11 @@ def decrypt_message(device_code: str, encrypted: str) -> str:
 | `device/{deviceCode}/config/push`                        | 1 | 参数配置下发                  | 未联调  |
 | `device/{deviceCode}/command/restart`                    | 1 | 远程重启指令                  | 联调完成 |
 | `device/{deviceCode}/command/emergency-stop`             | 1 | 紧急停机指令                  | 未联调  |
+| `device/{deviceCode}/command/force-feedback`         | 1 | 平台向主控设置力反馈参数（机械臂/夹爪力度）  | 未联调  |
 | `device/{deviceCode}/ota/notify`                         | 1 | OTA 升级通知                | 未联调  |
 | `device/{deviceCode}/camera/stream/query`                | 1 | 查询摄像头视频流地址（见第 12 章）     | 未联调  |
 | `master/{controllerCode}/teleop/associated-device/query` | 1 | 平台向主控查询“当前设备Mac信息”      | 未联调  |
 | `master/{controllerCode}/teleop/robot/assign`            | 1 | 平台通知主控当前应操作的机器人         | 未联调  |
-| `master/{controllerCode}/command/force-feedback`         | 1 | 平台向主控设置力反馈参数（机械臂/夹爪力度）  | 未联调  |
 | `master/{controllerCode}/command/sport-speed`            | 1 | 平台向主控设置运动与安全参数（底盘/升降速度） | 未联调  |
 
 ### 4.3 系统事件 Topic（EMQX 内部，平台订阅）

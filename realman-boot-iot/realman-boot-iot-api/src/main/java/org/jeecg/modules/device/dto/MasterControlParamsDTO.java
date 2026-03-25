@@ -9,6 +9,11 @@ import lombok.Data;
 @Data
 public class MasterControlParamsDTO {
 
+    /** 机器人设备ID */
+    private String deviceId;
+    /** 主控设备ID */
+    private String controllerId;
+
     /** 机械臂力度等级 */
     private Integer armLevel;
 

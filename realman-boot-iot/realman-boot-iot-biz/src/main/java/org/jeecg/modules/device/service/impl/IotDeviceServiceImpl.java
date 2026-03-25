@@ -550,36 +550,42 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
     }
 
     /**
-     * 向主控设备下发力反馈参数指令（机械臂/夹爪力度）
+     * 向机器人设备下发力反馈参数指令（机械臂/夹爪力度）
      *
      * <p>注意：此处仅负责通过 MQTT 下发指令并记录操作日志，不同步等待 ACK。
      * ACK 由 DeviceCommandAckHandler 统一记录。
      */
-    public String sendMasterForceFeedbackCommand(IotDevice controller,
-                                                 Integer armLevel,
-                                                 Integer gripperLevel,
-                                                 String operator) {
-        if (DeviceConstant.DeviceStatus.ONLINE != controller.getStatus()) {
-            throw new RuntimeException("主控设备不在线");
+    public String sendRobotForceFeedbackCommand(IotDevice robot,
+                                                Integer armLevel,
+                                                Integer gripperLevel,
+                                                String operator) {
+        if (DeviceConstant.DeviceStatus.ONLINE != robot.getStatus()) {
+            throw new RuntimeException("机器人设备不在线");
         }
         String commandId = IdUtil.fastSimpleUUID();
         long now = System.currentTimeMillis();
         try {
-            MqttMessageModel.MasterForceFeedbackCommand cmd = MqttMessageModel.MasterForceFeedbackCommand.builder()
+            MqttMessageModel.DeviceForceFeedbackCommand cmd = MqttMessageModel.DeviceForceFeedbackCommand.builder()
                     .commandId(commandId)
                     .armLevel(armLevel)
                     .gripperLevel(gripperLevel)
                     .timestamp(now)
                     .build();
             String payload = objectMapper.writeValueAsString(cmd);
-            String topic = String.format(DeviceConstant.MqttTopic.MASTER_FORCE_FEEDBACK, controller.getDeviceCode());
-            mqttPublisher.publishToDevice(controller.getDeviceCode(), topic, payload, 1);
+            String topic = String.format(DeviceConstant.MqttTopic.DEVICE_FORCE_FEEDBACK, robot.getDeviceCode());
+            mqttPublisher.publishToDevice(robot.getDeviceCode(), topic, payload, 1);
 
             String desc = "设置力反馈参数: armLevel=" + armLevel + ", gripperLevel=" + gripperLevel;
-            logService.recordLog(controller.getId(), controller.getDeviceCode(),
+            logService.recordLog(robot.getId(), robot.getDeviceCode(),
                     DeviceConstant.OperationType.COMMAND_SEND,
                     desc, "{commandId:" + commandId + "}",
                     DeviceConstant.OperationSource.PLATFORM, "PENDING", null, operator, null);
+
+            // 记录到 iot_device_config（指令已下发，syncStatus=0 待设备 ACK）
+            upsertDeviceConfig(robot.getId(), robot.getDeviceCode(), "arm_level",
+                    armLevel == null ? null : armLevel.toString(), "force_feedback");
+            upsertDeviceConfig(robot.getId(), robot.getDeviceCode(), "gripper_level",
+                    gripperLevel == null ? null : gripperLevel.toString(), "force_feedback");
         } catch (Exception e) {
             throw new RuntimeException("发送力反馈指令失败: " + e.getMessage(), e);
         }
@@ -614,6 +620,12 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
                     DeviceConstant.OperationType.COMMAND_SEND,
                     desc, "{commandId:" + commandId + "}",
                     DeviceConstant.OperationSource.PLATFORM, "PENDING", null, operator, null);
+
+            // 记录到 iot_device_config（指令已下发，syncStatus=0 待设备 ACK）
+            upsertDeviceConfig(controller.getId(), controller.getDeviceCode(), "move_speed_level",
+                    moveSpeedLevel == null ? null : moveSpeedLevel.toString(), "sport_speed");
+            upsertDeviceConfig(controller.getId(), controller.getDeviceCode(), "lift_speed_level",
+                    liftSpeedLevel == null ? null : liftSpeedLevel.toString(), "sport_speed");
         } catch (Exception e) {
             throw new RuntimeException("发送运动与安全参数指令失败: " + e.getMessage(), e);
         }
@@ -810,5 +822,42 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
                     .collect(Collectors.toMap(IotDeviceAuth::getDeviceId, a -> a, (a, b) -> a));
         }
         return Map.of();
+    }
+
+    /**
+     * 将参数配置写入 iot_device_config（存在则更新，不存在则插入）
+     *
+     * @param deviceId   设备 ID
+     * @param deviceCode 设备编码
+     * @param configKey  配置键，如 "arm_level"
+     * @param configValue 配置值（统一转 String 存储）
+     * @param configType 配置分类，如 "force_feedback" / "sport_speed"
+     */
+    private void upsertDeviceConfig(String deviceId, String deviceCode,
+                                    String configKey, String configValue, String configType) {
+        IotDeviceConfig existing = configMapper.selectOne(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<IotDeviceConfig>()
+                        .eq(IotDeviceConfig::getDeviceId, deviceId)
+                        .eq(IotDeviceConfig::getConfigKey, configKey)
+                        .last("LIMIT 1")
+        );
+        LocalDateTime now = LocalDateTime.now();
+        if (existing != null) {
+            existing.setConfigValue(configValue);
+            existing.setConfigType(configType);
+            existing.setSyncStatus(0);   // 0=待确认，指令已下发但设备尚未 ACK
+            existing.setSyncTime(now);
+            configMapper.updateById(existing);
+        } else {
+            IotDeviceConfig config = new IotDeviceConfig();
+            config.setDeviceId(deviceId);
+            config.setDeviceCode(deviceCode);
+            config.setConfigKey(configKey);
+            config.setConfigValue(configValue);
+            config.setConfigType(configType);
+            config.setSyncStatus(0);
+            config.setSyncTime(now);
+            configMapper.insert(config);
+        }
     }
 }
