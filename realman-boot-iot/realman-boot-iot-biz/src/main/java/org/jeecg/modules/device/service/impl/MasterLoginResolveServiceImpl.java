@@ -9,22 +9,23 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.constant.DeviceConstant;
 import org.jeecg.modules.device.dto.MasterLoginDTO;
-import org.jeecg.modules.device.entity.IotMasterLoginLog;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.entity.IotDeviceAuth;
+import org.jeecg.modules.device.entity.IotMasterLoginLog;
 import org.jeecg.modules.device.entity.workorder.WorkOrder;
 import org.jeecg.modules.device.entity.workorder.WorkOrderDevice;
-import org.jeecg.modules.device.mapper.IotMasterLoginLogMapper;
 import org.jeecg.modules.device.mapper.IotDeviceAuthMapper;
 import org.jeecg.modules.device.mapper.IotDeviceMapper;
+import org.jeecg.modules.device.mapper.IotMasterLoginLogMapper;
 import org.jeecg.modules.device.mapper.SysUserDepartLiteMapper;
 import org.jeecg.modules.device.mapper.workorder.WorkOrderDeviceMapper;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.mqtt.publisher.MqttPublisher;
-import org.jeecg.modules.device.service.MasterAssociatedDevicePendingService;
 import org.jeecg.modules.device.service.IMasterLoginResolveService;
-import org.jeecg.modules.device.service.IIotDeviceService;
+import org.jeecg.modules.device.service.MasterAssociatedDevicePendingService;
 import org.jeecg.modules.device.service.workorder.IWorkOrderService;
+import org.jeecg.modules.device.util.DeviceMacUtil;
+import org.jeecg.modules.device.util.IpToMacResolver;
 import org.jeecg.modules.device.util.MacResolveUtil;
 import org.jeecg.modules.device.vo.MasterLoginResolveVO;
 import org.jeecg.modules.device.vo.UsageStatusVO;
@@ -110,18 +111,21 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
             throw new RuntimeException("请求体不能为空");
         }
 
-        String tenantId = request.getHeader("x-tenant-id");
+        /*String tenantId = request.getHeader("x-tenant-id");
         if (tenantId == null || tenantId.isEmpty()) {
             throw new RuntimeException("缺少租户ID（x-tenant-id）");
-        }
+        }*/
 
-        // 解析客户端 MAC（前端不传时，尝试通过 ARP 在内网反查）
+        // 解析客户端 MAC：优先用客户端传来的 macAddress，传不了时走 ARP 兜底
         String mac = MacResolveUtil.resolveClientMac(request, dto.getMacAddress());
+//        String mac = DeviceMacUtil.getPrimaryMacAddress();
         if (mac == null || mac.isEmpty()) {
 //            throw new RuntimeException("无法获取主控设备 MAC 地址");
             log.error("无法获取主控设备 MAC 地址");
             mac = masterMac;
         }
+        log.info("主控设备MAC: {}", mac);
+        mac = mac.toLowerCase();
 
         // 通过 MAC 反查主控设备
         IotDevice controller = deviceMapper.selectOne(

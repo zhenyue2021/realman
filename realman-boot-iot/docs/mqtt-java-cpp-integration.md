@@ -1,6 +1,6 @@
-# MQTT 联调对接文档（Java 服务端 ↔ C++ 客户端）
+# MQTT 联调对接文档（ 服务端 ↔  客户端 ）
 
-本文档基于当前仓库实现整理：**服务端**为 Spring Boot（`realman-boot-iot-biz`），**设备端**以 C++ 实现 MQTT 客户端。所有业务 Topic 定义见 `DeviceConstant.MqttTopic`，JSON 模型见 `MqttMessageModel`。
+本文档基于当前仓库实现整理：**服务端**为 Spring Boot（`realman-boot-iot-biz`），**设备端**以 客户端 实现 MQTT 客户端。所有业务 Topic 定义见 `DeviceConstant.MqttTopic`，JSON 模型见 `MqttMessageModel`。
 
 ---
 
@@ -15,7 +15,7 @@
 | QoS | 业务消息建议使用 **QoS 1**（与 `mqtt.broker.qos` 一致） |
 | Clean Session | 平台侧为 `false`，便于断线重连后补收 QoS1 消息 |
 
-**C++ 侧**：使用 Paho、mosquitto 或自研客户端均可；需支持 UTF-8 Payload、QoS1、自动重连。
+**客户端 侧**：使用 Paho、mosquitto 或自研客户端均可；需支持 UTF-8 Payload、QoS1、自动重连。
 
 ---
 
@@ -34,7 +34,7 @@
 
 解密端：若整串 **不符合** `^[0-9a-fA-F]{32}:.+`，则 Java 端视为 **明文 JSON**（仅当 `device.encrypt.enabled=false` 调试时使用）。
 
-### 2.2 C++ 实现要点
+### 2.2 设备端 实现要点
 
 1. 使用 OpenSSL / mbedTLS：`SHA256`、`AES-256-CBC`、`EVP_BytesToKey` 或手动取 SHA256 前 32 字节作 key。  
 2. 加密后拼接字符串：`sprintf` / `std::ostringstream` 生成 `ivHex + ":" + base64Cipher`。  
@@ -92,7 +92,7 @@
 
 ## 4. JSON 示例（加密前明文）
 
-以下可直接作为 C++ 侧序列化参考；字段名需与 **Java 驼峰** 一致（Jackson 默认）。
+以下可直接作为 客户端 侧序列化参考；字段名需与 **Java 驼峰** 一致（Jackson 默认）。
 
 ### 4.1 机器人
 
@@ -199,7 +199,7 @@
 ```
 
 **停止遥操（平台当前实现）**  
-主控侧下行 Topic：`device/{controllerCode}/command/stop-control`；机器人侧：`master/{robotCode}/command/stop-control`。Payload 均为 **`RobotAssignCommand`** JSON（含 `workOrderId` 等），请以线上 `IotDeviceServiceImpl#stopTeleop` 为准。
+主控侧下行 Topic：`master/{controllerCode}/command/stop-control`；机器人侧：`device/{robotCode}/command/stop-control`。Payload 均为 **`RobotAssignCommand`** JSON（含 `workOrderId` 等），请以线上 `IotDeviceServiceImpl#stopTeleop` 为准。
 
 ---
 
@@ -215,7 +215,7 @@
 | `{deviceCode}/slave/cmd` | 机器人原始上报 |
 | `{deviceCode}/slave/states` | 机器人状态（`handle`） |
 
-**C++ 侧**：按设备角色选择 `设备码/master/...` 或 `设备码/slave/...`；Payload 为 **UTF-8 明文 JSON**（不经 `CommandEncryptService` 包一层）。具体字段与业务确认后再定 schema。
+**客户端 侧**：按设备角色选择 `设备码/master/...` 或 `设备码/slave/...`；Payload 为 **UTF-8 明文 JSON**（不经 `CommandEncryptService` 包一层）。具体字段与业务确认后再定 schema。
 
 ---
 
@@ -226,7 +226,7 @@
 | `$SYS/brokers/+/clients/+/connected` | 客户端上线 |
 | `$SYS/brokers/+/clients/+/disconnected` | 客户端下线 |
 
-设备 **无需订阅**；由平台解析 clientId 等设备标识做上下线状态。C++ 客户端仅需保证 **连接时 clientId 可被平台识别为 deviceCode**。
+设备 **无需订阅**；由平台解析 clientId 等设备标识做上下线状态。客户端 客户端仅需保证 **连接时 clientId 可被平台识别为 deviceCode**。
 
 ---
 

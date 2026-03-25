@@ -3,6 +3,7 @@ package org.jeecg.modules.device.scheduler;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.xxl.job.core.context.XxlJobHelper;
 import com.xxl.job.core.handler.annotation.XxlJob;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -197,6 +198,7 @@ public class DeviceSchedulerJob {
         // 3. 清理历史表中超过90天的数据
         int historyDeleted = statusMapper.deleteHistoryOlderThan(historyExpireBefore);
 
+        XxlJobHelper.log("[StatusCompact-History] 本次主表压缩/删除 {} 条，归档到历史表 {} 条，历史表清理 {} 条（设备数={}）",totalDeletedMain, totalArchived, historyDeleted, deviceIds.size());
         log.info("[StatusCompact-History] 本次主表压缩/删除 {} 条，归档到历史表 {} 条，历史表清理 {} 条（设备数={}）",
                 totalDeletedMain, totalArchived, historyDeleted, deviceIds.size());
     }
