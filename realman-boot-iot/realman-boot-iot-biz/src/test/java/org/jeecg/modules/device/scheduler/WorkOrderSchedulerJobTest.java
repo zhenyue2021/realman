@@ -99,7 +99,7 @@ class WorkOrderSchedulerJobTest {
 
         schedulerJob.startTimePush();
 
-        verify(webSocketServer).pushWorkOrderStart(eq("MASTER001"), eq("{\"id\":\"wo-001\"}"));
+        verify(webSocketServer).pushPendingWorkOrder(eq("MASTER001"), eq("{\"id\":\"wo-001\"}"));
     }
 
     @Test

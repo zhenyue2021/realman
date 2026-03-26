@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.constant.DeviceConstant;
+import org.jeecg.modules.device.constant.WorkOrderConstant;
 import org.jeecg.modules.device.dto.MasterLoginDTO;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.entity.IotDeviceAuth;
@@ -215,7 +216,11 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
         // 通过 WebSocket 推送工单信息给前端
         try {
             String workOrderJson = objectMapper.writeValueAsString(firstOrder);
-            deviceWebSocketServer.pushWorkOrderStart(controller.getDeviceCode(), workOrderJson);
+            if (WorkOrderConstant.ORDER_STATUS.PENDING.equals(firstOrder.getStatus())) {
+                deviceWebSocketServer.pushPendingWorkOrder(controller.getDeviceCode(), workOrderJson);
+            } else if (WorkOrderConstant.ORDER_STATUS.STARTED.equals(firstOrder.getStatus())) {
+                deviceWebSocketServer.pushStartedWorkOrder(controller.getDeviceCode(), workOrderJson);
+            }
             deviceWebSocketServer.pushAssociatedDeviceInfo(controller.getDeviceCode(), objectMapper.writeValueAsString(robot));
         } catch (Exception e) {
             log.warn("[ControllerLogin] WebSocket 推送工单失败: workOrderId={}, err={}", firstOrder.getId(), e.getMessage());

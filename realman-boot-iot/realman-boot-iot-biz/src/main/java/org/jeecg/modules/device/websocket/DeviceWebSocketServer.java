@@ -163,8 +163,8 @@ public class DeviceWebSocketServer {
      * @param controllerCode 主控 deviceCode
      * @param workOrderJson  工单 JSON（建议为 WorkOrder 对象序列化结果）
      */
-    public void pushWorkOrderStart(String controllerCode, String workOrderJson) {
-        String msg = "{\"type\":\"WORK_ORDER_START\",\"deviceCode\":\"" + controllerCode + "\",\"data\":" + workOrderJson + "}";
+    public void pushPendingWorkOrder(String controllerCode, String workOrderJson) {
+        String msg = "{\"type\":\"WORK_ORDER_PENDING\",\"deviceCode\":\"" + controllerCode + "\",\"data\":" + workOrderJson + "}";
         send(controllerCode, msg);
     }
 

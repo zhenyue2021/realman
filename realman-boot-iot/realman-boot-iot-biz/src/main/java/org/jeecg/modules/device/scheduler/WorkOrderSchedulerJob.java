@@ -219,7 +219,7 @@ public class WorkOrderSchedulerJob {
             }
             try {
                 String json = objectMapper.writeValueAsString(o);
-                webSocketServer.pushWorkOrderStart(controllerCode, json);
+                webSocketServer.pushPendingWorkOrder(controllerCode, json);
                 pushed++;
                 log.info("[WorkOrder-StartPush] pushed orderId={} controllerCode={} planStartTime={}",
                         o.getId(), controllerCode, o.getPlanStartTime());
