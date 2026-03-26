@@ -169,6 +169,19 @@ public class DeviceWebSocketServer {
     }
 
     /**
+     * 推送工单已开始提醒
+     *
+     * <p>只推送给该主控设备（device_type=2）的订阅者。
+     *
+     * @param controllerCode 主控 deviceCode
+     * @param workOrderJson  工单 JSON（建议为 WorkOrder 对象序列化结果）
+     */
+    public void pushStartedWorkOrder(String controllerCode, String workOrderJson) {
+        String msg = "{\"type\":\"WORK_ORDER_STARTEd\",\"deviceCode\":\"" + controllerCode + "\",\"data\":" + workOrderJson + "}";
+        send(controllerCode, msg);
+    }
+
+    /**
      * 推送主控“当前关联设备信息”（登录后触发查询）
      *
      * <p>只推送给该主控设备（device_type=2）的订阅者。

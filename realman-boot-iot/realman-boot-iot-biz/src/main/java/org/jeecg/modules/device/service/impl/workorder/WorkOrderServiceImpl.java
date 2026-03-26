@@ -4,13 +4,17 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.jeecg.modules.device.constant.DeviceConstant;
 import org.jeecg.modules.device.entity.workorder.WorkOrder;
 import org.jeecg.modules.device.entity.workorder.WorkOrderDevice;
 import org.jeecg.modules.device.service.IMasterOperationRecordService;
 import org.jeecg.modules.device.mapper.workorder.WorkOrderDeviceMapper;
 import org.jeecg.modules.device.mapper.workorder.WorkOrderMapper;
 import org.jeecg.modules.device.service.workorder.IWorkOrderService;
+import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,11 +23,14 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder>
         implements IWorkOrderService {
 
+    private final ObjectMapper objectMapper;
     private final WorkOrderDeviceMapper workOrderDeviceMapper;
     private final IMasterOperationRecordService operationRecordService;
+    private final DeviceWebSocketServer deviceWebSocketServer;
 
     @Override
     public IPage<WorkOrder> pageWorkOrders(Page<WorkOrder> page, String agentId, String status) {
@@ -114,6 +121,11 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
                 new LambdaQueryWrapper<WorkOrderDevice>().eq(WorkOrderDevice::getWorkOrderId, workOrderId));
     }
 
+    public WorkOrderDevice findMasterDevice(String workOrderId) {
+        return workOrderDeviceMapper.selectOne(
+                new LambdaQueryWrapper<WorkOrderDevice>().eq(WorkOrderDevice::getWorkOrderId, workOrderId).eq(WorkOrderDevice::getDeviceType, DeviceConstant.DeviceType.CONTROLLER).last("LIMIT 1"));
+    }
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void startWorkOrder(String workOrderId, String operatorId, String operatorName, String operatorPhone) {
@@ -121,6 +133,8 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
         if (order == null) {
             return;
         }
+        // 获取主控设备信息
+        WorkOrderDevice master = findMasterDevice(workOrderId);
         // 仅允许从 PENDING 开始，且当前时间在计划窗口内
         LocalDateTime now = LocalDateTime.now();
         if (!"PENDING".equals(order.getStatus())) {
@@ -139,6 +153,13 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
         order.setActualStartTime(now);
         this.updateById(order);
         operationRecordService.createRecordsForWorkOrderStart(workOrderId, operatorId, operatorName, now);
+        // 通过 WebSocket 推送工单信息给前端
+        try {
+            String workOrderJson = objectMapper.writeValueAsString(order);
+            deviceWebSocketServer.pushStartedWorkOrder(master.getDeviceCode(), workOrderJson);
+        } catch (Exception e) {
+            log.warn("[startWorkOrder] WebSocket 推送工单失败: workOrderId={}, err={}", order.getId(), e.getMessage());
+        }
     }
 
     @Override
