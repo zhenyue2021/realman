@@ -84,12 +84,11 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
                 .toList();
 
         LocalDateTime now = LocalDateTime.now();
-        // 返回当前时间窗口内且未开始的工单，按计划开始时间升序
+        // 返回进行中（STARTED）和待开始（PENDING）且未超时的工单，按计划开始时间升序
         LambdaQueryWrapper<WorkOrder> wrapper = new LambdaQueryWrapper<WorkOrder>()
                 .in(WorkOrder::getId, orderIds)
-                .eq(WorkOrder::getStatus, "PENDING")
+                .in(WorkOrder::getStatus, "STARTED", "PENDING")
                 .eq(WorkOrder::getDelFlag, 0)
-                .le(WorkOrder::getPlanStartTime, now)
                 .gt(WorkOrder::getPlanEndTime, now)
                 .orderByAsc(WorkOrder::getPlanStartTime);
         if (departmentIds != null && !departmentIds.isEmpty()) {

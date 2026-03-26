@@ -186,10 +186,10 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
         vo.setController(controller);
         vo.setAvailableRobots(available);
 
-        // 查询该主控及当前用户所绑定部门待开启且生效中的工单（已按计划开始时间升序）
+        // 查询该主控及当前用户所绑定部门进行中（STARTED）和待开始（PENDING）且未超时的工单且生效中的工单（已按计划开始时间升序）
         List<WorkOrder> pendingOrders = workOrderService.listPendingForControllerAndDepartments(controller.getDeviceCode(), departIds);
         if (pendingOrders == null || pendingOrders.isEmpty()) {
-            // 无待开启工单，仅写登录日志，不推送工单/机器人信息给前端
+            // 无进行中（STARTED）和待开始（PENDING）的工单，仅写登录日志，不推送工单/机器人信息给前端
             var loginLog = recordLogin(logDto);
             vo.setLoginLogId(loginLog != null ? loginLog.getId() : null);
             return vo;
