@@ -193,6 +193,7 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
             vo.setLoginLogId(loginLog != null ? loginLog.getId() : null);
             return vo;
         }
+        vo.setPendingWorkOrders(pendingOrders);
 
         // 取生效时间最近的第一条工单
         WorkOrder firstOrder = pendingOrders.get(0);

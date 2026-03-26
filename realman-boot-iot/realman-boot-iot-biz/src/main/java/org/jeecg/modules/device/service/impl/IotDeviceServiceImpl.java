@@ -454,31 +454,32 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
         if (!Objects.equals(robot.getStatus(), DeviceConstant.DeviceStatus.ONLINE)) {
             throw new RuntimeException("当前机器人不在线");
         }
-
+        String controllerDeviceCode = controller.getDeviceCode();
+        String robotDeviceCode = robot.getDeviceCode();
         String commandId = IdUtil.fastSimpleUUID();
         long now = System.currentTimeMillis();
         try {
             // 复用主控端当前应操作机器人 topic，不等待 ACK
-            String topic = String.format(DeviceConstant.MqttTopic.TELEOP_ROBOT_ASSIGN, controller.getDeviceCode());
+            String topic = String.format(DeviceConstant.MqttTopic.TELEOP_ROBOT_ASSIGN, controllerDeviceCode);
             MqttMessageModel.RobotAssignCommand assignCmd = MqttMessageModel.RobotAssignCommand.builder()
                     .commandId(commandId)
-                    .robotCode(robot.getDeviceCode())
+                    .robotCode(robotDeviceCode)
                     .timestamp(now)
                     .build();
-            mqttPublisher.publishToDevice(controller.getDeviceCode(), topic,
+            mqttPublisher.publishToDevice(controllerDeviceCode, topic,
                     objectMapper.writeValueAsString(assignCmd), 1);
 
             // 机器人状态置为使用中
             robot.setStatus(DeviceConstant.DeviceStatus.IN_USE);
             deviceMapper.updateById(robot);
 
-            logService.recordLog(controller.getId(), controller.getDeviceCode(),
+            logService.recordLog(controller.getId(), controllerDeviceCode,
                     DeviceConstant.OperationType.COMMAND_SEND,
-                    "开始遥操：通知主控关联机器人", "{commandId:" + commandId + ",robotCode:" + robot.getDeviceCode() + "}",
+                    "平台通知主控关联机器人", "{commandId:" + commandId + ",robotCode:" + robotDeviceCode + "}",
                     DeviceConstant.OperationSource.PLATFORM, "PENDING", null, operator, null);
-            logService.recordLog(robot.getId(), robot.getDeviceCode(),
+            logService.recordLog(robot.getId(), robotDeviceCode,
                     DeviceConstant.OperationType.COMMAND_SEND,
-                    "开始遥操：设备状态置为使用中", "{commandId:" + commandId + "}",
+                    "主控连接设备，设备状态置为使用中", "{commandId:" + commandId + ",controllerDeviceCode:" + controllerDeviceCode + "}",
                     DeviceConstant.OperationSource.PLATFORM, "SUCCESS", null, operator, null);
             // 获取机器人的摄像头视频流
             return getCameraStreams(robot.getId(), null);

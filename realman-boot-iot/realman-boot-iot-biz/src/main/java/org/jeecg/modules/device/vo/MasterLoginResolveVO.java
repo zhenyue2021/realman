@@ -26,5 +26,7 @@ public class MasterLoginResolveVO {
 
     /** 当前待开启的工单（按生效时间最近一条），无则为 null */
     private WorkOrder pendingWorkOrder;
+    /** 当前待开启的工单列表，无则为 null */
+    private List<WorkOrder> pendingWorkOrders;
 }
 

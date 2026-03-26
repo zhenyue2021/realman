@@ -231,7 +231,7 @@ public class MasterDeviceController {
 
     /** 开始遥操（通知主控关联目标机器人，不等待ACK） */
     @PostMapping("/{controllerId}/teleop/start")
-    @Operation(summary = "主控关联目标机器人")
+    @Operation(summary = "主控关联目标机器人，并获取视频流")
     public ApiResult<List<DeviceCameraStreamVO>> startTeleop(@PathVariable String controllerId,
                                        @RequestBody TeleopStartDTO dto) {
         ensureDeviceType(controllerId, DEVICE_TYPE_CONTROLLER);
