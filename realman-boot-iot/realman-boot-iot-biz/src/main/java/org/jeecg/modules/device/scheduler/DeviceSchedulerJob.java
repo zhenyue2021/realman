@@ -7,6 +7,7 @@ import com.xxl.job.core.context.XxlJobHelper;
 import com.xxl.job.core.handler.annotation.XxlJob;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.jeecg.modules.device.constant.DeviceConstant;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.entity.IotDeviceStatus;
@@ -15,6 +16,7 @@ import org.jeecg.modules.device.mapper.IotDeviceMapper;
 import org.jeecg.modules.device.mapper.IotDeviceStatusMapper;
 import org.jeecg.modules.device.mapper.IotOtaUpgradeRecordMapper;
 import org.jeecg.modules.device.mapper.IotOtaUpgradeTaskMapper;
+import org.jeecg.modules.device.mqtt.handler.RobotSlaveStatusHandler;
 import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
@@ -31,6 +33,7 @@ import java.util.List;
  *   <li>{@link #checkOtaTimeout}：每5分钟检测 OTA 升级超时</li>
  *   <li>{@link #compactTodayDeviceStatus}：当天状态每小时压缩</li>
  *   <li>{@link #compactDeviceStatusHistory}：最近7天及更早历史压缩</li>
+ *   <li>{@link #flushRobotStatusJob}：每分钟将机器人/主控高频上报状态落库</li>
  * </ul>
  *
  * <p>XXL-Job 配置（在 XXL-Job Admin 后台注册）：
@@ -39,6 +42,7 @@ import java.util.List;
  *   otaUpgradeTimeoutCheckJob Cron: 0 0/5 * * * ?  每5分钟执行
  *   compactTodayDeviceStatusJob Cron: 0 30 * * * ?  每小时第30分钟执行
  *   compactDeviceStatusJob    Cron: 0 20 2 * * ?   每天 02:20 执行
+ *   flushRobotStatusJob       Cron: 0 * * * * ?    每分钟执行
  * </pre>
  */
 @Slf4j
@@ -51,7 +55,10 @@ public class DeviceSchedulerJob {
     private final IotOtaUpgradeRecordMapper recordMapper;
     private final IotOtaUpgradeTaskMapper   taskMapper;
     private final StringRedisTemplate       redisTemplate;
-    private final DeviceWebSocketServer webSocketServer;
+    private final DeviceWebSocketServer     webSocketServer;
+    /** mqtt.enabled=false 时 Bean 不存在，注入 null，任务方法内做空判断 */
+    @Autowired(required = false)
+    private RobotSlaveStatusHandler robotSlaveStatusHandler;
 
     /**
      * 设备离线检测任务
@@ -201,6 +208,24 @@ public class DeviceSchedulerJob {
         XxlJobHelper.log("[StatusCompact-History] 本次主表压缩/删除 {} 条，归档到历史表 {} 条，历史表清理 {} 条（设备数={}）",totalDeletedMain, totalArchived, historyDeleted, deviceIds.size());
         log.info("[StatusCompact-History] 本次主表压缩/删除 {} 条，归档到历史表 {} 条，历史表清理 {} 条（设备数={}）",
                 totalDeletedMain, totalArchived, historyDeleted, deviceIds.size());
+    }
+
+    /**
+     * 机器人/主控状态高频落库节流任务
+     *
+     * <p>设备每秒上报状态，平台仅缓存最新一条；本任务每分钟触发一次，
+     * 将 {@link RobotSlaveStatusHandler} 中各设备的最新状态统一写入 DB，
+     * 每台设备每分钟落一条记录，将 DB 写压力从 ~60次/分钟 降为 1次/分钟。
+     *
+     * <p>XXL-Job Handler Name：{@code flushRobotStatusJob}，建议 Cron：{@code 0 * * * * ?}
+     */
+    @XxlJob("flushRobotStatusJob")
+    public void flushRobotStatusJob() {
+        if (robotSlaveStatusHandler == null) {
+            log.debug("[flushRobotStatusJob] MQTT 未启用，跳过");
+            return;
+        }
+        robotSlaveStatusHandler.flushPending();
     }
 
     @XxlJob("mockDeviceStatusJob")
