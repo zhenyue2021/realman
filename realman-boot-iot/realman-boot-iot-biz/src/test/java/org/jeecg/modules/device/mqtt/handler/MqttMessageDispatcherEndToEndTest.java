@@ -122,8 +122,7 @@ public class MqttMessageDispatcherEndToEndTest {
                 objectMapper,
                 logService,
                 configMapper,
-                deviceMapper,
-                forceFeedbackPending
+                deviceMapper
         );
         masterCommandAckHandler = Mockito.mock(MasterCommandAckHandler.class);
 
