@@ -60,12 +60,14 @@ public class RobotSlaveStatusHandler {
 
     /** 处理机器人原始状态上报（{robotCode}/slave/states） */
     public void handle(String robotCode, String payload) {
-        processStatus(robotCode, payload, "机器人", deviceWebSocketServer::pushRobotStatus, true);
+        log.debug("[SlaveStatusHandler] slave上报 robotCode={}", robotCode);
+        processStatus(robotCode, payload, deviceWebSocketServer::pushRobotStatus, true);
     }
 
     /** 处理主控设备原始状态上报（{masterCode}/master/states） */
     public void handleMasterStatus(String masterCode, String payload) {
-        processStatus(masterCode, payload, "主控", deviceWebSocketServer::pushMasterStatus, false);
+        log.debug("[SlaveStatusHandler] master上报 masterCode={}", masterCode);
+        processStatus(masterCode, payload, deviceWebSocketServer::pushMasterStatus, false);
     }
 
     // -------------------------------------------------------------------------
@@ -77,14 +79,12 @@ public class RobotSlaveStatusHandler {
      *
      * @param deviceCode 设备编码
      * @param payload    原始 Payload（可能加密）
-     * @param role       日志标识（机器人 / 主控）
      * @param wsPusher   WebSocket 推送方法引用
      * @param buffer     是否将最新状态缓入待落库缓冲区
      */
-    private void processStatus(String deviceCode, String payload, String role,
+    private void processStatus(String deviceCode, String payload,
                                 BiConsumer<String, String> wsPusher, boolean buffer) {
         String decrypted = encryptService.decryptFromDevice(deviceCode, payload);
-        log.debug("[SlaveStatusHandler] 收到{}状态上报 deviceCode={} payload={}", role, deviceCode, decrypted);
 
         IotDevice device = deviceMapper.selectOne(new LambdaQueryWrapper<IotDevice>()
                 .eq(IotDevice::getDeviceCode, deviceCode)
@@ -141,6 +141,11 @@ public class RobotSlaveStatusHandler {
      * 避免写入 epoch（1970-01-01）。
      */
     private void doPersist(IotDevice device, String raw) {
+
+        IotDeviceStatus s = new IotDeviceStatus();
+        s.setDeviceId(device.getId());
+        s.setDeviceCode(device.getDeviceCode());
+        s.setRawData(raw);
         long timestamp = 0;
         try {
             JsonNode root = objectMapper.readTree(raw);
@@ -152,10 +157,6 @@ public class RobotSlaveStatusHandler {
         LocalDateTime reportTime = timestamp > 0
                 ? LocalDateTime.ofInstant(Instant.ofEpochMilli(timestamp), ZoneId.systemDefault())
                 : LocalDateTime.now();
-
-        IotDeviceStatus s = new IotDeviceStatus();
-        s.setDeviceId(device.getId());
-        s.setDeviceCode(device.getDeviceCode());
         s.setReportTime(reportTime);
         s.setReceiveTime(LocalDateTime.now());
         statusMapper.insert(s);
