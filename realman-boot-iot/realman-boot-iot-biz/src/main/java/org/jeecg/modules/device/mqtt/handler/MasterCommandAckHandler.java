@@ -12,8 +12,10 @@ import org.jeecg.modules.device.entity.IotDeviceConfig;
 import org.jeecg.modules.device.mapper.IotDeviceConfigMapper;
 import org.jeecg.modules.device.mapper.IotDeviceMapper;
 import org.jeecg.modules.device.security.CommandEncryptService;
+import org.jeecg.modules.device.service.ForceFeedbackQueryPendingService;
 import org.jeecg.modules.device.service.IDeviceOperationLogService;
 import org.jeecg.modules.device.service.SportSpeedQueryPendingService;
+import org.jeecg.modules.device.vo.ForceFeedbackVO;
 import org.jeecg.modules.device.vo.SportSpeedVO;
 import org.springframework.stereotype.Component;
 
@@ -36,9 +38,10 @@ public class MasterCommandAckHandler {
     private final IotDeviceConfigMapper        configMapper;
     private final IotDeviceMapper              deviceMapper;
     private final SportSpeedQueryPendingService sportSpeedPending;
+    private final ForceFeedbackQueryPendingService forceFeedbackPending;
 
-    public void handle(String controllerCode, String cmd, String payload) throws Exception {
-        String decrypted = encryptService.decryptFromDevice(controllerCode, payload);
+    public void handle(String deviceCode, String cmd, String payload) throws Exception {
+        String decrypted = encryptService.decryptFromDevice(deviceCode, payload);
         log.info("[MasterCommandAckHandler] 解密成功, 主控上报消息体为: {}", decrypted);
         JsonNode node = objectMapper.readTree(decrypted);
 
@@ -47,10 +50,11 @@ public class MasterCommandAckHandler {
         String message = text(node, "message");
 
         log.info("[ControllerCommandAck] controller={} cmd={} commandId={} code={}",
-                controllerCode, cmd, commandId, code);
+                deviceCode, cmd, commandId, code);
 
+        String deviceId = resolveDeviceId(deviceCode);
         // 目前仍使用通用 COMMAND_SEND 类型，必要时可扩展专用类型
-        logService.recordLog(null, controllerCode,
+        logService.recordLog(deviceId, deviceCode,
                 DeviceConstant.OperationType.COMMAND_SEND,
                 "主控设备执行指令[" + cmd + "]" + (code == 0 ? "成功" : "失败"),
                 "{commandId:" + (commandId == null ? "" : commandId) + "}",
@@ -58,44 +62,78 @@ public class MasterCommandAckHandler {
                 code == 0 ? "SUCCESS" : "FAIL",
                 message, null, null);
 
-        // sport-speed 指令 ACK：更新 iot_device_config 中对应记录的同步状态
-        if ("sport-speed".equals(cmd)) {
-            int syncStatus = code == 0 ? DeviceConstant.ConfigSyncStatus.SUCCESS
-                                       : DeviceConstant.ConfigSyncStatus.FAILED;
-            LocalDateTime now = LocalDateTime.now();
-
-            // 1. 优先更新 PENDING 状态的记录
-            int updated = configMapper.update(null, new LambdaUpdateWrapper<IotDeviceConfig>()
-                    .eq(IotDeviceConfig::getDeviceCode, controllerCode)
-                    .eq(IotDeviceConfig::getConfigType, "sport_speed")
-                    .eq(IotDeviceConfig::getSyncStatus, DeviceConstant.ConfigSyncStatus.PENDING)
-                    .set(IotDeviceConfig::getSyncStatus, syncStatus)
-                    .set(IotDeviceConfig::getSyncTime, now));
-
-            // 2. 无 PENDING 记录且 code=0：视为设备主动上报当前配置，插入新记录
-            if (updated == 0 && code == 0) {
-                IotDevice device = deviceMapper.selectOne(new LambdaQueryWrapper<IotDevice>()
-                        .eq(IotDevice::getDeviceCode, controllerCode)
-                        .eq(IotDevice::getDeviceType, DeviceConstant.DeviceType.CONTROLLER)
-                        .last("LIMIT 1"));
-                String deviceId = device != null ? device.getId() : null;
-                insertConfigIfAbsent(deviceId, controllerCode, "move_speed_level",
-                        intValue(node, "moveSpeedLevel"), "sport_speed", syncStatus, now);
-                // 目前仅可设置移动速度
-//                insertConfigIfAbsent(deviceId, controllerCode, "lift_speed_level",
-//                        intValue(node, "liftSpeedLevel"), "sport_speed", syncStatus, now);
-                log.info("[MasterCommandAck] sport-speed 无PENDING记录，已按设备上报插入配置: controller={}", controllerCode);
-            } else {
-                log.info("[MasterCommandAck] sport-speed 配置同步状态已更新: controller={} updated={} status={}", controllerCode, updated, syncStatus);
-            }
-
-            // 若是查询指令（moveSpeedLevel/liftSpeedLevel 由设备回填），完成挂起的 Future
-            if (code == 0 && commandId != null) {
-                Integer moveSpeedLevel = node.has("moveSpeedLevel") && !node.get("moveSpeedLevel").isNull() ? node.get("moveSpeedLevel").asInt() : null;
-                Integer liftSpeedLevel = node.has("liftSpeedLevel") && !node.get("liftSpeedLevel").isNull() ? node.get("liftSpeedLevel").asInt() : null;
-                sportSpeedPending.complete(commandId, new SportSpeedVO(moveSpeedLevel, liftSpeedLevel));
-            }
+        switch (cmd) {
+            case "sport-speed":
+                handleSportSpeedAck(deviceId, deviceCode, node, code, commandId);
+                break;
+            case "force-feedback":
+                handleForceFeedbackAck(deviceId, deviceCode, node, code, commandId);
+                break;
+            default:
+                log.warn("[MasterCommandAckHandler] 未知指令类型, 忽略: controller={} cmd={}", deviceCode, cmd);
         }
+    }
+
+    /** sport-speed 指令 ACK 处理 */
+    private void handleSportSpeedAck(String deviceId, String deviceCode, JsonNode node, int code, String commandId) {
+        LocalDateTime now = LocalDateTime.now();
+        // 目前仅可设置移动速度
+        syncConfigStatus(deviceId, deviceCode, "sport_speed", "move_speed_level", "moveSpeedLevel", node, code, now);
+
+        // 若是查询指令（moveSpeedLevel/liftSpeedLevel 由设备回填），完成挂起的 Future
+        if (code == 0 && commandId != null) {
+            sportSpeedPending.complete(commandId,
+                    new SportSpeedVO(intNode(node, "moveSpeedLevel"), intNode(node, "liftSpeedLevel")));
+        }
+    }
+
+    /** force-feedback 指令 ACK 处理 */
+    private void handleForceFeedbackAck(String deviceId, String deviceCode, JsonNode node, int code, String commandId) {
+        LocalDateTime now = LocalDateTime.now();
+        // 目前仅可设置力
+        syncConfigStatus(deviceId, deviceCode, "force_feedback", "arm_level", "armLevel", node, code, now);
+
+        // 若是查询指令（armLevel/gripperLevel 由设备回填），完成挂起的 Future
+        if (code == 0 && commandId != null) {
+            forceFeedbackPending.complete(commandId,
+                    new ForceFeedbackVO(intNode(node, "armLevel"), intNode(node, "gripperLevel")));
+        }
+    }
+
+    /**
+     * 通用配置同步逻辑：
+     * 1. 优先更新 PENDING 状态的记录；
+     * 2. 无 PENDING 记录且 code=0：视为设备主动上报，按 configKey/nodeField 插入新记录。
+     */
+    private void syncConfigStatus(String deviceId, String deviceCode, String configType,
+                                  String configKey, String nodeField,
+                                  JsonNode node, int code, LocalDateTime now) {
+        int syncStatus = code == 0 ? DeviceConstant.ConfigSyncStatus.SUCCESS
+                                   : DeviceConstant.ConfigSyncStatus.FAILED;
+
+        int updated = configMapper.update(null, new LambdaUpdateWrapper<IotDeviceConfig>()
+                .eq(IotDeviceConfig::getDeviceCode, deviceCode)
+                .eq(IotDeviceConfig::getConfigType, configType)
+                .eq(IotDeviceConfig::getSyncStatus, DeviceConstant.ConfigSyncStatus.PENDING)
+                .set(IotDeviceConfig::getSyncStatus, syncStatus)
+                .set(IotDeviceConfig::getSyncTime, now));
+
+        if (updated == 0 && code == 0) {
+            insertConfigIfAbsent(deviceId, deviceCode,
+                    configKey, intValue(node, nodeField), configType, syncStatus, now);
+            log.info("[MasterCommandAck] {} 无PENDING记录，已按设备上报插入配置: controller={}", configType, deviceCode);
+        } else {
+            log.info("[MasterCommandAck] {} 配置同步状态已更新: controller={} updated={} status={}", configType, deviceCode, updated, syncStatus);
+        }
+    }
+
+    /** 查询主控设备 ID */
+    private String resolveDeviceId(String deviceCode) {
+        IotDevice device = deviceMapper.selectOne(new LambdaQueryWrapper<IotDevice>()
+                .eq(IotDevice::getDeviceCode, deviceCode)
+                .eq(IotDevice::getDeviceType, DeviceConstant.DeviceType.CONTROLLER)
+                .last("LIMIT 1"));
+        return device != null ? device.getId() : null;
     }
 
     /**
@@ -120,7 +158,13 @@ public class MasterCommandAckHandler {
         }
     }
 
-    /** 从 JsonNode 安全读取字段值，不存在时返回 null */
+    /** 从 JsonNode 安全读取 Integer，不存在时返回 null */
+    private static Integer intNode(JsonNode node, String field) {
+        JsonNode v = node.get(field);
+        return (v == null || v.isNull()) ? null : v.asInt();
+    }
+
+    /** 从 JsonNode 安全读取字段值（转 String），不存在时返回 null */
     private static String intValue(JsonNode node, String field) {
         JsonNode v = node.get(field);
         if (v == null || v.isNull()) return null;
