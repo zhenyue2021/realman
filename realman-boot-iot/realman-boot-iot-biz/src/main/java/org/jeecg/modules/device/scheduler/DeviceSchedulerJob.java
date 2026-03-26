@@ -17,6 +17,7 @@ import org.jeecg.modules.device.mapper.IotDeviceStatusMapper;
 import org.jeecg.modules.device.mapper.IotOtaUpgradeRecordMapper;
 import org.jeecg.modules.device.mapper.IotOtaUpgradeTaskMapper;
 import org.jeecg.modules.device.mqtt.handler.RobotSlaveStatusHandler;
+import org.jeecg.modules.device.service.workorder.IWorkOrderService;
 import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
@@ -34,6 +35,7 @@ import java.util.List;
  *   <li>{@link #compactTodayDeviceStatus}：当天状态每小时压缩</li>
  *   <li>{@link #compactDeviceStatusHistory}：最近7天及更早历史压缩</li>
  *   <li>{@link #flushRobotStatusJob}：每分钟将机器人/主控高频上报状态落库</li>
+ *   <li>{@link #pushStartedWorkOrderJob}：每分钟推送进行中工单到前端</li>
  * </ul>
  *
  * <p>XXL-Job 配置（在 XXL-Job Admin 后台注册）：
@@ -43,6 +45,7 @@ import java.util.List;
  *   compactTodayDeviceStatusJob Cron: 0 30 * * * ?  每小时第30分钟执行
  *   compactDeviceStatusJob    Cron: 0 20 2 * * ?   每天 02:20 执行
  *   flushRobotStatusJob       Cron: 0 * * * * ?    每分钟执行
+ *   pushStartedWorkOrderJob   Cron: 0 * * * * ?    每分钟执行
  * </pre>
  */
 @Slf4j
@@ -56,6 +59,7 @@ public class DeviceSchedulerJob {
     private final IotOtaUpgradeTaskMapper   taskMapper;
     private final StringRedisTemplate       redisTemplate;
     private final DeviceWebSocketServer     webSocketServer;
+    private final IWorkOrderService workOrderService;
     /** mqtt.enabled=false 时 Bean 不存在，注入 null，任务方法内做空判断 */
     @Autowired(required = false)
     private RobotSlaveStatusHandler robotSlaveStatusHandler;
@@ -226,6 +230,19 @@ public class DeviceSchedulerJob {
             return;
         }
         robotSlaveStatusHandler.flushPending();
+    }
+
+    /**
+     * 进行中工单推送任务
+     *
+     * <p>每分钟将所有 status=STARTED 且未超时（planEndTime > now）的工单，
+     * 通过 WebSocket 推送到对应主控前端，保持前端实时感知当前进行中的工单。
+     *
+     * <p>XXL-Job Handler Name：{@code pushStartedWorkOrderJob}，建议 Cron：{@code 0 * * * * ?}
+     */
+    @XxlJob("pushStartedWorkOrderJob")
+    public void pushStartedWorkOrderJob() {
+        workOrderService.pushStartedWorkOrders();
     }
 
     @XxlJob("mockDeviceStatusJob")

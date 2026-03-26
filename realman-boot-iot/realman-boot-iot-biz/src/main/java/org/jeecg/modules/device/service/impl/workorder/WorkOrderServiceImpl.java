@@ -269,5 +269,32 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
         bindDevices(existing.getId(), devices);
         return existing;
     }
+
+    @Override
+    public void pushStartedWorkOrders() {
+        LocalDateTime now = LocalDateTime.now();
+        // 查询所有已开启且未超时的工单
+        List<WorkOrder> startedOrders = this.list(new LambdaQueryWrapper<WorkOrder>()
+                .eq(WorkOrder::getStatus, "STARTED")
+                .eq(WorkOrder::getDelFlag, 0)
+                .gt(WorkOrder::getPlanEndTime, now));
+        if (startedOrders.isEmpty()) {
+            return;
+        }
+        for (WorkOrder order : startedOrders) {
+            WorkOrderDevice master = findMasterDevice(order.getId());
+            if (master == null || master.getDeviceCode() == null) {
+                log.warn("[pushStartedWorkOrders] 工单无主控设备，跳过: workOrderId={}", order.getId());
+                continue;
+            }
+            try {
+                String workOrderJson = objectMapper.writeValueAsString(order);
+                deviceWebSocketServer.pushStartedWorkOrder(master.getDeviceCode(), workOrderJson);
+            } catch (Exception e) {
+                log.warn("[pushStartedWorkOrders] WebSocket 推送失败: workOrderId={}, err={}", order.getId(), e.getMessage());
+            }
+        }
+        log.debug("[pushStartedWorkOrders] 推送进行中工单 {} 条", startedOrders.size());
+    }
 }
 

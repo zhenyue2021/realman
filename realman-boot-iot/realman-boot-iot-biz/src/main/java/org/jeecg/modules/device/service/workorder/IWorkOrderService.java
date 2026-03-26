@@ -37,5 +37,12 @@ public interface IWorkOrderService extends IService<WorkOrder> {
     WorkOrder createWorkOrderWithDevices(WorkOrder order, List<WorkOrderDevice> devices);
 
     WorkOrder editWorkOrderWithDevices(WorkOrder updated, List<WorkOrderDevice> devices);
+
+    /**
+     * 将所有已开启且未超时（status=STARTED，planEndTime > now）的工单，
+     * 通过 WebSocket 推送到对应主控前端。
+     * 由定时任务每分钟调用，保持前端实时感知进行中的工单。
+     */
+    void pushStartedWorkOrders();
 }
 
