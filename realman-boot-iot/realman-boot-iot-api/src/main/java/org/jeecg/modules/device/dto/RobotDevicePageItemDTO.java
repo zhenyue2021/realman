@@ -24,6 +24,8 @@ public class RobotDevicePageItemDTO {
     private String firmwareVersion;
     @Dict(dicCode = "device_status")
     private Integer status;
+    /** 使用状态：0-空闲 1-占用（使用中） */
+    private Integer useStatus;
     private String description;
     private String address;
     private LocalDateTime lastOnlineTime;

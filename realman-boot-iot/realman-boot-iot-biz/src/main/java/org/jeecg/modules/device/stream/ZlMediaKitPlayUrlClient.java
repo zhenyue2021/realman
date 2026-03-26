@@ -108,18 +108,9 @@ public class ZlMediaKitPlayUrlClient {
             try (Response response = httpClient.newCall(request).execute()) {
                 // OkHttp 的 body 只能读一次：必须先 string() 再记录文本，禁止对 ResponseBody 做 JSON 序列化（会得到 {}）
                 String body = response.body() != null ? response.body().string() : "";
-                log.info(
-                        "query_zlmediakit_stream | stream={}, url={}, code={}, body={}",
-                        streamTrim,
-                        response.request().url(),
-                        response.code(),
-                        body);
+                log.info("query_zlmediakit_stream | stream={}, url={}, code={}, body={}",streamTrim,response.request().url(),response.code(),body);
                 if (!response.isSuccessful()) {
-                    log.error(
-                            "query_zlmediakit_stream | stream={}, zlmediakit异常返回码 {}, 响应: {}",
-                            streamTrim,
-                            response.code(),
-                            body);
+                    log.error("query_zlmediakit_stream | stream={}, zlmediakit异常返回码 {}, 响应: {}", streamTrim, response.code(), body);
                     return null;
                 }
                 JSONObject json = JSON.parseObject(body);

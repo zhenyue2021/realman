@@ -34,6 +34,16 @@ public interface DeviceConstant {
     }
 
     /**
+     * 设备使用状态常量
+     */
+    interface UseStatus {
+        /** 空闲（未被任何遥操任务占用） */
+        int IDLE   = 0;
+        /** 占用（遥操中） */
+        int IN_USE = 1;
+    }
+
+    /**
      * MQTT Topic 模板（均为 printf 格式，%s 填入 deviceCode）
      *
      * <p>Topic 命名规则：

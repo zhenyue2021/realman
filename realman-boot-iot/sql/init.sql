@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS `iot_device` (
   `mac_address`         VARCHAR(64)    DEFAULT NULL COMMENT '设备网卡MAC地址',
   `firmware_version`    VARCHAR(32)    DEFAULT NULL,
   `status`              TINYINT        NOT NULL DEFAULT 0   COMMENT '0-未激活 1-在线 2-离线 3-禁用',
+  `use_status`          TINYINT        NOT NULL DEFAULT 0   COMMENT '使用状态：0-空闲 1-占用（使用中）',
   `device_secret`       VARCHAR(128)   DEFAULT NULL         COMMENT '设备密钥(64位Hex)，MQTT连接密码，同时派生per-device AES Key',
   `secret_create_time`  DATETIME       DEFAULT NULL         COMMENT '密钥生成时间',
   `description`         VARCHAR(512)   DEFAULT NULL,
@@ -421,3 +422,5 @@ VALUES
 
 -- 已有库升级：若表已存在但无 address 列，可执行（重复执行会报错，需自行判断）
 -- ALTER TABLE `iot_device` ADD COLUMN `address` VARCHAR(256) DEFAULT NULL COMMENT 'MQTT连接行政区划(高德IP定位)' AFTER `latitude`;
+-- 已有库升级：若表已存在但无 use_status 列，可执行
+-- ALTER TABLE `iot_device` ADD COLUMN `use_status` TINYINT NOT NULL DEFAULT 0 COMMENT '使用状态：0-空闲 1-占用（使用中）' AFTER `status`;

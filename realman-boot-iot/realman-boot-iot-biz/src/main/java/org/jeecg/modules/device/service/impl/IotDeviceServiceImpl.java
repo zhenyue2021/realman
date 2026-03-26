@@ -469,8 +469,8 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
             mqttPublisher.publishToDevice(controllerDeviceCode, topic,
                     objectMapper.writeValueAsString(assignCmd), 1);
 
-            // 机器人状态置为使用中
-            robot.setStatus(DeviceConstant.DeviceStatus.IN_USE);
+            // 机器人使用状态置为占用（使用中）
+            robot.setUseStatus(DeviceConstant.UseStatus.IN_USE);
             deviceMapper.updateById(robot);
 
             logService.recordLog(controller.getId(), controllerDeviceCode,
@@ -479,7 +479,7 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
                     DeviceConstant.OperationSource.PLATFORM, "PENDING", null, operator, null);
             logService.recordLog(robot.getId(), robotDeviceCode,
                     DeviceConstant.OperationType.COMMAND_SEND,
-                    "主控连接设备，设备状态置为使用中", "{commandId:" + commandId + ",controllerDeviceCode:" + controllerDeviceCode + "}",
+                    "主控连接设备，设备使用状态置为占用", "{commandId:" + commandId + ",controllerDeviceCode:" + controllerDeviceCode + "}",
                     DeviceConstant.OperationSource.PLATFORM, "SUCCESS", null, operator, null);
             // 获取机器人的摄像头视频流
             return getCameraStreams(robot.getId(), null);
@@ -538,8 +538,8 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
             mqttPublisher.publishToDevice(robotDeviceCode, robotTopic,
                     objectMapper.writeValueAsString(stopForRobot), 1);
 
-            // 3) 不等待ACK，直接将机器人状态置为在线
-            robot.setStatus(DeviceConstant.DeviceStatus.ONLINE);
+            // 3) 不等待ACK，直接将机器人使用状态置为空闲
+            robot.setUseStatus(DeviceConstant.UseStatus.IDLE);
             deviceMapper.updateById(robot);
 
             logService.recordLog(controller.getId(), controllerDeviceCode,
@@ -548,7 +548,7 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
                     DeviceConstant.OperationSource.PLATFORM, "PENDING", null, operator, null);
             logService.recordLog(robot.getId(), robotDeviceCode,
                     DeviceConstant.OperationType.COMMAND_SEND,
-                    "停止遥操：设备状态置为在线", "{commandId:" + commandId + "}",
+                    "停止遥操：设备使用状态置为空闲", "{commandId:" + commandId + "}",
                     DeviceConstant.OperationSource.PLATFORM, "SUCCESS", null, operator, null);
         } catch (Exception e) {
             throw new RuntimeException("停止遥操失败: " + e.getMessage(), e);
@@ -770,7 +770,7 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
                     result.add(DeviceCameraStreamVO.builder()
                             .cameraIndex(c.getCameraIndex())
                             .cameraName(c.getCameraName())
-                            .streamUrl(playUrl != null ? playUrl : c.getStreamUrl())
+                            .streamUrl(playUrl)
                             .build());
                 } else {
                     result.add(c);
