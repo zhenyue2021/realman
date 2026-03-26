@@ -127,8 +127,14 @@ public class MqttConfig {
                 "+/master/states",                  // 主控设备主动上报状态等数据
                 "+/master/rtsp/ctrl",               // 主控设备主动上报 RTSP
                 // ========== 订阅机器人设备主动上报的数据 ==========
-                "+/slave/cmd",                     // 机器人设备主动上报指令
-                "+/slave/states"                   // 机器人设备主动上报状态等数据
+                "+/slave/cmd",                      // 机器人设备主动上报指令
+                "+/slave/states",                   // 机器人设备主动上报状态等数据
+                // ========== 兼容设备发布带前导 / 的 Topic（部分固件将 topic 写为 /code/slave/states 等）==========
+                "/+/master/cmd",
+                "/+/master/states",
+                "/+/master/rtsp/ctrl",
+                "/+/slave/cmd",
+                "/+/slave/states"
         };
         int[] qosArr = new int[topics.length];
         Arrays.fill(qosArr, qos);

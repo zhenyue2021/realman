@@ -72,6 +72,10 @@ public class MqttMessageDispatcher {
      * @param message MQTT 消息对象（Payload 为 AES 加密密文或原始 JSON）
      */
     public void dispatch(String topic, MqttMessage message) {
+        // 标准化：去除前导 /，兼容部分设备固件将 topic 写为 /code/slave/states 的情况
+        if (topic != null && topic.startsWith("/")) {
+            topic = topic.substring(1);
+        }
         String payload = new String(message.getPayload(), StandardCharsets.UTF_8);
         try {
             // 0. $SYS 系统事件（设备上下线）
@@ -160,8 +164,7 @@ public class MqttMessageDispatcher {
      * @param payload    原始 Payload（明文 JSON，非加密）
      */
     private void dispatchRawTopic(String deviceCode, String role, String path, String payload) {
-        // TODO: 按需注入对应 Handler 并路由
-        // 机器人原始状态上报：{robotCode}/slave/status
+        // 机器人原始状态上报：{robotCode}/slave/states
         if ("slave".equals(role) && "states".equals(path)) {
             robotSlaveStatusHandler.handle(deviceCode, payload);
             return;
