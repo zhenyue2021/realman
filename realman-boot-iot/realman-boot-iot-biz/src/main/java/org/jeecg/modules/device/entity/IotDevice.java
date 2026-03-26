@@ -43,7 +43,7 @@ public class IotDevice implements Serializable {
     /**
      * 使用状态：0-空闲 1-占用（使用中）
      */
-    @TableField("use_status")
+    @TableField("device_use_status")
     private Integer useStatus;
     /**
      * 64位Hex设备密钥，MQTT连接密码，同时派生AES Key

@@ -169,6 +169,7 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
                 v.setRobotCode(robot.getDeviceCode());
                 v.setRobotName(robot.getDeviceName());
                 v.setStatus(robot.getStatus());
+                v.setUseStatus(robot.getUseStatus());
                 v.setDeviceModel(robot.getDeviceModel());
                 v.setFirmwareVersion(robot.getFirmwareVersion());
                 available.add(v);
@@ -215,6 +216,7 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
         try {
             String workOrderJson = objectMapper.writeValueAsString(firstOrder);
             deviceWebSocketServer.pushWorkOrderStart(controller.getDeviceCode(), workOrderJson);
+            deviceWebSocketServer.pushAssociatedDeviceInfo(controller.getDeviceCode(), objectMapper.writeValueAsString(robot));
         } catch (Exception e) {
             log.warn("[ControllerLogin] WebSocket 推送工单失败: workOrderId={}, err={}", firstOrder.getId(), e.getMessage());
         }

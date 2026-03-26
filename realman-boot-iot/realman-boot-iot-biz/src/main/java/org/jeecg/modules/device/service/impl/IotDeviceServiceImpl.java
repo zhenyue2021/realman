@@ -29,6 +29,7 @@ import org.jeecg.modules.device.service.IIotDeviceService;
 import org.jeecg.modules.device.util.DeviceExcelExportUtil;
 import org.jeecg.modules.device.vo.DeviceCameraStreamVO;
 import org.jeecg.modules.device.vo.DeviceDetailVO;
+import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -66,18 +67,19 @@ import java.util.stream.Collectors;
 public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice>
         implements IIotDeviceService {
 
-    private final IotDeviceMapper            deviceMapper;
-    private final IotDeviceConfigMapper      configMapper;
-    private final IotDeviceStatusMapper      statusMapper;
-    private final DeviceSecretService        secretService;
-    private final CommandEncryptService      encryptService;
-    private final MqttPublisher              mqttPublisher;
-    private final StringRedisTemplate        redisTemplate;
-    private final ObjectMapper               objectMapper;
-    private final IDeviceOperationLogService logService;
-    private final IotDeviceAuthMapper deviceAuthMapper;
-    private final DeviceCameraStreamPendingService deviceCameraStreamPendingService;
-    private final ZlMediaKitPlayUrlClient      zlMediaKitPlayUrlClient;
+    private final IotDeviceMapper                   deviceMapper;
+    private final IotDeviceConfigMapper             configMapper;
+    private final IotDeviceStatusMapper             statusMapper;
+    private final DeviceSecretService               secretService;
+    private final CommandEncryptService             encryptService;
+    private final MqttPublisher                     mqttPublisher;
+    private final StringRedisTemplate               redisTemplate;
+    private final ObjectMapper                      objectMapper;
+    private final IDeviceOperationLogService        logService;
+    private final IotDeviceAuthMapper               deviceAuthMapper;
+    private final DeviceCameraStreamPendingService  deviceCameraStreamPendingService;
+    private final ZlMediaKitPlayUrlClient           zlMediaKitPlayUrlClient;
+private final DeviceWebSocketServer                 deviceWebSocketServer;
 
 
     //    流媒体 MQTT 查询下发：host、push port、app（拉流 HTTPS 见 {@link ZlMediaKitPlayUrlClient}）

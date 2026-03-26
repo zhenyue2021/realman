@@ -37,6 +37,8 @@ public class UsageStatusVO {
         /** 状态：1-在线 2-离线 等 */
         @Dict(dicCode = "device_status")
         private Integer status;
+        @Dict(dicCode = "device_use_status")
+        private Integer useStatus;
         /** 电量等可从实时状态取，这里简单用字段 */
         private String batteryLevel;
         private String deviceModel;
