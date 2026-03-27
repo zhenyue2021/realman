@@ -108,7 +108,7 @@ class WorkOrderControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200));
 
-        verify(workOrderService).submitWorkOrder("wo-1");
+        verify(workOrderService).submitWorkOrder("wo-1", "operator");
     }
 
     @Test

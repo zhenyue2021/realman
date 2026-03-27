@@ -163,7 +163,7 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void submitWorkOrder(String workOrderId) {
+    public void submitWorkOrder(String workOrderId, String operator) {
         WorkOrder order = this.getById(workOrderId);
         if (order == null) {
             return;

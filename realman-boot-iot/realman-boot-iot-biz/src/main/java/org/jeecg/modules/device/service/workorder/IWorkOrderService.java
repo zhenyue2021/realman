@@ -26,7 +26,7 @@ public interface IWorkOrderService extends IService<WorkOrder> {
 
     void startWorkOrder(String workOrderId, String operatorId, String operatorName, String operatorPhone);
 
-    void submitWorkOrder(String workOrderId);
+    void submitWorkOrder(String workOrderId, String operator);
 
     void fillTimeoutReason(String workOrderId, String reason, String source);
 

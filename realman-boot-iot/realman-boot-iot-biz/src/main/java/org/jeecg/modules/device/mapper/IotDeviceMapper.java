@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.jeecg.modules.device.dto.AuthorizedDeviceOptionDTO;
 import org.jeecg.modules.device.dto.OptionDTO;
 import org.jeecg.modules.device.entity.IotDevice;
 
@@ -78,4 +79,42 @@ public interface IotDeviceMapper extends BaseMapper<IotDevice> {
             ORDER BY d.create_time ASC
             """)
     List<OptionDTO> listAuthUsers();
+
+    /**
+     * 查询已授权给指定企业列表的设备。
+     * deviceType=2：主控设备（关联 iot_device_auth.controller_id）
+     * deviceType=1：机器人设备（关联 iot_device_auth.device_id）
+     * 只返回授权状态启用（status=1）且设备未删除的记录，结果去重。
+     */
+    @Select("""
+            <script>
+            SELECT DISTINCT
+                   d.id           AS id,
+                   d.device_code  AS deviceCode,
+                   d.device_name  AS deviceName,
+                   d.status       AS status,
+                   d.use_status   AS useStatus,
+                   d.device_model AS deviceModel
+            FROM iot_device_auth a
+            <choose>
+              <when test="deviceType == 2">
+                JOIN iot_device d ON d.id = a.controller_id
+              </when>
+              <otherwise>
+                JOIN iot_device d ON d.id = a.device_id
+              </otherwise>
+            </choose>
+            WHERE a.enterprise_id IN
+              <foreach item="eid" collection="enterpriseIds" open="(" separator="," close=")">
+                #{eid}
+              </foreach>
+              AND a.status = 1
+              AND a.del_flag = 0
+              AND d.del_flag = 0
+            ORDER BY d.device_code ASC
+            </script>
+            """)
+    List<AuthorizedDeviceOptionDTO> listAuthorizedDevicesByEnterprise(
+            @Param("enterpriseIds") List<String> enterpriseIds,
+            @Param("deviceType") int deviceType);
 }

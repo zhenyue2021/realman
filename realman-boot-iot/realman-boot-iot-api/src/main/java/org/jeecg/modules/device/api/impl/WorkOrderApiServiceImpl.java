@@ -8,6 +8,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import org.jeecg.modules.device.api.WorkOrderApiService;
+import org.jeecg.modules.device.dto.AuthorizedDeviceOptionDTO;
 import org.jeecg.modules.device.dto.workorder.WorkOrderCreateDTO;
 import org.jeecg.modules.device.dto.workorder.WorkOrderDetailDTO;
 import org.jeecg.modules.device.dto.workorder.WorkOrderDeviceDTO;
@@ -17,6 +18,8 @@ import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.entity.workorder.WorkOrder;
 import org.jeecg.modules.device.entity.workorder.WorkOrderDevice;
 import org.jeecg.modules.device.entity.workorder.WorkOrderComplianceConfig;
+import org.jeecg.modules.device.mapper.IotDeviceMapper;
+import org.jeecg.modules.device.mapper.SysUserDepartLiteMapper;
 import org.jeecg.modules.device.mapper.workorder.WorkOrderDeviceMapper;
 import org.jeecg.modules.device.service.IIotDeviceService;
 import org.jeecg.modules.device.service.workorder.IWorkOrderService;
@@ -46,6 +49,8 @@ public class WorkOrderApiServiceImpl implements WorkOrderApiService {
     private final IIotDeviceService deviceService;
     private final IWorkOrderComplianceConfigService complianceConfigService;
     private final WorkOrderDeviceMapper workOrderDeviceMapper;
+    private final IotDeviceMapper iotDeviceMapper;
+    private final SysUserDepartLiteMapper sysUserDepartLiteMapper;
 
     @Override
     public WorkOrder create(WorkOrderCreateDTO dto, String operator) {
@@ -413,6 +418,49 @@ public class WorkOrderApiServiceImpl implements WorkOrderApiService {
             }
         }
         return dto;
+    }
+
+    @Override
+    public List<WorkOrderComplianceConfig> listConfigsByEnterprise(String username) {
+        List<String> enterpriseIds = resolveEnterpriseIds(username);
+        if (enterpriseIds.isEmpty()) {
+            return List.of();
+        }
+        LambdaQueryWrapper<WorkOrderComplianceConfig> wrapper = new LambdaQueryWrapper<>();
+        wrapper.in(WorkOrderComplianceConfig::getEnterpriseId, enterpriseIds);
+        wrapper.eq(WorkOrderComplianceConfig::getDelFlag, 0);
+        wrapper.orderByDesc(WorkOrderComplianceConfig::getCreateTime);
+        return complianceConfigService.list(wrapper);
+    }
+
+    @Override
+    public List<AuthorizedDeviceOptionDTO> listAuthorizedControllers(String username) {
+        List<String> enterpriseIds = resolveEnterpriseIds(username);
+        if (enterpriseIds.isEmpty()) {
+            return List.of();
+        }
+        return iotDeviceMapper.listAuthorizedDevicesByEnterprise(enterpriseIds, 2);
+    }
+
+    @Override
+    public List<AuthorizedDeviceOptionDTO> listAuthorizedRobots(String username) {
+        List<String> enterpriseIds = resolveEnterpriseIds(username);
+        if (enterpriseIds.isEmpty()) {
+            return List.of();
+        }
+        return iotDeviceMapper.listAuthorizedDevicesByEnterprise(enterpriseIds, 1);
+    }
+
+    /**
+     * 通过用户名查询其所属的全部有效企业 ID 列表。
+     * 关联 sys_user，sys_user_depart 和 sys_depart，过滤状态不可用的部门。
+     */
+    private List<String> resolveEnterpriseIds(String username) {
+        if (StrUtil.isBlank(username)) {
+            return List.of();
+        }
+        List<String> ids = sysUserDepartLiteMapper.listValidEnterpriseIdsByUsername(username);
+        return ids == null ? List.of() : ids;
     }
 
     private void markComplianceApplied(String complianceId, String operator) {

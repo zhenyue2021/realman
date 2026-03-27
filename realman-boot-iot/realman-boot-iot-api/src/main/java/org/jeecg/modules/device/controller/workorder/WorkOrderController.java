@@ -21,6 +21,9 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import org.jeecg.modules.device.dto.AuthorizedDeviceOptionDTO;
+import org.jeecg.modules.device.entity.workorder.WorkOrderComplianceConfig;
+
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -71,11 +74,7 @@ public class WorkOrderController {
     @PostMapping("/add")
     @Operation(summary = "创建工单")
     public ApiResult<WorkOrder> create(@RequestBody WorkOrderCreateDTO dto, HttpServletRequest request) {
-        String operator = null;
-        try {
-            operator = JwtUtil.getUserNameByToken(request);
-        } catch (JeecgBootException ignored) {
-        }
+        String operator = safeUsername(request);
         String tenantId = request.getHeader("x-tenant-id");
         if (tenantId == null || tenantId.isEmpty()) {
             throw new RuntimeException("缺少租户ID（x-tenant-id）");
@@ -90,11 +89,7 @@ public class WorkOrderController {
     public ApiResult<WorkOrder> edit(@PathVariable String id,
                                      @RequestBody WorkOrderCreateDTO dto,
                                      HttpServletRequest request) {
-        String operator = null;
-        try {
-            operator = JwtUtil.getUserNameByToken(request);
-        } catch (JeecgBootException ignored) {
-        }
+        String operator = safeUsername(request);
         WorkOrder updated = workOrderApiService.edit(id, dto, operator);
         return ApiResult.ok(updated);
     }
@@ -115,8 +110,9 @@ public class WorkOrderController {
 
     @PostMapping("/{id}/submit")
     @Operation(summary = "提交工单")
-    public ApiResult<Void> submit(@PathVariable String id) {
-        workOrderService.submitWorkOrder(id);
+    public ApiResult<Void> submit(HttpServletRequest request, @PathVariable String id) {
+        String operator = safeUsername(request);
+        workOrderService.submitWorkOrder(id, operator);
         return ApiResult.ok(null);
     }
 
@@ -131,12 +127,7 @@ public class WorkOrderController {
     @Operation(summary = "审核工单")
     public ApiResult<Void> audit(@PathVariable String id, @RequestBody WorkOrderAuditDTO dto,
                                  HttpServletRequest request) {
-        String auditor = null;
-        try {
-            auditor = JwtUtil.getUserNameByToken(request);
-        } catch (JeecgBootException ignored) {
-        }
-        workOrderService.auditWorkOrder(id, dto.getResult(), dto.getComment(), auditor);
+        workOrderService.auditWorkOrder(id, dto.getResult(), dto.getComment(), safeUsername(request));
         return ApiResult.ok(null);
     }
 
@@ -144,12 +135,7 @@ public class WorkOrderController {
     @Operation(summary = "关闭工单")
     public ApiResult<Void> close(@PathVariable String id, @RequestBody WorkOrderTimeoutReasonDTO dto,
                                  HttpServletRequest request) {
-        String closer = null;
-        try {
-            closer = JwtUtil.getUserNameByToken(request);
-        } catch (JeecgBootException ignored) {
-        }
-        workOrderService.closeWorkOrder(id, dto.getReason(), closer);
+        workOrderService.closeWorkOrder(id, dto.getReason(), safeUsername(request));
         return ApiResult.ok(null);
     }
 
@@ -159,16 +145,41 @@ public class WorkOrderController {
         return ApiResult.ok(workOrderService.listPendingForController(controllerCode));
     }
 
+    @GetMapping("/init/configs")
+    @Operation(summary = "工单配置列表（当前登录人所属企业）")
+    public ApiResult<List<WorkOrderComplianceConfig>> initConfigs(HttpServletRequest request) {
+        String username = safeUsername(request);
+        return ApiResult.ok(workOrderApiService.listConfigsByEnterprise(username));
+    }
+
+    @GetMapping("/init/controllers")
+    @Operation(summary = "已授权给所属企业的主控设备列表")
+    public ApiResult<List<AuthorizedDeviceOptionDTO>> initControllers(HttpServletRequest request) {
+        String username = safeUsername(request);
+        return ApiResult.ok(workOrderApiService.listAuthorizedControllers(username));
+    }
+
+    @GetMapping("/init/robots")
+    @Operation(summary = "已授权给所属企业的机器人列表")
+    public ApiResult<List<AuthorizedDeviceOptionDTO>> initRobots(HttpServletRequest request) {
+        String username = safeUsername(request);
+        return ApiResult.ok(workOrderApiService.listAuthorizedRobots(username));
+    }
+
+    private String safeUsername(HttpServletRequest request) {
+        try {
+            return JwtUtil.getUserNameByToken(request);
+        } catch (JeecgBootException ignored) {
+            return null;
+        }
+    }
+
     @PostMapping("/{id}/attachments")
     @Operation(summary = "新增工单附件")
     public ApiResult<Void> addAttachments(@PathVariable String id,
                                           @RequestBody List<WorkOrderAttachmentDTO> dtos,
                                           HttpServletRequest request) {
-        String username = null;
-        try {
-            username = JwtUtil.getUserNameByToken(request);
-        } catch (JeecgBootException ignored) {
-        }
+        String username = safeUsername(request);
         List<WorkOrderAttachment> list = dtos == null ? List.of() : dtos.stream().map(d -> {
             WorkOrderAttachment a = new WorkOrderAttachment();
             a.setFileName(d.getFileName());

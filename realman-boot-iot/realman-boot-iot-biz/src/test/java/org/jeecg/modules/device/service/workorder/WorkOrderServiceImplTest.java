@@ -176,7 +176,7 @@ class WorkOrderServiceImplTest {
         order.setStatus("PENDING");
         when(workOrderMapper.selectById("wo-001")).thenReturn(order);
 
-        assertThatThrownBy(() -> workOrderService.submitWorkOrder("wo-001"))
+        assertThatThrownBy(() -> workOrderService.submitWorkOrder("wo-001", "operator"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("不允许提交");
         verify(workOrderMapper, never()).updateById(any(WorkOrder.class));
@@ -190,7 +190,7 @@ class WorkOrderServiceImplTest {
         when(workOrderMapper.selectById("wo-001")).thenReturn(order);
         when(workOrderMapper.updateById(any(WorkOrder.class))).thenReturn(1);
 
-        workOrderService.submitWorkOrder("wo-001");
+        workOrderService.submitWorkOrder("wo-001", "operator");
 
         ArgumentCaptor<WorkOrder> captor = ArgumentCaptor.forClass(WorkOrder.class);
         verify(workOrderMapper).updateById(captor.capture());
