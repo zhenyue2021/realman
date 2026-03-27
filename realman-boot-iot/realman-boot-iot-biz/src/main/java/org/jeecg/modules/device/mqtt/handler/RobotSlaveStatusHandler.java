@@ -1,8 +1,8 @@
 package org.jeecg.modules.device.mqtt.handler;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.entity.IotDevice;
@@ -12,14 +12,13 @@ import org.jeecg.modules.device.mapper.IotDeviceStatusMapper;
 import org.jeecg.modules.device.security.CommandEncryptService;
 import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Component;
 
-import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 
@@ -28,10 +27,19 @@ import java.util.function.BiConsumer;
  *
  * <p>Topic 格式：{deviceCode}/slave/states（机器人） | {deviceCode}/master/states（主控）
  *
- * <p>处理流程：解密 → 校验设备 → WebSocket 推送 → 缓冲最新状态
+ * <p>处理流程：解密 → 校验设备 → WebSocket 推送 → 写入 Redis 队列
  *
- * <p>持久化策略：每台机器人设备的最新状态缓冲在内存中，由外部调度器（{@code DeviceSchedulerJob}）
- * 定期调用 {@link #flushPending()} 统一落库，避免高频上报（约1次/秒）对数据库造成写压力。
+ * <p>持久化策略：上报数据追加到 Redis List（{@code iot:slave:pending:{deviceCode}}），
+ * 同时将 deviceCode 记入 tracking Set（{@code iot:slave:pending:devices}）。
+ * 由外部调度器（{@code DeviceSchedulerJob}）定期调用 {@link #flushPending()} 落库：
+ * 每台设备的本轮所有上报数据序列化为 JSON 数组写一条记录。
+ *
+ * <p>集群安全保证：
+ * <ul>
+ *   <li>两个 Lua 脚本均为 Redis 原子操作，多节点同时 flush 时 tracking Set 只被一个节点摘出，
+ *       天然互斥，不会重复写库。</li>
+ *   <li>新上报在 tracking Set 被摘出后仍会重新写入 Set + List，等下一轮 flush 处理，不丢失。</li>
+ * </ul>
  */
 @Slf4j
 @Component
@@ -44,15 +52,57 @@ public class RobotSlaveStatusHandler {
     private final IotDeviceMapper deviceMapper;
     private final IotDeviceStatusMapper statusMapper;
     private final CommandEncryptService encryptService;
+    private final StringRedisTemplate redisTemplate;
+
+    // -------------------------------------------------------------------------
+    // Redis key 定义
+    // -------------------------------------------------------------------------
+
+    /** 上报数据 List key 前缀：{prefix}{deviceCode} */
+    private static final String PENDING_KEY_PREFIX = "iot:slave:pending:";
+    /** 待 flush 的 deviceCode tracking Set */
+    private static final String PENDING_DEVICES_SET = "iot:slave:pending:devices";
+
+    // -------------------------------------------------------------------------
+    // Lua 脚本（Redis 原子操作）
+    // -------------------------------------------------------------------------
 
     /**
-     * 待落库缓冲区：key=deviceCode，value=该设备最新一条解密后的状态 JSON。
-     * 每次有新上报时覆盖旧值，确保定时任务刷写的始终是最新状态。
+     * 原子摘出 tracking Set：SMEMBERS + DEL。
+     * 同一 flush 周期内多节点竞争时，只有先执行的节点能拿到成员列表，
+     * 后执行的节点拿到空列表直接跳过，天然保证不重复处理。
      */
-    private final ConcurrentHashMap<String, PendingEntry> pendingMap = new ConcurrentHashMap<>();
+    @SuppressWarnings("rawtypes")
+    private static final RedisScript<List> POP_DEVICES_SCRIPT = new DefaultRedisScript<>(
+            "local m = redis.call('SMEMBERS', KEYS[1]); " +
+            "if #m > 0 then redis.call('DEL', KEYS[1]) end; " +
+            "return m",
+            List.class
+    );
 
-    /** 待落库条目：保存设备实体 + 最新原始 JSON */
-    private record PendingEntry(IotDevice device, String raw) {}
+    /**
+     * 原子摘出设备 List：LRANGE 0 -1 + DEL。
+     * 保证快照与清除原子完成：flush 期间新推入的数据若在 DEL 之前到达则包含在本次结果，
+     * 若在 DEL 之后到达则留在新列表中等下一轮处理，两种情况均不丢失数据。
+     */
+    @SuppressWarnings("rawtypes")
+    private static final RedisScript<List> DRAIN_LIST_SCRIPT = new DefaultRedisScript<>(
+            "local v = redis.call('LRANGE', KEYS[1], 0, -1); " +
+            "if #v > 0 then redis.call('DEL', KEYS[1]) end; " +
+            "return v",
+            List.class
+    );
+
+    // -------------------------------------------------------------------------
+    // 本节点设备缓存（减少 flush 时的 DB 查询频率）
+    // -------------------------------------------------------------------------
+
+    /**
+     * 设备实体本地缓存：key=deviceCode。
+     * 设备信息变更概率极低，各节点独立缓存自己处理过的设备即可。
+     * 缓存未命中时（如跨节点 flush）直接查库，每分钟一次，开销可接受。
+     */
+    private final ConcurrentHashMap<String, IotDevice> deviceCache = new ConcurrentHashMap<>();
 
     // -------------------------------------------------------------------------
     // 公开入口
@@ -75,21 +125,24 @@ public class RobotSlaveStatusHandler {
     // -------------------------------------------------------------------------
 
     /**
-     * 通用状态处理：解密 → 校验设备 → WebSocket 推送 → 可选缓冲
+     * 通用状态处理：解密 → 校验设备 → WebSocket 推送 → 可选写入 Redis 队列
      *
      * @param deviceCode 设备编码
      * @param payload    原始 Payload（可能加密）
      * @param wsPusher   WebSocket 推送方法引用
-     * @param buffer     是否将最新状态缓入待落库缓冲区
+     * @param buffer     是否将上报数据追加到 Redis 待落库队列
      */
     private void processStatus(String deviceCode, String payload,
                                 BiConsumer<String, String> wsPusher, boolean buffer) {
         String decrypted = encryptService.decryptFromDevice(deviceCode, payload);
 
-        IotDevice device = deviceMapper.selectOne(new LambdaQueryWrapper<IotDevice>()
-                .eq(IotDevice::getDeviceCode, deviceCode)
-                .last("LIMIT 1"));
+        // 设备校验：优先读本地缓存，缓存未命中才查库
+        IotDevice device = deviceCache.computeIfAbsent(deviceCode, k ->
+                deviceMapper.selectOne(new LambdaQueryWrapper<IotDevice>()
+                        .eq(IotDevice::getDeviceCode, k)
+                        .last("LIMIT 1")));
         if (device == null) {
+            // computeIfAbsent 不缓存 null，下次仍会重试查库
             log.warn("[SlaveStatusHandler] 未知设备，忽略上报: {}", deviceCode);
             return;
         }
@@ -97,68 +150,84 @@ public class RobotSlaveStatusHandler {
         wsPusher.accept(deviceCode, decrypted);
 
         if (buffer) {
-            // 覆盖写：高频上报时始终保留最新状态，等待定时任务统一落库
-            pendingMap.put(deviceCode, new PendingEntry(device, decrypted));
+            // 追加到 Redis List，并将 deviceCode 加入 tracking Set
+            redisTemplate.opsForList().rightPush(PENDING_KEY_PREFIX + deviceCode, decrypted);
+            redisTemplate.opsForSet().add(PENDING_DEVICES_SET, deviceCode);
         }
     }
 
     /**
-     * 定时落库：每分钟将缓冲区中所有设备的最新状态写入 DB，每台设备落一条记录。
+     * 定时落库：将各设备本轮积累的所有上报数据序列化为 JSON 数组，每台设备写一条记录。
      *
-     * <p>采用"先摘出、再写库"策略：
+     * <p>流程：
      * <ol>
-     *   <li>从 {@link #pendingMap} 中原子摘出所有待写条目</li>
-     *   <li>逐条写库（失败单独打印日志，不影响其他设备）</li>
+     *   <li>原子摘出 tracking Set（{@link #POP_DEVICES_SCRIPT}），获取本轮 deviceCode 列表</li>
+     *   <li>逐个原子摘出各设备 Redis List（{@link #DRAIN_LIST_SCRIPT}）</li>
+     *   <li>将所有条目组装为 JSON 数组落库；单台设备失败不影响其他设备</li>
      * </ol>
-     * 摘出后若设备继续上报，新条目会重新进入 pendingMap，等下一分钟刷写，不会丢失。
      */
     public void flushPending() {
-        if (pendingMap.isEmpty()) {
+        @SuppressWarnings("unchecked")
+        List<String> deviceCodes = redisTemplate.execute(POP_DEVICES_SCRIPT,
+                List.of(PENDING_DEVICES_SET));
+        if (deviceCodes == null || deviceCodes.isEmpty()) {
             return;
         }
-        // 原子摘出：从 map 中移除并收集本轮需要落库的条目
-        List<PendingEntry> batch = new ArrayList<>();
-        for (Map.Entry<String, PendingEntry> entry : pendingMap.entrySet()) {
-            PendingEntry removed = pendingMap.remove(entry.getKey());
-            if (removed != null) {
-                batch.add(removed);
-            }
-        }
-        log.info("[SlaveStatusHandler] 定时落库，本轮设备数={}", batch.size());
-        for (PendingEntry e : batch) {
+
+        int flushedDevices = 0;
+        for (String deviceCode : deviceCodes) {
             try {
-                doPersist(e.device(), e.raw());
+                @SuppressWarnings("unchecked")
+                List<String> raws = redisTemplate.execute(DRAIN_LIST_SCRIPT,
+                        List.of(PENDING_KEY_PREFIX + deviceCode));
+                if (raws == null || raws.isEmpty()) {
+                    continue;
+                }
+
+                IotDevice device = loadDevice(deviceCode);
+                if (device == null) {
+                    log.warn("[SlaveStatusHandler] 未知设备，跳过落库: {}", deviceCode);
+                    continue;
+                }
+
+                ArrayNode array = objectMapper.createArrayNode();
+                for (String raw : raws) {
+                    try {
+                        array.add(objectMapper.readTree(raw));
+                    } catch (Exception e) {
+                        array.add(raw); // 解析失败以字符串节点兜底，不丢弃数据
+                    }
+                }
+                doPersist(device, objectMapper.writeValueAsString(array));
+                flushedDevices++;
             } catch (Exception ex) {
-                log.error("[SlaveStatusHandler] 落库失败 deviceCode={}", e.device().getDeviceCode(), ex);
+                log.error("[SlaveStatusHandler] 落库失败 deviceCode={}", deviceCode, ex);
             }
         }
+        log.info("[SlaveStatusHandler] 定时落库，本轮设备数={}", flushedDevices);
+    }
+
+    /** 加载设备实体：优先本地缓存，未命中时查库（flush 每分钟一次，开销可接受） */
+    private IotDevice loadDevice(String deviceCode) {
+        return deviceCache.computeIfAbsent(deviceCode, k ->
+                deviceMapper.selectOne(new LambdaQueryWrapper<IotDevice>()
+                        .eq(IotDevice::getDeviceCode, k)
+                        .last("LIMIT 1")));
     }
 
     /**
-     * 执行单条状态记录写库。
-     *
-     * <p>reportTime 取设备端 timestamp 字段（毫秒）；字段缺失或值 ≤0 时降级为平台当前时间，
-     * 避免写入 epoch（1970-01-01）。
+     * 执行单条批量状态记录写库。
+     * {@code rawData} 为本轮该设备所有上报数据的 JSON 数组；时间字段均取落库时的平台当前时间。
      */
-    private void doPersist(IotDevice device, String raw) {
-
+    private void doPersist(IotDevice device, String rawData) {
         IotDeviceStatus s = new IotDeviceStatus();
         s.setDeviceId(device.getId());
         s.setDeviceCode(device.getDeviceCode());
-        s.setRawData(raw);
-        long timestamp = 0;
-        try {
-            JsonNode root = objectMapper.readTree(raw);
-            timestamp = root.path("timestamp").asLong();
-        } catch (Exception e) {
-            log.warn("[SlaveStatusHandler] 解析 timestamp 失败，使用平台时间: deviceCode={}", device.getDeviceCode());
-        }
-
-        LocalDateTime reportTime = timestamp > 0
-                ? LocalDateTime.ofInstant(Instant.ofEpochMilli(timestamp), ZoneId.systemDefault())
-                : LocalDateTime.now();
-        s.setReportTime(reportTime);
-        s.setReceiveTime(LocalDateTime.now());
-        statusMapper.insert(s);
+        s.setRawData(rawData);
+        LocalDateTime now = LocalDateTime.now();
+        s.setReportTime(now);
+        s.setReceiveTime(now);
+        // 这种上报不记录，没有实际意义，已有状态上报逻辑（只是数据没那么全，且上报时间也没那么频繁）
+//        statusMapper.insert(s);
     }
 }
