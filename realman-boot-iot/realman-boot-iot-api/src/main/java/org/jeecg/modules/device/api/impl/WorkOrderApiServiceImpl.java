@@ -244,6 +244,7 @@ public class WorkOrderApiServiceImpl implements WorkOrderApiService {
             dto.setAgentName(o.getAgentName());
             dto.setComplianceId(o.getComplianceId());
             dto.setStatus(o.getStatus());
+            dto.setAuditResult(o.getAuditResult());
             dto.setOperatorId(o.getOperatorId());
             dto.setOperatorName(o.getOperatorName());
             dto.setCreateTime(format(o.getCreateTime()));

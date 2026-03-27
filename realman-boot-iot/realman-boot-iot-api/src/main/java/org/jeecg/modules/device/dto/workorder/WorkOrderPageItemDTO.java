@@ -75,6 +75,11 @@ public class WorkOrderPageItemDTO {
      */
     @Dict(dicCode = "order_status")
     private String status;
+    /**
+     * 审核结果
+     */
+    @Dict(dicCode = "audit_result")
+    private String auditResult;
 
     /**
      * 主控设备（单个）

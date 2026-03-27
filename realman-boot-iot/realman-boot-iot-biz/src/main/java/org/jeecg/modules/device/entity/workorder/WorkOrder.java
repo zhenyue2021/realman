@@ -63,6 +63,7 @@ public class WorkOrder implements Serializable {
     private String status;
 
     @TableField("audit_result")
+    @Dict(dicCode = "audit_result")
     private String auditResult;
 
     @TableField("operator_id")
