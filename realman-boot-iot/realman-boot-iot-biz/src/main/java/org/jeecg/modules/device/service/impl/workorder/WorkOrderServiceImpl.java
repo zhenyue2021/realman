@@ -168,10 +168,15 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
         if (order == null) {
             return;
         }
-        // 仅允许已开始或已超时的工单提交
+        // 仅允许已开始或未超时的工单提交
         if (!"STARTED".equals(order.getStatus()) && !"TIMEOUT".equals(order.getStatus())) {
-            throw new IllegalStateException("当前工单状态不允许提交");
+            throw new IllegalStateException("当前工单状态不允许提交---" + order.getStatus());
         }
+        // 仅允许提交自己开启的工单
+        if (!operator.equals(order.getOperatorName())) {
+            throw new IllegalStateException("该工单不是由您开启，您无法提交他人工单");
+        }
+        order.setUpdateBy(operator);
         order.setStatus("SUBMITTED");
         LocalDateTime submitTime = LocalDateTime.now();
         order.setSubmitTime(submitTime);
