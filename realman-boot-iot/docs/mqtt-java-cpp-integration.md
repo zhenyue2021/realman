@@ -168,7 +168,178 @@
 {"operationType":"LOCAL","operationDesc":"按键急停","operationDetail":null,"operationResult":"SUCCESS","operationTime":1710000000000}
 ```
 
-### 4.2 主控
+### 4.2 SLAM 地图上传与同步
+
+SLAM 涉及两条独立子流程，均走 **`device/{deviceCode}/slam/...`** Topic，Payload 经 `CommandEncryptService` 加解密。
+
+---
+
+#### 4.2.1 地图上传流程
+
+```
+机器人                                   平台
+  │                                        │
+  │── slam/upload/request ────────────────>│  1. 机器人告知平台：准备上传地图，附文件元信息
+  │<── slam/upload/permit ─────────────────│  2. 平台响应预签名上传地址（PUT URL）
+  │                                        │
+  │   （机器人使用 putUrl 直传 OSS/MinIO）  │
+  │                                        │
+  │── slam/upload/complete ───────────────>│  3. 机器人通知平台：上传已完成
+```
+
+**第 1 步：上行 `device/{deviceCode}/slam/upload/request`**
+
+```json
+{
+  "requestId": "req-20240101-001",
+  "mapName": "warehouse_floor1",
+  "mapVersion": "v2.1",
+  "md5": "d41d8cd98f00b204e9800998ecf8427e",
+  "size": 2097152,
+  "ext": "pgm",
+  "timestamp": 1710000000000
+}
+```
+
+| 字段 | 说明 |
+|------|------|
+| `requestId` | 本次上传请求 ID，与后续 `permit` / `complete` 三步对应 |
+| `mapName` | 地图名称（人可读） |
+| `mapVersion` | 地图版本号（可选） |
+| `md5` | 文件 MD5，平台用于完整性校验 |
+| `size` | 文件字节数 |
+| `ext` | 文件扩展名（不含点），如 `pgm`、`zip` |
+
+**第 2 步：下行 `device/{deviceCode}/slam/upload/permit`**
+
+```json
+{
+  "requestId": "req-20240101-001",
+  "mapId": "map-uuid-0001",
+  "objectKey": "slam/ROBOT_001/map-uuid-0001.pgm",
+  "putUrl": "https://oss.example.com/slam/ROBOT_001/map-uuid-0001.pgm?X-Amz-Signature=...",
+  "expireAt": 1710003600000,
+  "timestamp": 1710000000200
+}
+```
+
+| 字段 | 说明 |
+|------|------|
+| `requestId` | 与请求一致 |
+| `mapId` | 平台生成的地图 ID，后续引用地图均用此字段 |
+| `objectKey` | 存储 Object Key（用于 complete 阶段核对） |
+| `putUrl` | 预签名 PUT URL，机器人直接 HTTP PUT 上传文件体 |
+| `expireAt` | PUT URL 过期时间（毫秒时间戳），超时需重新申请 |
+
+> **客户端行为**：收到 `permit` 后，用 `putUrl` 做 HTTP PUT 上传裸文件（Content-Type 与 OSS 约定一致），上传成功再发 `upload/complete`。
+
+**第 3 步：上行 `device/{deviceCode}/slam/upload/complete`**
+
+成功：
+```json
+{
+  "requestId": "req-20240101-001",
+  "mapId": "map-uuid-0001",
+  "objectKey": "slam/ROBOT_001/map-uuid-0001.pgm",
+  "md5": "d41d8cd98f00b204e9800998ecf8427e",
+  "size": 2097152,
+  "code": 0,
+  "message": null,
+  "timestamp": 1710000050000
+}
+```
+
+失败：
+```json
+{
+  "requestId": "req-20240101-001",
+  "mapId": "map-uuid-0001",
+  "objectKey": "slam/ROBOT_001/map-uuid-0001.pgm",
+  "md5": null,
+  "size": null,
+  "code": 1,
+  "message": "PUT 上传超时",
+  "timestamp": 1710000050000
+}
+```
+
+| 字段 | 说明 |
+|------|------|
+| `code` | `0` = 成功，非 `0` = 失败 |
+| `message` | 失败原因（成功时为 `null`） |
+
+---
+
+#### 4.2.2 地图同步流程
+
+```
+平台                                    目标机器人
+  │                                        │
+  │── slam/sync/command ──────────────────>│  1. 平台指示机器人从 OSS 拉取地图
+  │<── slam/sync/ack ──────────────────────│  2. 机器人同步完成（或失败）后回传结果
+```
+
+**第 1 步：下行 `device/{deviceCode}/slam/sync/command`**
+
+```json
+{
+  "commandId": "task-sync-0001",
+  "bindingId": "binding-uuid-0001",
+  "slamMapId": "map-uuid-0001",
+  "sourceRobotCode": "ROBOT_001",
+  "objectKey": "slam/ROBOT_001/map-uuid-0001.pgm",
+  "getUrl": "https://oss.example.com/slam/ROBOT_001/map-uuid-0001.pgm?X-Amz-Signature=...",
+  "md5": "d41d8cd98f00b204e9800998ecf8427e",
+  "size": 2097152,
+  "timestamp": 1710000060000
+}
+```
+
+| 字段 | 说明 |
+|------|------|
+| `commandId` | 同步任务 ID，与 ACK 对应 |
+| `bindingId` | 同步绑定关系 ID（多机共享场景使用） |
+| `slamMapId` | 地图 ID（与上传阶段一致） |
+| `sourceRobotCode` | 地图来源机器人编码 |
+| `objectKey` | 存储 Object Key |
+| `getUrl` | 预签名 GET URL，机器人直接 HTTP GET 下载 |
+| `md5` | 平台已校验的文件 MD5，机器人下载后需对比 |
+
+> **客户端行为**：收到指令后用 `getUrl` HTTP GET 下载地图文件，校验 MD5，加载完毕后发 `slam/sync/ack`。
+
+**第 2 步：上行 `device/{deviceCode}/slam/sync/ack`**
+
+成功：
+```json
+{
+  "commandId": "task-sync-0001",
+  "bindingId": "binding-uuid-0001",
+  "slamMapId": "map-uuid-0001",
+  "code": 0,
+  "message": null,
+  "timestamp": 1710000120000
+}
+```
+
+失败：
+```json
+{
+  "commandId": "task-sync-0001",
+  "bindingId": "binding-uuid-0001",
+  "slamMapId": "map-uuid-0001",
+  "code": 2,
+  "message": "MD5 校验不一致",
+  "timestamp": 1710000120000
+}
+```
+
+| 字段 | 说明 |
+|------|------|
+| `code` | `0` = 成功，非 `0` = 失败（建议定义：`1`=下载失败 `2`=MD5 校验失败 `3`=加载失败） |
+
+---
+
+### 4.3 主控
 
 **下行 `master/{code}/teleop/associated-device/query` → 上行 `.../teleop/associated-device/ack`**
 
