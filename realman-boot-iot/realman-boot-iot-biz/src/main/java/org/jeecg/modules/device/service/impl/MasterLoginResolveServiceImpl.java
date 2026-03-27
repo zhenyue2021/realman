@@ -234,6 +234,7 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
             current.setRobotCode(robot.getDeviceCode());
             current.setRobotName(robot.getDeviceName());
             current.setStatus(robot.getStatus());
+            current.setUseStatus(robot.getUseStatus());
             current.setDeviceModel(robot.getDeviceModel());
             current.setFirmwareVersion(robot.getFirmwareVersion());
             vo.setCurrentRobot(current);

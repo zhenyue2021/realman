@@ -154,7 +154,7 @@ public class WorkOrderController {
     }
 
     @GetMapping("/pending/controller/{controllerCode}")
-    @Operation(summary = "主控端待开始工单列表")
+    @Operation(summary = "主控端待开始工单列表（含待开始及已开始未提交未逾期）")
     public ApiResult<List<WorkOrder>> pendingForController(HttpServletRequest request, @PathVariable String controllerCode) {
         return ApiResult.ok(workOrderService.listPendingForController(controllerCode));
     }
