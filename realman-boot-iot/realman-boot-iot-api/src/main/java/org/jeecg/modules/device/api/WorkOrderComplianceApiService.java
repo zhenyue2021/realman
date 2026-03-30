@@ -2,6 +2,8 @@ package org.jeecg.modules.device.api;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import org.jeecg.modules.device.dto.OptionDTO;
+import org.jeecg.modules.device.dto.OptionTreeDTO;
 import org.jeecg.modules.device.dto.workorder.WorkOrderComplianceConfigDetailDTO;
 import org.jeecg.modules.device.dto.workorder.WorkOrderComplianceConfigPageVo;
 import org.jeecg.modules.device.dto.workorder.WorkOrderComplianceQueryDTO;
@@ -23,5 +25,9 @@ public interface WorkOrderComplianceApiService {
     WorkOrderComplianceConfigDetailDTO detail(String id);
 
     List<WorkOrderComplianceConfig> listForExport(WorkOrderComplianceQueryDTO query);
+
+    List<OptionDTO> tenantOptions();
+
+    List<OptionTreeDTO> enterpriseOptionsTree();
 }
 

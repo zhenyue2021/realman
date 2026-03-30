@@ -5,10 +5,15 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import org.jeecg.modules.device.api.WorkOrderComplianceApiService;
+import org.jeecg.modules.device.component.DeviceServiceComponent;
+import org.jeecg.modules.device.dto.OptionDTO;
+import org.jeecg.modules.device.dto.OptionTreeDTO;
 import org.jeecg.modules.device.dto.workorder.WorkOrderComplianceConfigDetailDTO;
 import org.jeecg.modules.device.dto.workorder.WorkOrderComplianceConfigPageVo;
 import org.jeecg.modules.device.dto.workorder.WorkOrderComplianceQueryDTO;
 import org.jeecg.modules.device.entity.workorder.WorkOrderComplianceConfig;
+import org.jeecg.modules.device.mapper.SysDepartLiteMapper;
+import org.jeecg.modules.device.mapper.SysTenantLiteMapper;
 import org.jeecg.modules.device.service.workorder.IWorkOrderComplianceConfigService;
 import org.springframework.stereotype.Service;
 
@@ -19,6 +24,9 @@ import java.util.List;
 public class WorkOrderComplianceApiServiceImpl implements WorkOrderComplianceApiService {
 
     private final IWorkOrderComplianceConfigService configService;
+    private final SysTenantLiteMapper tenantMapper;
+    private final SysDepartLiteMapper departMapper;
+    private final DeviceServiceComponent deviceComponent;
 
     @Override
     public IPage<WorkOrderComplianceConfigPageVo> pageConfigs(Page<WorkOrderComplianceConfigPageVo> page,
@@ -80,6 +88,16 @@ public class WorkOrderComplianceApiServiceImpl implements WorkOrderComplianceApi
     @Override
     public List<WorkOrderComplianceConfig> listForExport(WorkOrderComplianceQueryDTO query) {
         return configService.listForExport(query.getAgentId(), query.getEnterpriseId(), query.getApplyStatus());
+    }
+
+    @Override
+    public List<OptionTreeDTO> enterpriseOptionsTree() {
+        return deviceComponent.buildEnterpriseTree(departMapper.listEnterpriseTreeRows());
+    }
+
+    @Override
+    public List<OptionDTO> tenantOptions() {
+        return tenantMapper.listAllTenants();
     }
 }
 

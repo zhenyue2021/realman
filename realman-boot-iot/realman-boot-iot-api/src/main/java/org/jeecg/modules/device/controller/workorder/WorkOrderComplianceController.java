@@ -10,6 +10,8 @@ import org.jeecg.common.exception.JeecgBootException;
 import org.jeecg.common.system.util.JwtUtil;
 import org.jeecg.common.util.ContentDispositionUtil;
 import org.jeecg.modules.device.api.WorkOrderComplianceApiService;
+import org.jeecg.modules.device.dto.OptionDTO;
+import org.jeecg.modules.device.dto.OptionTreeDTO;
 import org.jeecg.modules.device.dto.workorder.WorkOrderComplianceConfigDetailDTO;
 import org.jeecg.modules.device.dto.workorder.WorkOrderComplianceConfigPageVo;
 import org.jeecg.modules.device.dto.workorder.WorkOrderComplianceQueryDTO;
@@ -53,6 +55,18 @@ public class WorkOrderComplianceController {
         }
         WorkOrderComplianceConfig created = apiService.create(config, operator);
         return ApiResult.ok(created);
+    }
+    @GetMapping("/tenants")
+    @Operation(summary = "租户下拉列表")
+    public ApiResult<List<OptionDTO>> tenantOptions(HttpServletRequest request) {
+        return ApiResult.ok(apiService.tenantOptions());
+    }
+
+
+    @GetMapping("/enterprises/tree")
+    @Operation(summary = "企业下拉树")
+    public ApiResult<List<OptionTreeDTO>> enterpriseOptionsTree(HttpServletRequest request) {
+        return ApiResult.ok(apiService.enterpriseOptionsTree());
     }
 
     @GetMapping("/{id}")
