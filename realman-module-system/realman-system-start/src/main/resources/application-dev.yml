@@ -222,7 +222,7 @@ jeecg:
     #webapp文件路径
     webapp: /opt/webapp
   shiro:
-    excludeUrls: /api/integration/**,/sys/api/translateManyDict
+    excludeUrls: /sys/api/translateManyDict
   # 短信发送方式 aliyun阿里云短信 tencent腾讯云短信
   smsSendType: aliyun
   #阿里云oss存储和大鱼短信秘钥配置
@@ -328,3 +328,12 @@ justauth:
     type: default
     prefix: 'demo::'
     timeout: 1h
+
+# 外部集成模块配置
+integration:
+  temp-token:
+    # 内部服务账号，仅用于为外部系统颁发临时 Token，不用于页面登录
+    service-username: yunwei
+    # 允许调用临时 Token 接口的来源系统白名单（大小写不敏感）
+    allowed-source-systems:
+      - DEW
