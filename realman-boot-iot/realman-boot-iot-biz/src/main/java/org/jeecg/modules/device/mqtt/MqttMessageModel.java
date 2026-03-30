@@ -554,4 +554,48 @@ public class MqttMessageModel {
         private String message;
         private long timestamp;
     }
+
+    /**
+     * 上行：设备请求外部系统服务参数（Topic: device/{deviceCode}/ext-params/request）
+     *
+     * <p>所有设备共享同一套外部参数，由 sourceSystem 标识数据来源。
+     * 若 sourceSystem 为空，平台使用配置项 {@code integration.ext-params.default-source-system} 的值。
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class ExtParamsRequest {
+        /** 请求唯一ID，响应时原样返回，便于设备侧对账 */
+        private String commandId;
+        /** 外部系统编码（如 DEW），为空时使用平台配置的默认值 */
+        private String sourceSystem;
+    }
+
+    /**
+     * 下行：平台响应设备的外部系统服务参数（Topic: device/{deviceCode}/ext-params/response）
+     *
+     * <p>code=0 表示成功，此时各业务字段有值；code 非 0 表示失败，message 说明原因。
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class ExtParamsResponse {
+        /** 与请求的 commandId 对应 */
+        private String commandId;
+        /** 0=成功，非 0=失败 */
+        private int code;
+        /** 失败描述（code != 0 时填充） */
+        private String message;
+        private String endpoint;
+        private String bucket;
+        private String bjExpiration;
+        private String utcExpiration;
+        private String accessKeyId;
+        private String accessKeySecret;
+        private String securityToken;
+    }
 }

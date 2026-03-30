@@ -120,6 +120,7 @@ public class MqttConfig {
                 "device/+/slam/upload/request",     // 机器人请求SLAM上传许可
                 "device/+/slam/upload/complete",    // 机器人通知SLAM上传完成
                 "device/+/slam/sync/ack",           // 机器人回传SLAM同步结果
+                "device/+/ext-params/request",      // 设备请求外部系统服务参数（如STS临时凭证）
                 "$SYS/brokers/+/clients/+/connected",    // EMQX 设备上线事件
                 "$SYS/brokers/+/clients/+/disconnected",  // EMQX 设备下线事件
                 // ========== 订阅主控设备主动上报的数据 ==========

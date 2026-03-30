@@ -132,6 +132,21 @@ public interface DeviceConstant {
         String SLAM_SYNC_COMMAND = "device/%s/slam/sync/command";
         /** 上行：机器人回传 SLAM 同步结果 */
         String SLAM_SYNC_ACK = "device/%s/slam/sync/ack";
+        /**
+         * 上行：设备请求外部系统服务参数（如 STS 临时凭证）
+         *
+         * <p>Topic: device/{deviceCode}/ext-params/request
+         * <p>配合 {@link org.jeecg.modules.device.mqtt.MqttMessageModel.ExtParamsRequest} 使用，
+         * 平台收到后从 Redis 缓存读取并通过 {@link #EXT_PARAMS_RESPONSE} 下发。
+         */
+        String EXT_PARAMS_REQUEST  = "device/%s/ext-params/request";
+        /**
+         * 下行：平台下发外部系统服务参数
+         *
+         * <p>Topic: device/{deviceCode}/ext-params/response
+         * <p>配合 {@link org.jeecg.modules.device.mqtt.MqttMessageModel.ExtParamsResponse} 使用。
+         */
+        String EXT_PARAMS_RESPONSE = "device/%s/ext-params/response";
 
         /** EMQX 系统事件：设备 MQTT 连接建立（clientId 从 topic 路径中提取） */
         String SYS_CONNECTED    = "$SYS/brokers/+/clients/+/connected";

@@ -64,6 +64,7 @@ public class MqttMessageDispatcher {
     private final SlamUploadRequestHandler            slamUploadRequestHandler;
     private final SlamUploadCompleteHandler           slamUploadCompleteHandler;
     private final SlamSyncAckHandler                  slamSyncAckHandler;
+    private final ExtParamsRequestHandler             extParamsRequestHandler;
 
     /**
      * 分发 MQTT 消息到对应 Handler
@@ -151,6 +152,7 @@ public class MqttMessageDispatcher {
             case "slam/upload/request"                -> slamUploadRequestHandler.handle(deviceCode, payload);
             case "slam/upload/complete"               -> slamUploadCompleteHandler.handle(deviceCode, payload);
             case "slam/sync/ack"                      -> slamSyncAckHandler.handle(deviceCode, payload);
+            case "ext-params/request"                 -> extParamsRequestHandler.handle(deviceCode, payload);
             default -> log.warn("[Dispatcher] 未知路径: {}", topic);
         }
     }
