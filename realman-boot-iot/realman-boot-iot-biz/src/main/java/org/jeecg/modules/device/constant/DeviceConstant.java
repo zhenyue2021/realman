@@ -143,10 +143,10 @@ public interface DeviceConstant {
         /**
          * 下行：平台下发外部系统服务参数
          *
-         * <p>Topic: device/{deviceCode}/ext-params/response
+         * <p>Topic: device/{deviceCode}/ext-params/ack
          * <p>配合 {@link org.jeecg.modules.device.mqtt.MqttMessageModel.ExtParamsResponse} 使用。
          */
-        String EXT_PARAMS_RESPONSE = "device/%s/ext-params/response";
+        String EXT_PARAMS_RESPONSE = "device/%s/ext-params/ack";
 
         /** EMQX 系统事件：设备 MQTT 连接建立（clientId 从 topic 路径中提取） */
         String SYS_CONNECTED    = "$SYS/brokers/+/clients/+/connected";
