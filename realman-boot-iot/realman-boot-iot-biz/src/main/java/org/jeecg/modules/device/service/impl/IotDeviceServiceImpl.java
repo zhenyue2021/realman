@@ -566,7 +566,7 @@ private final DeviceWebSocketServer                 deviceWebSocketServer;
     public String sendMasterForceFeedbackCommand(IotDevice master,
                                                  Integer armLevel,
                                                  Integer gripperLevel,
-                                                 String operator) {
+                                                 String operator, String configType) {
         if (DeviceConstant.DeviceStatus.ONLINE != master.getStatus()) {
             throw new RuntimeException("主控设备不在线");
         }
@@ -591,9 +591,9 @@ private final DeviceWebSocketServer                 deviceWebSocketServer;
 
             // 记录到 iot_device_config（指令已下发，syncStatus=0 待设备 ACK）
             upsertDeviceConfig(master.getId(), master.getDeviceCode(), "arm_level",
-                    armLevel == null ? null : armLevel.toString(), "force_feedback");
+                    armLevel == null ? null : armLevel.toString(), Objects.nonNull(configType) ? configType : "0");
 //            upsertDeviceConfig(master.getId(), master.getDeviceCode(), "gripper_level",
-//                    gripperLevel == null ? null : gripperLevel.toString(), "force_feedback");
+//                    gripperLevel == null ? null : gripperLevel.toString(), Objects.nonNull(configType) ? configType : "0");
         } catch (Exception e) {
             throw new RuntimeException("发送力反馈指令失败: " + e.getMessage(), e);
         }
@@ -606,7 +606,7 @@ private final DeviceWebSocketServer                 deviceWebSocketServer;
     public String sendMasterSportSpeedCommand(IotDevice controller,
                                               Integer moveSpeedLevel,
                                               Integer liftSpeedLevel,
-                                              String operator) {
+                                              String operator, String configType) {
         if (DeviceConstant.DeviceStatus.ONLINE != controller.getStatus()) {
             throw new RuntimeException("主控设备不在线");
         }
@@ -631,9 +631,10 @@ private final DeviceWebSocketServer                 deviceWebSocketServer;
 
             // 记录到 iot_device_config（指令已下发，syncStatus=0 待设备 ACK）
             upsertDeviceConfig(controller.getId(), controller.getDeviceCode(), "move_speed_level",
-                    moveSpeedLevel == null ? null : moveSpeedLevel.toString(), "sport_speed");
-            upsertDeviceConfig(controller.getId(), controller.getDeviceCode(), "lift_speed_level",
-                    liftSpeedLevel == null ? null : liftSpeedLevel.toString(), "sport_speed");
+                    moveSpeedLevel == null ? null : moveSpeedLevel.toString(), Objects.nonNull(configType) ? configType : "0");
+            // 暂时不支持设置身体升降速度等级
+//            upsertDeviceConfig(controller.getId(), controller.getDeviceCode(), "lift_speed_level",
+//                    liftSpeedLevel == null ? null : liftSpeedLevel.toString(), Objects.nonNull(configType) ? configType : "0");
         } catch (Exception e) {
             throw new RuntimeException("发送运动与安全参数指令失败: " + e.getMessage(), e);
         }

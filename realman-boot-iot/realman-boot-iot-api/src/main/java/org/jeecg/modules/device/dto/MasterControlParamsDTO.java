@@ -28,5 +28,8 @@ public class MasterControlParamsDTO {
 
     /** 操作员标识（用于审计） */
     private String operator;
+
+    /** 是否自定义：0-否，1-是 */
+    private String configType;
 }
 

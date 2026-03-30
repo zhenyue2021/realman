@@ -78,7 +78,7 @@ public class MasterCommandAckHandler {
     private void handleSportSpeedAck(String deviceId, String deviceCode, JsonNode node, int code, String commandId) {
         LocalDateTime now = LocalDateTime.now();
         // 目前仅可设置移动速度
-        syncConfigStatus(deviceId, deviceCode, "sport_speed", "move_speed_level", "moveSpeedLevel", node, code, now);
+        syncConfigStatus(deviceId, deviceCode, "0", "move_speed_level", "moveSpeedLevel", node, code, now);
 
         // 若是查询指令（moveSpeedLevel/liftSpeedLevel 由设备回填），完成挂起的 Future
         if (code == 0 && commandId != null) {
@@ -91,7 +91,7 @@ public class MasterCommandAckHandler {
     private void handleForceFeedbackAck(String deviceId, String deviceCode, JsonNode node, int code, String commandId) {
         LocalDateTime now = LocalDateTime.now();
         // 目前仅可设置力
-        syncConfigStatus(deviceId, deviceCode, "force_feedback", "arm_level", "armLevel", node, code, now);
+        syncConfigStatus(deviceId, deviceCode, "0", "arm_level", "armLevel", node, code, now);
 
         // 若是查询指令（armLevel/gripperLevel 由设备回填），完成挂起的 Future
         if (code == 0 && commandId != null) {
