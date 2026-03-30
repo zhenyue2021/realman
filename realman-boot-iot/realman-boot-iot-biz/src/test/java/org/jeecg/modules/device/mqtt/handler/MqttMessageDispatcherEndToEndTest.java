@@ -62,6 +62,7 @@ public class MqttMessageDispatcherEndToEndTest {
     private MasterCommandAckHandler masterCommandAckHandler;
     private OtaProgressHandler otaProgressHandler;
     private DeviceOperationLogHandler operationLogHandler;
+    private ExtParamsRequestHandler extParamsRequestHandler;
 
     // 分发器
     private MqttMessageDispatcher dispatcher;
@@ -172,7 +173,8 @@ public class MqttMessageDispatcherEndToEndTest {
                 robotSlaveStatusHandler,
                 slamUploadRequestHandler,
                 slamUploadCompleteHandler,
-                slamSyncAckHandler
+                slamSyncAckHandler,
+                extParamsRequestHandler
         );
     }
 

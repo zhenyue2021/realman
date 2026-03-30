@@ -6,7 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.common.util.RedisUtil;
 import org.jeecg.modules.device.constant.DeviceConstant;
-import org.jeecg.modules.device.integration.mapper.ExtParamRecordIotMapper;
+import org.jeecg.modules.device.mapper.ExtParamRecordIotMapper;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.mqtt.publisher.MqttPublisher;
 import org.jeecg.modules.device.security.CommandEncryptService;
@@ -89,10 +89,10 @@ public class ExtParamsRequestHandler {
         log.warn("[ExtParams] Redis 缓存未命中，降级查库: sourceSystem={}", sourceSystem);
         Map<String, Object> dbData = extParamRecordIotMapper.findLatestDataBySourceSystem(sourceSystem);
         if (dbData == null || dbData.isEmpty()) {
-            log.warn("[ExtParams] 库中亦无数据，返回 404: sourceSystem={}", sourceSystem);
+            log.warn("[ExtParams] 库中亦无数据，返回 400: sourceSystem={}", sourceSystem);
             return MqttMessageModel.ExtParamsResponse.builder()
                     .commandId(commandId)
-                    .code(404)
+                    .code(400)
                     .message("暂无可用的外部服务参数，请稍后重试")
                     .build();
         }

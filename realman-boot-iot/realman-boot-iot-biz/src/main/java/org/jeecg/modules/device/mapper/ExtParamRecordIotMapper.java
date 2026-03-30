@@ -1,4 +1,4 @@
-package org.jeecg.modules.device.integration.mapper;
+package org.jeecg.modules.device.mapper;
 
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
