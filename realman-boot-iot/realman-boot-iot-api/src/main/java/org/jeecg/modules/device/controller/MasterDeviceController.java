@@ -238,15 +238,16 @@ public class MasterDeviceController {
     /** 操作记录分页（遥操员使用主控操控机器人完成工单的时间） */
     @PostMapping("/operation-record/page")
     @Operation(summary = "主控设备关联工单操作记录分页")
-    public ApiResult<IPage<WorkOrderOperationRecordVO>> workOrderRecords(
-            @RequestParam String controllerCode,
-            @RequestParam(defaultValue = "1")  int pageNo,
-            @RequestParam(defaultValue = "10") int pageSize) {
+    public ApiResult<IPage<WorkOrderOperationRecordVO>> workOrderRecords(@RequestBody OperationRecordQueryDTO query) {
+        if (Objects.isNull(query)) {
+            return ApiResult.fail("请求体 不能为空");
+        }
+        String controllerCode = query.getControllerCode();
         if (controllerCode == null || controllerCode.isBlank()) {
             return ApiResult.fail("controllerCode 不能为空");
         }
         return ApiResult.ok(masterDeviceApiService.pageWorkOrderOperationRecords(
-                new Page<>(pageNo, pageSize), controllerCode));
+                new Page<>(query.getPageNo(), query.getPageSize()), controllerCode));
     }
 
     /** 操作记录导出 Excel */
