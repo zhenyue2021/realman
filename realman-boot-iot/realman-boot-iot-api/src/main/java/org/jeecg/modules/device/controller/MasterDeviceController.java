@@ -12,30 +12,16 @@ import lombok.extern.slf4j.Slf4j;
 import org.jeecg.common.exception.JeecgBootException;
 import org.jeecg.common.system.util.JwtUtil;
 import org.jeecg.common.util.ContentDispositionUtil;
-import org.jeecg.modules.device.dto.MasterControlParamsDTO;
-import org.jeecg.modules.device.dto.MasterLoginDTO;
-import org.jeecg.modules.device.dto.DeviceAddDTO;
-import org.jeecg.modules.device.dto.OperationRecordQueryDTO;
-import org.jeecg.modules.device.dto.DeviceRequestDTO;
-import org.jeecg.modules.device.dto.MasterDevicePageItemDTO;
-import org.jeecg.modules.device.dto.DeviceRestartDTO;
-import org.jeecg.modules.device.dto.TeleopStartDTO;
-import org.jeecg.modules.device.dto.TeleopStopDTO;
-import org.jeecg.modules.device.dto.DeviceUpdateDTO;
-import org.jeecg.modules.device.dto.EmergencyStopDTO;
 import org.jeecg.modules.device.api.MasterDeviceApiService;
-import org.jeecg.modules.device.entity.MasterOperationRecord;
+import org.jeecg.modules.device.dto.*;
 import org.jeecg.modules.device.entity.IotDevice;
+import org.jeecg.modules.device.entity.MasterOperationRecord;
+import org.jeecg.modules.device.service.IIotDeviceService;
 import org.jeecg.modules.device.service.IMasterLoginResolveService;
 import org.jeecg.modules.device.service.IMasterOperationRecordService;
 import org.jeecg.modules.device.service.IMasterUsageStatusService;
-import org.jeecg.modules.device.service.IIotDeviceService;
 import org.jeecg.modules.device.util.DeviceExcelExportUtil;
-import org.jeecg.modules.device.vo.ApiResult;
-import org.jeecg.modules.device.vo.DeviceCameraStreamVO;
-import org.jeecg.modules.device.vo.DeviceDetailVO;
-import org.jeecg.modules.device.vo.MasterLoginResolveVO;
-import org.jeecg.modules.device.vo.UsageStatusVO;
+import org.jeecg.modules.device.vo.*;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -251,16 +237,16 @@ public class MasterDeviceController {
 
     /** 操作记录分页（遥操员使用主控操控机器人完成工单的时间） */
     @PostMapping("/operation-record/page")
-    @Operation(summary = "操作记录分页")
-    public ApiResult<IPage<MasterOperationRecord>> operationRecordPage(@RequestBody OperationRecordQueryDTO query) {
-        int pageNo = query.getPageNo() != null ? query.getPageNo() : 1;
-        int pageSize = query.getPageSize() != null ? query.getPageSize() : 10;
-        com.baomidou.mybatisplus.extension.plugins.pagination.Page<MasterOperationRecord> page =
-                new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(pageNo, pageSize);
-        IPage<MasterOperationRecord> result = operationRecordService.pageRecords(page,
-                query.getControllerId(), query.getControllerCode(), query.getRobotId(),
-                query.getStartTimeFrom(), query.getStartTimeTo());
-        return ApiResult.ok(result);
+    @Operation(summary = "主控设备关联工单操作记录分页")
+    public ApiResult<IPage<WorkOrderOperationRecordVO>> workOrderRecords(
+            @RequestParam String controllerCode,
+            @RequestParam(defaultValue = "1")  int pageNo,
+            @RequestParam(defaultValue = "10") int pageSize) {
+        if (controllerCode == null || controllerCode.isBlank()) {
+            return ApiResult.fail("controllerCode 不能为空");
+        }
+        return ApiResult.ok(masterDeviceApiService.pageWorkOrderOperationRecords(
+                new Page<>(pageNo, pageSize), controllerCode));
     }
 
     /** 操作记录导出 Excel */

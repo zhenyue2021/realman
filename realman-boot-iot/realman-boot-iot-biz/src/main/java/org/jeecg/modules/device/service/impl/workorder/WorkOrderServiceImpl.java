@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.constant.DeviceConstant;
+import org.jeecg.modules.device.dto.WorkOrderOperationRecordDTO;
 import org.jeecg.modules.device.entity.workorder.WorkOrder;
 import org.jeecg.modules.device.entity.workorder.WorkOrderDevice;
 import org.jeecg.modules.device.service.IMasterOperationRecordService;
@@ -28,6 +29,7 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
         implements IWorkOrderService {
 
     private final ObjectMapper objectMapper;
+    private final WorkOrderMapper workOrderMapper;
     private final WorkOrderDeviceMapper workOrderDeviceMapper;
     private final IMasterOperationRecordService operationRecordService;
     private final DeviceWebSocketServer deviceWebSocketServer;
@@ -299,6 +301,14 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
             }
         }
         log.debug("[pushStartedWorkOrders] 推送进行中工单 {} 条", startedOrders.size());
+    }
+
+
+    @Override
+    public IPage<WorkOrderOperationRecordDTO> pageWorkOrderOperationRecords(
+            Page<WorkOrder> page,
+            String controllerCode) {
+        return workOrderMapper.pageWorkOrderOperationRecords(page, controllerCode);
     }
 }
 

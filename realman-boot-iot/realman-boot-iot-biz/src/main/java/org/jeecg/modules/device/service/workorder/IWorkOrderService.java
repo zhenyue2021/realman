@@ -3,6 +3,7 @@ package org.jeecg.modules.device.service.workorder;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
+import org.jeecg.modules.device.dto.WorkOrderOperationRecordDTO;
 import org.jeecg.modules.device.entity.workorder.WorkOrder;
 import org.jeecg.modules.device.entity.workorder.WorkOrderDevice;
 
@@ -44,5 +45,12 @@ public interface IWorkOrderService extends IService<WorkOrder> {
      * 由定时任务每分钟调用，保持前端实时感知进行中的工单。
      */
     void pushStartedWorkOrders();
+
+    /**
+     * 按主控设备码分页查询关联工单操作记录
+     */
+    IPage<WorkOrderOperationRecordDTO> pageWorkOrderOperationRecords(
+            Page<WorkOrder> page,
+            String controllerCode);
 }
 

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.jeecg.modules.device.mapper.workorder.WorkOrderMapper">
+
+    <select id="pageWorkOrderOperationRecords"
+            resultType="org.jeecg.modules.device.dto.WorkOrderOperationRecordDTO">
+        SELECT
+            wo.id                                                AS workOrderId,
+            wod_c.device_code                                    AS controllerCode,
+            wod_r.device_code                                    AS robotDeviceCode,
+            wo.actual_start_time                                 AS actualStartTime,
+            wo.submit_time                                       AS submitTime,
+            CASE
+                WHEN wo.submit_time IS NOT NULL AND wo.actual_start_time IS NOT NULL
+                THEN TIMESTAMPDIFF(SECOND, wo.actual_start_time, wo.submit_time)
+                ELSE NULL
+            END                                                  AS durationSeconds
+        FROM work_order wo
+        INNER JOIN work_order_device wod_c
+            ON  wod_c.work_order_id = wo.id
+            AND wod_c.device_type   = '2'
+            AND wod_c.device_code   = #{controllerCode}
+        LEFT JOIN work_order_device wod_r
+            ON  wod_r.work_order_id = wo.id
+            AND wod_r.device_type   = '1'
+        WHERE wo.del_flag          = 0
+          AND wo.actual_start_time IS NOT NULL
+          AND wo.status NOT IN ('PENDING', 'STARTED')
+        ORDER BY wo.actual_start_time DESC
+    </select>
+
+</mapper>

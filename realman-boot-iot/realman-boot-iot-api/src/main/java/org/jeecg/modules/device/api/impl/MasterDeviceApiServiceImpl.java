@@ -9,12 +9,16 @@ import org.jeecg.modules.device.api.MasterDeviceApiService;
 import org.jeecg.modules.device.constant.DeviceConstant;
 import org.jeecg.modules.device.dto.DeviceRequestDTO;
 import org.jeecg.modules.device.dto.MasterDevicePageItemDTO;
+import org.jeecg.modules.device.dto.WorkOrderOperationRecordDTO;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.entity.IotDeviceAuth;
 import org.jeecg.modules.device.entity.IotMasterLoginLog;
+import org.jeecg.modules.device.entity.workorder.WorkOrder;
 import org.jeecg.modules.device.mapper.IotDeviceAuthMapper;
 import org.jeecg.modules.device.mapper.IotMasterLoginLogMapper;
 import org.jeecg.modules.device.service.IIotDeviceService;
+import org.jeecg.modules.device.service.workorder.IWorkOrderService;
+import org.jeecg.modules.device.vo.WorkOrderOperationRecordVO;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -22,9 +26,10 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -35,6 +40,7 @@ public class MasterDeviceApiServiceImpl implements MasterDeviceApiService {
     private final IIotDeviceService deviceService;
     private final IotMasterLoginLogMapper loginLogMapper;
     private final IotDeviceAuthMapper deviceAuthMapper;
+    private final IWorkOrderService workOrderService;
 
     private final RestTemplate restTemplate = defaultRestTemplate();
 
@@ -96,6 +102,35 @@ public class MasterDeviceApiServiceImpl implements MasterDeviceApiService {
         out.setRecords(records);
         return out;
     }
+
+    @Override
+    public IPage<WorkOrderOperationRecordVO> pageWorkOrderOperationRecords(
+            Page<?> page,
+            String controllerCode) {
+        Page<WorkOrder> workOrderPage = new Page<>(page.getCurrent(), page.getSize());
+        IPage<WorkOrderOperationRecordDTO> dtoPage =
+                workOrderService.pageWorkOrderOperationRecords(workOrderPage, controllerCode);
+
+        // DTO → VO 转换，保留分页元数据
+        List<WorkOrderOperationRecordVO> voList = dtoPage.getRecords().stream()
+                .map(dto -> {
+                    WorkOrderOperationRecordVO vo = new WorkOrderOperationRecordVO();
+                    vo.setWorkOrderId(dto.getWorkOrderId());
+                    vo.setControllerCode(dto.getControllerCode());
+                    vo.setRobotDeviceCode(dto.getRobotDeviceCode());
+                    vo.setOperatorStartTime(dto.getActualStartTime());
+                    vo.setOperatorEndTime(dto.getSubmitTime());
+                    vo.setDurationSeconds(dto.getDurationSeconds());
+                    return vo;
+                }).toList();
+
+        Page<WorkOrderOperationRecordVO> voPage =
+                new Page<>(dtoPage.getCurrent(), dtoPage.getSize(), dtoPage.getTotal());
+        voPage.setRecords(voList);
+        return voPage;
+    }
+
+
 
     private Map<String, IotMasterLoginLog> loadLastLogin(List<String> controllerIds) {
         if (controllerIds == null || controllerIds.isEmpty()) {
