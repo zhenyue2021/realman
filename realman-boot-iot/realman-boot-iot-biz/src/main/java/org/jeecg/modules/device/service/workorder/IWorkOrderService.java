@@ -24,7 +24,7 @@ public interface IWorkOrderService extends IService<WorkOrder> {
 
     void bindDevices(String workOrderId, List<WorkOrderDevice> devices);
     List<WorkOrderDevice> findDevices(String workOrderId);
-
+    WorkOrderDevice findMasterDevice(String workOrderId);
     void startWorkOrder(String workOrderId, String operatorId, String operatorName, String operatorPhone);
 
     void submitWorkOrder(String workOrderId, String operator);

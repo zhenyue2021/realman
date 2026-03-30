@@ -39,4 +39,13 @@ public interface IWorkOrderSchedulerService {
      * 使用 Redis 去重，保证同一工单仅推送一次；推送异常时删除去重 Key 以允许重试。
      */
     void startTimePush();
+
+    /**
+     * 进行中工单推送任务
+     *
+     * <p>每分钟将所有 status=STARTED 且未超时（planEndTime > now）的工单，
+     * 通过 WebSocket 推送到对应主控前端，保持前端实时感知当前进行中的工单。
+     *
+     */
+    void pushStartedWorkOrders();
 }

@@ -62,4 +62,17 @@ public class WorkOrderSchedulerJob {
     public void startTimePush() {
         workOrderSchedulerService.startTimePush();
     }
+
+    /**
+     * 进行中工单推送任务
+     *
+     * <p>每分钟将所有 status=STARTED 且未超时（planEndTime > now）的工单，
+     * 通过 WebSocket 推送到对应主控前端，保持前端实时感知当前进行中的工单。
+     *
+     * <p>XXL-Job Handler Name：{@code pushStartedWorkOrderJob}，建议 Cron：{@code 0 * * * * ?}
+     */
+    @XxlJob("pushStartedWorkOrderJob")
+    public void pushStartedWorkOrderJob() {
+        workOrderSchedulerService.pushStartedWorkOrders();
+    }
 }

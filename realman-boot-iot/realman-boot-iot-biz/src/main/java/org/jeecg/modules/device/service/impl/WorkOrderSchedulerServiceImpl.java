@@ -1,11 +1,13 @@
 package org.jeecg.modules.device.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.constant.DeviceConstant;
+import org.jeecg.modules.device.dto.WorkOrderDTO;
 import org.jeecg.modules.device.entity.workorder.WorkOrder;
 import org.jeecg.modules.device.entity.workorder.WorkOrderComplianceConfig;
 import org.jeecg.modules.device.entity.workorder.WorkOrderDevice;
@@ -14,6 +16,8 @@ import org.jeecg.modules.device.mapper.workorder.WorkOrderDeviceMapper;
 import org.jeecg.modules.device.mapper.workorder.WorkOrderMapper;
 import org.jeecg.modules.device.service.IMasterOperationRecordService;
 import org.jeecg.modules.device.service.IWorkOrderSchedulerService;
+import org.jeecg.modules.device.service.workorder.IWorkOrderComplianceConfigService;
+import org.jeecg.modules.device.service.workorder.IWorkOrderService;
 import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -35,6 +39,8 @@ public class WorkOrderSchedulerServiceImpl implements IWorkOrderSchedulerService
     private final WorkOrderMapper workOrderMapper;
     private final WorkOrderComplianceConfigMapper configMapper;
     private final IMasterOperationRecordService operationRecordService;
+    private final IWorkOrderService workOrderService;
+    private final IWorkOrderComplianceConfigService workOrderConfigService;
     private final WorkOrderDeviceMapper workOrderDeviceMapper;
     private final StringRedisTemplate redisTemplate;
     private final DeviceWebSocketServer webSocketServer;
@@ -293,6 +299,39 @@ public class WorkOrderSchedulerServiceImpl implements IWorkOrderSchedulerService
                         .eq(WorkOrderComplianceConfig::getDelFlag, 0)
         );
         return cfgs.stream().collect(Collectors.toMap(WorkOrderComplianceConfig::getId, c -> c));
+    }
+
+
+    @Override
+    public void pushStartedWorkOrders() {
+        LocalDateTime now = LocalDateTime.now();
+        // 查询所有已开启且未超时的工单
+        List<WorkOrder> startedOrders = workOrderService.list(new LambdaQueryWrapper<WorkOrder>()
+                .eq(WorkOrder::getStatus, "STARTED")
+                .eq(WorkOrder::getDelFlag, 0)
+                .gt(WorkOrder::getPlanEndTime, now));
+        if (startedOrders.isEmpty()) {
+            return;
+        }
+        for (WorkOrder order : startedOrders) {
+            WorkOrderDevice master = workOrderService.findMasterDevice(order.getId());
+            if (master == null || master.getDeviceCode() == null) {
+                log.warn("[pushStartedWorkOrders] 工单无主控设备，跳过: workOrderId={}", order.getId());
+                continue;
+            }
+            // 获取工单合规配置
+            WorkOrderComplianceConfig complianceConfig = workOrderConfigService.getById(order.getComplianceId());
+            WorkOrderDTO workOrderDTO = new WorkOrderDTO();
+            try {
+                BeanUtil.copyProperties(order, workOrderDTO);
+                workOrderDTO.setWorkOrderComplianceConfig(complianceConfig);
+                String workOrderJson = objectMapper.writeValueAsString(order);
+                webSocketServer.pushStartedWorkOrder(master.getDeviceCode(), workOrderJson);
+            } catch (Exception e) {
+                log.warn("[pushStartedWorkOrders] WebSocket 推送失败: workOrderId={}, err={}", order.getId(), e.getMessage());
+            }
+        }
+        log.debug("[pushStartedWorkOrders] 推送进行中工单 {} 条", startedOrders.size());
     }
 
     /**
