@@ -325,7 +325,7 @@ public class WorkOrderSchedulerServiceImpl implements IWorkOrderSchedulerService
             try {
                 BeanUtil.copyProperties(order, workOrderDTO);
                 workOrderDTO.setWorkOrderComplianceConfig(complianceConfig);
-                String workOrderJson = objectMapper.writeValueAsString(order);
+                String workOrderJson = objectMapper.writeValueAsString(workOrderDTO);
                 webSocketServer.pushStartedWorkOrder(master.getDeviceCode(), workOrderJson);
             } catch (Exception e) {
                 log.warn("[pushStartedWorkOrders] WebSocket 推送失败: workOrderId={}, err={}", order.getId(), e.getMessage());

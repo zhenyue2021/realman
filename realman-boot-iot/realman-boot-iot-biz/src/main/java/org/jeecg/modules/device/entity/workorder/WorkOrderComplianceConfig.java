@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
+import org.jeecg.common.aspect.annotation.Dict;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
@@ -36,19 +37,23 @@ public class WorkOrderComplianceConfig implements Serializable {
     private String taskScene;
 
     @TableField("timeout_alert_enabled")
+    @Dict(dicCode = "enabled_status")
     private Integer timeoutAlertEnabled;
 
     @TableField("timeout_alert_offset")
     private String timeoutAlertOffset;
 
     @TableField("task_limit_enabled")
+    @Dict(dicCode = "enabled_status")
     private Integer taskLimitEnabled;
 
     @TableField("acceptance_enabled")
+    @Dict(dicCode = "enabled_status")
     private Integer acceptanceEnabled;
 
     /** 是否启用超时提交：0-禁用 1-启用 */
     @TableField("overtime_enabled")
+    @Dict(dicCode = "enabled_status")
     private Integer overtimeEnabled;
 
     @TableField("overtime_reason_enum")
@@ -58,12 +63,14 @@ public class WorkOrderComplianceConfig implements Serializable {
     private String overtimeReasonDesc;
 
     @TableField("auto_close_enabled")
+    @Dict(dicCode = "enabled_status")
     private Integer autoCloseEnabled;
 
     @TableField("auto_close_offset")
     private String autoCloseOffset;
 
     @TableField("apply_status")
+    @Dict(dicCode = "apply_status")
     private Integer applyStatus;
 
     @TableField("create_by")
