@@ -25,6 +25,10 @@ public class MasterControlParamsDTO {
 
     /** 身体升降速度等级 */
     private Integer liftSpeedLevel;
+    private String armLevelConfigType;
+    private String gripperLevelConfigType;
+    private String moveSpeedLevelConfigType;
+    private String liftSpeedLevelConfigType;
 
     /** 操作员标识（用于审计） */
     private String operator;

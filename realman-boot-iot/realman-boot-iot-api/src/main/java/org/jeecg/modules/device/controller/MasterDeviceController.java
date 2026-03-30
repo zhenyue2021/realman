@@ -159,8 +159,8 @@ public class MasterDeviceController {
         IotDevice controller = ensureDeviceType(controllerId, DEVICE_TYPE_CONTROLLER);
         org.jeecg.modules.device.service.impl.IotDeviceServiceImpl impl =
                 (org.jeecg.modules.device.service.impl.IotDeviceServiceImpl) deviceService;
-        impl.sendMasterForceFeedbackCommand(controller, dto.getArmLevel(), dto.getGripperLevel(), dto.getOperator(), dto.getConfigType());
-        impl.sendMasterSportSpeedCommand(controller, dto.getMoveSpeedLevel(), dto.getLiftSpeedLevel(), dto.getOperator(), dto.getConfigType());
+        impl.sendMasterForceFeedbackCommand(controller, dto.getArmLevel(), dto.getGripperLevel(), dto.getOperator(), dto.getArmLevelConfigType(), dto.getGripperLevelConfigType());
+        impl.sendMasterSportSpeedCommand(controller, dto.getMoveSpeedLevel(), dto.getLiftSpeedLevel(), dto.getOperator(), dto.getMoveSpeedLevelConfigType(), dto.getLiftSpeedLevelConfigType());
         return ApiResult.ok(null, "参数已下发，等待主控设备确认");
     }
 

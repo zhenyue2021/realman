@@ -29,4 +29,13 @@ public class IotDeviceConfig implements Serializable {
     private LocalDateTime createTime;
     @TableField(value = "update_time", fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updateTime;
+
+    @TableField(exist = false)
+    private String armLevelConfigType;
+    @TableField(exist = false)
+    private String gripperLevelConfigType;
+    @TableField(exist = false)
+    private String moveSpeedLevelConfigType;
+    @TableField(exist = false)
+    private String liftSpeedLevelConfigType;
 }

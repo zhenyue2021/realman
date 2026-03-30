@@ -374,6 +374,16 @@ private final DeviceWebSocketServer                 deviceWebSocketServer;
                 new LambdaQueryWrapper<IotDeviceConfig>()
                         .eq(IotDeviceConfig::getDeviceId, deviceId)
                         .orderByAsc(IotDeviceConfig::getConfigKey));
+        // 5.1 处理 configType：按 configKey 将 configType 回填到对应的具名字段（参考 MasterControlParamsDTO）
+        deviceConfigs.forEach(cfg -> {
+            switch (cfg.getConfigKey()) {
+                case "arm_level"        -> cfg.setArmLevelConfigType(cfg.getConfigType());
+                case "gripper_level"    -> cfg.setGripperLevelConfigType(cfg.getConfigType());
+                case "move_speed_level" -> cfg.setMoveSpeedLevelConfigType(cfg.getConfigType());
+                case "lift_speed_level" -> cfg.setLiftSpeedLevelConfigType(cfg.getConfigType());
+                default -> { /* 其他 configKey 无需处理 */ }
+            }
+        });
 
         // 6. 最近 20 条操作日志
         List<IotDeviceOperationLog> recentLogs = logService
@@ -566,7 +576,7 @@ private final DeviceWebSocketServer                 deviceWebSocketServer;
     public String sendMasterForceFeedbackCommand(IotDevice master,
                                                  Integer armLevel,
                                                  Integer gripperLevel,
-                                                 String operator, String configType) {
+                                                 String operator, String armLevelConfigType, String gripperLevelConfigType) {
         if (DeviceConstant.DeviceStatus.ONLINE != master.getStatus()) {
             throw new RuntimeException("主控设备不在线");
         }
@@ -591,9 +601,9 @@ private final DeviceWebSocketServer                 deviceWebSocketServer;
 
             // 记录到 iot_device_config（指令已下发，syncStatus=0 待设备 ACK）
             upsertDeviceConfig(master.getId(), master.getDeviceCode(), "arm_level",
-                    armLevel == null ? null : armLevel.toString(), Objects.nonNull(configType) ? configType : "0");
+                    armLevel == null ? null : armLevel.toString(), Objects.nonNull(armLevelConfigType) ? armLevelConfigType : "0");
 //            upsertDeviceConfig(master.getId(), master.getDeviceCode(), "gripper_level",
-//                    gripperLevel == null ? null : gripperLevel.toString(), Objects.nonNull(configType) ? configType : "0");
+//                    gripperLevel == null ? null : gripperLevel.toString(), Objects.nonNull(gripperLevelConfigType) ? gripperLevelConfigType : "0");
         } catch (Exception e) {
             throw new RuntimeException("发送力反馈指令失败: " + e.getMessage(), e);
         }
@@ -606,7 +616,7 @@ private final DeviceWebSocketServer                 deviceWebSocketServer;
     public String sendMasterSportSpeedCommand(IotDevice controller,
                                               Integer moveSpeedLevel,
                                               Integer liftSpeedLevel,
-                                              String operator, String configType) {
+                                              String operator, String moveSpeedConfigType, String liftSpeedLevelConfigType) {
         if (DeviceConstant.DeviceStatus.ONLINE != controller.getStatus()) {
             throw new RuntimeException("主控设备不在线");
         }
@@ -631,10 +641,10 @@ private final DeviceWebSocketServer                 deviceWebSocketServer;
 
             // 记录到 iot_device_config（指令已下发，syncStatus=0 待设备 ACK）
             upsertDeviceConfig(controller.getId(), controller.getDeviceCode(), "move_speed_level",
-                    moveSpeedLevel == null ? null : moveSpeedLevel.toString(), Objects.nonNull(configType) ? configType : "0");
+                    moveSpeedLevel == null ? null : moveSpeedLevel.toString(), Objects.nonNull(moveSpeedConfigType) ? moveSpeedConfigType : "0");
             // 暂时不支持设置身体升降速度等级
 //            upsertDeviceConfig(controller.getId(), controller.getDeviceCode(), "lift_speed_level",
-//                    liftSpeedLevel == null ? null : liftSpeedLevel.toString(), Objects.nonNull(configType) ? configType : "0");
+//                    liftSpeedLevel == null ? null : liftSpeedLevel.toString(), Objects.nonNull(liftSpeedLevelConfigType) ? liftSpeedLevelConfigType : "0");
         } catch (Exception e) {
             throw new RuntimeException("发送运动与安全参数指令失败: " + e.getMessage(), e);
         }
