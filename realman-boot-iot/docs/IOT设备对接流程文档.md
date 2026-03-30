@@ -74,12 +74,12 @@
 
 设备连接 EMQX 时须携带以下参数：
 
-| 参数 | 值 | 说明                              |
-|------|-----|---------------------------------|
-| `clientId` | `{deviceCode}` | 设备唯一编码/主控端防越权可使用“iot-plantform” |
-| `username` | `{deviceCode}` | 设备唯一编码，全局唯一                     |
-| `password` | `MD5(deviceCode)` | 32位小写十六进制字符串                    |
-| `cleanSession` | `false` | 保留 QoS1 离线消息                    |
+| 参数             | 值                 | 说明                              |
+|----------------|-------------------|---------------------------------|
+| `clientId`     | `{deviceCode}`    | 设备唯一编码/主控端防越权可使用“iot-plantform” |
+| `username`     | `{deviceCode}`    | 设备唯一编码，全局唯一                     |
+| `password`     | `MD5(deviceCode)` | 32位小写十六进制字符串                    |
+| `cleanSession` | `false`           | 保留 QoS1 离线消息                    |
 
 **密钥生成规则**：
 
@@ -168,13 +168,13 @@ Content-Type: application/json
 
 所有设备与平台之间的业务消息均使用 **AES-256-CBC** 加密传输（可通过服务端配置关闭，仅用于调试）。
 
-| 项目 | 规格 |
-|------|------|
-| 算法 | AES/CBC/PKCS5Padding |
-| 密钥长度 | 256-bit（32字节） |
-| 密钥派生 | `SHA256(deviceCode)[0..31]` |
-| IV | 每条消息独立随机生成 16 字节 |
-| 密文编码 | Base64 |
+| 项目   | 规格                             |
+|------|--------------------------------|
+| 算法   | AES/CBC/PKCS5Padding           |
+| 密钥长度 | 256-bit（32字节）                  |
+| 密钥派生 | `SHA256(deviceCode)[0..31]`    |
+| IV   | 每条消息独立随机生成 16 字节               |
+| 密文编码 | Base64                         |
 | 消息格式 | `{ivHex}:{base64(ciphertext)}` |
 
 ### 3.2 密钥派生
@@ -240,50 +240,50 @@ def decrypt_message(device_code: str, encrypted: str) -> str:
 
 ### 4.1 上行 Topic（设备发布 → 平台订阅）
 
-| Topic | QoS | 说明                                        | 联调情况   |
-|-------|-----|-------------------------------------------|--------|
-| `device/{deviceCode}/status/report` | 1 | 设备周期性状态上报                                 | 联调完成   | 
-| `device/{deviceCode}/command/{cmd}/ack` | 1 | 指令集执行确认（如 `restart`、`emergency-stop` 等）   | 重启联调完成 |
-| `device/{deviceCode}/ota/progress` | 1 | OTA 升级进度上报                                | 未联调    |
-| `device/{deviceCode}/log/operation` | 1 | 设备操作日志上报                                  | 联调完成   |
-| `device/{deviceCode}/camera/stream/ack` | 1 | 机器人上报摄像头视频流地址（见第 12 章）                    | 联调完成   |
-| `master/{controllerCode}/teleop/associated-device/response` | 1 | 主控上报当前设备Mac信息                             | 已废弃    |
-| `master/{controllerCode}/command/{cmd}/ack` | 1 | 主控设备指令 ACK（力反馈/运动与安全参数等）                  | 联调完成    |
-| `{robotCode}/slave/status` | 1 | 机器人原始状态上报（遥操作场景，由平台透传至 WebSocket） | 联调完成    |
-| `device/{deviceCode}/ext-params/request` | 1 | 设备请求外部系统服务参数（如 STS 临时凭证，见第 16 章） | 未联调    |
+| Topic                                                       | QoS | 说明                                      | 联调情况   |
+|-------------------------------------------------------------|-----|-----------------------------------------|--------|
+| `device/{deviceCode}/status/report`                         | 1   | 设备周期性状态上报                               | 联调完成   | 
+| `device/{deviceCode}/command/{cmd}/ack`                     | 1   | 指令集执行确认（如 `restart`、`emergency-stop` 等） | 重启联调完成 |
+| `device/{deviceCode}/ota/progress`                          | 1   | OTA 升级进度上报                              | 未联调    |
+| `device/{deviceCode}/log/operation`                         | 1   | 设备操作日志上报                                | 联调完成   |
+| `device/{deviceCode}/camera/stream/ack`                     | 1   | 机器人上报摄像头视频流地址（见第 12 章）                  | 联调完成   |
+| `master/{controllerCode}/teleop/associated-device/response` | 1   | 主控上报当前设备Mac信息                           | 已废弃    |
+| `master/{controllerCode}/command/{cmd}/ack`                 | 1   | 主控设备指令 ACK（力反馈/运动与安全参数等）                | 联调完成   |
+| `{robotCode}/slave/status`                                  | 1   | 机器人原始状态上报（遥操作场景，由平台透传至 WebSocket）       | 联调完成   |
+| `device/{deviceCode}/ext-params/request`                    | 1   | 设备请求外部系统服务参数（如 STS 临时凭证，见第 16 章）        | 未联调    |
 
 ### 4.2 下行 Topic（平台发布 → 设备订阅）
 
-| Topic                                                    | QoS | 说明                      | 联调情况 |
-|----------------------------------------------------------|-----|-------------------------|------| 
-| `device/{deviceCode}/command/restart`                    | 1 | 远程重启指令                  | 联调完成 |
-| `device/{deviceCode}/command/emergency-stop`             | 1 | 紧急停机指令                  | 未联调  |
-| `device/{deviceCode}/ota/notify`                         | 1 | OTA 升级通知                | 未联调  |
-| `device/{deviceCode}/camera/stream/query`                | 1 | 查询摄像头视频流地址（见第 12 章）     | 联调完成  |
-| `master/{controllerCode}/teleop/associated-device/query` | 1 | 平台向主控查询“当前设备Mac信息”      | 联调完成  |
-| `master/{controllerCode}/teleop/robot/assign`            | 1 | 平台通知主控当前应操作的机器人         | 联调完成  |
-| `master/{controllerCode}/command/force-feedback`         | 1 | 平台向主控设置力反馈参数（机械臂/夹爪力度）  | 联调完成  |
-| `master/{controllerCode}/command/sport-speed`            | 1 | 平台向主控设置运动与安全参数（底盘/升降速度） | 联调完成  |
-| `device/{deviceCode}/ext-params/ack`                     | 1 | 平台响应外部系统服务参数（如 STS 临时凭证，见第 16 章） | 未联调 |
+| Topic                                                    | QoS | 说明                               | 联调情况 |
+|----------------------------------------------------------|-----|----------------------------------|------| 
+| `device/{deviceCode}/command/restart`                    | 1   | 远程重启指令                           | 联调完成 |
+| `device/{deviceCode}/command/emergency-stop`             | 1   | 紧急停机指令                           | 未联调  |
+| `device/{deviceCode}/ota/notify`                         | 1   | OTA 升级通知                         | 未联调  |
+| `device/{deviceCode}/camera/stream/query`                | 1   | 查询摄像头视频流地址（见第 12 章）              | 联调完成 |
+| `master/{controllerCode}/teleop/associated-device/query` | 1   | 平台向主控查询“当前设备Mac信息”               | 联调完成 |
+| `master/{controllerCode}/teleop/robot/assign`            | 1   | 平台通知主控当前应操作的机器人                  | 联调完成 |
+| `master/{controllerCode}/command/force-feedback`         | 1   | 平台向主控设置力反馈参数（机械臂/夹爪力度）           | 联调完成 |
+| `master/{controllerCode}/command/sport-speed`            | 1   | 平台向主控设置运动与安全参数（底盘/升降速度）          | 联调完成 |
+| `device/{deviceCode}/ext-params/ack`                     | 1   | 平台响应外部系统服务参数（如 STS 临时凭证，见第 16 章） | 未联调  |
 
 ### 4.3 系统事件 Topic（EMQX 内部，平台订阅）
 
-| Topic | 说明 | 联调情况 |
-|-------|------|------|
-| `$SYS/brokers/+/clients/+/connected` | 设备上线通知 | 联调完成 |
+| Topic                                   | 说明     | 联调情况 |
+|-----------------------------------------|--------|------|
+| `$SYS/brokers/+/clients/+/connected`    | 设备上线通知 | 联调完成 |
 | `$SYS/brokers/+/clients/+/disconnected` | 设备下线通知 | 联调完成 |
 
 ### 4.4 遥操作辅助 Topic（平台订阅原始上报）
 
 > 说明：以下 Topic 主要用于主控/机器人遥操作场景，由平台统一订阅并路由给对应 Handler，设备无需感知平台内部实现细节。
 
-| Topic | 说明 | 联调情况     |
-|-------|------|----------|
-| `{controllerCode}/master/cmd` | 主控设备原始指令上报 | 未使用-不经平台 |
-| `{controllerCode}/master/states` | 主控设备原始状态上报 | 联调完成      |
-| `{controllerCode}/master/rtsp/ctrl` | 主控设备 RTSP 控制/相关信息上报 | 未使用-不经平台  |
-| `{robotCode}/slave/cmd` | 机器人原始指令上报 | 未使用-不经平台   |
-| `{robotCode}/slave/status` | 机器人原始状态上报（与 4.1 中相同，平台通过 WebSocket 转发给前端） | 联调完成     |
+| Topic                               | 说明                                        | 联调情况     |
+|-------------------------------------|-------------------------------------------|----------|
+| `{controllerCode}/master/cmd`       | 主控设备原始指令上报                                | 未使用-不经平台 |
+| `{controllerCode}/master/states`    | 主控设备原始状态上报                                | 联调完成     |
+| `{controllerCode}/master/rtsp/ctrl` | 主控设备 RTSP 控制/相关信息上报                       | 未使用-不经平台 |
+| `{robotCode}/slave/cmd`             | 机器人原始指令上报                                 | 未使用-不经平台 |
+| `{robotCode}/slave/status`          | 机器人原始状态上报（与 4.1 中相同，平台通过 WebSocket 转发给前端） | 联调完成     |
 
 > **建议**：设备上线后须订阅自身的所有相关下行 Topic（配置、指令、OTA、摄像头等），使用 `cleanSession=false` 确保离线期间的下行消息不丢失。
 
@@ -338,15 +338,15 @@ device/{deviceCode}/status/report
 
 ```json
 {
-  "temperature":    25.6,          // 数值，单位℃，可为 null
-  "humidity":       65.3,          // 数值，单位 %RH，可为 null
-  "batteryLevel":   87.5,          // 数值，0~100，可为 null
-  "signalStrength": -72,           // 整数，单位 dBm，可为 null
-  "runStatus":      1,             // 整数，业务自定义状态码，可为 null
-  "longitude":      116.397428,    // 数值，WGS84 经度，可为 null
-  "latitude":       39.909187,     // 数值，WGS84 纬度，可为 null
-  "timestamp":      1710000000000, // 长整数，设备本地时间（毫秒时间戳），必填
-  "extra": {                       // 对象，扩展字段，可为 null 或 {}
+  "temperature": 25.6,
+  "humidity": 65.3,
+  "batteryLevel": 87.5,
+  "signalStrength": -72,
+  "runStatus": 1,
+  "longitude": 116.397428,
+  "latitude": 39.909187,
+  "timestamp": 1710000000000,
+  "extra": {
     "customKey1": "value1",
     "customKey2": 123
   }
@@ -357,17 +357,17 @@ device/{deviceCode}/status/report
 
 字段尚未完全确定
 
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `temperature` | BigDecimal | 否 | 环境温度，℃ |
-| `humidity` | BigDecimal | 否 | 环境湿度，%RH |
-| `batteryLevel` | BigDecimal | 否 | 电池电量，0~100 |
-| `signalStrength` | Integer | 否 | 信号强度，dBm，通常为负值 |
-| `runStatus` | Integer | 否 | 设备业务运行状态，自定义枚举 |
-| `longitude` | BigDecimal | 否 | 经度，WGS84 坐标系 |
-| `latitude` | BigDecimal | 否 | 纬度，WGS84 坐标系 |
-| `timestamp` | Long | **是** | 设备本地时间，毫秒级 Unix 时间戳 |
-| `extra` | Map | 否 | 扩展字段，键值对任意内容 |
+| 字段               | 类型         | 必填    | 说明                  |
+|------------------|------------|-------|---------------------|
+| `temperature`    | BigDecimal | 否     | 环境温度，℃              |
+| `humidity`       | BigDecimal | 否     | 环境湿度，%RH            |
+| `batteryLevel`   | BigDecimal | 否     | 电池电量，0~100          |
+| `signalStrength` | Integer    | 否     | 信号强度，dBm，通常为负值      |
+| `runStatus`      | Integer    | 否     | 设备业务运行状态，自定义枚举      |
+| `longitude`      | BigDecimal | 否     | 经度，WGS84 坐标系        |
+| `latitude`       | BigDecimal | 否     | 纬度，WGS84 坐标系        |
+| `timestamp`      | Long       | **是** | 设备本地时间，毫秒级 Unix 时间戳 |
+| `extra`          | Map        | 否     | 扩展字段，键值对任意内容        |
 
 ### 6.3 平台处理流程
 
@@ -380,7 +380,8 @@ device/{deviceCode}/status/report
   └─ 异步写入历史表 iot_device_status（含 reportTime + receiveTime）
 ```
 
-> **离线检测**：平台通过 Redis Key TTL=6分钟（设备上报间隔≤5分钟 + 1分钟缓冲）检测离线。定时任务扫描在线集合，若 Key 已过期则标记设备为 OFFLINE。
+> **离线检测**：平台通过 Redis Key TTL=6分钟（设备上报间隔≤5分钟 + 1分钟缓冲）检测离线。定时任务扫描在线集合，若 Key
+> 已过期则标记设备为 OFFLINE。
 
 ---
 
@@ -421,13 +422,13 @@ QoS: 1
 
 ```json
 {
-  "commandId": "550e8400-e29b-41d4-a716-446655440000",  // UUID，关联 ACK
-  "params": {                   // 参数键值对，内容由业务定义
+  "commandId": "550e8400-e29b-41d4-a716-446655440000",
+  "params": {
     "reportInterval": 60,
-    "threshold":      80.0,
-    "mode":           "auto"
+    "threshold": 80.0,
+    "mode": "auto"
   },
-  "timestamp": 1710000000000   // 平台发送时间，毫秒时间戳
+  "timestamp": 1710000000000
 }
 ```
 
@@ -440,10 +441,10 @@ QoS: 1
 
 ```json
 {
-  "commandId": "550e8400-e29b-41d4-a716-446655440000",  // 对应 ConfigPush 的 commandId
-  "code":      0,               // 0=成功，非0=失败
-  "message":   "",              // 失败时填写原因，成功时可为空
-  "timestamp": 1710000005000   // 设备处理完成时间，毫秒时间戳
+  "commandId": "550e8400-e29b-41d4-a716-446655440000",
+  "code": 0,
+  "message": "",
+  "timestamp": 1710000005000
 }
 ```
 
@@ -484,7 +485,7 @@ QoS: 1
 ```json
 {
   "commandId": "550e8400-e29b-41d4-a716-446655440001",
-  "reason":    "设备故障，需重启恢复",   // 重启原因说明
+  "reason": "设备故障，需重启恢复",
   "timestamp": 1710000000000
 }
 ```
@@ -499,8 +500,8 @@ QoS: 1
 ```json
 {
   "commandId": "550e8400-e29b-41d4-a716-446655440001",
-  "code":      0,               // 0=已执行重启，非0=拒绝执行
-  "message":   "",              // 拒绝原因（code≠0时填写）
+  "code": 0,
+  "message": "",
   "timestamp": 1710000003000
 }
 ```
@@ -557,31 +558,31 @@ QoS: 1
 
 ```json
 {
-  "taskId":       "task-uuid-001",
-  "recordId":     "record-uuid-001",
-  "firmwareId":   "firmware-uuid-001",
-  "version":      "v2.1.0",
-  "downloadUrl":  "http://minio:9001/iot-firmware/v2.1.0.bin?X-Amz-...",
-  "fileMd5":      "d41d8cd98f00b204e9800998ecf8427e",
-  "fileSize":     2097152,
+  "taskId": "task-uuid-001",
+  "recordId": "record-uuid-001",
+  "firmwareId": "firmware-uuid-001",
+  "version": "v2.1.0",
+  "downloadUrl": "http://minio:9001/iot-firmware/v2.1.0.bin?X-Amz-...",
+  "fileMd5": "d41d8cd98f00b204e9800998ecf8427e",
+  "fileSize": 2097152,
   "forceUpgrade": 1,
-  "timestamp":    1710000000000
+  "timestamp": 1710000000000
 }
 ```
 
 **字段说明**：
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `taskId` | String | 升级任务ID |
-| `recordId` | String | 本设备升级记录ID（后续上报进度必须携带） |
-| `firmwareId` | String | 固件ID |
-| `version` | String | 目标固件版本号 |
-| `downloadUrl` | String | MinIO 预签名下载URL，7天有效 |
-| `fileMd5` | String | 固件文件 MD5 校验值 |
-| `fileSize` | Long | 固件文件大小（字节） |
-| `forceUpgrade` | Integer | 1=强制升级，0=可选升级 |
-| `timestamp` | Long | 通知发送时间，毫秒时间戳 |
+| 字段             | 类型      | 说明                    |
+|----------------|---------|-----------------------|
+| `taskId`       | String  | 升级任务ID                |
+| `recordId`     | String  | 本设备升级记录ID（后续上报进度必须携带） |
+| `firmwareId`   | String  | 固件ID                  |
+| `version`      | String  | 目标固件版本号               |
+| `downloadUrl`  | String  | MinIO 预签名下载URL，7天有效   |
+| `fileMd5`      | String  | 固件文件 MD5 校验值          |
+| `fileSize`     | Long    | 固件文件大小（字节）            |
+| `forceUpgrade` | Integer | 1=强制升级，0=可选升级         |
+| `timestamp`    | Long    | 通知发送时间，毫秒时间戳          |
 
 ### 9.3 上行消息：OtaProgress（设备 → 平台）
 
@@ -592,43 +593,43 @@ QoS: 1
 
 ```json
 {
-  "taskId":          "task-uuid-001",
-  "recordId":        "record-uuid-001",
-  "status":          3,
-  "progress":        45,
+  "taskId": "task-uuid-001",
+  "recordId": "record-uuid-001",
+  "status": 3,
+  "progress": 45,
   "downloadedBytes": 943718,
-  "failReason":      "",
-  "newVersion":      "v2.1.0",
-  "timestamp":       1710000060000
+  "failReason": "",
+  "newVersion": "v2.1.0",
+  "timestamp": 1710000060000
 }
 ```
 
 **字段说明**：
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `taskId` | String | 升级任务ID |
-| `recordId` | String | 升级记录ID（对应 OtaNotify.recordId） |
-| `status` | Integer | 升级状态码（见下方枚举） |
-| `progress` | Integer | 下载进度百分比，0~100 |
-| `downloadedBytes` | Long | 已下载字节数（用于断点续传） |
-| `failReason` | String | 失败原因（status=FAILED 时填写） |
-| `newVersion` | String | 升级成功后的新版本（status=SUCCESS 时填写） |
-| `timestamp` | Long | 上报时间，毫秒时间戳 |
+| 字段                | 类型      | 说明                            |
+|-------------------|---------|-------------------------------|
+| `taskId`          | String  | 升级任务ID                        |
+| `recordId`        | String  | 升级记录ID（对应 OtaNotify.recordId） |
+| `status`          | Integer | 升级状态码（见下方枚举）                  |
+| `progress`        | Integer | 下载进度百分比，0~100                 |
+| `downloadedBytes` | Long    | 已下载字节数（用于断点续传）                |
+| `failReason`      | String  | 失败原因（status=FAILED 时填写）       |
+| `newVersion`      | String  | 升级成功后的新版本（status=SUCCESS 时填写） |
+| `timestamp`       | Long    | 上报时间，毫秒时间戳                    |
 
 **升级状态枚举**：
 
-| code | 名称 | 说明 |
-|------|------|------|
-| 0 | PENDING | 待通知（平台侧） |
-| 1 | NOTIFIED | 已发送通知 |
-| 2 | CONFIRMED | 设备已确认收到 |
-| 3 | DOWNLOADING | 下载中（持续上报 progress） |
-| 4 | DOWNLOADED | 下载完成，等待安装 |
-| 5 | INSTALLING | 安装中 |
-| 6 | SUCCESS | 升级成功 |
-| 7 | FAILED | 升级失败 |
-| 8 | TIMEOUT | 超时（平台检测） |
+| code | 名称          | 说明                 |
+|------|-------------|--------------------|
+| 0    | PENDING     | 待通知（平台侧）           |
+| 1    | NOTIFIED    | 已发送通知              |
+| 2    | CONFIRMED   | 设备已确认收到            |
+| 3    | DOWNLOADING | 下载中（持续上报 progress） |
+| 4    | DOWNLOADED  | 下载完成，等待安装          |
+| 5    | INSTALLING  | 安装中                |
+| 6    | SUCCESS     | 升级成功               |
+| 7    | FAILED      | 升级失败               |
+| 8    | TIMEOUT     | 超时（平台检测）           |
 
 > **断点续传**：平台将 `downloadedBytes` 缓存于 Redis（TTL=40分钟），设备重连后可查询断点偏移量继续下载。
 
@@ -647,36 +648,36 @@ QoS: 1
 
 ```json
 {
-  "operationType":   "PARAM_MODIFY",
-  "operationDesc":   "本地修改上报间隔参数",
+  "operationType": "PARAM_MODIFY",
+  "operationDesc": "本地修改上报间隔参数",
   "operationDetail": "{\"reportInterval\":30}",
   "operationResult": "SUCCESS",
-  "operationTime":   1710000000000
+  "operationTime": 1710000000000
 }
 ```
 
 **字段说明**：
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `operationType` | String | 操作类型（见枚举表） |
-| `operationDesc` | String | 操作描述 |
-| `operationDetail` | String | 操作详情（建议 JSON 字符串格式） |
+| 字段                | 类型     | 说明                      |
+|-------------------|--------|-------------------------|
+| `operationType`   | String | 操作类型（见枚举表）              |
+| `operationDesc`   | String | 操作描述                    |
+| `operationDetail` | String | 操作详情（建议 JSON 字符串格式）     |
 | `operationResult` | String | 执行结果：`SUCCESS` / `FAIL` |
-| `operationTime` | Long | 操作发生时间，毫秒时间戳 |
+| `operationTime`   | Long   | 操作发生时间，毫秒时间戳            |
 
 **操作类型枚举**：
 
-| operationType | 说明 |
-|---------------|------|
-| `PARAM_MODIFY` | 参数修改 |
+| operationType      | 说明   |
+|--------------------|------|
+| `PARAM_MODIFY`     | 参数修改 |
 | `FIRMWARE_UPGRADE` | 固件升级 |
-| `REMOTE_RESTART` | 远程重启 |
-| `DEVICE_ONLINE` | 设备上线 |
-| `DEVICE_OFFLINE` | 设备下线 |
-| `DEVICE_REGISTER` | 设备注册 |
-| `COMMAND_SEND` | 指令发送 |
-| `SECRET_RESET` | 密钥重置 |
+| `REMOTE_RESTART`   | 远程重启 |
+| `DEVICE_ONLINE`    | 设备上线 |
+| `DEVICE_OFFLINE`   | 设备下线 |
+| `DEVICE_REGISTER`  | 设备注册 |
+| `COMMAND_SEND`     | 指令发送 |
+| `SECRET_RESET`     | 密钥重置 |
 
 ---
 
@@ -748,8 +749,8 @@ Payload: AES-256-CBC 加密后的 JSON 字符串
 
 - **commandId**：本次查询的唯一标识（UUID），机器人在响应时必须原样带回。
 - **cameraIndex**：
-  - `null`：查询全部摄像头；
-  - `0, 1, 2, ...`：查询指定路摄像头的流地址。
+    - `null`：查询全部摄像头；
+    - `0, 1, 2, ...`：查询指定路摄像头的流地址。
 - **timestamp**：平台发送时间，毫秒时间戳。
 
 ### 12.3 上行消息：CameraStreamResponse（机器人 → 平台）
@@ -787,22 +788,22 @@ Payload: AES-256-CBC 加密后的 JSON 字符串
 
 字段说明：
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `commandId` | String | 对应下行 `CameraStreamQuery.commandId` |
-| `code` | Integer | 执行结果：0=成功，非 0=失败（如不支持、内部错误等） |
-| `message` | String | 失败原因（`code != 0` 时填写），成功可为空字符串 |
-| `cameras` | Array\<Object\> | 摄像头列表，元素结构见下表 |
-| `timestamp` | Long | 设备回复时间，毫秒时间戳 |
+| 字段          | 类型              | 说明                                 |
+|-------------|-----------------|------------------------------------|
+| `commandId` | String          | 对应下行 `CameraStreamQuery.commandId` |
+| `code`      | Integer         | 执行结果：0=成功，非 0=失败（如不支持、内部错误等）       |
+| `message`   | String          | 失败原因（`code != 0` 时填写），成功可为空字符串     |
+| `cameras`   | Array\<Object\> | 摄像头列表，元素结构见下表                      |
+| `timestamp` | Long            | 设备回复时间，毫秒时间戳                       |
 
 `cameras` 中单个元素（对应 CameraInfo）结构：
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `cameraIndex` | Integer | 摄像头路数索引，从 0 开始，与 Query 中的索引对应 |
-| `cameraName` | String | 摄像头名称/标识，可为空 |
-| `streamUrl` | String | 视频流地址（如 `rtsp://`、`rtmp://`、`http(s)://...m3u8` 等） |
-| `streamType` | String | 流类型（如 `rtsp`、`rtmp`、`hls`），可为空 |
+| 字段            | 类型      | 说明                                                 |
+|---------------|---------|----------------------------------------------------|
+| `cameraIndex` | Integer | 摄像头路数索引，从 0 开始，与 Query 中的索引对应                      |
+| `cameraName`  | String  | 摄像头名称/标识，可为空                                       |
+| `streamUrl`   | String  | 视频流地址（如 `rtsp://`、`rtmp://`、`http(s)://...m3u8` 等） |
+| `streamType`  | String  | 流类型（如 `rtsp`、`rtmp`、`hls`），可为空                     |
 
 > 注意：当 `cameraIndex` 为某个非空索引时，平台预期 `cameras` 只返回该索引对应的一条记录；  
 > 当 `cameraIndex = null` 时，建议返回所有可用摄像头的列表。
@@ -811,28 +812,28 @@ Payload: AES-256-CBC 加密后的 JSON 字符串
 
 - 订阅下行 Topic：`device/{deviceCode}/camera/stream/query`。
 - 解密收到的消息，解析出：
-  - `commandId`：必须原样带回给平台；
-  - `cameraIndex`：`null`=全部，非 null=指定路；
-  - `timestamp`：可用于本地超时控制或日志。
+    - `commandId`：必须原样带回给平台；
+    - `cameraIndex`：`null`=全部，非 null=指定路；
+    - `timestamp`：可用于本地超时控制或日志。
 - 根据 `cameraIndex`：
-  - 若为 `null`，枚举设备上所有摄像头，构建 `cameras` 数组；
-  - 若为非负整数，仅返回对应路数（若不存在该路，可返回 `code!=0` 并在 `message` 中说明）。
+    - 若为 `null`，枚举设备上所有摄像头，构建 `cameras` 数组；
+    - 若为非负整数，仅返回对应路数（若不存在该路，可返回 `code!=0` 并在 `message` 中说明）。
 - 构造 `CameraStreamResponse`，加密后发布到：
-  - `device/{deviceCode}/camera/stream/ack`，QoS=1。
+    - `device/{deviceCode}/camera/stream/ack`，QoS=1。
 
 ---
 
 ## 13. Redis 缓存说明
 
-| Key 格式 | 类型 | TTL | 说明 |
-|----------|------|-----|------|
-| `iot:device:status:{deviceCode}` | String | **6分钟** | 设备最新状态 JSON，TTL 过期即视为离线 |
-| `iot:device:secret:{deviceCode}` | String | 24小时 | 设备密钥缓存，避免每次鉴权查库 |
-| `iot:device:aeskey:{deviceCode}` | String | 24小时 | AES Key 缓存（SHA256派生结果） |
-| `iot:device:online` | Set | 永久 | 在线设备编码集合，结合 status Key TTL 判断离线 |
-| `iot:config:sync:{deviceCode}:{commandId}` | String | 30秒 | 配置下发等待 ACK 标记 |
-| `iot:ota:progress:{deviceCode}:{recordId}` | String | 40分钟 | OTA 断点续传进度（已下载字节数） |
-| `iot:upload:chunk:{uploadId}` | Hash | — | 固件分片上传进度 |
+| Key 格式                                     | 类型     | TTL     | 说明                              |
+|--------------------------------------------|--------|---------|---------------------------------|
+| `iot:device:status:{deviceCode}`           | String | **6分钟** | 设备最新状态 JSON，TTL 过期即视为离线         |
+| `iot:device:secret:{deviceCode}`           | String | 24小时    | 设备密钥缓存，避免每次鉴权查库                 |
+| `iot:device:aeskey:{deviceCode}`           | String | 24小时    | AES Key 缓存（SHA256派生结果）          |
+| `iot:device:online`                        | Set    | 永久      | 在线设备编码集合，结合 status Key TTL 判断离线 |
+| `iot:config:sync:{deviceCode}:{commandId}` | String | 30秒     | 配置下发等待 ACK 标记                   |
+| `iot:ota:progress:{deviceCode}:{recordId}` | String | 40分钟    | OTA 断点续传进度（已下载字节数）              |
+| `iot:upload:chunk:{uploadId}`              | Hash   | —       | 固件分片上传进度                        |
 
 ---
 
@@ -840,18 +841,19 @@ Payload: AES-256-CBC 加密后的 JSON 字符串
 
 ### 设备在线状态
 
-| code | 名称 | 说明 |
-|------|------|------|
-| 0 | INACTIVE | 未激活（新建设备，从未连接过） |
-| 1 | ONLINE | 在线 |
-| 2 | OFFLINE | 离线 |
-| 3 | DISABLED | 禁用（拒绝认证） |
+| code | 名称       | 说明              |
+|------|----------|-----------------|
+| 0    | INACTIVE | 未激活（新建设备，从未连接过） |
+| 1    | ONLINE   | 在线              |
+| 2    | OFFLINE  | 离线              |
+| 3    | DISABLED | 禁用（拒绝认证）        |
 
 ---
 
 ## 16. 外部系统服务参数获取（STS 凭证）
 
-设备需要访问外部对象存储时，须先向平台请求 STS 临时凭证。所有设备共享同一套参数，平台从 Redis 缓存（TTL 跟随凭证过期时间）读取后下发；缓存未命中时自动降级查库。
+设备需要访问外部对象存储时，须先向平台请求 STS 临时凭证。所有设备共享同一套参数，平台从 Redis 缓存（TTL
+跟随凭证过期时间）读取后下发；缓存未命中时自动降级查库。
 
 ### 16.1 交互流程
 
@@ -875,14 +877,14 @@ QoS: 1
 ```json
 {
   "commandId": "req_084ecb37bbd8",
-  "sourceSystem": "DEW"  // 外部系统编码（如 DEW），缺省，可选
+  "sourceSystem": "DEW"
 }
 ```
 
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `commandId` | String | 是 | 请求唯一标识，响应时原样返回，用于对账 |
-| `sourceSystem` | String | 否 | 外部系统编码（如 `DEW`）；为空时平台使用默认配置值 |
+| 字段             | 类型     | 必填 | 说明                           |
+|----------------|--------|----|------------------------------|
+| `commandId`    | String | 是  | 请求唯一标识，响应时原样返回，用于对账          |
+| `sourceSystem` | String | 否  | 外部系统编码（如 `DEW`）；为空时平台使用默认配置值 |
 
 ### 16.3 下行消息：ExtParamsResponse（平台 → 设备）
 
@@ -917,18 +919,18 @@ QoS: 1
 }
 ```
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `commandId` | String | 与请求一致 |
-| `code` | int | `0`=成功，`400`=暂无数据 |
-| `message` | String | 失败描述，`code=0` 时为 `null` |
-| `endpoint` | String | STS endpoint 地址 |
-| `bucket` | String | OSS Bucket 名称 |
-| `bjExpiration` | String | 凭证北京时间过期时间（`yyyy-MM-dd HH:mm:ss`） |
-| `utcExpiration` | String | 凭证 UTC 过期时间（ISO-8601，如 `2026-02-25T09:28:15Z`） |
-| `accessKeyId` | String | STS AccessKeyId |
-| `accessKeySecret` | String | STS AccessKeySecret |
-| `securityToken` | String | STS SecurityToken（长字符串） |
+| 字段                | 类型     | 说明                                             |
+|-------------------|--------|------------------------------------------------|
+| `commandId`       | String | 与请求一致                                          |
+| `code`            | int    | `0`=成功，`400`=暂无数据                              |
+| `message`         | String | 失败描述，`code=0` 时为 `null`                        |
+| `endpoint`        | String | STS endpoint 地址                                |
+| `bucket`          | String | OSS Bucket 名称                                  |
+| `bjExpiration`    | String | 凭证北京时间过期时间（`yyyy-MM-dd HH:mm:ss`）              |
+| `utcExpiration`   | String | 凭证 UTC 过期时间（ISO-8601，如 `2026-02-25T09:28:15Z`） |
+| `accessKeyId`     | String | STS AccessKeyId                                |
+| `accessKeySecret` | String | STS AccessKeySecret                            |
+| `securityToken`   | String | STS SecurityToken（长字符串）                        |
 
 ### 16.4 设备端行为建议
 
@@ -951,6 +953,7 @@ QoS: 1
 - [ ] 收到 ConfigPush 后应用配置并回复 ConfigAck（携带相同 `commandId`）
 - [ ] 收到 RemoteRestartCommand 后**先回复 RestartAck** 再执行重启
 - [ ] OTA 升级过程中定期上报 progress，终态（SUCCESS/FAILED）必须上报
-- [ ] 若支持摄像头：订阅 `device/{deviceCode}/camera/stream/query`，收到 CameraStreamQuery 后按 `commandId`、`cameraIndex` 查询流地址，加密后上报到 `device/{deviceCode}/camera/stream/ack`（响应中必须带回相同 `commandId`）
+- [ ] 设备支持摄像头：订阅 `device/{deviceCode}/camera/stream/query`，收到 CameraStreamQuery 后按 `commandId`、`cameraIndex`
+  查询流地址，加密后上报到 `device/{deviceCode}/camera/stream/ack`（响应中必须带回相同 `commandId`）
 - [ ] `cleanSession = false`，确保离线期间下行消息不丢失
 
