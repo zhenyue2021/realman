@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
+import org.jeecg.common.util.ContentDispositionUtil;
 import org.jeecg.modules.device.api.MasterDeviceApiService;
 import org.jeecg.modules.device.constant.DeviceConstant;
 import org.jeecg.modules.device.dto.DeviceRequestDTO;
@@ -18,9 +19,11 @@ import org.jeecg.modules.device.mapper.IotDeviceAuthMapper;
 import org.jeecg.modules.device.mapper.IotMasterLoginLogMapper;
 import org.jeecg.modules.device.service.IIotDeviceService;
 import org.jeecg.modules.device.service.workorder.IWorkOrderService;
+import org.jeecg.modules.device.util.DeviceExcelExportUtil;
 import org.jeecg.modules.device.vo.WorkOrderOperationRecordVO;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
@@ -130,7 +133,23 @@ public class MasterDeviceApiServiceImpl implements MasterDeviceApiService {
         return voPage;
     }
 
-
+    @Override
+    public ResponseEntity<byte[]> operationRecordExport(Page<WorkOrder> page, String controllerCode) {
+        IPage<WorkOrderOperationRecordDTO> dtoPage =
+                workOrderService.pageWorkOrderOperationRecords(page, controllerCode);
+        List<WorkOrderOperationRecordDTO> list = dtoPage.getRecords();
+        byte[] bytes;
+        try {
+            bytes = DeviceExcelExportUtil.exportOperationRecords(list);
+        } catch (Exception e) {
+            throw new RuntimeException("导出失败", e);
+        }
+        String filename = "operation_record_" + System.currentTimeMillis() + ".xlsx";
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDispositionUtil.attachment(filename))
+                .body(bytes);
+    }
 
     private Map<String, IotMasterLoginLog> loadLastLogin(List<String> controllerIds) {
         if (controllerIds == null || controllerIds.isEmpty()) {

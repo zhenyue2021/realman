@@ -3,7 +3,7 @@ package org.jeecg.modules.device.util;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.streaming.SXSSFSheet;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
-import org.jeecg.modules.device.entity.MasterOperationRecord;
+import org.jeecg.modules.device.dto.WorkOrderOperationRecordDTO;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.entity.IotDeviceAuth;
 
@@ -102,32 +102,35 @@ public final class DeviceExcelExportUtil {
     }
 
     /** 操作记录导出（主控设备ID、机器人ID、开始/结束操作时间、操作时长） */
-    public static byte[] exportOperationRecords(List<MasterOperationRecord> list) throws Exception {
+    public static byte[] exportOperationRecords(List<WorkOrderOperationRecordDTO> list) throws Exception {
         try (SXSSFWorkbook wb = new SXSSFWorkbook(500);
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Sheet sheet = wb.createSheet("操作记录");
             CellStyle headerStyle = headerStyle(wb);
             CellStyle dateStyle = dateStyle(wb);
-            String[] headers = {"主控设备ID", "主控设备编号", "机器人ID", "机器人编号", "遥操员", "工单ID",
-                    "开始操作时间", "结束操作时间", "操作时长"};
+            String[] headers = {"主控设备ID", "机器人ID", "开始操作时间", "结束操作时间", "操作时长"};
             writeHeader(sheet, headers, headerStyle);
             int rowNum = 1;
-            for (MasterOperationRecord r : list) {
+            for (WorkOrderOperationRecordDTO r : list) {
                 Row row = sheet.createRow(rowNum++);
-                setCell(row, 0, r.getControllerId());
-                setCell(row, 1, r.getControllerCode());
-                setCell(row, 2, r.getRobotId());
-                setCell(row, 3, r.getRobotCode());
-                setCell(row, 4, r.getOperatorName() != null ? r.getOperatorName() : r.getOperatorId());
-                setCell(row, 5, r.getWorkOrderId());
-                setCell(row, 6, format(r.getStartTime()), dateStyle);
-                setCell(row, 7, format(r.getEndTime()), dateStyle);
-                setCell(row, 8, durationStr(r.getStartTime(), r.getEndTime()));
+                setCell(row, 0, r.getControllerCode());
+                setCell(row, 1, r.getRobotDeviceCode());
+                setCell(row, 2, format(r.getActualStartTime()), dateStyle);
+                setCell(row, 3, format(r.getSubmitTime()), dateStyle);
+                setCell(row, 4, formatDuration(r.getDurationSeconds()));
             }
             autoSizeColumns(sheet, headers.length);
             wb.write(out);
             return out.toByteArray();
         }
+    }
+
+    private static String formatDuration(Long seconds) {
+        if (seconds == null) return "";
+        long h = seconds / 3600;
+        long m = (seconds % 3600) / 60;
+        long s = seconds % 60;
+        return h + "时" + m + "分" + s + "秒";
     }
 
     private static String durationStr(LocalDateTime start, LocalDateTime end) {

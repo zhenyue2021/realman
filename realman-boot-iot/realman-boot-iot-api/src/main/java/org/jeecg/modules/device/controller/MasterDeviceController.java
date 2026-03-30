@@ -15,12 +15,11 @@ import org.jeecg.common.util.ContentDispositionUtil;
 import org.jeecg.modules.device.api.MasterDeviceApiService;
 import org.jeecg.modules.device.dto.*;
 import org.jeecg.modules.device.entity.IotDevice;
-import org.jeecg.modules.device.entity.MasterOperationRecord;
+import org.jeecg.modules.device.entity.workorder.WorkOrder;
 import org.jeecg.modules.device.service.IIotDeviceService;
 import org.jeecg.modules.device.service.IMasterLoginResolveService;
 import org.jeecg.modules.device.service.IMasterOperationRecordService;
 import org.jeecg.modules.device.service.IMasterUsageStatusService;
-import org.jeecg.modules.device.util.DeviceExcelExportUtil;
 import org.jeecg.modules.device.vo.*;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -254,20 +253,15 @@ public class MasterDeviceController {
     @PostMapping("/operation-record/export")
     @Operation(summary = "操作记录导出")
     public ResponseEntity<byte[]> operationRecordExport(@RequestBody OperationRecordQueryDTO query) {
-        java.util.List<MasterOperationRecord> list = operationRecordService.listForExport(
-                query.getControllerId(), query.getControllerCode(), query.getRobotId(),
-                query.getStartTimeFrom(), query.getStartTimeTo());
-        byte[] bytes;
-        try {
-            bytes = DeviceExcelExportUtil.exportOperationRecords(list);
-        } catch (Exception e) {
-            throw new RuntimeException("导出失败", e);
+        if (Objects.isNull(query)) {
+           throw new RuntimeException("请求体 不能为空");
         }
-        String filename = "operation_record_" + System.currentTimeMillis() + ".xlsx";
-        return ResponseEntity.ok()
-                .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDispositionUtil.attachment(filename))
-                .body(bytes);
+        String controllerCode = query.getControllerCode();
+        if (controllerCode == null || controllerCode.isBlank()) {
+            throw new RuntimeException("controllerCode 不能为空");
+        }
+        return  masterDeviceApiService.operationRecordExport(new Page<WorkOrder>(1, 1000), controllerCode);
+
     }
 
     /** 使用状态：最近登录时间、最近一次遥操开始时间、当前设备、可使用的机器人 */
