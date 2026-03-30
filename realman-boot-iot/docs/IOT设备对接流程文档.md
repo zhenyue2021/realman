@@ -24,6 +24,7 @@
 13. [Redis 缓存说明](#13-redis-缓存说明)
 14. [设备状态枚举](#14-设备状态枚举)
 15. [数据库表结构参考](#15-数据库表结构参考)
+16. [外部系统服务参数获取（STS 凭证）](#16-外部系统服务参数获取sts-凭证)
 
 ---
 
@@ -241,29 +242,29 @@ def decrypt_message(device_code: str, encrypted: str) -> str:
 
 | Topic | QoS | 说明                                        | 联调情况   |
 |-------|-----|-------------------------------------------|--------|
-| `device/{deviceCode}/status/report` | 1 | 设备周期性状态上报                                 | 联调完成   |
-| `device/{deviceCode}/config/ack` | 1 | 参数配置执行确认                                  | 未联调    |
+| `device/{deviceCode}/status/report` | 1 | 设备周期性状态上报                                 | 联调完成   | 
 | `device/{deviceCode}/command/{cmd}/ack` | 1 | 指令集执行确认（如 `restart`、`emergency-stop` 等）   | 重启联调完成 |
 | `device/{deviceCode}/ota/progress` | 1 | OTA 升级进度上报                                | 未联调    |
 | `device/{deviceCode}/log/operation` | 1 | 设备操作日志上报                                  | 联调完成   |
-| `device/{deviceCode}/camera/stream/ack` | 1 | 机器人上报摄像头视频流地址（见第 12 章）                    | 未联调    |
-| `master/{controllerCode}/teleop/associated-device/response` | 1 | 主控上报当前设备Mac信息                             | 未联调    |
-| `master/{controllerCode}/command/{cmd}/ack` | 1 | 主控设备指令 ACK（力反馈/运动与安全参数等）                  | 未联调    |
-| `{robotCode}/slave/status` | 1 | 机器人原始状态上报（遥操作场景，明文 JSON，由平台透传至 WebSocket） | 未联调    |
+| `device/{deviceCode}/camera/stream/ack` | 1 | 机器人上报摄像头视频流地址（见第 12 章）                    | 联调完成   |
+| `master/{controllerCode}/teleop/associated-device/response` | 1 | 主控上报当前设备Mac信息                             | 已废弃    |
+| `master/{controllerCode}/command/{cmd}/ack` | 1 | 主控设备指令 ACK（力反馈/运动与安全参数等）                  | 联调完成    |
+| `{robotCode}/slave/status` | 1 | 机器人原始状态上报（遥操作场景，由平台透传至 WebSocket） | 联调完成    |
+| `device/{deviceCode}/ext-params/request` | 1 | 设备请求外部系统服务参数（如 STS 临时凭证，见第 16 章） | 未联调    |
 
 ### 4.2 下行 Topic（平台发布 → 设备订阅）
 
 | Topic                                                    | QoS | 说明                      | 联调情况 |
-|----------------------------------------------------------|-----|-------------------------|------|
-| `device/{deviceCode}/config/push`                        | 1 | 参数配置下发                  | 未联调  |
+|----------------------------------------------------------|-----|-------------------------|------| 
 | `device/{deviceCode}/command/restart`                    | 1 | 远程重启指令                  | 联调完成 |
 | `device/{deviceCode}/command/emergency-stop`             | 1 | 紧急停机指令                  | 未联调  |
 | `device/{deviceCode}/ota/notify`                         | 1 | OTA 升级通知                | 未联调  |
-| `device/{deviceCode}/camera/stream/query`                | 1 | 查询摄像头视频流地址（见第 12 章）     | 未联调  |
-| `master/{controllerCode}/teleop/associated-device/query` | 1 | 平台向主控查询“当前设备Mac信息”      | 未联调  |
-| `master/{controllerCode}/teleop/robot/assign`            | 1 | 平台通知主控当前应操作的机器人         | 未联调  |
-| `master/{controllerCode}/command/force-feedback`         | 1 | 平台向主控设置力反馈参数（机械臂/夹爪力度）  | 未联调  |
-| `master/{controllerCode}/command/sport-speed`            | 1 | 平台向主控设置运动与安全参数（底盘/升降速度） | 未联调  |
+| `device/{deviceCode}/camera/stream/query`                | 1 | 查询摄像头视频流地址（见第 12 章）     | 联调完成  |
+| `master/{controllerCode}/teleop/associated-device/query` | 1 | 平台向主控查询“当前设备Mac信息”      | 联调完成  |
+| `master/{controllerCode}/teleop/robot/assign`            | 1 | 平台通知主控当前应操作的机器人         | 联调完成  |
+| `master/{controllerCode}/command/force-feedback`         | 1 | 平台向主控设置力反馈参数（机械臂/夹爪力度）  | 联调完成  |
+| `master/{controllerCode}/command/sport-speed`            | 1 | 平台向主控设置运动与安全参数（底盘/升降速度） | 联调完成  |
+| `device/{deviceCode}/ext-params/ack`                     | 1 | 平台响应外部系统服务参数（如 STS 临时凭证，见第 16 章） | 未联调 |
 
 ### 4.3 系统事件 Topic（EMQX 内部，平台订阅）
 
@@ -276,13 +277,13 @@ def decrypt_message(device_code: str, encrypted: str) -> str:
 
 > 说明：以下 Topic 主要用于主控/机器人遥操作场景，由平台统一订阅并路由给对应 Handler，设备无需感知平台内部实现细节。
 
-| Topic | 说明 |  联调情况    |
-|-------|------|------------|
-| `{controllerCode}/master/cmd` | 主控设备原始指令上报 | 未联调    |
-| `{controllerCode}/master/states` | 主控设备原始状态上报 | 未联调    |
-| `{controllerCode}/master/rtsp/ctrl` | 主控设备 RTSP 控制/相关信息上报 | 未联调    |
-| `{robotCode}/slave/cmd` | 机器人原始指令上报 | 未联调    |
-| `{robotCode}/slave/status` | 机器人原始状态上报（与 4.1 中相同，平台通过 WebSocket 转发给前端） | 未联调    |
+| Topic | 说明 | 联调情况     |
+|-------|------|----------|
+| `{controllerCode}/master/cmd` | 主控设备原始指令上报 | 未使用-不经平台 |
+| `{controllerCode}/master/states` | 主控设备原始状态上报 | 联调完成      |
+| `{controllerCode}/master/rtsp/ctrl` | 主控设备 RTSP 控制/相关信息上报 | 未使用-不经平台  |
+| `{robotCode}/slave/cmd` | 机器人原始指令上报 | 未使用-不经平台   |
+| `{robotCode}/slave/status` | 机器人原始状态上报（与 4.1 中相同，平台通过 WebSocket 转发给前端） | 联调完成     |
 
 > **建议**：设备上线后须订阅自身的所有相关下行 Topic（配置、指令、OTA、摄像头等），使用 `cleanSession=false` 确保离线期间的下行消息不丢失。
 
@@ -848,12 +849,102 @@ Payload: AES-256-CBC 加密后的 JSON 字符串
 
 ---
 
+## 16. 外部系统服务参数获取（STS 凭证）
+
+设备需要访问外部对象存储时，须先向平台请求 STS 临时凭证。所有设备共享同一套参数，平台从 Redis 缓存（TTL 跟随凭证过期时间）读取后下发；缓存未命中时自动降级查库。
+
+### 16.1 交互流程
+
+```
+设备                                         IOT 平台
+  │                                               │
+  │── ext-params/request ────────────────────────>│  1. 设备请求 STS 参数
+  │   {commandId, sourceSystem}                   │     解密 → 读 Redis（key: realman:ext:param:{sourceSystem}）
+  │                                               │     缓存未命中 → 降级查库 → 回写缓存
+  │<── ext-params/ack ──────────────────────────  │  2. 平台响应凭证（加密下发）
+  │   {commandId, code, endpoint, bucket, ...}    │
+```
+
+### 16.2 上行消息：ExtParamsRequest（设备 → 平台）
+
+```
+Topic: device/{deviceCode}/ext-params/request
+QoS: 1
+```
+
+```json
+{
+  "commandId": "req_084ecb37bbd8",
+  "sourceSystem": "DEW"  // 外部系统编码（如 DEW），缺省，可选
+}
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `commandId` | String | 是 | 请求唯一标识，响应时原样返回，用于对账 |
+| `sourceSystem` | String | 否 | 外部系统编码（如 `DEW`）；为空时平台使用默认配置值 |
+
+### 16.3 下行消息：ExtParamsResponse（平台 → 设备）
+
+```
+Topic: device/{deviceCode}/ext-params/ack
+QoS: 1
+```
+
+**成功（code=0）**
+
+```json
+{
+  "commandId": "req_084ecb37bbd8",
+  "code": 0,
+  "endpoint": "sts.cn-beijing.aliyuncs.com",
+  "bucket": "embodied-data",
+  "bjExpiration": "2026-02-25 17:28:15",
+  "utcExpiration": "2026-02-25T09:28:15Z",
+  "accessKeyId": "STS.NYx3uEBnMWqC3ogAa14JAFM6y",
+  "accessKeySecret": "Ai36sQjvJgoXoyusBkNJCYjAKup9Vy7g7JW2EsQj7v1h",
+  "securityToken": "CAISxwJ1q6Ft5B2yfSjIr5rNeM..."
+}
+```
+
+**失败（code=400，缓存与库中均无数据）**
+
+```json
+{
+  "commandId": "req_084ecb37bbd8",
+  "code": 400,
+  "message": "暂无可用的外部服务参数，请稍后重试"
+}
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `commandId` | String | 与请求一致 |
+| `code` | int | `0`=成功，`400`=暂无数据 |
+| `message` | String | 失败描述，`code=0` 时为 `null` |
+| `endpoint` | String | STS endpoint 地址 |
+| `bucket` | String | OSS Bucket 名称 |
+| `bjExpiration` | String | 凭证北京时间过期时间（`yyyy-MM-dd HH:mm:ss`） |
+| `utcExpiration` | String | 凭证 UTC 过期时间（ISO-8601，如 `2026-02-25T09:28:15Z`） |
+| `accessKeyId` | String | STS AccessKeyId |
+| `accessKeySecret` | String | STS AccessKeySecret |
+| `securityToken` | String | STS SecurityToken（长字符串） |
+
+### 16.4 设备端行为建议
+
+1. **按需请求**：在需要访问 OSS 前发起请求，不必每次操作都重新请求。
+2. **凭证刷新**：比对 `bjExpiration`，在过期前（建议提前 5 分钟）主动重新请求。
+3. **重试策略**：收到 `code=400` 时，等待一段时间后重试（外部系统尚未推送参数至平台）。
+4. **commandId**：每次请求使用唯一值（如 UUID 或时间戳+随机数），便于与响应对账。
+
+---
+
 ## 附录：对接快速检查清单
 
 **设备端必须实现**：
 
 - [ ] MQTT 连接时 `password = MD5(deviceCode)`（32位小写Hex）
-- [ ] 连接后订阅 4 个下行 Topic（`config/push`、`command/restart`、`ota/notify`、`camera/stream/query`）
+- [ ] 连接后订阅下行 Topic（`config/push`、`command/restart`、`ota/notify`、`camera/stream/query`、`ext-params/ack`）
 - [ ] 所有业务消息使用 AES-256-CBC 加密/解密，密钥由 `SHA256(deviceCode)` 派生
 - [ ] 每次上报状态消息中包含 `timestamp` 字段（毫秒时间戳）
 - [ ] 状态上报间隔 **≤ 5分钟**（否则平台将判定为离线）

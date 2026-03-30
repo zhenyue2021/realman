@@ -63,6 +63,7 @@
 | 上行 | `device/{deviceCode}/slam/upload/request` | 请求上传地图 | `SlamUploadRequest` |
 | 上行 | `device/{deviceCode}/slam/upload/complete` | 上传完成 | `SlamUploadComplete` |
 | 上行 | `device/{deviceCode}/slam/sync/ack` | 同步结果 | `SlamSyncAck` |
+| 上行 | `device/{deviceCode}/ext-params/request` | 请求外部系统服务参数（如 STS 临时凭证） | `ExtParamsRequest` |
 | 下行 | `device/{deviceCode}/config/push` | 下发配置 | `ConfigPush` |
 | 下行 | `device/{deviceCode}/command/restart` | 远程重启 | `RemoteRestartCommand` |
 | 下行 | `device/{deviceCode}/command/emergency-stop` | 紧急停机 | `EmergencyStopCommand` |
@@ -71,8 +72,9 @@
 | 下行 | `device/{deviceCode}/camera/stream/query` | 查询摄像头流 | `CameraStreamQuery` |
 | 下行 | `device/{deviceCode}/slam/upload/permit` | 上传许可 | `SlamUploadPermit` |
 | 下行 | `device/{deviceCode}/slam/sync/command` | 同步地图指令 | `SlamSyncCommand` |
+| 下行 | `device/{deviceCode}/ext-params/ack` | 平台响应外部系统服务参数 | `ExtParamsResponse` |
 
-**订阅建议（机器人最小集）**：`device/{deviceCode}/config/push`、`.../command/+`、`.../ota/notify`、`.../camera/stream/query`、`.../slam/upload/permit`、`.../slam/sync/command`（可按能力裁剪）。
+**订阅建议（机器人最小集）**：`device/{deviceCode}/config/push`、`.../command/+`、`.../ota/notify`、`.../camera/stream/query`、`.../slam/upload/permit`、`.../slam/sync/command`、`.../ext-params/ack`（可按能力裁剪）。
 
 ### 3.2 主控（`device_type = 2`）
 
@@ -339,9 +341,56 @@ SLAM 涉及两条独立子流程，均走 **`device/{deviceCode}/slam/...`** Top
 
 ---
 
-### 4.3 主控
+### 4.3 外部系统服务参数（STS 凭证）
 
-**下行 `master/{code}/teleop/associated-device/query` → 上行 `.../teleop/associated-device/ack`**
+设备在需要访问对象存储前，向平台请求 STS 临时凭证。所有设备共享同一套参数；平台读取 Redis 缓存（TTL 与凭证过期时间对齐），缓存未命中时自动降级查库。
+
+**上行 `device/{code}/ext-params/request`**
+
+```json
+{
+  "commandId": "req_084ecb37bbd8",
+  "sourceSystem": "DEW" // 可选
+}
+```
+
+**下行 `device/{code}/ext-params/ack`（成功）**
+
+```json
+{
+  "commandId": "req_084ecb37bbd8",
+  "code": 0,
+  "endpoint": "sts.cn-beijing.aliyuncs.com",
+  "bucket": "embodied-data",
+  "bjExpiration": "2026-02-25 17:28:15",
+  "utcExpiration": "2026-02-25T09:28:15Z",
+  "accessKeyId": "STS.NYx3uEBnMWqC3ogAa14JAFM6y",
+  "accessKeySecret": "Ai36sQjvJgoXoyusBkNJCYjAKup9Vy7g7JW2EsQj7v1h",
+  "securityToken": "CAISxwJ1q6Ft5B2yfSjIr5rNeM..."
+}
+```
+
+**下行 `device/{code}/ext-params/ack`（失败，缓存与库中均无数据）**
+
+```json
+{
+  "commandId": "req_084ecb37bbd8",
+  "code": 400,
+  "message": "暂无可用的外部服务参数，请稍后重试"
+}
+```
+
+**客户端行为**：
+- `commandId` 使用每次请求唯一的字符串（UUID 或时间戳+随机数），响应中原样返回用于对账。
+- `sourceSystem` 可缺省，平台使用默认配置值（当前为 `DEW`）。
+- 比对 `bjExpiration`，在过期前（建议提前 5 分钟）主动重新请求刷新凭证。
+- 收到 `code=400` 时等待后重试（外部系统尚未向平台推送参数）。
+
+---
+
+### 4.4 主控
+
+**下行 `master/{code}/teleop/associated-device/query` → 上行 `master/{code}/teleop/associated-device/ack`**
 
 ```json
 {"commandId":"...","operatorId":"op001","loginLogId":null,"timestamp":1710000000000}
@@ -406,9 +455,10 @@ SLAM 涉及两条独立子流程，均走 **`device/{deviceCode}/slam/...`** Top
 1. **加密**：用同一 `deviceCode` 对样例 JSON 加解密，与 Java `CommandEncryptService` 互测一条往返。  
 2. **Topic**：逐条核对本节表格与 `DeviceConstant.MqttTopic`，注意 **`master/`** 与 **`device/`** 前缀不可混用。  
 3. **commandId**：所有 Query/Command 与 Ack/Response **必须**携带相同 `commandId`（字符串 UUID）。  
-4. **摄像头**：机器人应答必须使用 **`device/{code}/camera/stream/ack`**（与 `DeviceConstant.MqttTopic.CAMERA_STREAM_RESPONSE`、平台订阅、分发器一致）。  
-5. **主控关联设备**：应答 Topic 为 **`master/{code}/teleop/associated-device/ack`**。  
-6. **调试**：可将 `device.encrypt.enabled=false` 用明文 JSON 抓包；上线前务必恢复为加密。
+4. **摄像头**：机器人应答必须使用 **`device/{code}/camera/stream/ack`**（与 `DeviceConstant.MqttTopic.CAMERA_STREAM_RESPONSE`、平台订阅、分发器一致）。
+5. **主控关联设备**：应答 Topic 为 **`master/{code}/teleop/associated-device/ack`**。
+6. **外部服务参数**：订阅 `device/{code}/ext-params/ack`，发起请求时 `commandId` 须唯一；根据 `bjExpiration` 在过期前主动刷新，收到 `code=400` 稍后重试。
+7. **调试**：可将 `device.encrypt.enabled=false` 用明文 JSON 抓包；上线前务必恢复为加密。
 
 ---
 
