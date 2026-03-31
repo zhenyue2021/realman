@@ -1,9 +1,14 @@
 package org.jeecg.modules.device.dto.workorder;
 
+import com.baomidou.mybatisplus.annotation.FieldFill;
 import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
 import org.jeecg.common.aspect.annotation.Dict;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -12,78 +17,75 @@ import java.util.List;
 @Data
 public class WorkOrderPageItemDTO {
 
-    /**
-     * 工单ID
-     */
     private String id;
 
-    /**
-     * 所属租户信息（代理商/企业）
-     */
-    private String agentId;
-    private String agentName;
-    private String departmentId;
-    private String departmentName;
-    private String enterpriseId;
-    private String enterpriseName;
-
-    /**
-     * 依赖规则（合规配置）
-     */
-    private String complianceId;
-    /**
-     * 工单任务名称
-     */
     private String taskName;
 
-    /**
-     * 合规配置（规则）信息
-     */
-    private String taskScene;
-    private Integer timeoutAlertEnabled;
-    private String timeoutAlertOffset;
-    private Integer taskLimitEnabled;
-    private Integer acceptanceEnabled;
-    /** 是否启用超时提交：0-禁用 1-启用 */
-    private Integer overtimeEnabled;
-    private String overtimeReasonEnum;
-    private String overtimeReasonDesc;
-    private Integer autoCloseEnabled;
-    private String autoCloseOffset;
-    private Integer applyStatus;
+    private String agentId;
 
-    /**
-     * 时间
-     */
-    private String createTime;
-    private String updateTime;
-    private String planStartTime;
-    private String planEndTime;
+    private String agentName;
 
-    /**
-     * 计费信息
-     */
+    private String departmentId;
+
+    private String departmentName;
+
+    private String complianceId;
+
     private String currency;
+
     private String unitPrice;
+
     private String totalPrice;
 
-    /**
-     * 操作员
-     */
-    private String operatorId;
-    private String operatorName;
+    private String remark;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime planStartTime;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime planEndTime;
 
-    /**
-     * 状态
-     */
     @Dict(dicCode = "order_status")
     private String status;
-    /**
-     * 审核结果
-     */
+
     @Dict(dicCode = "audit_result")
     private String auditResult;
 
+
+    private String operatorId;
+    private String operatorName;
+    private String operatorPhone;
+
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime actualStartTime;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime submitTime;
+
+    private String timeoutReason;
+
+    private String timeoutReasonSource;
+
+    private String auditBy;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime auditTime;
+
+    private String auditComment;
+
+    private String closeBy;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime closeTime;
+
+    private String closeReason;
+
+    private String createBy;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime createTime;
+    private String updateBy;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime updateTime;
+
+    /**
+     * 工单合规配置
+     */
+    private WorkOrderComplianceConfigDetailDTO compliance;
     /**
      * 主控设备（单个）
      */

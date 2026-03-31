@@ -112,7 +112,7 @@ public class WorkOrderSchedulerServiceImpl implements IWorkOrderSchedulerService
             if (cfg == null || cfg.getTaskLimitEnabled() == null || cfg.getTaskLimitEnabled() != 1) {
                 continue;
             }
-            // 已开启超时提交（overtimeEnabled=1），由提交接口自行校验，此处不标记 TIMEOUT
+            // 已开启超时提交（overtimeEnabled=1），启用超时提交标记为： TIMEOUT，否则为： CLOSED，用户原因，系统自动关单
             if (cfg.getOvertimeEnabled() != null && cfg.getOvertimeEnabled() == 1) {
                 o.setStatus(WorkOrderConstant.ORDER_STATUS.TIMEOUT);
             } else if (cfg.getOvertimeEnabled() != null && cfg.getOvertimeEnabled() == 0) {
@@ -120,7 +120,9 @@ public class WorkOrderSchedulerServiceImpl implements IWorkOrderSchedulerService
                 o.setTimeoutReasonSource("用户原因");
                 o.setTimeoutReason("操作员超时未完成");
                 o.setCloseTime(now);
-                o.setCloseBy("SYSTEM");
+                o.setCloseBy("系统");
+                o.setUpdateBy("系统");
+                o.setCloseReason("操作员超时未完成，系统自动关单");
             }
             workOrderMapper.updateById(o);
             // 同步结束操作记录，结束时间取计划结束时间

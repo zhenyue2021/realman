@@ -9,11 +9,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import org.jeecg.modules.device.api.WorkOrderApiService;
 import org.jeecg.modules.device.dto.AuthorizedDeviceOptionDTO;
-import org.jeecg.modules.device.dto.workorder.WorkOrderCreateDTO;
-import org.jeecg.modules.device.dto.workorder.WorkOrderDetailDTO;
-import org.jeecg.modules.device.dto.workorder.WorkOrderDeviceDTO;
-import org.jeecg.modules.device.dto.workorder.WorkOrderPageItemDTO;
-import org.jeecg.modules.device.dto.workorder.WorkOrderQueryDTO;
+import org.jeecg.modules.device.dto.workorder.*;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.entity.workorder.WorkOrder;
 import org.jeecg.modules.device.entity.workorder.WorkOrderDevice;
@@ -24,6 +20,7 @@ import org.jeecg.modules.device.mapper.workorder.WorkOrderDeviceMapper;
 import org.jeecg.modules.device.service.IIotDeviceService;
 import org.jeecg.modules.device.service.workorder.IWorkOrderService;
 import org.jeecg.modules.device.service.workorder.IWorkOrderComplianceConfigService;
+import org.springframework.context.annotation.Bean;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -240,40 +237,15 @@ public class WorkOrderApiServiceImpl implements WorkOrderApiService {
 
         List<WorkOrderPageItemDTO> dtoRecords = orders.stream().map(o -> {
             WorkOrderPageItemDTO dto = new WorkOrderPageItemDTO();
-            dto.setId(o.getId());
-            dto.setTaskName(o.getTaskName());
-            dto.setAgentId(o.getAgentId());
-            dto.setAgentName(o.getAgentName());
-            dto.setComplianceId(o.getComplianceId());
-            dto.setStatus(o.getStatus());
-            dto.setAuditResult(o.getAuditResult());
-            dto.setOperatorId(o.getOperatorId());
-            dto.setOperatorName(o.getOperatorName());
-            dto.setCreateTime(format(o.getCreateTime()));
-            dto.setUpdateTime(format(o.getUpdateTime()));
-            dto.setPlanStartTime(format(o.getPlanStartTime()));
-            dto.setPlanEndTime(format(o.getPlanEndTime()));
-            dto.setCurrency(o.getCurrency());
+            BeanUtil.copyProperties(o, dto);
             dto.setUnitPrice(o.getUnitPrice() != null ? o.getUnitPrice().toPlainString() : null);
             dto.setTotalPrice(o.getTotalPrice() != null ? o.getTotalPrice().toPlainString() : null);
-            dto.setDepartmentId(o.getDepartmentId());
-            dto.setDepartmentName(o.getDepartmentName());
 
             WorkOrderComplianceConfig cfg = cfgMap.get(o.getComplianceId());
             if (cfg != null) {
-                dto.setEnterpriseId(cfg.getEnterpriseId());
-                dto.setEnterpriseName(cfg.getEnterpriseName());
-                dto.setTaskScene(cfg.getTaskScene());
-                dto.setTimeoutAlertEnabled(cfg.getTimeoutAlertEnabled());
-                dto.setTimeoutAlertOffset(cfg.getTimeoutAlertOffset());
-                dto.setTaskLimitEnabled(cfg.getTaskLimitEnabled());
-                dto.setAcceptanceEnabled(cfg.getAcceptanceEnabled());
-                dto.setOvertimeEnabled(cfg.getOvertimeEnabled());
-                dto.setOvertimeReasonEnum(cfg.getOvertimeReasonEnum());
-                dto.setOvertimeReasonDesc(cfg.getOvertimeReasonDesc());
-                dto.setAutoCloseEnabled(cfg.getAutoCloseEnabled());
-                dto.setAutoCloseOffset(cfg.getAutoCloseOffset());
-                dto.setApplyStatus(cfg.getApplyStatus());
+                WorkOrderComplianceConfigDetailDTO configDetailDTO = new WorkOrderComplianceConfigDetailDTO();
+                BeanUtil.copyProperties(cfg, configDetailDTO);
+                dto.setCompliance(configDetailDTO);
             }
 
             List<WorkOrderDevice> binds = devicesByOrderId.getOrDefault(o.getId(), List.of());
