@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.constant.DeviceConstant;
+import org.jeecg.modules.device.constant.WorkOrderConstant;
 import org.jeecg.modules.device.dto.WorkOrderDTO;
 import org.jeecg.modules.device.entity.workorder.WorkOrder;
 import org.jeecg.modules.device.entity.workorder.WorkOrderComplianceConfig;
@@ -113,9 +114,14 @@ public class WorkOrderSchedulerServiceImpl implements IWorkOrderSchedulerService
             }
             // 已开启超时提交（overtimeEnabled=1），由提交接口自行校验，此处不标记 TIMEOUT
             if (cfg.getOvertimeEnabled() != null && cfg.getOvertimeEnabled() == 1) {
-                continue;
+                o.setStatus(WorkOrderConstant.ORDER_STATUS.TIMEOUT);
+            } else if (cfg.getOvertimeEnabled() != null && cfg.getOvertimeEnabled() == 0) {
+                o.setStatus(WorkOrderConstant.ORDER_STATUS.CLOSED);
+                o.setTimeoutReasonSource("用户原因");
+                o.setTimeoutReason("操作员超时未完成");
+                o.setCloseTime(now);
+                o.setCloseBy("SYSTEM");
             }
-            o.setStatus("TIMEOUT");
             workOrderMapper.updateById(o);
             // 同步结束操作记录，结束时间取计划结束时间
             if (o.getPlanEndTime() != null) {

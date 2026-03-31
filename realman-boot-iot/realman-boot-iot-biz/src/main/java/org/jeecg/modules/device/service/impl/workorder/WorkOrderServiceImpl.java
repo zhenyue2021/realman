@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.constant.DeviceConstant;
+import org.jeecg.modules.device.constant.WorkOrderConstant;
 import org.jeecg.modules.device.dto.WorkOrderOperationRecordDTO;
 import org.jeecg.modules.device.entity.workorder.WorkOrder;
 import org.jeecg.modules.device.entity.workorder.WorkOrderDevice;
@@ -75,7 +76,7 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
         }
         // 先查找与该主控相关的工单ID（计划主控或实际主控）
         LambdaQueryWrapper<WorkOrderDevice> deviceWrapper = new LambdaQueryWrapper<WorkOrderDevice>()
-                .eq(WorkOrderDevice::getDeviceType, "2")
+                .eq(WorkOrderDevice::getDeviceType, DeviceConstant.DeviceType.CONTROLLER)
                 .eq(WorkOrderDevice::getDeviceCode, controllerCode);
         List<WorkOrderDevice> binds = workOrderDeviceMapper.selectList(deviceWrapper);
         if (binds.isEmpty()) {
@@ -86,13 +87,11 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
                 .distinct()
                 .toList();
 
-        LocalDateTime now = LocalDateTime.now();
-        // 返回进行中（STARTED）和待开始（PENDING）且未超时的工单，按计划开始时间升序
+        // 返回进行中（STARTED）和待开始（PENDING）的工单，按计划开始时间升序 ..此处不查询是否超时，超时逻辑已在定时任务中处理
         LambdaQueryWrapper<WorkOrder> wrapper = new LambdaQueryWrapper<WorkOrder>()
                 .in(WorkOrder::getId, orderIds)
-                .in(WorkOrder::getStatus, "STARTED", "PENDING")
+                .in(WorkOrder::getStatus, WorkOrderConstant.ORDER_STATUS.PENDING, WorkOrderConstant.ORDER_STATUS.STARTED)
                 .eq(WorkOrder::getDelFlag, 0)
-                .gt(WorkOrder::getPlanEndTime, now)
                 .orderByAsc(WorkOrder::getPlanStartTime);
         if (departmentIds != null && !departmentIds.isEmpty()) {
             wrapper.in(WorkOrder::getDepartmentId, departmentIds);
