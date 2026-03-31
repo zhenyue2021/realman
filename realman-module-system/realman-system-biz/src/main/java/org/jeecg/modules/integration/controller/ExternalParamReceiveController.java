@@ -109,8 +109,8 @@ public class ExternalParamReceiveController {
     @PostMapping("/receive")
     @Operation(summary = "外部系统传参接收（POST JSON）")
     public Result<Map<String, Object>> receive(@Valid @RequestBody ExternalParamReceiveDTO dto) {
-        log.info("[ExternalParam] 接收参数: sourceSystem={}, requestId={}, bizType={}",
-                dto.getSourceSystem(), dto.getRequestId(), dto.getBizType());
+        log.info("[ExternalParam] 接收参数: sourceSystem={}, targetSystem={}, requestId={}, bizType={}",
+                dto.getSourceSystem(), dto.getTargetSystem(), dto.getRequestId(), dto.getBizType());
 
         boolean stored = externalParamRecordService.receiveAndStore(dto);
 
@@ -120,12 +120,13 @@ public class ExternalParamReceiveController {
         return Result.ok(ack);
     }
 
-    @GetMapping("/params/{sourceSystem}")
-    @Operation(summary = "查询指定来源系统的最新缓存参数")
-    public Result<Map<String, Object>> getCachedParams(@PathVariable String sourceSystem) {
-        Map<String, Object> data = externalParamRecordService.getCachedData(sourceSystem);
+    @GetMapping("/params/{sourceSystem}/{targetSystem}")
+    @Operation(summary = "查询指定来源系统+目标系统的最新缓存参数")
+    public Result<Map<String, Object>> getCachedParams(@PathVariable String sourceSystem,
+                                                       @PathVariable String targetSystem) {
+        Map<String, Object> data = externalParamRecordService.getCachedData(sourceSystem, targetSystem);
         if (data == null) {
-            return Result.error("暂无缓存数据，sourceSystem=" + sourceSystem);
+            return Result.error("暂无缓存数据，sourceSystem=" + sourceSystem + ", targetSystem=" + targetSystem);
         }
         return Result.ok(data);
     }

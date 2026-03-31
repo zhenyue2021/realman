@@ -20,6 +20,10 @@ public class ExternalParamRecord implements Serializable {
     @TableField("source_system")
     private String sourceSystem;
 
+    /** 目标系统编码（本系统内部标识） */
+    @TableField("target_system")
+    private String targetSystem;
+
     /** 请求唯一标识，用于幂等校验 */
     @TableField("request_id")
     private String requestId;

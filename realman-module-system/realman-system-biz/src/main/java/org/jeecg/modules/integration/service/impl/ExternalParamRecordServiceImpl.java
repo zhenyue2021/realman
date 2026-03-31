@@ -24,7 +24,7 @@ import java.util.Map;
 public class ExternalParamRecordServiceImpl extends ServiceImpl<ExternalParamRecordMapper, ExternalParamRecord>
         implements IExternalParamRecordService {
 
-    /** Redis key 前缀：ext:param:{sourceSystem} */
+    /** Redis key 前缀：ext:param:{sourceSystem}:{targetSystem} */
     private static final String REDIS_KEY_PREFIX = "realman:ext:param:";
 
     /** utcExpiration 解析失败时的兜底 TTL（1 小时） */
@@ -54,6 +54,7 @@ public class ExternalParamRecordServiceImpl extends ServiceImpl<ExternalParamRec
         // 3. 构建持久化实体
         ExternalParamRecord record = new ExternalParamRecord();
         record.setSourceSystem(dto.getSourceSystem());
+        record.setTargetSystem(dto.getTargetSystem());
         record.setRequestId(dto.getRequestId());
         record.setBizType(dto.getBizType());
         record.setParamTimestamp(paramTimestamp);
@@ -74,10 +75,10 @@ public class ExternalParamRecordServiceImpl extends ServiceImpl<ExternalParamRec
         log.info("[ExternalParam] 参数已入库: id={}, sourceSystem={}, requestId={}",
                 record.getId(), dto.getSourceSystem(), dto.getRequestId());
 
-        // 5. 写入 Redis，key = ext:param:{sourceSystem}，value = data JSON
+        // 5. 写入 Redis，key = ext:param:{sourceSystem}:{targetSystem}，value = data JSON
         //    TTL 跟随凭证过期时间（utcExpiration），解析失败则用默认 1 小时
         if (data != null) {
-            String cacheKey = REDIS_KEY_PREFIX + dto.getSourceSystem();
+            String cacheKey = REDIS_KEY_PREFIX + dto.getSourceSystem() + ":" + dto.getTargetSystem();
             long ttl = computeTtlSeconds(record.getUtcExpiration());
             redisUtil.set(cacheKey, data.toJSONString());
             redisUtil.expire(cacheKey, ttl);
@@ -89,22 +90,23 @@ public class ExternalParamRecordServiceImpl extends ServiceImpl<ExternalParamRec
 
     @Override
     @SuppressWarnings("unchecked")
-    public Map<String, Object> getCachedData(String sourceSystem) {
-        String cacheKey = REDIS_KEY_PREFIX + sourceSystem;
+    public Map<String, Object> getCachedData(String sourceSystem, String targetSystem) {
+        String cacheKey = REDIS_KEY_PREFIX + sourceSystem + ":" + targetSystem;
         Object cached = redisUtil.get(cacheKey);
         if (cached != null) {
             return JSON.parseObject(cached.toString(), Map.class);
         }
 
-        // 缓存未命中，降级查库：取该来源系统最新一条记录
-        log.warn("[ExternalParam] 缓存未命中，降级查库: sourceSystem={}", sourceSystem);
+        // 缓存未命中，降级查库：取该来源系统+目标系统最新一条记录
+        log.warn("[ExternalParam] 缓存未命中，降级查库: sourceSystem={}, targetSystem={}", sourceSystem, targetSystem);
         ExternalParamRecord record = this.getOne(
                 new LambdaQueryWrapper<ExternalParamRecord>()
                         .eq(ExternalParamRecord::getSourceSystem, sourceSystem)
+                        .eq(ExternalParamRecord::getTargetSystem, targetSystem)
                         .orderByDesc(ExternalParamRecord::getCreateTime)
                         .last("LIMIT 1"));
         if (record == null) {
-            log.warn("[ExternalParam] 库中亦无数据: sourceSystem={}", sourceSystem);
+            log.warn("[ExternalParam] 库中亦无数据: sourceSystem={}, targetSystem={}", sourceSystem, targetSystem);
             return null;
         }
 
@@ -113,7 +115,7 @@ public class ExternalParamRecordServiceImpl extends ServiceImpl<ExternalParamRec
         long ttl = computeTtlSeconds(record.getUtcExpiration());
         redisUtil.set(cacheKey, JSON.toJSONString(data));
         redisUtil.expire(cacheKey, ttl);
-        log.info("[ExternalParam] 降级查库成功，已回写缓存: sourceSystem={}, ttl={}s", sourceSystem, ttl);
+        log.info("[ExternalParam] 降级查库成功，已回写缓存: sourceSystem={}, targetSystem={}, ttl={}s", sourceSystem, targetSystem, ttl);
         return data;
     }
 

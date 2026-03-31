@@ -16,10 +16,11 @@ public interface IExternalParamRecordService extends IService<ExternalParamRecor
     boolean receiveAndStore(ExternalParamReceiveDTO dto);
 
     /**
-     * 从 Redis 缓存查询指定来源系统的最新 data 参数。
+     * 从 Redis 缓存查询指定来源系统+目标系统的最新 data 参数。
      * 缓存未命中时返回 null。
      *
      * @param sourceSystem 外部系统编码，如 "DEW"
+     * @param targetSystem 目标系统编码
      */
-    Map<String, Object> getCachedData(String sourceSystem);
+    Map<String, Object> getCachedData(String sourceSystem, String targetSystem);
 }

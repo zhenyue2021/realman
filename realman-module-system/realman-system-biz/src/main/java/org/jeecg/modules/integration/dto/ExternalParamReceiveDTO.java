@@ -20,6 +20,12 @@ public class ExternalParamReceiveDTO implements Serializable {
     private String sourceSystem;
 
     /**
+     * 内部系统编码（用于区分调用方）
+     */
+    @NotBlank(message = "targetSystem不能为空")
+    private String targetSystem;
+
+    /**
      * 本次请求唯一标识（便于幂等与排查）
      */
     @NotBlank(message = "requestId不能为空")
