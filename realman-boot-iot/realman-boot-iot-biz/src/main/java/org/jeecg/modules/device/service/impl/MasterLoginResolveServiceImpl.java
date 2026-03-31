@@ -1,5 +1,6 @@
 package org.jeecg.modules.device.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -10,10 +11,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.constant.DeviceConstant;
 import org.jeecg.modules.device.constant.WorkOrderConstant;
 import org.jeecg.modules.device.dto.MasterLoginDTO;
+import org.jeecg.modules.device.dto.WorkOrderDTO;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.entity.IotDeviceAuth;
 import org.jeecg.modules.device.entity.IotMasterLoginLog;
 import org.jeecg.modules.device.entity.workorder.WorkOrder;
+import org.jeecg.modules.device.entity.workorder.WorkOrderComplianceConfig;
 import org.jeecg.modules.device.entity.workorder.WorkOrderDevice;
 import org.jeecg.modules.device.mapper.IotDeviceAuthMapper;
 import org.jeecg.modules.device.mapper.IotDeviceMapper;
@@ -24,6 +27,7 @@ import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.mqtt.publisher.MqttPublisher;
 import org.jeecg.modules.device.service.IMasterLoginResolveService;
 import org.jeecg.modules.device.service.MasterAssociatedDevicePendingService;
+import org.jeecg.modules.device.service.workorder.IWorkOrderComplianceConfigService;
 import org.jeecg.modules.device.service.workorder.IWorkOrderService;
 import org.jeecg.modules.device.vo.MasterLoginResolveVO;
 import org.jeecg.modules.device.vo.UsageStatusVO;
@@ -58,6 +62,7 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
     private final SysUserDepartLiteMapper sysUserDepartLiteMapper;
     private final WorkOrderDeviceMapper workOrderDeviceMapper;
     private final IWorkOrderService workOrderService;
+    private final IWorkOrderComplianceConfigService workOrderConfigService;
     private final DeviceWebSocketServer deviceWebSocketServer;
     private final MasterAssociatedDevicePendingService masterAssociatedDevicePendingService;
     /** 配置中心配置的master的Mac地址 */
@@ -225,9 +230,13 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
         } catch (Exception e) {
             log.warn("[ControllerLogin] WebSocket 推送工单失败: workOrderId={}, err={}", firstOrder.getId(), e.getMessage());
         }
-
+        // 获取工单合规性配置
+        WorkOrderComplianceConfig complianceConfig = workOrderConfigService.getById(firstOrder.getComplianceId());
+        WorkOrderDTO workOrderDTO = new WorkOrderDTO();
+        BeanUtil.copyProperties(firstOrder, workOrderDTO);
+        workOrderDTO.setWorkOrderComplianceConfig(complianceConfig);
         // 组装返回 VO
-        vo.setPendingWorkOrder(firstOrder);
+        vo.setPendingWorkOrder(workOrderDTO);
         if (robot != null) {
             UsageStatusVO.RobotBasicVO current = new UsageStatusVO.RobotBasicVO();
             current.setRobotId(robot.getId());

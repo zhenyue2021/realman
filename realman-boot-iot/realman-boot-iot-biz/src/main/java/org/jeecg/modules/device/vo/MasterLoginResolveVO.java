@@ -1,6 +1,7 @@
 package org.jeecg.modules.device.vo;
 
 import lombok.Data;
+import org.jeecg.modules.device.dto.WorkOrderDTO;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.entity.workorder.WorkOrder;
 
@@ -25,7 +26,7 @@ public class MasterLoginResolveVO {
     private List<UsageStatusVO.RobotBasicVO> availableRobots;
 
     /** 当前待开启的工单（按生效时间最近一条），无则为 null */
-    private WorkOrder pendingWorkOrder;
+    private WorkOrderDTO pendingWorkOrder;
     /** 当前待开启的工单列表，无则为 null */
     private List<WorkOrder> pendingWorkOrders;
 }
