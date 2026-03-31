@@ -121,76 +121,18 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
         String deviceCode = dto.getDeviceCode();
         log.info("请求体：{} 主控设备编码: {}", dto, deviceCode);
 
-        // 通过 设备ID 查询主控设备
-        IotDevice controller = deviceMapper.selectOne(
-                new LambdaQueryWrapper<IotDevice>()
-                        .eq(IotDevice::getDeviceCode, deviceCode)
-                        .eq(IotDevice::getDeviceType, DEVICE_TYPE_CONTROLLER)
-        );
-        if (controller == null) {
-            throw new RuntimeException("主控设备不存在或非主控设备: deviceCode:" + deviceCode);
-        }
+        IotDevice controller = lookupController(deviceCode);
+        checkControllerOnline(controller);
 
-        // 通过 MQTT 与主控做一次在线 & MAC 一致性校验（如不通过会直接抛异常）
-//        verifyControllerOnlineAndMac(controller, mac, dto);
-        // 设备是否在线
-        boolean online = Objects.equals(controller.getStatus(), DeviceConstant.DeviceStatus.ONLINE);
-        if ((!online)) {
-            throw new RuntimeException("当前主控设备不在线");
-        }
-        // 部门/企业授权：当前用户所属部门对该主控的有效授权
-        String operatorId = dto.getOperatorId();
-        if (operatorId == null || operatorId.isEmpty()) {
-            throw new RuntimeException("缺少操作员ID（operatorId）");
-        }
-        List<String> departIds = sysUserDepartLiteMapper.listDepartIdsByUserId(operatorId);
-        if (departIds == null || departIds.isEmpty()) {
-            throw new RuntimeException("无权限：当前用户未绑定企业");
-        }
         LocalDateTime now = LocalDateTime.now();
-        LambdaQueryWrapper<IotDeviceAuth> authWrapper = new LambdaQueryWrapper<IotDeviceAuth>()
-                .eq(IotDeviceAuth::getControllerId, controller.getId())
-                .eq(IotDeviceAuth::getStatus, 1)
-                .and(w -> w.isNull(IotDeviceAuth::getEffectiveTime).or().le(IotDeviceAuth::getEffectiveTime, now))
-                .and(w -> w.isNull(IotDeviceAuth::getExpireTime).or().ge(IotDeviceAuth::getExpireTime, now))
-                .in(IotDeviceAuth::getEnterpriseId, departIds);
-        List<IotDeviceAuth> auths = deviceAuthMapper.selectList(authWrapper);
-        if (auths == null || auths.isEmpty()) {
-            throw new RuntimeException("无权限：主控设备未授权给当前用户所在企业");
-        }
+        List<String> departIds = lookupDepartIds(dto.getOperatorId());
+        List<IotDeviceAuth> auths = queryAuths(controller, departIds, now);
 
-        // 可用机器人列表（授权绑定）
-        List<UsageStatusVO.RobotBasicVO> available = new ArrayList<>();
-        Set<String> allowedRobotIds = new HashSet<>();
-        for (IotDeviceAuth a : auths) {
-            if (a.getDeviceId() != null && !a.getDeviceId().isEmpty()) {
-                allowedRobotIds.add(a.getDeviceId());
-            }
-        }
-        for (String rid : allowedRobotIds) {
-            IotDevice robot = deviceMapper.selectById(rid);
-            if (robot != null && Integer.valueOf(DEVICE_TYPE_ROBOT).equals(robot.getDeviceType())) {
-                UsageStatusVO.RobotBasicVO v = new UsageStatusVO.RobotBasicVO();
-                v.setRobotId(robot.getId());
-                v.setRobotCode(robot.getDeviceCode());
-                v.setRobotName(robot.getDeviceName());
-                v.setStatus(robot.getStatus());
-                v.setUseStatus(robot.getUseStatus());
-                v.setDeviceModel(robot.getDeviceModel());
-                v.setFirmwareVersion(robot.getFirmwareVersion());
-                available.add(v);
-            }
-        }
-        // 构建登录日志 DTO（公共部分）
-        MasterLoginDTO logDto = new MasterLoginDTO();
-        logDto.setDeviceId(controller.getId());
-        logDto.setDeviceCode(controller.getDeviceCode());
-        logDto.setOperatorId(dto.getOperatorId());
-        logDto.setOperatorName(dto.getOperatorName());
+        MasterLoginDTO logDto = buildLoginLogDto(controller, dto);
 
         MasterLoginResolveVO vo = new MasterLoginResolveVO();
         vo.setController(controller);
-        vo.setAvailableRobots(available);
+        vo.setAvailableRobots(buildAvailableRobots(auths));
 
         // 查询该主控及当前用户所绑定部门进行中（STARTED）和待开始（PENDING）且未超时的工单且生效中的工单（已按计划开始时间升序）
         List<WorkOrder> pendingOrders = workOrderService.listPendingForControllerAndDepartments(controller.getDeviceCode(), departIds);
@@ -202,23 +144,115 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
         }
         vo.setPendingWorkOrders(pendingOrders);
 
-        // 取生效时间最近的第一条工单
         WorkOrder firstOrder = pendingOrders.get(0);
-
-        // 查找该工单关联的机器人设备
         IotDevice robot = resolveWorkOrderRobot(firstOrder.getId());
 
-        // 补全登录日志中的机器人信息
         if (robot != null) {
             logDto.setAssociatedRobotId(robot.getId());
             logDto.setAssociatedRobotCode(robot.getDeviceCode());
-            // 通知设备操作的是哪台机器人
-//            notifyControllerWhichRobot(robot);
         }
         var loginLog = this.recordLogin(logDto);
         vo.setLoginLogId(loginLog != null ? loginLog.getId() : null);
 
-        // 通过 WebSocket 推送工单信息给前端
+        pushWorkOrderViaWebSocket(controller, firstOrder, robot);
+
+        vo.setPendingWorkOrder(buildWorkOrderDto(firstOrder));
+        if (robot != null) {
+            vo.setCurrentRobot(toRobotBasicVO(robot));
+        }
+        return vo;
+    }
+
+    /** 查询主控设备，不存在则抛异常 */
+    private IotDevice lookupController(String deviceCode) {
+        IotDevice controller = deviceMapper.selectOne(
+                new LambdaQueryWrapper<IotDevice>()
+                        .eq(IotDevice::getDeviceCode, deviceCode)
+                        .eq(IotDevice::getDeviceType, DEVICE_TYPE_CONTROLLER)
+        );
+        if (controller == null) {
+            throw new RuntimeException("主控设备不存在或非主控设备: deviceCode:" + deviceCode);
+        }
+        return controller;
+    }
+
+    /** 校验主控在线状态，离线则抛异常 */
+    private void checkControllerOnline(IotDevice controller) {
+        if (!Objects.equals(controller.getStatus(), DeviceConstant.DeviceStatus.ONLINE)) {
+            throw new RuntimeException("当前主控设备不在线");
+        }
+    }
+
+    /** 查询操作员所属部门列表，operatorId 为空或无部门时抛异常 */
+    private List<String> lookupDepartIds(String operatorId) {
+        if (operatorId == null || operatorId.isEmpty()) {
+            throw new RuntimeException("缺少操作员ID（operatorId）");
+        }
+        List<String> departIds = sysUserDepartLiteMapper.listDepartIdsByUserId(operatorId);
+        if (departIds == null || departIds.isEmpty()) {
+            throw new RuntimeException("无权限：当前用户未绑定企业");
+        }
+        return departIds;
+    }
+
+    /** 查询主控对指定部门的有效授权，无授权则抛异常 */
+    private List<IotDeviceAuth> queryAuths(IotDevice controller, List<String> departIds, LocalDateTime now) {
+        LambdaQueryWrapper<IotDeviceAuth> authWrapper = new LambdaQueryWrapper<IotDeviceAuth>()
+                .eq(IotDeviceAuth::getControllerId, controller.getId())
+                .eq(IotDeviceAuth::getStatus, 1)
+                .and(w -> w.isNull(IotDeviceAuth::getEffectiveTime).or().le(IotDeviceAuth::getEffectiveTime, now))
+                .and(w -> w.isNull(IotDeviceAuth::getExpireTime).or().ge(IotDeviceAuth::getExpireTime, now))
+                .in(IotDeviceAuth::getEnterpriseId, departIds);
+        List<IotDeviceAuth> auths = deviceAuthMapper.selectList(authWrapper);
+        if (auths == null || auths.isEmpty()) {
+            throw new RuntimeException("无权限：主控设备未授权给当前用户所在企业");
+        }
+        return auths;
+    }
+
+    /** 从授权列表中提取可用机器人列表 */
+    private List<UsageStatusVO.RobotBasicVO> buildAvailableRobots(List<IotDeviceAuth> auths) {
+        Set<String> allowedRobotIds = new HashSet<>();
+        for (IotDeviceAuth a : auths) {
+            if (a.getDeviceId() != null && !a.getDeviceId().isEmpty()) {
+                allowedRobotIds.add(a.getDeviceId());
+            }
+        }
+        List<UsageStatusVO.RobotBasicVO> available = new ArrayList<>();
+        for (String rid : allowedRobotIds) {
+            IotDevice robot = deviceMapper.selectById(rid);
+            if (robot != null && Integer.valueOf(DEVICE_TYPE_ROBOT).equals(robot.getDeviceType())) {
+                available.add(toRobotBasicVO(robot));
+            }
+        }
+        return available;
+    }
+
+    /** 构建登录日志 DTO（公共基础部分，机器人信息由调用方按需补全） */
+    private MasterLoginDTO buildLoginLogDto(IotDevice controller, MasterLoginDTO dto) {
+        MasterLoginDTO logDto = new MasterLoginDTO();
+        logDto.setDeviceId(controller.getId());
+        logDto.setDeviceCode(controller.getDeviceCode());
+        logDto.setOperatorId(dto.getOperatorId());
+        logDto.setOperatorName(dto.getOperatorName());
+        return logDto;
+    }
+
+    /** 将 IotDevice 转换为 RobotBasicVO */
+    private UsageStatusVO.RobotBasicVO toRobotBasicVO(IotDevice robot) {
+        UsageStatusVO.RobotBasicVO v = new UsageStatusVO.RobotBasicVO();
+        v.setRobotId(robot.getId());
+        v.setRobotCode(robot.getDeviceCode());
+        v.setRobotName(robot.getDeviceName());
+        v.setStatus(robot.getStatus());
+        v.setUseStatus(robot.getUseStatus());
+        v.setDeviceModel(robot.getDeviceModel());
+        v.setFirmwareVersion(robot.getFirmwareVersion());
+        return v;
+    }
+
+    /** 通过 WebSocket 向前端推送工单状态及关联机器人信息 */
+    private void pushWorkOrderViaWebSocket(IotDevice controller, WorkOrder firstOrder, IotDevice robot) {
         try {
             String workOrderJson = objectMapper.writeValueAsString(firstOrder);
             if (WorkOrderConstant.ORDER_STATUS.PENDING.equals(firstOrder.getStatus())) {
@@ -230,25 +264,15 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
         } catch (Exception e) {
             log.warn("[ControllerLogin] WebSocket 推送工单失败: workOrderId={}, err={}", firstOrder.getId(), e.getMessage());
         }
-        // 获取工单合规性配置
-        WorkOrderComplianceConfig complianceConfig = workOrderConfigService.getById(firstOrder.getComplianceId());
+    }
+
+    /** 组装工单 DTO（含合规性配置） */
+    private WorkOrderDTO buildWorkOrderDto(WorkOrder order) {
+        WorkOrderComplianceConfig complianceConfig = workOrderConfigService.getById(order.getComplianceId());
         WorkOrderDTO workOrderDTO = new WorkOrderDTO();
-        BeanUtil.copyProperties(firstOrder, workOrderDTO);
+        BeanUtil.copyProperties(order, workOrderDTO);
         workOrderDTO.setWorkOrderComplianceConfig(complianceConfig);
-        // 组装返回 VO
-        vo.setPendingWorkOrder(workOrderDTO);
-        if (robot != null) {
-            UsageStatusVO.RobotBasicVO current = new UsageStatusVO.RobotBasicVO();
-            current.setRobotId(robot.getId());
-            current.setRobotCode(robot.getDeviceCode());
-            current.setRobotName(robot.getDeviceName());
-            current.setStatus(robot.getStatus());
-            current.setUseStatus(robot.getUseStatus());
-            current.setDeviceModel(robot.getDeviceModel());
-            current.setFirmwareVersion(robot.getFirmwareVersion());
-            vo.setCurrentRobot(current);
-        }
-        return vo;
+        return workOrderDTO;
     }
 
     /**
