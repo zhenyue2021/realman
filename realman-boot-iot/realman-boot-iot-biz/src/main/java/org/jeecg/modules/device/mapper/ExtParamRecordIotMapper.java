@@ -16,14 +16,15 @@ import java.util.Map;
 public interface ExtParamRecordIotMapper {
 
     /**
-     * 按 sourceSystem 查询最新一条记录的 data 字段集合。
+     * 按 sourceSystem + targetSystem 查询最新一条记录的 data 字段集合。
      * 返回 Map key 与 Redis 缓存中存储的 JSON key 保持一致，
      * 便于直接组装 {@link org.jeecg.modules.device.mqtt.MqttMessageModel.ExtParamsResponse}。
      */
     @Select("SELECT endpoint, bucket, bj_expiration AS bjExpiration, utc_expiration AS utcExpiration, " +
             "access_key_id AS accessKeyId, access_key_secret AS accessKeySecret, security_token AS securityToken " +
             "FROM integration_external_param_record " +
-            "WHERE source_system = #{sourceSystem} " +
+            "WHERE source_system = #{sourceSystem} AND target_system = #{targetSystem} " +
             "ORDER BY create_time DESC LIMIT 1")
-    Map<String, Object> findLatestDataBySourceSystem(@Param("sourceSystem") String sourceSystem);
+    Map<String, Object> findLatestData(@Param("sourceSystem") String sourceSystem,
+                                       @Param("targetSystem") String targetSystem);
 }

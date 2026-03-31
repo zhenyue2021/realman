@@ -14,23 +14,24 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.Map;
 
 /**
  * 处理设备请求外部系统服务参数（上行）
  *
  * <p>Topic 上行：device/{deviceCode}/ext-params/request
- * <p>Topic 下行：device/{deviceCode}/ext-params/response
+ * <p>Topic 下行：device/{deviceCode}/ext-params/ack
  *
  * <p>查询优先级：
  * <ol>
- *   <li>Redis 缓存（key: realman:ext:param:{sourceSystem}）</li>
+ *   <li>Redis 缓存（key: realman:ext:param:{req.targetSystem}:{req.sourceSystem}）</li>
  *   <li>降级查库（integration_external_param_record，取最新一条）并回写缓存</li>
- *   <li>库中亦无数据则响应 code=404</li>
+ *   <li>库中亦无数据则响应 code=400</li>
  * </ol>
  *
- * <p>所有设备共享同一套参数，每次外部系统推送（/api/integration/external/receiveParams）
- * 都会刷新 Redis 缓存，TTL 与凭证过期时间对齐。
+ * <p>注意：设备请求中 targetSystem 是外部系统的编码（如 GLN_MANAGE_PLATFORM），
+ * 对应外部系统推送时的 sourceSystem，因此缓存 key 需做翻转查找。
  */
 @Slf4j
 @Component
@@ -43,12 +44,6 @@ public class ExtParamsRequestHandler {
     /** utcExpiration 解析失败时的兜底 TTL（1 小时） */
     private static final long DEFAULT_TTL_SECONDS = 3600L;
 
-    /**
-     * 设备请求中未携带 sourceSystem 时使用的默认值，
-     * 可通过配置项 integration.ext-params.default-source-system 覆盖。
-     */
-    @Value("${integration.ext-params.default-source-system:DEW}")
-    private String defaultSourceSystem;
 
     private final CommandEncryptService encryptService;
     private final ObjectMapper objectMapper;
@@ -61,65 +56,86 @@ public class ExtParamsRequestHandler {
         MqttMessageModel.ExtParamsRequest req =
                 objectMapper.readValue(decrypted, MqttMessageModel.ExtParamsRequest.class);
 
-        // 确定 sourceSystem：优先使用设备请求中的值，缺省则用配置默认值
-        String sourceSystem = (req.getSourceSystem() != null && !req.getSourceSystem().isBlank())
-                ? req.getSourceSystem()
-                : defaultSourceSystem;
+        String sourceSystem = req.getSourceSystem();
+        String targetSystem = req.getTargetSystem();
 
-        log.info("[ExtParams] 设备请求外部参数: deviceCode={}, commandId={}, sourceSystem={}",
-                deviceCode, req.getCommandId(), sourceSystem);
+        log.info("[ExtParams] 设备请求外部参数: deviceCode={}, requestId={}, sourceSystem={}, targetSystem={}, bizType={}",
+                deviceCode, req.getRequestId(), sourceSystem, targetSystem, req.getBizType());
 
-        MqttMessageModel.ExtParamsResponse resp = buildResponse(req.getCommandId(), sourceSystem);
+        MqttMessageModel.ExtParamsResponse resp = buildResponse(req.getRequestId(), sourceSystem, targetSystem);
 
         String respTopic = String.format(DeviceConstant.MqttTopic.EXT_PARAMS_RESPONSE, deviceCode);
         mqttPublisher.publishToDevice(deviceCode, respTopic, objectMapper.writeValueAsString(resp), 1);
     }
 
     @SuppressWarnings("unchecked")
-    private MqttMessageModel.ExtParamsResponse buildResponse(String commandId, String sourceSystem) {
+    private MqttMessageModel.ExtParamsResponse buildResponse(String requestId, String sourceSystem, String targetSystem) {
+        // 缓存 key：外部系统推送时以自身为 sourceSystem，设备请求中的 targetSystem 即外部系统编码
+        // 因此 key = realman:ext:param:{req.targetSystem}:{req.sourceSystem}
+        String cacheKey = REDIS_KEY_PREFIX + targetSystem + ":" + sourceSystem;
+
         // 1. 优先读 Redis 缓存
-        Object cached = redisUtil.get(REDIS_KEY_PREFIX + sourceSystem);
+        Object cached = redisUtil.get(cacheKey);
         if (cached != null) {
             Map<String, Object> data = JSON.parseObject(cached.toString(), Map.class);
-            log.info("[ExtParams] 缓存命中，响应设备: commandId={}, sourceSystem={}", commandId, sourceSystem);
-            return toResponse(commandId, data);
+            log.info("[ExtParams] 缓存命中，响应设备: requestId={}, sourceSystem={}, targetSystem={}",
+                    requestId, sourceSystem, targetSystem);
+            return toResponse(requestId, sourceSystem, targetSystem, data);
         }
 
-        // 2. 缓存未命中，降级查库
-        log.warn("[ExtParams] Redis 缓存未命中，降级查库: sourceSystem={}", sourceSystem);
-        Map<String, Object> dbData = extParamRecordIotMapper.findLatestDataBySourceSystem(sourceSystem);
+        // 2. 缓存未命中，降级查库（外部系统是 source，请求方是 target）
+        log.warn("[ExtParams] Redis 缓存未命中，降级查库: sourceSystem={}, targetSystem={}", sourceSystem, targetSystem);
+        Map<String, Object> dbData = extParamRecordIotMapper.findLatestData(targetSystem, sourceSystem);
         if (dbData == null || dbData.isEmpty()) {
-            log.warn("[ExtParams] 库中亦无数据，返回 400: sourceSystem={}", sourceSystem);
+            log.warn("[ExtParams] 库中亦无数据，返回 400: sourceSystem={}, targetSystem={}", sourceSystem, targetSystem);
             return MqttMessageModel.ExtParamsResponse.builder()
-                    .commandId(commandId)
+                    .requestId(requestId)
+                    .sourceSystem(sourceSystem)
+                    .targetSystem(targetSystem)
+                    .bizType("upload_url_response")
+                    .timestamp(LocalDateTime.now().toString())
                     .code(400)
                     .message("暂无可用的外部服务参数，请稍后重试")
                     .build();
         }
 
         // 3. 查库成功，回写 Redis 缓存（TTL 跟随凭证过期时间）
-        String cacheKey = REDIS_KEY_PREFIX + sourceSystem;
         long ttl = computeTtlSeconds(str(dbData, "utcExpiration"));
         redisUtil.set(cacheKey, JSON.toJSONString(dbData));
         redisUtil.expire(cacheKey, ttl);
-        log.info("[ExtParams] 降级查库成功，已回写缓存: sourceSystem={}, ttl={}s", sourceSystem, ttl);
+        log.info("[ExtParams] 降级查库成功，已回写缓存: cacheKey={}, ttl={}s", cacheKey, ttl);
 
-        return toResponse(commandId, dbData);
+        return toResponse(requestId, sourceSystem, targetSystem, dbData);
     }
 
-    private MqttMessageModel.ExtParamsResponse toResponse(String commandId, Map<String, Object> data) {
+    private MqttMessageModel.ExtParamsResponse toResponse(String requestId, String reqSourceSystem, String targetSystem, Map<String, Object> data) {
+        String localDateTime = LocalDateTime.now().toString();
+        MqttMessageModel.ExtParamsResponse.StsCredential credential =
+                MqttMessageModel.ExtParamsResponse.StsCredential.builder()
+                        .endpoint(str(data, "endpoint"))
+                        .bucket(str(data, "bucket"))
+                        .bjExpiration(str(data, "bjExpiration"))
+                        .utcExpiration(str(data, "utcExpiration"))
+                        .accessKeyId(str(data, "accessKeyId"))
+                        .accessKeySecret(str(data, "accessKeySecret"))
+                        .securityToken(str(data, "securityToken"))
+                        .build();
+        MqttMessageModel.ExtParamsResponse.ResponseParams params =
+                MqttMessageModel.ExtParamsResponse.ResponseParams.builder()
+                        .timestamp(localDateTime)
+                        .data(credential)
+                        .build();
         MqttMessageModel.ExtParamsResponse resp = MqttMessageModel.ExtParamsResponse.builder()
-                .commandId(commandId)
-                .code(0)
-                .endpoint(str(data, "endpoint"))
-                .bucket(str(data, "bucket"))
-                .bjExpiration(str(data, "bjExpiration"))
-                .utcExpiration(str(data, "utcExpiration"))
-                .accessKeyId(str(data, "accessKeyId"))
-                .accessKeySecret(str(data, "accessKeySecret"))
-                .securityToken(str(data, "securityToken"))
+                .requestId(requestId)
+                .sourceSystem(reqSourceSystem)
+                .targetSystem(targetSystem)
+                .bizType("upload_url_response")
+                .timestamp(localDateTime)
+                .code(200)
+                .message("success")
+                .params(params)
                 .build();
-        log.info("[ExtParams] 参数已响应: commandId={}, accessKeyId={}", commandId, resp.getAccessKeyId());
+        log.info("[ExtParams] 参数已响应: requestId={}, accessKeyId={}", requestId, credential.getAccessKeyId());
         return resp;
     }
 

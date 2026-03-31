@@ -568,15 +568,23 @@ public class MqttMessageModel {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class ExtParamsRequest {
         /** 请求唯一ID，响应时原样返回，便于设备侧对账 */
-        private String commandId;
-        /** 外部系统编码（如 DEW），为空时使用平台配置的默认值 */
+        private String requestId;
+        /** 请求方系统编码（如 RM_FUNC_MCAP_UPLOADER） */
         private String sourceSystem;
+        /** 目标系统编码（如 GLN_MANAGE_PLATFORM） */
+        private String targetSystem;
+        /** 业务类型（如 upload_url_request） */
+        private String bizType;
+        /** 请求时间戳（ISO-8601 本地时间，响应时回传至 params.timestamp） */
+        private String timestamp;
+        /** 业务参数（dataType / deviceId / fileSize 等，平台透传不解析） */
+        private Map<String, Object> params;
     }
 
     /**
-     * 下行：平台响应设备的外部系统服务参数（Topic: device/{deviceCode}/ext-params/response）
+     * 下行：平台响应设备的外部系统服务参数（Topic: device/{deviceCode}/ext-params/ack）
      *
-     * <p>code=0 表示成功，此时各业务字段有值；code 非 0 表示失败，message 说明原因。
+     * <p>code=200 表示成功；code 非 200 表示失败，message 说明原因。
      */
     @Data
     @Builder
@@ -584,18 +592,48 @@ public class MqttMessageModel {
     @AllArgsConstructor
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class ExtParamsResponse {
-        /** 与请求的 commandId 对应 */
-        private String commandId;
-        /** 0=成功，非 0=失败 */
+        /** 与请求的 requestId 对应 */
+        private String requestId;
+        /** 响应方系统编码（平台侧标识，如 GLN_MANAGE_PLATFORM） */
+        private String sourceSystem;
+        /** 目标系统编码（即请求方，如 RM_FUNC_MCAP_UPLOADER） */
+        private String targetSystem;
+        /** 业务类型（如 upload_url_response） */
+        private String bizType;
+        /** 响应时间戳（ISO-8601 本地时间） */
+        private String timestamp;
+        /** 200=成功，非 200=失败 */
         private int code;
-        /** 失败描述（code != 0 时填充） */
+        /** 失败描述（code != 200 时填充） */
         private String message;
-        private String endpoint;
-        private String bucket;
-        private String bjExpiration;
-        private String utcExpiration;
-        private String accessKeyId;
-        private String accessKeySecret;
-        private String securityToken;
+        /** 业务数据（成功时填充） */
+        private ResponseParams params;
+
+        @Data
+        @Builder
+        @NoArgsConstructor
+        @AllArgsConstructor
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        public static class ResponseParams {
+            /** 回传请求方的原始时间戳 */
+            private String timestamp;
+            /** STS 临时凭证数据 */
+            private StsCredential data;
+        }
+
+        @Data
+        @Builder
+        @NoArgsConstructor
+        @AllArgsConstructor
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        public static class StsCredential {
+            private String endpoint;
+            private String bucket;
+            private String bjExpiration;
+            private String utcExpiration;
+            private String accessKeyId;
+            private String accessKeySecret;
+            private String securityToken;
+        }
     }
 }
