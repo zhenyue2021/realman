@@ -55,14 +55,13 @@ public class MqttMessageDispatcherEndToEndTest {
     private DeviceOnlineOfflineHandler onlineOfflineHandler;
     private ForceFeedbackQueryPendingService forceFeedbackPending;
 
-    // 被测 Handler
-    private DeviceStatusHandler statusHandler;
     private DeviceConfigAckHandler configAckHandler;
     private DeviceCommandAckHandler commandAckHandler;
     private MasterCommandAckHandler masterCommandAckHandler;
     private OtaProgressHandler otaProgressHandler;
     private DeviceOperationLogHandler operationLogHandler;
     private ExtParamsRequestHandler extParamsRequestHandler;
+    private MasterCommandHandler masterCommandHandler;
 
     // 分发器
     private MqttMessageDispatcher dispatcher;
@@ -91,6 +90,8 @@ public class MqttMessageDispatcherEndToEndTest {
         webSocketServer = Mockito.mock(DeviceWebSocketServer.class);
         logService = Mockito.mock(IDeviceOperationLogService.class);
         onlineOfflineHandler = Mockito.mock(DeviceOnlineOfflineHandler.class);
+        extParamsRequestHandler = Mockito.mock(ExtParamsRequestHandler.class);
+        masterCommandHandler = Mockito.mock(MasterCommandHandler.class);
 
         // Redis ops for handlers
         @SuppressWarnings("unchecked")
@@ -101,7 +102,7 @@ public class MqttMessageDispatcherEndToEndTest {
         when(redisTemplate.opsForSet()).thenReturn(setOps);
 
         // 构造各 Handler 实例
-        statusHandler = new DeviceStatusHandler(
+        DeviceStatusHandler statusHandler = new DeviceStatusHandler(
                 deviceMapper,
                 statusMapper,
                 encryptService,
@@ -174,7 +175,8 @@ public class MqttMessageDispatcherEndToEndTest {
                 slamUploadRequestHandler,
                 slamUploadCompleteHandler,
                 slamSyncAckHandler,
-                extParamsRequestHandler
+                extParamsRequestHandler,
+                masterCommandHandler
         );
     }
 

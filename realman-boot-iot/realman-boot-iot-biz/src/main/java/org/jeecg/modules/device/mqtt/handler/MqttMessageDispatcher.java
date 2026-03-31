@@ -65,6 +65,7 @@ public class MqttMessageDispatcher {
     private final SlamUploadCompleteHandler           slamUploadCompleteHandler;
     private final SlamSyncAckHandler                  slamSyncAckHandler;
     private final ExtParamsRequestHandler             extParamsRequestHandler;
+    private final MasterCommandHandler                masterCommandHandler;
 
     /**
      * 分发 MQTT 消息到对应 Handler
@@ -174,6 +175,11 @@ public class MqttMessageDispatcher {
         // 主控设备原始状态上报：{robotCode}/master/states
         if ("master".equals(role) && "states".equals(path)) {
             robotSlaveStatusHandler.handleMasterStatus(deviceCode, payload);
+            return;
+        }
+        // 主控设备原始状态上报：{masterCode}/master/cmd
+        if ("master".equals(role) && "cmd".equals(path)) {
+            masterCommandHandler.handle(deviceCode, payload);
             return;
         }
         log.debug("[Dispatcher] 原始上报 deviceCode={} role={} path={}", deviceCode, role, path);

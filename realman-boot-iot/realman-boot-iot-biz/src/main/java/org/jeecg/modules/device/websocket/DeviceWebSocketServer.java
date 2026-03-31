@@ -124,6 +124,18 @@ public class DeviceWebSocketServer {
     }
 
     /**
+     * 推送“主控设备指令”数据（由 MasterCommandHandler#handle 在收到 {controllerCode}/master/cmd 后调用）
+     *
+     *
+     * @param controllerCode  主控设备编码
+     * @param cmdJson 主控设备上报指令 JSON（原始上报数据）
+     */
+    public void pushMasterCmdStatus(String controllerCode, String cmdJson) {
+        String msg = "{\"type\":\"MASTER_CMD\",\"deviceCode\":\"" + controllerCode + "\",\"data\":" + cmdJson + "}";
+        send(controllerCode, msg);
+    }
+
+    /**
      * 推送设备上线/下线事件（由 DeviceOnlineOfflineHandler 在处理 $SYS 事件后调用）
      *
      * <p>同时推送给该设备的订阅者和 "all" 全局订阅者。

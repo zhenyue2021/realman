@@ -33,6 +33,7 @@ public class MqttMessageDispatcherTest {
     private SlamUploadCompleteHandler slamUploadCompleteHandler;
     private SlamSyncAckHandler slamSyncAckHandler;
     private ExtParamsRequestHandler extParamsRequestHandler;
+    private MasterCommandHandler masterCommandHandler;
 
     private MqttMessageDispatcher dispatcher;
 
@@ -51,6 +52,8 @@ public class MqttMessageDispatcherTest {
         slamUploadRequestHandler = Mockito.mock(SlamUploadRequestHandler.class);
         slamUploadCompleteHandler = Mockito.mock(SlamUploadCompleteHandler.class);
         slamSyncAckHandler = Mockito.mock(SlamSyncAckHandler.class);
+        extParamsRequestHandler = Mockito.mock(ExtParamsRequestHandler.class);
+        masterCommandHandler = Mockito.mock(MasterCommandHandler.class);
 
         dispatcher = new MqttMessageDispatcher(
                 statusHandler,
@@ -66,7 +69,8 @@ public class MqttMessageDispatcherTest {
                 slamUploadRequestHandler,
                 slamUploadCompleteHandler,
                 slamSyncAckHandler,
-                extParamsRequestHandler
+                extParamsRequestHandler,
+                masterCommandHandler
         );
     }
 
