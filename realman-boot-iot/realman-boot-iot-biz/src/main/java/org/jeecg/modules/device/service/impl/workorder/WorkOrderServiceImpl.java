@@ -159,9 +159,9 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
         List<WorkOrderDevice> devices = findDevices(workOrderId);
         if (CollectionUtil.isNotEmpty(devices)) {
             devices.forEach(d -> {
-                d.setActualDeviceId(master.getDeviceId());
-                d.setActualDeviceName(master.getDeviceName());
-                d.setActualDeviceCode(master.getDeviceCode());
+                d.setActualDeviceId(d.getDeviceId());
+                d.setActualDeviceName(d.getDeviceName());
+                d.setActualDeviceCode(d.getDeviceCode());
                 workOrderDeviceMapper.updateById(d);
             });
         }
@@ -205,7 +205,7 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
             return;
         }
         order.setTimeoutReason(reason);
-        order.setTimeoutReasonSource(source != null && !source.isEmpty() ? source : "USER");
+        order.setTimeoutReasonSource(source != null && !source.isEmpty() ? source : "用户原因");
         this.updateById(order);
     }
 

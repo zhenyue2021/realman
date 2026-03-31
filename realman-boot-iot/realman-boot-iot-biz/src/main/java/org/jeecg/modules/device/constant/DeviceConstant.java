@@ -249,6 +249,19 @@ public interface DeviceConstant {
          */
         String ROBOT = "1";
     }
+    /**
+     * 设备类型
+     */
+    interface DEVICE_TYPE_INTEGER {
+        /**
+         * 主控设备
+         */
+        int CONTROLLER = 2;
+        /**
+         * 机器人设备
+         */
+        int ROBOT = 1;
+    }
 
     /**
      * Redis Key 前缀规范（统一命名空间 iot:）
