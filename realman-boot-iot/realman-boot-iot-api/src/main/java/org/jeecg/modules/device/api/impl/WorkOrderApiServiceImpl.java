@@ -256,6 +256,8 @@ public class WorkOrderApiServiceImpl implements WorkOrderApiService {
             dto.setCurrency(o.getCurrency());
             dto.setUnitPrice(o.getUnitPrice() != null ? o.getUnitPrice().toPlainString() : null);
             dto.setTotalPrice(o.getTotalPrice() != null ? o.getTotalPrice().toPlainString() : null);
+            dto.setDepartmentId(o.getDepartmentId());
+            dto.setDepartmentName(o.getDepartmentName());
 
             WorkOrderComplianceConfig cfg = cfgMap.get(o.getComplianceId());
             if (cfg != null) {

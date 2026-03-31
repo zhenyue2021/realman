@@ -1,5 +1,6 @@
 package org.jeecg.modules.device.dto.workorder;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import lombok.Data;
 import org.jeecg.common.aspect.annotation.Dict;
 
@@ -21,6 +22,8 @@ public class WorkOrderPageItemDTO {
      */
     private String agentId;
     private String agentName;
+    private String departmentId;
+    private String departmentName;
     private String enterpriseId;
     private String enterpriseName;
 
