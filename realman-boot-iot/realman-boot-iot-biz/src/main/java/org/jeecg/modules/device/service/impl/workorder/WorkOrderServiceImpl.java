@@ -1,5 +1,6 @@
 package org.jeecg.modules.device.service.impl.workorder;
 
+import cn.hutool.core.collection.CollectionUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -154,6 +155,16 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
         order.setActualStartTime(now);
         this.updateById(order);
         operationRecordService.createRecordsForWorkOrderStart(workOrderId, operatorId, operatorName, now);
+        // 更新实际使用设备-即当前设置的主控及机器人设备
+        List<WorkOrderDevice> devices = findDevices(workOrderId);
+        if (CollectionUtil.isNotEmpty(devices)) {
+            devices.forEach(d -> {
+                d.setActualDeviceId(master.getDeviceId());
+                d.setActualDeviceName(master.getDeviceName());
+                d.setActualDeviceCode(master.getDeviceCode());
+                workOrderDeviceMapper.updateById(d);
+            });
+        }
         // 通过 WebSocket 推送工单信息给前端
         try {
             String workOrderJson = objectMapper.writeValueAsString(order);

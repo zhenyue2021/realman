@@ -456,11 +456,11 @@ private final DeviceWebSocketServer                 deviceWebSocketServer;
     @Transactional(rollbackFor = Exception.class)
     public List<DeviceCameraStreamVO> startTeleop(String controllerId, String robotId, String operator) {
         IotDevice controller = require(controllerId);
-        if (!Objects.equals(controller.getDeviceType(), 2)) {
+        if (!Objects.equals(controller.getDeviceType(), DeviceConstant.DeviceType.CONTROLLER)) {
             throw new RuntimeException("设备类型不匹配：不是主控设备");
         }
         IotDevice robot = require(robotId);
-        if (!Objects.equals(robot.getDeviceType(), 1)) {
+        if (!Objects.equals(robot.getDeviceType(), DeviceConstant.DeviceType.ROBOT)) {
             throw new RuntimeException("设备类型不匹配：不是机器人设备");
         }
         if (!Objects.equals(robot.getStatus(), DeviceConstant.DeviceStatus.ONLINE)) {

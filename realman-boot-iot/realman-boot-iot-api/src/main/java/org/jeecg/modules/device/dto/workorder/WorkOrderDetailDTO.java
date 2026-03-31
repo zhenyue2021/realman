@@ -1,8 +1,10 @@
 package org.jeecg.modules.device.dto.workorder;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
 import org.jeecg.common.aspect.annotation.Dict;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
@@ -39,10 +41,10 @@ public class WorkOrderDetailDTO {
     private String complianceId;
 
     private String remark;
-
-    private String planStartTime;
-
-    private String planEndTime;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime planStartTime;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime planEndTime;
 
     @Dict(dicCode = "order_status")
     private String status;
@@ -55,34 +57,35 @@ public class WorkOrderDetailDTO {
     private String operatorName;
 
     private String operatorPhone;
-
-    private String actualStartTime;
-
-    private String submitTime;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime actualStartTime;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime submitTime;
 
     private String timeoutReason;
 
     private String timeoutReasonSource;
 
     private String auditBy;
-
-    private String auditTime;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime auditTime;
 
     private String auditComment;
 
     private String closeBy;
-
-    private String closeTime;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime closeTime;
 
     private String closeReason;
 
     private String createBy;
-
-    private String createTime;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime createTime;
 
     private String updateBy;
 
-    private String updateTime;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime updateTime;
 
     private String tenantId;
 

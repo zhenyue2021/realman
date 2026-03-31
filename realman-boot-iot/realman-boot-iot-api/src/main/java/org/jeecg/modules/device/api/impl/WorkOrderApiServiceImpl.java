@@ -83,9 +83,6 @@ public class WorkOrderApiServiceImpl implements WorkOrderApiService {
                     w.setDeviceId(d.getDeviceId());
                     w.setDeviceName(d.getDeviceName());
                     w.setDeviceCode(d.getDeviceCode());
-                    w.setActualDeviceId(d.getActualDeviceId());
-                    w.setActualDeviceName(d.getActualDeviceName());
-                    w.setActualDeviceCode(d.getActualDeviceCode());
                     return w;
                 }).collect(Collectors.toList());
 
