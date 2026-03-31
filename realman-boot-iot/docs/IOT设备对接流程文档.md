@@ -876,15 +876,31 @@ QoS: 1
 
 ```json
 {
-  "commandId": "req_084ecb37bbd8",
-  "sourceSystem": "DEW"
+  "requestId": "req_084ecb37bbd8",
+  "sourceSystem": "RM_FUNC_MCAP_UPLOADER",
+  "targetSystem": "GLN_MANAGE_PLATFORM",
+  "bizType": "upload_url_request",
+  "timestamp": "2026-02-25T16:28:32.6247124",
+  "params": {
+    "dataType": "MCAP",
+    "deviceId": "realbot_001",
+    "fileSize": 104857600
+  }
 }
 ```
 
+
+
 | 字段             | 类型     | 必填 | 说明                           |
 |----------------|--------|----|------------------------------|
-| `commandId`    | String | 是  | 请求唯一标识，响应时原样返回，用于对账          |
-| `sourceSystem` | String | 否  | 外部系统编码（如 `DEW`）；为空时平台使用默认配置值 |
+| `requestId`    | String | 是  | 请求唯一标识，响应时原样返回，用于对账          |
+| `sourceSystem` | String | 是  | 固定值：`RM_FUNC_MCAP_UPLOADER` |
+| `targetSystem` | String | 是  | 固定值：`GLN_MANAGE_PLATFORM` |
+| `bizType` | String | 是  | 固定值：`upload_url_request` |
+| `timestamp` | String | 是  | UTC+8 时间戳，精确到毫秒 |
+| `params.dataType` | String | 是  | 固定值：`MCAP` |
+| `params.deviceId` | String | 是  | 设备唯一标识 |
+| `params.fileSize` | int    | 否  | 待上传文件大小（字节） |
 
 ### 16.3 下行消息：ExtParamsResponse（平台 → 设备）
 
@@ -897,15 +913,25 @@ QoS: 1
 
 ```json
 {
-  "commandId": "req_084ecb37bbd8",
-  "code": 0,
-  "endpoint": "sts.cn-beijing.aliyuncs.com",
-  "bucket": "embodied-data",
-  "bjExpiration": "2026-02-25 17:28:15",
-  "utcExpiration": "2026-02-25T09:28:15Z",
-  "accessKeyId": "STS.NYx3uEBnMWqC3ogAa14JAFM6y",
-  "accessKeySecret": "Ai36sQjvJgoXoyusBkNJCYjAKup9Vy7g7JW2EsQj7v1h",
-  "securityToken": "CAISxwJ1q6Ft5B2yfSjIr5rNeM..."
+  "requestId": "req_084ecb37bbd8",
+  "sourceSystem": "GLN_MANAGE_PLATFORM",
+  "targetSystem": "RM_FUNC_MCAP_UPLOADER",
+  "bizType": "upload_url_response",
+  "timestamp": "2026-02-25T16:28:33.1247124",
+  "code": 200,
+  "message": "success",
+  "params": {
+    "timestamp": "2026-02-25T16:28:32.6247124",
+    "data": {
+      "endpoint": "sts.cn-beijing.aliyuncs.com",
+      "bucket": "embodied-data",
+      "bjExpiration": "2026-02-25 17:28:15",
+      "utcExpiration": "2026-02-25T09:28:15Z",
+      "accessKeyId": "STS.NYx3uEBnMWqC3ogAa14JAFM6y",
+      "accessKeySecret": "Ai36sQjvJgoXoyusBkNJCYjAKup9Vy7g7JW2EsQj7v1h",
+      "securityToken": "CAISxwJ1q6Ft5B2yfSjIr5rNeM..."
+    }
+  }
 }
 ```
 
@@ -913,24 +939,33 @@ QoS: 1
 
 ```json
 {
-  "commandId": "req_084ecb37bbd8",
+  "requestId": "req_084ecb37bbd8",
+  "sourceSystem": "GLN_MANAGE_PLATFORM",
+  "targetSystem": "RM_FUNC_MCAP_UPLOADER",
+  "bizType": "upload_url_response",
+  "timestamp": "2026-02-25T16:28:33.1247124",
   "code": 400,
   "message": "暂无可用的外部服务参数，请稍后重试"
 }
 ```
 
-| 字段                | 类型     | 说明                                             |
-|-------------------|--------|------------------------------------------------|
-| `commandId`       | String | 与请求一致                                          |
-| `code`            | int    | `0`=成功，`400`=暂无数据                              |
-| `message`         | String | 失败描述，`code=0` 时为 `null`                        |
-| `endpoint`        | String | STS endpoint 地址                                |
-| `bucket`          | String | OSS Bucket 名称                                  |
-| `bjExpiration`    | String | 凭证北京时间过期时间（`yyyy-MM-dd HH:mm:ss`）              |
-| `utcExpiration`   | String | 凭证 UTC 过期时间（ISO-8601，如 `2026-02-25T09:28:15Z`） |
-| `accessKeyId`     | String | STS AccessKeyId                                |
-| `accessKeySecret` | String | STS AccessKeySecret                            |
-| `securityToken`   | String | STS SecurityToken（长字符串）                        |
+| 字段                       | 类型     | 说明                                             |
+|--------------------------|--------|------------------------------------------------|
+| `requestId`              | String | 与请求一致                                          |
+| `code`                   | int    | `0`=成功，`400`=暂无数据                              |
+| `message`                | String | 失败描述，`code=0` 时为 `null`                        |
+| `sourceSystem`           | String | 是  | 固定值：`RM_FUNC_MCAP_UPLOADER` |
+| `targetSystem`           | String | 是  | 固定值：`GLN_MANAGE_PLATFORM` |
+| `bizType`                | String | 是  | 固定值：`upload_url_request` |
+| `timestamp`              | String | 是  | UTC+8 时间戳，精确到毫秒 |
+| `params.timestamp`       | String | 与达尔文推送一致                                |
+| `params.data.endpoint`   | String | STS endpoint 地址                                |
+| `params.data.bucket`          | String | OSS Bucket 名称                                  |
+| `params.data.bjExpiration`    | String | 凭证北京时间过期时间（`yyyy-MM-dd HH:mm:ss`）              |
+| `params.data.utcExpiration`   | String | 凭证 UTC 过期时间（ISO-8601，如 `2026-02-25T09:28:15Z`） |
+| `params.data.accessKeyId`     | String | STS AccessKeyId                                |
+| `params.data.accessKeySecret` | String | STS AccessKeySecret                            |
+| `params.data.securityToken`   | String | STS SecurityToken（长字符串）                        |
 
 ### 16.4 设备端行为建议
 

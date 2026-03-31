@@ -762,7 +762,7 @@ private final DeviceWebSocketServer                 deviceWebSocketServer;
 
         try {
             List<MqttMessageModel.CameraInfo> cameras = future.get(10, TimeUnit.SECONDS);
-            log.info("设备 {} 摄像头流查询结果：{}", deviceId, JSON.toJSONString(cameras));
+            log.debug("设备 {} 摄像头流查询结果：{}", deviceId, JSON.toJSONString(cameras));
             sourceResult =  cameras.stream()
                     .map(c -> DeviceCameraStreamVO.builder()
                             .cameraIndex(c.getCameraIndex())
