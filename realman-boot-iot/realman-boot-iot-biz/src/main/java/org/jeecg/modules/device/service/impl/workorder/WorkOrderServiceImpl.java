@@ -229,6 +229,20 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    public void deleteWorkOrder(String workOrderId) {
+        WorkOrder order = this.getById(workOrderId);
+        if (order == null) {
+            throw new IllegalArgumentException("工单不存在: " + workOrderId);
+        }
+        if (!WorkOrderConstant.ORDER_STATUS.PENDING.equals(order.getStatus())) {
+            throw new IllegalStateException("仅待开始（PENDING）状态的工单可删除，当前状态: " + order.getStatus());
+        }
+        this.removeById(workOrderId);
+        log.info("[WorkOrder] 工单已逻辑删除: workOrderId={}", workOrderId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
     public void closeWorkOrder(String workOrderId, String reason, String closer) {
         WorkOrder order = this.getById(workOrderId);
         if (order == null) {

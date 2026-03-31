@@ -131,6 +131,13 @@ public class WorkOrderController {
         return ApiResult.ok(null);
     }
 
+    @DeleteMapping("/{id}")
+    @Operation(summary = "删除工单")
+    public ApiResult<Void> delete(@PathVariable String id) {
+        workOrderService.deleteWorkOrder(id);
+        return ApiResult.ok(null);
+    }
+
     @PostMapping("/{id}/close")
     @Operation(summary = "关闭工单")
     public ApiResult<Void> close(@PathVariable String id, @RequestBody WorkOrderTimeoutReasonDTO dto,

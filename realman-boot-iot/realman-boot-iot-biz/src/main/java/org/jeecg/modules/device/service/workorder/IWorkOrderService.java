@@ -35,6 +35,11 @@ public interface IWorkOrderService extends IService<WorkOrder> {
 
     void closeWorkOrder(String workOrderId, String reason, String closer);
 
+    /**
+     * 逻辑删除工单，仅 PENDING 状态允许删除。
+     */
+    void deleteWorkOrder(String workOrderId);
+
     WorkOrder createWorkOrderWithDevices(WorkOrder order, List<WorkOrderDevice> devices);
 
     WorkOrder editWorkOrderWithDevices(WorkOrder updated, List<WorkOrderDevice> devices);
