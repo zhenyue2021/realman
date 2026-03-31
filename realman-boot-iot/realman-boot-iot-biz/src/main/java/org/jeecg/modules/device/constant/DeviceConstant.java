@@ -148,6 +148,13 @@ public interface DeviceConstant {
          */
         String EXT_PARAMS_RESPONSE = "device/%s/ext-params/ack";
 
+        /** 下行：平台向设备发送建图/定位/导航指令 */
+        String SLAM_REQUEST  = "device/%s/slam/request";
+        /** 上行：设备响应建图/定位/导航指令（含 sequence/total 多次响应） */
+        String SLAM_ACK      = "device/%s/slam/ack";
+        /** 上行：设备上报 SLAM 地图模式及当前位姿 */
+        String SLAM_STATES   = "device/%s/slam/states";
+
         /** EMQX 系统事件：设备 MQTT 连接建立（clientId 从 topic 路径中提取） */
         String SYS_CONNECTED    = "$SYS/brokers/+/clients/+/connected";
         /** EMQX 系统事件：设备 MQTT 连接断开 */
@@ -315,5 +322,44 @@ public interface DeviceConstant {
         int SUCCESS = 1;
         int PARTIAL_FAIL = 2;
         int FAIL = 3;
+    }
+
+    /**
+     * SLAM 指令请求记录状态
+     * <pre>
+     *   PENDING → PARTIAL（收到中间响应 sequence < total）
+     *   PARTIAL → COMPLETED（收到最终响应 sequence == total 且 success=true）
+     *   PENDING/PARTIAL → FAILED（success=false 或 code≠0）
+     * </pre>
+     */
+    interface SlamCommandStatus {
+        /** 已发送，等待设备响应 */
+        String PENDING   = "PENDING";
+        /** 收到部分响应（多次响应场景，尚未收到最终响应） */
+        String PARTIAL   = "PARTIAL";
+        /** 已完成（收到最终响应且成功） */
+        String COMPLETED = "COMPLETED";
+        /** 失败 */
+        String FAILED    = "FAILED";
+    }
+
+    /**
+     * SLAM 功能代码
+     */
+    interface SlamFunction {
+        String SWITCH_MODE              = "SwitchMode";
+        String GET_CURRENT_MAP          = "GetCurrentMap";
+        String SAVE_MAP                 = "SaveMap";
+        String SINGLE_POINT_NAVIGATION  = "SinglePointNavigation";
+        String MULTI_WAYPOINT_NAVIGATION = "MultiWaypointNavigation";
+        String SET_INITIAL_POSE         = "SetInitialPose";
+    }
+
+    /**
+     * Redis Key - SLAM 相关
+     */
+    interface SlamRedisKey {
+        /** 设备 SLAM 当前状态快照：iot:slam:states:{deviceCode} */
+        String SLAM_STATES_PREFIX = "iot:slam:states:";
     }
 }

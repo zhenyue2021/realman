@@ -1,6 +1,7 @@
 package org.jeecg.modules.device.mqtt;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -634,6 +635,78 @@ public class MqttMessageModel {
             private String accessKeyId;
             private String accessKeySecret;
             private String securityToken;
+        }
+    }
+
+    /**
+     * 下行：平台向设备发送建图/定位/导航指令（Topic: device/{deviceCode}/slam/request）
+     *
+     * <p>function 枚举值见 {@code DeviceConstant.SlamFunction}。
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class SlamRequest {
+        /** 请求唯一标识，响应时原样回传 */
+        private String commandId;
+        /** 功能代码（SwitchMode / GetCurrentMap / SaveMap 等） */
+        private String function;
+        /** 功能参数（依 function 不同结构不同） */
+        private Map<String, Object> params;
+    }
+
+    /**
+     * 上行：设备响应建图/定位/导航指令（Topic: device/{deviceCode}/slam/ack）
+     *
+     * <p>单次请求可能有多次响应（sequence/total），最后一次 sequence==total。
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class SlamAck {
+        private String commandId;
+        private String function;
+        private Boolean success;
+        private Integer code;
+        private String message;
+        /** 当前响应序号（从 1 开始） */
+        private Integer sequence;
+        /** 本次请求总响应次数 */
+        private Integer total;
+        /** 响应数据（依 function 不同结构不同） */
+        private Map<String, Object> data;
+    }
+
+    /**
+     * 上行：设备上报 SLAM 地图状态及当前位姿（Topic: device/{deviceCode}/slam/states）
+     *
+     * <p>IdleMode 模式下仅有 slamNavMode，其他模式同时包含 currentPose。
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class SlamStates {
+        @JsonProperty("slam_nav_mode")
+        private String slamNavMode;
+        @JsonProperty("current_pose")
+        private Pose currentPose;
+
+        @Data
+        @NoArgsConstructor
+        @AllArgsConstructor
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        public static class Pose {
+            @JsonProperty("pixel_x")
+            private Integer pixelX;
+            @JsonProperty("pixel_y")
+            private Integer pixelY;
+            private Double yaw;
         }
     }
 }
