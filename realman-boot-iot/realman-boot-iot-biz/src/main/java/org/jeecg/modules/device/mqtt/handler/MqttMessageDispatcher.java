@@ -151,7 +151,7 @@ public class MqttMessageDispatcher {
             case "ota/progress"                       -> otaProgressHandler.handle(deviceCode, payload);
             case "log/operation"                      -> operationLogHandler.handle(deviceCode, payload);
             case "camera/stream/ack"                  -> deviceCameraStreamResponseHandler.handle(deviceCode, payload);
-            case "teleop/associated-device/ack"  -> masterAssociatedDeviceResponseHandler.handle(deviceCode, payload);
+            case "teleop/associated-device/ack"       -> masterAssociatedDeviceResponseHandler.handle(deviceCode, payload);
             case "slam/upload/request"                -> slamUploadRequestHandler.handle(deviceCode, payload);
             case "slam/upload/complete"               -> slamUploadCompleteHandler.handle(deviceCode, payload);
             case "slam/sync/ack"                      -> slamSyncAckHandler.handle(deviceCode, payload);

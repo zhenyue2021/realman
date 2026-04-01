@@ -15,12 +15,16 @@ import org.jeecg.modules.device.mapper.IotSlamCommandRecordMapper;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.mqtt.publisher.MqttPublisher;
 import org.jeecg.modules.device.service.IIotSlamCommandService;
+import org.jeecg.modules.device.service.SlamCommandPendingService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 @Slf4j
 @Service
@@ -28,12 +32,16 @@ import java.util.UUID;
 public class IotSlamCommandServiceImpl extends ServiceImpl<IotSlamCommandRecordMapper, IotSlamCommandRecord>
         implements IIotSlamCommandService {
 
+    /** 等待设备首次 ACK 的超时时间（秒） */
+    private static final long ACK_WAIT_TIMEOUT_SECONDS = 10L;
+
     /** SLAM 状态 Redis TTL（秒），5 分钟 */
     private static final long SLAM_STATES_TTL = 300L;
 
     private final MqttPublisher mqttPublisher;
     private final ObjectMapper objectMapper;
     private final RedisUtil redisUtil;
+    private final SlamCommandPendingService pendingService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -47,7 +55,7 @@ public class IotSlamCommandServiceImpl extends ServiceImpl<IotSlamCommandRecordM
                 .params(params)
                 .build();
 
-        // 创建记录
+        // 创建记录（先落库，保证无论 MQTT 是否成功均有记录）
         IotSlamCommandRecord record = new IotSlamCommandRecord();
         record.setDeviceCode(deviceCode);
         record.setCommandId(commandId);
@@ -57,6 +65,9 @@ public class IotSlamCommandServiceImpl extends ServiceImpl<IotSlamCommandRecordM
         record.setSendTime(LocalDateTime.now());
         this.save(record);
 
+        // 注册 Future（在发送 MQTT 前注册，防止 ACK 先于 Future 注册到达）
+        CompletableFuture<MqttMessageModel.SlamAck> future = pendingService.register(commandId);
+
         // 发送 MQTT
         try {
             String topic = String.format(DeviceConstant.MqttTopic.SLAM_REQUEST, deviceCode);
@@ -64,15 +75,32 @@ public class IotSlamCommandServiceImpl extends ServiceImpl<IotSlamCommandRecordM
             mqttPublisher.publishToDevice(deviceCode, topic, payload, 1);
             log.info("[SlamCommand] 指令已发送: deviceCode={}, commandId={}, function={}", deviceCode, commandId, function);
         } catch (Exception e) {
+            pendingService.completeExceptionally(commandId, e);
             log.error("[SlamCommand] MQTT 发送失败: deviceCode={}, commandId={}", deviceCode, commandId, e);
-            // 发送失败直接标记为 FAILED
             record.setStatus(DeviceConstant.SlamCommandStatus.FAILED);
             record.setAckMessage("MQTT 发送失败: " + e.getMessage());
             record.setCompleteTime(LocalDateTime.now());
             this.updateById(record);
+            return record;
         }
 
-        return record;
+        // 等待设备首次 ACK（设备收到请求后会立即响应第一次结果）
+        // 若 total > 1，后续响应会在 this.handleAck 中继续更新 DB，此处只等第一次即可返回给调用方
+        try {
+            future.get(ACK_WAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            log.info("[SlamCommand] 收到首次 ACK: deviceCode={}, commandId={}", deviceCode, commandId);
+        } catch (TimeoutException e) {
+            // 超时不改变记录状态（设备可能稍后仍会响应，this.handleAck 会更新 DB）
+            pendingService.completeExceptionally(commandId, e);
+            log.warn("[SlamCommand] 等待首次 ACK 超时({}s): deviceCode={}, commandId={}",
+                    ACK_WAIT_TIMEOUT_SECONDS, deviceCode, commandId);
+        } catch (Exception e) {
+            pendingService.completeExceptionally(commandId, e);
+            log.error("[SlamCommand] 等待 ACK 异常: deviceCode={}, commandId={}", deviceCode, commandId, e);
+        }
+
+        // 重新读取最新状态（this.handleAck 可能已更新）
+        return this.getById(record.getId());
     }
 
     @Override
@@ -89,16 +117,21 @@ public class IotSlamCommandServiceImpl extends ServiceImpl<IotSlamCommandRecordM
                         .last("LIMIT 1"));
         if (record == null) {
             log.warn("[SlamCommand] 未找到对应记录，忽略 ack: commandId={}", ack.getCommandId());
+            // 未找到记录时也要释放 pending future，防止泄漏
+            pendingService.completeExceptionally(ack.getCommandId(),
+                    new IllegalStateException("未找到对应的指令记录"));
             return;
         }
 
-        // 已经是终态则不再更新
+        // 已处于终态则不再更新 DB，但仍需完成 pending future（防止 sendCommand 一直阻塞）
         if (DeviceConstant.SlamCommandStatus.COMPLETED.equals(record.getStatus())
                 || DeviceConstant.SlamCommandStatus.FAILED.equals(record.getStatus())) {
-            log.info("[SlamCommand] 记录已处于终态，忽略 ack: commandId={}, status={}", ack.getCommandId(), record.getStatus());
+            log.info("[SlamCommand] 记录已处于终态，忽略重复 ack: commandId={}, status={}", ack.getCommandId(), record.getStatus());
+            pendingService.complete(ack.getCommandId(), ack);
             return;
         }
 
+        // 更新记录
         record.setAckSuccess(ack.getSuccess());
         record.setAckCode(ack.getCode());
         record.setAckMessage(ack.getMessage());
@@ -125,6 +158,12 @@ public class IotSlamCommandServiceImpl extends ServiceImpl<IotSlamCommandRecordM
         this.updateById(record);
         log.info("[SlamCommand] ack 已处理: commandId={}, function={}, sequence={}/{}, status={}",
                 ack.getCommandId(), ack.getFunction(), ack.getSequence(), ack.getTotal(), record.getStatus());
+
+        // 完成 pending future，解锁 sendCommand 的等待（仅第一次 ACK 有效，之后 map 中已无此 entry）
+        boolean released = pendingService.complete(ack.getCommandId(), ack);
+        if (released) {
+            log.info("[SlamCommand] pending future 已释放: commandId={}", ack.getCommandId());
+        }
     }
 
     @Override
