@@ -288,6 +288,10 @@ public interface DeviceConstant {
         String UPLOAD_CHUNK_PREFIX  = "iot:upload:chunk:";
         /** SLAM 上传会话缓存：iot:slam:upload:session:{deviceCode}:{requestId} */
         String SLAM_UPLOAD_SESSION_PREFIX = "iot:slam:upload:session:";
+        /** 遥操关系缓存（主控→机器人）：iot:teleop:master2robot:{masterCode}，值为 robotCode */
+        String TELEOP_MASTER_TO_ROBOT = "iot:teleop:master2robot:";
+        /** 遥操关系缓存（机器人→主控）：iot:teleop:robot2master:{robotCode}，值为 masterCode */
+        String TELEOP_ROBOT_TO_MASTER = "iot:teleop:robot2master:";
     }
 
     /**

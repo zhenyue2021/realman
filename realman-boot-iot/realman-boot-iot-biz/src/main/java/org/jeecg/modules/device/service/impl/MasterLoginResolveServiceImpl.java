@@ -34,6 +34,7 @@ import org.jeecg.modules.device.vo.UsageStatusVO;
 import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -65,6 +66,7 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
     private final IWorkOrderComplianceConfigService workOrderConfigService;
     private final DeviceWebSocketServer deviceWebSocketServer;
     private final MasterAssociatedDevicePendingService masterAssociatedDevicePendingService;
+    private final StringRedisTemplate redisTemplate;
     /** 配置中心配置的master的Mac地址 */
     @Value("${device.master.device_code:master_develop001_30-50-f1-01-cc-5f}")
     private String masterCode;
@@ -153,6 +155,14 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
         }
         var loginLog = this.recordLogin(logDto);
         vo.setLoginLogId(loginLog != null ? loginLog.getId() : null);
+
+        if (robot != null) {
+            String masterCode2 = controller.getDeviceCode();
+            String robotCode2  = robot.getDeviceCode();
+            redisTemplate.opsForValue().set(DeviceConstant.RedisKey.TELEOP_MASTER_TO_ROBOT + masterCode2, robotCode2);
+            redisTemplate.opsForValue().set(DeviceConstant.RedisKey.TELEOP_ROBOT_TO_MASTER + robotCode2, masterCode2);
+            log.info("[TeleopCache] 写入遥操关系缓存: master={} robot={}", masterCode2, robotCode2);
+        }
 
         pushWorkOrderViaWebSocket(controller, firstOrder, robot);
 

@@ -107,8 +107,8 @@ public class DeviceWebSocketServer implements MessageListener {
 
     /**
      * 推送 设备状态 数据（由 DeviceStatusHandler 在收到 {deviceCode}/status 后调用）
-     * @param deviceCode
-     * @param statusJson
+     * @param deviceCode    设备代码
+     * @param statusJson    设备状态实时数据JSON格式
      */
     public void pushDeviceStatus(String deviceCode, String statusJson) {
         String msg = buildMsg(DeviceConstant.WebSocketType.STATUS, deviceCode, statusJson);
