@@ -35,7 +35,7 @@ public class IotSlamCommandServiceImpl extends ServiceImpl<IotSlamCommandRecordM
         implements IIotSlamCommandService {
 
     /** 等待设备首次 ACK 的超时时间（秒） */
-    private static final long ACK_WAIT_TIMEOUT_SECONDS = 10L;
+    private static final long ACK_WAIT_TIMEOUT_SECONDS = 5L;
 
     /** SLAM 状态 Redis TTL（秒），5 分钟 */
     private static final long SLAM_STATES_TTL = 300L;
@@ -61,7 +61,7 @@ public class IotSlamCommandServiceImpl extends ServiceImpl<IotSlamCommandRecordM
         IotSlamCommandRecord record = new IotSlamCommandRecord();
         record.setDeviceCode(deviceCode);
         record.setCommandId(commandId);
-        record.setFunction(function);
+        record.setFunctionName(function);
         record.setParamsJson(params != null ? JSON.toJSONString(params) : null);
         record.setStatus(DeviceConstant.SlamCommandStatus.PENDING);
         record.setSendTime(LocalDateTime.now());

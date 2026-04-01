@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 import java.io.Serializable;
@@ -37,8 +38,9 @@ public class IotSlamCommandRecord implements Serializable {
     private String commandId;
 
     /** 功能代码（SwitchMode / GetCurrentMap / SaveMap 等） */
-    @TableField("function")
-    private String function;
+    @JsonProperty("function")
+    @TableField("function_name")
+    private String functionName;
 
     /** 请求参数 JSON */
     @TableField("params_json")

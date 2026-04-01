@@ -420,7 +420,7 @@ CREATE TABLE IF NOT EXISTS `iot_slam_command_record` (
                                                          `id`            VARCHAR(32)     NOT NULL                    COMMENT '主键（雪花ID）',
                                                          `device_code`   VARCHAR(64)     NOT NULL                    COMMENT '设备编码',
                                                          `command_id`    VARCHAR(64)     NOT NULL                    COMMENT '请求唯一标识（下发到设备的 commandId）',
-                                                         `function`      VARCHAR(64)     NOT NULL                    COMMENT '功能代码（SwitchMode/GetCurrentMap/SaveMap/SinglePointNavigation/MultiWaypointNavigation/SetInitialPose）',
+                                                         `function_name` VARCHAR(64)     NOT NULL                    COMMENT '功能代码（SwitchMode/GetCurrentMap/SaveMap/SinglePointNavigation/MultiWaypointNavigation/SetInitialPose）',
                                                          `params_json`   TEXT                                        COMMENT '请求参数 JSON',
                                                          `status`        VARCHAR(16)     NOT NULL DEFAULT 'PENDING'  COMMENT '状态：PENDING（已发送等待响应）/ PARTIAL（部分响应）/ COMPLETED（成功完成）/ FAILED（失败）',
                                                          `ack_success`   TINYINT(1)                                  COMMENT 'ack 响应 success 字段',

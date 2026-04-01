@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import com.fasterxml.jackson.annotation.JsonAlias;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.jeecg.common.util.RedisUtil;
@@ -36,7 +37,7 @@ public class SlamCommandController {
      * <p>请求体示例（切换模式）：
      * <pre>
      * {
-     *   "function": "SwitchMode",
+     *   "functionName": "SwitchMode",
      *   "params": { "target_mode": "MappingAndLocalization" }
      * }
      * </pre>
@@ -48,7 +49,7 @@ public class SlamCommandController {
     public ApiResult<IotSlamCommandRecord> send(@PathVariable String deviceCode,
                                                 @RequestBody SlamCommandRequest body) {
         IotSlamCommandRecord record = slamCommandService.sendCommand(
-                deviceCode, body.getFunction(), body.getParams());
+                deviceCode, body.getFunctionName(), body.getParams());
         return ApiResult.ok(record);
     }
 
@@ -82,7 +83,8 @@ public class SlamCommandController {
     @Data
     public static class SlamCommandRequest {
         /** 功能代码，见 DeviceConstant.SlamFunction */
-        private String function;
+        @JsonAlias("function")
+        private String functionName;
         /** 功能参数（依 function 不同结构不同，可为 null） */
         private Map<String, Object> params;
     }
