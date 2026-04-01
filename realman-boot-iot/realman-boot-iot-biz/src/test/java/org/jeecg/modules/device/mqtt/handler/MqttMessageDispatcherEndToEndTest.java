@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.apache.ibatis.session.Configuration;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
+import org.jeecg.common.util.RedisUtil;
 import org.jeecg.modules.device.constant.DeviceConstant;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.entity.IotDeviceConfig;
@@ -12,6 +13,7 @@ import org.jeecg.modules.device.entity.IotDeviceStatus;
 import org.jeecg.modules.device.entity.IotOtaUpgradeRecord;
 import org.jeecg.modules.device.mapper.*;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
+import org.jeecg.modules.device.mqtt.publisher.MqttPublisher;
 import org.jeecg.modules.device.security.CommandEncryptService;
 import org.jeecg.modules.device.service.DeviceCameraStreamPendingService;
 import org.jeecg.modules.device.service.ForceFeedbackQueryPendingService;
@@ -62,6 +64,14 @@ public class MqttMessageDispatcherEndToEndTest {
     private DeviceOperationLogHandler operationLogHandler;
     private ExtParamsRequestHandler extParamsRequestHandler;
     private MasterCommandHandler masterCommandHandler;
+
+
+    private SlamAckHandler slamAckHandler;
+    private SlamStatesHandler slamStatesHandler;
+
+    private MqttPublisher mqttPublisher;
+    private RedisUtil redisUtil;
+    private ExtParamRecordIotMapper extParamRecordIotMapper;
 
     // 分发器
     private MqttMessageDispatcher dispatcher;
@@ -145,6 +155,10 @@ public class MqttMessageDispatcherEndToEndTest {
                 logService
         );
 
+        extParamsRequestHandler = Mockito.mock(ExtParamsRequestHandler.class);
+        masterCommandHandler = Mockito.mock(MasterCommandHandler.class);
+        slamAckHandler = Mockito.mock(SlamAckHandler.class);
+        slamStatesHandler = Mockito.mock(SlamStatesHandler.class);
         DeviceCameraStreamPendingService cameraStreamPendingService = Mockito.mock(DeviceCameraStreamPendingService.class);
         DeviceCameraStreamResponseHandler deviceCameraStreamResponseHandler = new DeviceCameraStreamResponseHandler(
                 encryptService,
@@ -175,6 +189,8 @@ public class MqttMessageDispatcherEndToEndTest {
                 slamUploadRequestHandler,
                 slamUploadCompleteHandler,
                 slamSyncAckHandler,
+                slamAckHandler,
+                slamStatesHandler,
                 extParamsRequestHandler,
                 masterCommandHandler
         );

@@ -32,6 +32,8 @@ public class MqttMessageDispatcherTest {
     private SlamUploadRequestHandler slamUploadRequestHandler;
     private SlamUploadCompleteHandler slamUploadCompleteHandler;
     private SlamSyncAckHandler slamSyncAckHandler;
+    private SlamAckHandler slamAckHandler;
+    private SlamStatesHandler slamStatesHandler;
     private ExtParamsRequestHandler extParamsRequestHandler;
     private MasterCommandHandler masterCommandHandler;
 
@@ -69,6 +71,8 @@ public class MqttMessageDispatcherTest {
                 slamUploadRequestHandler,
                 slamUploadCompleteHandler,
                 slamSyncAckHandler,
+                slamAckHandler,
+                slamStatesHandler,
                 extParamsRequestHandler,
                 masterCommandHandler
         );
