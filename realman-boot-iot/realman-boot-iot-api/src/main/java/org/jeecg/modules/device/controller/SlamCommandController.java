@@ -24,7 +24,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/slam-command")
 @RequiredArgsConstructor
-@Tag(name = "建图-定位-导航指令")
+@Tag(name = "SLAM 建图-定位-导航指令")
 public class SlamCommandController {
 
     private final IIotSlamCommandService slamCommandService;

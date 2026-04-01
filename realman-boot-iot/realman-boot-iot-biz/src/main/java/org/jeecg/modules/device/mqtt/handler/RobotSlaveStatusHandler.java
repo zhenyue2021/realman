@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jeecg.modules.device.constant.DeviceConstant;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.entity.IotDeviceStatus;
 import org.jeecg.modules.device.mapper.IotDeviceMapper;
@@ -114,9 +115,15 @@ public class RobotSlaveStatusHandler {
         processStatus(robotCode, payload, deviceWebSocketServer::pushRobotStatus, true);
     }
 
-    /** 处理主控设备原始状态上报（{masterCode}/master/states） */
-    public void handleMasterStatus(String masterCode, String payload) {
-        log.debug("[SlaveStatusHandler] master上报 masterCode={}", masterCode);
+    /** 处理主控设备原始状态上报（{robotCode}/master/states） */
+    public void handleMasterStatus(String robotCode, String payload) {
+        log.debug("[SlaveStatusHandler] master上报 robotCode={}", robotCode);
+        String masterCode = redisTemplate.opsForValue()
+                .get(DeviceConstant.RedisKey.TELEOP_ROBOT_TO_MASTER + robotCode);
+        if (masterCode == null) {
+            log.warn("[MasterCommandHandler] 未找到机器人 {} 对应的主控缓存，忽略消息", robotCode);
+            return;
+        }
         processStatus(masterCode, payload, deviceWebSocketServer::pushMasterStatus, false);
     }
 

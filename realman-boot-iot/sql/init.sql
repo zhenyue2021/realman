@@ -279,7 +279,7 @@ CREATE TABLE IF NOT EXISTS `work_order` (
   `plan_start_time`       DATETIME     NOT NULL COMMENT '计划开始时间',
   `plan_end_time`         DATETIME     NOT NULL COMMENT '计划结束时间（失效时间）',
   `status`                VARCHAR(20)  NOT NULL DEFAULT 'PENDING' COMMENT '状态: PENDING/STARTED/SUBMITTED/COMPLETED/TIMEOUT/CLOSED',
-  `audit_result`          VARCHAR(20)           COMMENT '审核结果: PASS/FAIL/TIMEOUT/CLOSED',
+  `audit_result`          VARCHAR(20)           COMMENT '审核结果: 0-不合格，1-合格',
   `operator_id`           VARCHAR(36)           COMMENT '开启人员ID',
   `operator_name`         VARCHAR(50)           COMMENT '开启人员姓名',
   `operator_phone`        VARCHAR(20)           COMMENT '开启人员联系方式',

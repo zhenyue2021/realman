@@ -1,5 +1,7 @@
 package org.jeecg.modules.device.service.impl;
 
+import cn.hutool.core.util.IdUtil;
+import cn.hutool.core.util.RandomUtil;
 import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -46,7 +48,7 @@ public class IotSlamCommandServiceImpl extends ServiceImpl<IotSlamCommandRecordM
     @Override
     @Transactional(rollbackFor = Exception.class)
     public IotSlamCommandRecord sendCommand(String deviceCode, String function, Map<String, Object> params) {
-        String commandId = "slam_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+        String commandId = "SLAM_" + IdUtil.getSnowflakeNextId() + RandomUtil.randomStringUpper(6);
 
         // 构建下行报文
         MqttMessageModel.SlamRequest request = MqttMessageModel.SlamRequest.builder()
