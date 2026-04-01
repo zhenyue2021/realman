@@ -6,6 +6,7 @@ import org.jeecg.modules.device.service.ForceFeedbackQueryPendingService;
 import org.jeecg.modules.device.service.MasterAssociatedDevicePendingService;
 import org.jeecg.modules.device.service.SlamCommandPendingService;
 import org.jeecg.modules.device.service.SportSpeedQueryPendingService;
+import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
@@ -43,6 +44,7 @@ public class RedisPendingListenerConfig {
     private final SportSpeedQueryPendingService     sportSpeedPendingService;
     private final MasterAssociatedDevicePendingService associatedDevicePendingService;
     private final SlamCommandPendingService         slamCommandPendingService;
+    private final DeviceWebSocketServer             deviceWebSocketServer;
 
     @Bean
     public RedisMessageListenerContainer pendingListenerContainer() {
@@ -63,6 +65,9 @@ public class RedisPendingListenerConfig {
 
         container.addMessageListener(slamCommandPendingService,
                 new PatternTopic(SlamCommandPendingService.CHANNEL_PREFIX + "*"));
+
+        container.addMessageListener(deviceWebSocketServer,
+                new PatternTopic(DeviceWebSocketServer.WS_PUSH_CHANNEL_PREFIX + "*"));
 
         return container;
     }

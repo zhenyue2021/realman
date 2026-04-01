@@ -356,6 +356,30 @@ public interface DeviceConstant {
     }
 
     /**
+     * WebSocket 推送消息类型（对应前端 msg.type 字段）
+     */
+    interface WebSocketType {
+        /** 设备综合状态（温湿度/电量/信号/定位等） */
+        String STATUS                = "STATUS";
+        /** 机器人原始状态上报 */
+        String ROBOT_STATUS          = "ROBOT_STATUS";
+        /** 主控设备原始状态上报 */
+        String MASTER_STATUS         = "MASTER_STATUS";
+        /** 主控设备指令上报 */
+        String MASTER_CMD            = "MASTER_CMD";
+        /** 设备上下线事件 */
+        String ONLINE_STATUS         = "ONLINE_STATUS";
+        /** OTA 升级进度 */
+        String OTA_PROGRESS          = "OTA_PROGRESS";
+        /** 工单待执行提醒（到达 plan_start_time） */
+        String WORK_ORDER_PENDING    = "WORK_ORDER_PENDING";
+        /** 工单已开始提醒 */
+        String WORK_ORDER_STARTED    = "WORK_ORDER_STARTED";
+        /** 主控当前关联设备信息 */
+        String ASSOCIATED_DEVICE_INFO = "ASSOCIATED_DEVICE_INFO";
+    }
+
+    /**
      * Redis Key - SLAM 相关
      */
     interface SlamRedisKey {
