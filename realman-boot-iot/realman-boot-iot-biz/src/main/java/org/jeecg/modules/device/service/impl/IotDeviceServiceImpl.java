@@ -562,6 +562,10 @@ private final DeviceWebSocketServer                 deviceWebSocketServer;
                     DeviceConstant.OperationType.COMMAND_SEND,
                     "停止遥操：设备使用状态置为空闲", "{commandId:" + commandId + "}",
                     DeviceConstant.OperationSource.PLATFORM, "SUCCESS", null, operator, null);
+            // 清除遥操关系缓存
+            redisTemplate.delete(DeviceConstant.RedisKey.TELEOP_MASTER_TO_ROBOT + controllerDeviceCode);
+            redisTemplate.delete(DeviceConstant.RedisKey.TELEOP_ROBOT_TO_MASTER + robotDeviceCode);
+            log.info("[TeleopCache] 清除遥操关系缓存: master={} robot={}", controllerDeviceCode, robotDeviceCode);
         } catch (Exception e) {
             throw new RuntimeException("停止遥操失败: " + e.getMessage(), e);
         }
