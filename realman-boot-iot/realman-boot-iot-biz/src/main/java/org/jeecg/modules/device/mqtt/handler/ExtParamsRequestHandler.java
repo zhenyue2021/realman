@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.common.util.RedisUtil;
 import org.jeecg.modules.device.constant.DeviceConstant;
+import org.jeecg.modules.device.constant.MqttConstant;
 import org.jeecg.modules.device.mapper.ExtParamRecordIotMapper;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.mqtt.publisher.MqttPublisher;
@@ -65,7 +66,7 @@ public class ExtParamsRequestHandler {
         MqttMessageModel.ExtParamsResponse resp = buildResponse(req.getRequestId(), sourceSystem, targetSystem);
 
         String respTopic = String.format(DeviceConstant.MqttTopic.EXT_PARAMS_RESPONSE, deviceCode);
-        mqttPublisher.publishToDevice(deviceCode, respTopic, objectMapper.writeValueAsString(resp), 1);
+        mqttPublisher.publishToDevice(deviceCode, respTopic, objectMapper.writeValueAsString(resp), MqttConstant.MQTT_QOS.QOS_1);
     }
 
     @SuppressWarnings("unchecked")

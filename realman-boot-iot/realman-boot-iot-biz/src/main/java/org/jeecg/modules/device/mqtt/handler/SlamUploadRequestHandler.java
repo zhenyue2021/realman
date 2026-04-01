@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.constant.DeviceConstant;
+import org.jeecg.modules.device.constant.MqttConstant;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.mqtt.publisher.MqttPublisher;
 import org.jeecg.modules.device.security.CommandEncryptService;
@@ -27,7 +28,7 @@ public class SlamUploadRequestHandler {
         MqttMessageModel.SlamUploadPermit permit = slamService.handleUploadRequest(deviceCode, req);
         mqttPublisher.publishToDevice(deviceCode,
                 String.format(DeviceConstant.MqttTopic.SLAM_UPLOAD_PERMIT, deviceCode),
-                objectMapper.writeValueAsString(permit), 1);
+                objectMapper.writeValueAsString(permit), MqttConstant.MQTT_QOS.QOS_1);
         log.info("[SLAM] 上传许可已下发 deviceCode={}, mapId={}", deviceCode, permit.getMapId());
     }
 }

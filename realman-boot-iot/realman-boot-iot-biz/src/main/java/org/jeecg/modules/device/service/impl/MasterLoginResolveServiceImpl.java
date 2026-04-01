@@ -9,6 +9,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.constant.DeviceConstant;
+import org.jeecg.modules.device.constant.MqttConstant;
 import org.jeecg.modules.device.constant.WorkOrderConstant;
 import org.jeecg.modules.device.dto.MasterLoginDTO;
 import org.jeecg.modules.device.dto.WorkOrderDTO;
@@ -307,7 +308,7 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
         String topic = String.format(DeviceConstant.MqttTopic.ASSOCIATED_DEVICE_QUERY, controller.getDeviceCode());
         try {
             mqttPublisher.publishToDevice(controller.getDeviceCode(), topic,
-                    objectMapper.writeValueAsString(query), 1);
+                    objectMapper.writeValueAsString(query), MqttConstant.MQTT_QOS.QOS_1);
         } catch (Exception e) {
             masterAssociatedDevicePendingService.completeExceptionally(commandId, e);
             throw new RuntimeException("主控在线状态查询失败，请稍后重试", e);
@@ -359,7 +360,7 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
 
         try {
             mqttPublisher.publishToDevice(robot.getDeviceCode(), topic,
-                    objectMapper.writeValueAsString(assignCmd), 1);
+                    objectMapper.writeValueAsString(assignCmd), MqttConstant.MQTT_QOS.QOS_1);
         } catch (Exception e) {
             throw new RuntimeException("通过 MQTT 通知主控设备操作的是哪台机器人失败，请稍后重试", e);
         }

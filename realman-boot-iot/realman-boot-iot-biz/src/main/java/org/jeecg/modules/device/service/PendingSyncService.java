@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.jeecg.modules.device.constant.DeviceConstant;
+import org.jeecg.modules.device.constant.MqttConstant;
 import org.jeecg.modules.device.entity.IotDeviceConfig;
 import org.jeecg.modules.device.entity.IotOtaUpgradeRecord;
 import org.jeecg.modules.device.mapper.IotDeviceConfigMapper;
@@ -85,7 +86,7 @@ public class PendingSyncService {
                                 .commandId(commandId).params(params)
                                 .timestamp(System.currentTimeMillis()).build());
                 mqttPublisher.publishToDevice(deviceCode,
-                        String.format(DeviceConstant.MqttTopic.CONFIG_PUSH, deviceCode), payload, 1);
+                        String.format(DeviceConstant.MqttTopic.CONFIG_PUSH, deviceCode), payload, MqttConstant.MQTT_QOS.QOS_1);
                 log.info("[PendingSync] 设备[{}]上线，补推{}条待同步配置", deviceCode, params.size());
             } catch (Exception e) {
                 log.error("[PendingSync] 补推配置失败 deviceCode={}", deviceCode, e);

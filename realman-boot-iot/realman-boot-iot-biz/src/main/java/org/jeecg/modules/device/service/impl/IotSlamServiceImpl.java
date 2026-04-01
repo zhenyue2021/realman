@@ -12,6 +12,7 @@ import io.minio.http.Method;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.constant.DeviceConstant;
+import org.jeecg.modules.device.constant.MqttConstant;
 import org.jeecg.modules.device.dto.SlamBindingPageQueryDTO;
 import org.jeecg.modules.device.dto.SlamMapDetailDTO;
 import org.jeecg.modules.device.dto.SlamMapPageQueryDTO;
@@ -179,7 +180,7 @@ public class IotSlamServiceImpl implements IIotSlamService {
                             .build();
                     mqttPublisher.publishToDevice(target.getDeviceCode(),
                             String.format(DeviceConstant.MqttTopic.SLAM_SYNC_COMMAND, target.getDeviceCode()),
-                            objectMapper.writeValueAsString(cmd), 1);
+                            objectMapper.writeValueAsString(cmd), MqttConstant.MQTT_QOS.QOS_1);
                 } catch (Exception e) {
                     log.warn("[SLAM] 下发同步命令失败 taskId={}, robotCode={}, err={}",
                             task.getId(), target.getDeviceCode(), e.getMessage());

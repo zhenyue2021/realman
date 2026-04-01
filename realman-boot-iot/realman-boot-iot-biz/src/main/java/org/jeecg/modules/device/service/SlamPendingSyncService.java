@@ -8,6 +8,7 @@ import io.minio.http.Method;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.constant.DeviceConstant;
+import org.jeecg.modules.device.constant.MqttConstant;
 import org.jeecg.modules.device.entity.IotRobotSlamBinding;
 import org.jeecg.modules.device.entity.IotSlamMap;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
@@ -79,7 +80,7 @@ public class SlamPendingSyncService {
 
                 mqttPublisher.publishToDevice(deviceCode,
                         String.format(DeviceConstant.MqttTopic.SLAM_SYNC_COMMAND, deviceCode),
-                        objectMapper.writeValueAsString(cmd), 1);
+                        objectMapper.writeValueAsString(cmd), MqttConstant.MQTT_QOS.QOS_1);
                 pushed++;
             } catch (Exception e) {
                 log.warn("[SlamPendingSync] 补推失败 deviceCode={}, bindingId={}, err={}",

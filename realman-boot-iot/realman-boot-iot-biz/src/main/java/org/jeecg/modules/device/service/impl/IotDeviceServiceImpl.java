@@ -13,6 +13,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.constant.DeviceConstant;
+import org.jeecg.modules.device.constant.MqttConstant;
 import org.jeecg.modules.device.dto.DeviceRequestDTO;
 import org.jeecg.modules.device.dto.DeviceUpdateDTO;
 import org.jeecg.modules.device.entity.*;
@@ -253,7 +254,7 @@ private final DeviceWebSocketServer                 deviceWebSocketServer;
                 String payload = objectMapper.writeValueAsString(MqttMessageModel.ConfigPush.builder()
                         .commandId(commandId).params(params).timestamp(System.currentTimeMillis()).build());
                 mqttPublisher.publishToDevice(device.getDeviceCode(),
-                        String.format(DeviceConstant.MqttTopic.CONFIG_PUSH, device.getDeviceCode()), payload, 1);
+                        String.format(DeviceConstant.MqttTopic.CONFIG_PUSH, device.getDeviceCode()), payload, MqttConstant.MQTT_QOS.QOS_1);
                 // 写入 ACK 等待 Key，超时后自然过期（设备未响应不阻塞后续逻辑）
                 redisTemplate.opsForValue().set(
                         DeviceConstant.RedisKey.CONFIG_SYNC_PREFIX + device.getDeviceCode() + ":" + commandId,
@@ -428,7 +429,7 @@ private final DeviceWebSocketServer                 deviceWebSocketServer;
                 }
             }
             String payload = objectMapper.writeValueAsString(body);
-            mqttPublisher.publishToDevice(device.getDeviceCode(), topic, payload, 1);
+            mqttPublisher.publishToDevice(device.getDeviceCode(), topic, payload, MqttConstant.MQTT_QOS.QOS_1);
 
             String opType = mapCommandToOperationType(cmd);
             String desc = "发送指令[" + cmd + "]" + (reason != null ? (": " + reason) : "");
@@ -479,7 +480,7 @@ private final DeviceWebSocketServer                 deviceWebSocketServer;
                     .timestamp(now)
                     .build();
             mqttPublisher.publishToDevice(controllerDeviceCode, topic,
-                    objectMapper.writeValueAsString(assignCmd), 1);
+                    objectMapper.writeValueAsString(assignCmd), MqttConstant.MQTT_QOS.QOS_1);
 
             // 机器人使用状态置为占用（使用中）
             robot.setUseStatus(DeviceConstant.UseStatus.IN_USE);
@@ -537,7 +538,7 @@ private final DeviceWebSocketServer                 deviceWebSocketServer;
                     .timestamp(now)
                     .build();
             mqttPublisher.publishToDevice(controllerDeviceCode, controllerTopic,
-                    objectMapper.writeValueAsString(stopForController), 1);
+                    objectMapper.writeValueAsString(stopForController), MqttConstant.MQTT_QOS.QOS_1);
 
             // 2) 通知机器人停止遥操
             String robotTopic = String.format(DeviceConstant.MqttTopic.DEVICE_STOP_CONTROL, robotDeviceCode);
@@ -548,7 +549,7 @@ private final DeviceWebSocketServer                 deviceWebSocketServer;
                     .timestamp(now)
                     .build();
             mqttPublisher.publishToDevice(robotDeviceCode, robotTopic,
-                    objectMapper.writeValueAsString(stopForRobot), 1);
+                    objectMapper.writeValueAsString(stopForRobot), MqttConstant.MQTT_QOS.QOS_1);
 
             // 3) 不等待ACK，直接将机器人使用状态置为空闲
             robot.setUseStatus(DeviceConstant.UseStatus.IDLE);
@@ -595,7 +596,7 @@ private final DeviceWebSocketServer                 deviceWebSocketServer;
                     .build();
             String payload = objectMapper.writeValueAsString(cmd);
             String topic = String.format(DeviceConstant.MqttTopic.MASTER_FORCE_FEEDBACK, master.getDeviceCode());
-            mqttPublisher.publishToDevice(master.getDeviceCode(), topic, payload, 1);
+            mqttPublisher.publishToDevice(master.getDeviceCode(), topic, payload, MqttConstant.MQTT_QOS.QOS_1);
 
             String desc = "设置力反馈参数: armLevel=" + armLevel + ", gripperLevel=" + gripperLevel;
             logService.recordLog(master.getId(), master.getDeviceCode(),
@@ -635,7 +636,7 @@ private final DeviceWebSocketServer                 deviceWebSocketServer;
                     .build();
             String payload = objectMapper.writeValueAsString(cmd);
             String topic = String.format(DeviceConstant.MqttTopic.MASTER_SPORT_SPEED, controller.getDeviceCode());
-            mqttPublisher.publishToDevice(controller.getDeviceCode(), topic, payload, 1);
+            mqttPublisher.publishToDevice(controller.getDeviceCode(), topic, payload, MqttConstant.MQTT_QOS.QOS_1);
 
             String desc = "设置运动与安全参数: moveSpeedLevel=" + moveSpeedLevel + ", liftSpeedLevel=" + liftSpeedLevel;
             logService.recordLog(controller.getId(), controller.getDeviceCode(),
@@ -758,7 +759,7 @@ private final DeviceWebSocketServer                 deviceWebSocketServer;
                     .build();
             String payload = objectMapper.writeValueAsString(query);
             String topic = String.format(DeviceConstant.MqttTopic.CAMERA_STREAM_QUERY, device.getDeviceCode());
-            mqttPublisher.publishToDevice(device.getDeviceCode(), topic, payload, 1);
+            mqttPublisher.publishToDevice(device.getDeviceCode(), topic, payload, MqttConstant.MQTT_QOS.QOS_1);
         } catch (Exception e) {
             deviceCameraStreamPendingService.completeExceptionally(commandId, e);
             throw new RuntimeException("摄像头流查询指令发送失败: " + e.getMessage(), e);
@@ -812,7 +813,7 @@ private final DeviceWebSocketServer                 deviceWebSocketServer;
                     .build();
             String payload = objectMapper.writeValueAsString(cmd);
             String topic = String.format(DeviceConstant.MqttTopic.MASTER_FORCE_FEEDBACK, device.getDeviceCode());
-            mqttPublisher.publishToDevice(device.getDeviceCode(), topic, payload, 1);
+            mqttPublisher.publishToDevice(device.getDeviceCode(), topic, payload, MqttConstant.MQTT_QOS.QOS_1);
         } catch (Exception e) {
             throw new RuntimeException("发送力反馈查询指令失败: " + e.getMessage(), e);
         }
@@ -833,7 +834,7 @@ private final DeviceWebSocketServer                 deviceWebSocketServer;
                     .build();
             String payload = objectMapper.writeValueAsString(cmd);
             String topic = String.format(DeviceConstant.MqttTopic.MASTER_SPORT_SPEED, device.getDeviceCode());
-            mqttPublisher.publishToDevice(device.getDeviceCode(), topic, payload, 1);
+            mqttPublisher.publishToDevice(device.getDeviceCode(), topic, payload, MqttConstant.MQTT_QOS.QOS_1);
         } catch (Exception e) {
             throw new RuntimeException("发送运动速度查询指令失败: " + e.getMessage(), e);
         }

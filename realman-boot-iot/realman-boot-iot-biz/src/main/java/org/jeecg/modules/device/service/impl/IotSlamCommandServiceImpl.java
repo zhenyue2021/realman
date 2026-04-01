@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.common.util.RedisUtil;
 import org.jeecg.modules.device.constant.DeviceConstant;
+import org.jeecg.modules.device.constant.MqttConstant;
 import org.jeecg.modules.device.entity.IotSlamCommandRecord;
 import org.jeecg.modules.device.mapper.IotSlamCommandRecordMapper;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
@@ -74,7 +75,7 @@ public class IotSlamCommandServiceImpl extends ServiceImpl<IotSlamCommandRecordM
         try {
             String topic = String.format(DeviceConstant.MqttTopic.SLAM_REQUEST, deviceCode);
             String payload = objectMapper.writeValueAsString(request);
-            mqttPublisher.publishToDevice(deviceCode, topic, payload, 1);
+            mqttPublisher.publishToDevice(deviceCode, topic, payload, MqttConstant.MQTT_QOS.QOS_1);
             log.info("[SlamCommand] 指令已发送: deviceCode={}, commandId={}, function={}", deviceCode, commandId, function);
         } catch (Exception e) {
             pendingService.completeExceptionally(commandId, e);

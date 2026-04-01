@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.FileUtils;
 import org.jeecg.modules.device.constant.DeviceConstant;
+import org.jeecg.modules.device.constant.MqttConstant;
 import org.jeecg.modules.device.entity.*;
 import org.jeecg.modules.device.mapper.*;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
@@ -317,7 +318,7 @@ public class IotOtaServiceImpl extends ServiceImpl<IotOtaFirmwareMapper, IotOtaF
                         .fileMd5(fw.getFileMd5()).fileSize(fw.getFileSize())
                         .forceUpgrade(fw.getForceUpgrade()).timestamp(System.currentTimeMillis()).build());
                 mqttPublisher.publishToDevice(device.getDeviceCode(),
-                        String.format(DeviceConstant.MqttTopic.OTA_NOTIFY, device.getDeviceCode()), payload, 1);
+                        String.format(DeviceConstant.MqttTopic.OTA_NOTIFY, device.getDeviceCode()), payload, MqttConstant.MQTT_QOS.QOS_1);
 
                 // 更新记录状态为 NOTIFIED
                 rec.setUpgradeStatus(DeviceConstant.OtaUpgradeStatus.NOTIFIED);
