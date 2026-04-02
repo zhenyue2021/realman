@@ -124,7 +124,7 @@ public class IotSlamMapServiceImpl extends ServiceImpl<IotSlamMapMapper, IotSlam
             this.update(new LambdaUpdateWrapper<IotSlamMap>()
                     .eq(IotSlamMap::getRobotCode, record.getRobotCode())
                     .ne(IotSlamMap::getId, map.getId())
-                    .set(IotSlamMap::getIsDeleted, 1));
+                    .set(IotSlamMap::getDelFlag, 1));
 
             log.info("[SlamMap] 地图记录已保存: id={}, robotCode={}, mapName={}",
                     map.getId(), map.getRobotCode(), map.getMapName());

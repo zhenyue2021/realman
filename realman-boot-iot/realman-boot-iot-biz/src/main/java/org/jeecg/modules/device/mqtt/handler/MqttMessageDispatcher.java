@@ -61,9 +61,6 @@ public class MqttMessageDispatcher {
     private final DeviceCameraStreamResponseHandler   deviceCameraStreamResponseHandler;
     private final MasterAssociatedDeviceResponseHandler masterAssociatedDeviceResponseHandler;
     private final RobotSlaveStatusHandler             robotSlaveStatusHandler;
-    private final SlamUploadRequestHandler            slamUploadRequestHandler;
-    private final SlamUploadCompleteHandler           slamUploadCompleteHandler;
-    private final SlamSyncAckHandler                  slamSyncAckHandler;
     private final SlamAckHandler                      slamAckHandler;
     private final SlamStatesHandler                   slamStatesHandler;
     private final ExtParamsRequestHandler             extParamsRequestHandler;
@@ -152,9 +149,6 @@ public class MqttMessageDispatcher {
             case "log/operation"                      -> operationLogHandler.handle(deviceCode, payload);
             case "camera/stream/ack"                  -> deviceCameraStreamResponseHandler.handle(deviceCode, payload);
             case "teleop/associated-device/ack"       -> masterAssociatedDeviceResponseHandler.handle(deviceCode, payload);
-            case "slam/upload/request"                -> slamUploadRequestHandler.handle(deviceCode, payload);
-            case "slam/upload/complete"               -> slamUploadCompleteHandler.handle(deviceCode, payload);
-            case "slam/sync/ack"                      -> slamSyncAckHandler.handle(deviceCode, payload);
             case "slam/ack"                           -> slamAckHandler.handle(deviceCode, payload);
             case "slam/states"                        -> slamStatesHandler.handle(deviceCode, payload);
             case "ext-params/request"                 -> extParamsRequestHandler.handle(deviceCode, payload);

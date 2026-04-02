@@ -29,9 +29,6 @@ public class MqttMessageDispatcherTest {
     private DeviceCameraStreamResponseHandler deviceCameraStreamResponseHandler;
     private MasterAssociatedDeviceResponseHandler masterAssociatedDeviceResponseHandler;
     private RobotSlaveStatusHandler robotSlaveStatusHandler;
-    private SlamUploadRequestHandler slamUploadRequestHandler;
-    private SlamUploadCompleteHandler slamUploadCompleteHandler;
-    private SlamSyncAckHandler slamSyncAckHandler;
     private SlamAckHandler slamAckHandler;
     private SlamStatesHandler slamStatesHandler;
     private ExtParamsRequestHandler extParamsRequestHandler;
@@ -51,9 +48,8 @@ public class MqttMessageDispatcherTest {
         deviceCameraStreamResponseHandler = Mockito.mock(DeviceCameraStreamResponseHandler.class);
         masterAssociatedDeviceResponseHandler = Mockito.mock(MasterAssociatedDeviceResponseHandler.class);
         robotSlaveStatusHandler = Mockito.mock(RobotSlaveStatusHandler.class);
-        slamUploadRequestHandler = Mockito.mock(SlamUploadRequestHandler.class);
-        slamUploadCompleteHandler = Mockito.mock(SlamUploadCompleteHandler.class);
-        slamSyncAckHandler = Mockito.mock(SlamSyncAckHandler.class);
+        slamAckHandler = Mockito.mock(SlamAckHandler.class);
+        slamStatesHandler = Mockito.mock(SlamStatesHandler.class);
         extParamsRequestHandler = Mockito.mock(ExtParamsRequestHandler.class);
         masterCommandHandler = Mockito.mock(MasterCommandHandler.class);
 
@@ -68,9 +64,6 @@ public class MqttMessageDispatcherTest {
                 deviceCameraStreamResponseHandler,
                 masterAssociatedDeviceResponseHandler,
                 robotSlaveStatusHandler,
-                slamUploadRequestHandler,
-                slamUploadCompleteHandler,
-                slamSyncAckHandler,
                 slamAckHandler,
                 slamStatesHandler,
                 extParamsRequestHandler,
@@ -225,6 +218,24 @@ public class MqttMessageDispatcherTest {
     }
 
     @Test
+    void testSlamAck() throws Exception {
+        String deviceCode = "ROBOT001";
+        String topic = "device/" + deviceCode + "/slam/ack";
+        String payload = "{\"requestId\":\"req1\",\"success\":true}";
+        dispatcher.dispatch(topic, mqttMsg(payload));
+        Mockito.verify(slamAckHandler).handle(deviceCode, payload);
+    }
+
+    @Test
+    void testSlamStates() throws Exception {
+        String deviceCode = "ROBOT001";
+        String topic = "device/" + deviceCode + "/slam/states";
+        String payload = "{\"slamNavMode\":\"Mapping\"}";
+        dispatcher.dispatch(topic, mqttMsg(payload));
+        Mockito.verify(slamStatesHandler).handle(deviceCode, payload);
+    }
+
+    @Test
     void testUnknownBusinessTopic() {
         String deviceCode = "DEV001";
         String topic = "device/" + deviceCode + "/unknown/path";
@@ -258,14 +269,4 @@ public class MqttMessageDispatcherTest {
                 onlineOfflineHandler
         );
     }
-
-    @Test
-    void testSlamUploadRequest() throws Exception {
-        String deviceCode = "ROBOT001";
-        String topic = "device/" + deviceCode + "/slam/upload/request";
-        String payload = "{\"requestId\":\"req1\"}";
-        dispatcher.dispatch(topic, mqttMsg(payload));
-        Mockito.verify(slamUploadRequestHandler).handle(deviceCode, payload);
-    }
 }
-

@@ -66,8 +66,8 @@ public class IotSlamMap implements Serializable {
 
     /** 逻辑删除：0=有效，1=已被新地图替代 */
     @TableLogic
-    @TableField("is_deleted")
-    private Integer isDeleted;
+    @TableField("del_flag")
+    private Integer delFlag;
 
     @TableField(value = "create_time", fill = FieldFill.INSERT)
     private LocalDateTime createTime;

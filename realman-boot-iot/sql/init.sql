@@ -364,11 +364,11 @@ CREATE TABLE IF NOT EXISTS `iot_slam_map` (
     `command_id`                VARCHAR(64)                                 COMMENT '关联的 SLAM 指令 ID',
     `presigned_url`             VARCHAR(2048)                               COMMENT 'MinIO 预签名 GET URL',
     `presigned_url_expire_time` DATETIME                                    COMMENT '预签名 URL 过期时间',
-    `is_deleted`                TINYINT(1)      NOT NULL DEFAULT 0          COMMENT '逻辑删除：0=有效，1=已被新地图替代',
+    `del_flag`                  TINYINT(1)      NOT NULL DEFAULT 0          COMMENT '逻辑删除：0=有效，1=已被新地图替代',
     `create_time`               DATETIME                                    COMMENT '创建时间',
     `update_time`               DATETIME                                    COMMENT '更新时间',
     PRIMARY KEY (`id`),
-    KEY `idx_robot_code_deleted` (`robot_code`, `is_deleted`),
+    KEY `idx_robot_code_del_flag` (`robot_code`, `del_flag`),
     KEY `idx_command_id` (`command_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='SLAM 地图文件记录';
 
