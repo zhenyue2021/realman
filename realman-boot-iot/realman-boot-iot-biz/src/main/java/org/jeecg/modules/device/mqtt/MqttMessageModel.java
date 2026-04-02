@@ -702,10 +702,10 @@ public class MqttMessageModel {
         @AllArgsConstructor
         @JsonInclude(JsonInclude.Include.NON_NULL)
         public static class Pose {
-            @JsonProperty("pixel_x")
-            private Integer pixelX;
-            @JsonProperty("pixel_y")
-            private Integer pixelY;
+            @JsonProperty("x")
+            private Double pixelX;
+            @JsonProperty("y")
+            private Double pixelY;
             private Double yaw;
         }
     }
