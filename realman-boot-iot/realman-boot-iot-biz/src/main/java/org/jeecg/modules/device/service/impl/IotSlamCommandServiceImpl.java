@@ -59,7 +59,7 @@ public class IotSlamCommandServiceImpl extends ServiceImpl<IotSlamCommandRecordM
 
         // 构建下行报文
         MqttMessageModel.SlamRequest request = MqttMessageModel.SlamRequest.builder()
-                .requestId(commandId)
+                .commandId(commandId)
                 .function(function)
                 .params(params)
                 .build();
