@@ -10,6 +10,8 @@ import java.util.List;
 @Data
 public class WorkOrderDetailDTO {
 
+    private String id;
+
     /**
      * 工单任务名称
      */
