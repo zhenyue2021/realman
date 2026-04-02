@@ -15,6 +15,9 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /**
  * WebSocket 实时推送服务
@@ -54,6 +57,29 @@ public class DeviceWebSocketServer implements MessageListener {
 
     /** 活跃 WebSocket 会话映射，Key = {deviceCode}:{sessionId}，支持并发访问 */
     private static final Map<String, Session> sessions = new ConcurrentHashMap<>();
+
+    /**
+     * 高频状态消息节流缓存，Key = targetCode，Value = 待推送的最新消息。
+     * 设备每 10ms 上报一次时，中间帧对前端无意义，只推最新一帧即可。
+     * 定时任务每 100ms 将缓存中的最新消息推出并清空，避免消息积压与前端收到过时数据。
+     */
+    private static final Map<String, String> latestMessages = new ConcurrentHashMap<>();
+    private static final ScheduledExecutorService throttleScheduler =
+            Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, "ws-throttle");
+                t.setDaemon(true);
+                return t;
+            });
+
+    static {
+        // 每 100ms 将各 deviceCode 的最新消息推送一次，推完移除，保证前端看到的始终是最新帧
+        throttleScheduler.scheduleAtFixedRate(() -> {
+            latestMessages.forEach((targetCode, msg) -> {
+                latestMessages.remove(targetCode);
+                send(targetCode, msg);
+            });
+        }, 100, 100, TimeUnit.MILLISECONDS);
+    }
 
     /**
      * field 注入（@ServerEndpoint 与构造器注入存在兼容性问题，统一使用 @Autowired field 注入）。
@@ -128,34 +154,32 @@ public class DeviceWebSocketServer implements MessageListener {
      */
     public void pushRobotStatus(String robotCode, String statusJson) {
         String msg = buildMsg(DeviceConstant.WebSocketType.ROBOT_STATUS, robotCode, statusJson);
-        redisPublish(robotCode, msg);
-        redisPublish(REALMAN_CODE, msg);
+        throttle(robotCode, msg);
+        throttle(REALMAN_CODE, msg);
     }
 
     /**
      * 推送"主控设备原始状态"数据（由 RobotSlaveStatusHandler.handleMasterStatus 在收到 {controllerCode}/master/states 后调用）
      *
-     *
-     * @param robotCode  机器人设备编码
-     * @param statusJson 机器人状态 JSON（原始上报数据）
+     * @param robotCode  主控设备编码
+     * @param statusJson 主控状态 JSON（原始上报数据）
      */
     public void pushMasterStatus(String robotCode, String statusJson) {
         String msg = buildMsg(DeviceConstant.WebSocketType.MASTER_STATUS, robotCode, statusJson);
-        redisPublish(robotCode, msg);
-        redisPublish(REALMAN_CODE, msg);
+        throttle(robotCode, msg);
+        throttle(REALMAN_CODE, msg);
     }
 
     /**
      * 推送"主控设备指令"数据（由 MasterCommandHandler#handle 在收到 {controllerCode}/master/cmd 后调用）
-     *
      *
      * @param controllerCode  主控设备编码
      * @param cmdJson 主控设备上报指令 JSON（原始上报数据）
      */
     public void pushMasterCmdStatus(String controllerCode, String cmdJson) {
         String msg = buildMsg(DeviceConstant.WebSocketType.MASTER_CMD, controllerCode, cmdJson);
-        redisPublish(controllerCode, msg);
-        redisPublish(REALMAN_CODE, msg);
+        throttle(controllerCode, msg);
+        throttle(REALMAN_CODE, msg);
     }
 
     /**
@@ -274,6 +298,14 @@ public class DeviceWebSocketServer implements MessageListener {
     }
 
     /**
+     * 高频消息节流：只保留每个 targetCode 的最新消息，由定时任务统一推送。
+     * 适用于设备状态类高频上报（10ms/次），避免前端积压旧帧。
+     */
+    private void throttle(String targetCode, String message) {
+        latestMessages.put(targetCode, message);
+    }
+
+    /**
      * 向 Redis 频道发布消息；若 Redis 不可用则降级为本节点本地推送。
      *
      * @param targetCode deviceCode 或 REALMAN_CODE
@@ -291,16 +323,23 @@ public class DeviceWebSocketServer implements MessageListener {
     /**
      * 向指定 targetCode 的所有本地活跃 sessions 推送消息。
      * Key 前缀匹配：{targetCode}: 或 all:
+     *
+     * <p><b>并发安全：</b>JSR-356 规定 {@link RemoteEndpoint.Basic} 不允许多线程并发写同一会话。
+     * MQTT 回调线程与 Redis onMessage 线程可能同时向同一连接推送，导致
+     * {@code TEXT_FULL_WRITING} 异常。对每个 session 加 {@code synchronized} 保证串行写入。
      */
-    private void send(String targetCode, String message) {
+    private static void send(String targetCode, String message) {
         sessions.forEach((key, session) -> {
             if (key.startsWith(targetCode + ":") && session.isOpen()) {
-                try {
-                    String preview = message != null && message.length() > 500 ? message.substring(0, 500) + "..." : message;
-                    log.debug("[WS] send key={}, preview={}", key, preview);
-                    session.getBasicRemote().sendText(message);
-                } catch (IOException e) {
-                    log.warn("[WS] 推送失败 key={}", key);
+                synchronized (session) {
+                    if (!session.isOpen()) return;
+                    try {
+                        String preview = message != null && message.length() > 500 ? message.substring(0, 500) + "..." : message;
+                        log.debug("[WS] send key={}, preview={}", key, preview);
+                        session.getBasicRemote().sendText(message);
+                    } catch (IOException | IllegalStateException e) {
+                        log.warn("[WS] 推送失败 key={}", key, e);
+                    }
                 }
             }
         });
