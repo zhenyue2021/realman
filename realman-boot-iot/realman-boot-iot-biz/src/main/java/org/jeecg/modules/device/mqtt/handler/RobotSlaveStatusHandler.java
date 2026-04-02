@@ -211,7 +211,7 @@ public class RobotSlaveStatusHandler {
                 log.error("[SlaveStatusHandler] 落库失败 deviceCode={}", deviceCode, ex);
             }
         }
-        log.info("[SlaveStatusHandler] 定时落库，本轮设备数={}", flushedDevices);
+        log.debug("[SlaveStatusHandler] 定时落库，本轮设备数={}", flushedDevices);
     }
 
     /** 加载设备实体：优先本地缓存，未命中时查库（flush 每分钟一次，开销可接受） */
