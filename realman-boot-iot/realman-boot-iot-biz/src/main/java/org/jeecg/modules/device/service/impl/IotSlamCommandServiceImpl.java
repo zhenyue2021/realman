@@ -1,7 +1,6 @@
 package org.jeecg.modules.device.service.impl;
 
 import cn.hutool.core.util.IdUtil;
-import cn.hutool.core.util.RandomUtil;
 import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -20,6 +19,7 @@ import org.jeecg.modules.device.mqtt.publisher.MqttPublisher;
 import org.jeecg.modules.device.service.IIotSlamCommandService;
 import org.jeecg.modules.device.service.SlamCommandPendingService;
 import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -45,6 +45,8 @@ public class IotSlamCommandServiceImpl extends ServiceImpl<IotSlamCommandRecordM
     private final MqttPublisher mqttPublisher;
     private final ObjectMapper objectMapper;
     private final RedisUtil redisUtil;
+    /** 与 {@link MasterLoginResolveServiceImpl} 写入遥操关系时一致，必须用字符串方式读写 */
+    private final StringRedisTemplate stringRedisTemplate;
     private final SlamCommandPendingService pendingService;
     private final DeviceWebSocketServer webSocketServer;
     private final TransactionTemplate transactionTemplate;
@@ -192,12 +194,13 @@ public class IotSlamCommandServiceImpl extends ServiceImpl<IotSlamCommandRecordM
             redisUtil.set(key, objectMapper.writeValueAsString(states));
             redisUtil.expire(key, SLAM_STATES_TTL);
             log.debug("[SlamStates] 状态已缓存: deviceCode={}, mode={}", deviceCode, states.getSlamNavMode());
-            Object object = redisUtil.get(DeviceConstant.RedisKey.TELEOP_ROBOT_TO_MASTER + deviceCode);
-            if (object == null) {
+            // TELEOP_ROBOT_TO_MASTER 由 StringRedisTemplate 写入纯字符串，不可用 RedisUtil(Jackson) 反序列化
+            String masterCode = stringRedisTemplate.opsForValue()
+                    .get(DeviceConstant.RedisKey.TELEOP_ROBOT_TO_MASTER + deviceCode);
+            if (masterCode == null) {
                 log.warn("[MasterCommandHandler] 未找到机器人 {} 对应的主控缓存，忽略消息", deviceCode);
                 return;
             }
-            String masterCode = object.toString();
             webSocketServer.pushSlamStates(masterCode, objectMapper.writeValueAsString(states));
         } catch (Exception e) {
             log.error("[SlamStates] 状态缓存失败: deviceCode={}", deviceCode, e);
