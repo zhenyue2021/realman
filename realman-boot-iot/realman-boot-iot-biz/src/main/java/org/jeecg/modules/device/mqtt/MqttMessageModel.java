@@ -650,7 +650,7 @@ public class MqttMessageModel {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class SlamRequest {
         /** 请求唯一标识，响应时原样回传 */
-        private String commandId;
+        private String requestId;
         /** 功能代码（SwitchMode / GetCurrentMap / SaveMap 等） */
         private String function;
         /** 功能参数（依 function 不同结构不同） */

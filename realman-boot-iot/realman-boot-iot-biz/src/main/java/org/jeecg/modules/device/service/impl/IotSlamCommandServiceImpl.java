@@ -24,7 +24,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -49,11 +48,11 @@ public class IotSlamCommandServiceImpl extends ServiceImpl<IotSlamCommandRecordM
     @Override
     @Transactional(rollbackFor = Exception.class)
     public IotSlamCommandRecord sendCommand(String deviceCode, String function, Map<String, Object> params) {
-        String commandId = "SLAM_" + IdUtil.getSnowflakeNextId() + RandomUtil.randomStringUpper(6);
+        String commandId = "req_" + function + "_" + IdUtil.getSnowflakeNextId();
 
         // 构建下行报文
         MqttMessageModel.SlamRequest request = MqttMessageModel.SlamRequest.builder()
-                .commandId(commandId)
+                .requestId(commandId)
                 .function(function)
                 .params(params)
                 .build();

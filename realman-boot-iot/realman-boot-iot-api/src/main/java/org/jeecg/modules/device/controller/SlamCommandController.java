@@ -45,7 +45,7 @@ public class SlamCommandController {
      * SinglePointNavigation / MultiWaypointNavigation / SetInitialPose
      */
     @PostMapping("/{deviceCode}/send")
-    @Operation(summary = "发送 SLAM 指令（SwitchMode / GetCurrentMap / SaveMap / 导航等）")
+    @Operation(summary = "发送 SLAM 指令")
     public ApiResult<IotSlamCommandRecord> send(@PathVariable String deviceCode,
                                                 @RequestBody SlamCommandRequest body) {
         IotSlamCommandRecord record = slamCommandService.sendCommand(
@@ -57,7 +57,7 @@ public class SlamCommandController {
      * 分页查询指定设备的 SLAM 指令记录（按发送时间倒序）
      */
     @GetMapping("/{deviceCode}/records")
-    @Operation(summary = "分页查询 SLAM 指令请求/响应记录")
+//    @Operation(summary = "分页查询 SLAM 指令请求/响应记录")
     public ApiResult<IPage<IotSlamCommandRecord>> records(
             @PathVariable String deviceCode,
             @RequestParam(defaultValue = "1") int pageNo,
@@ -73,7 +73,7 @@ public class SlamCommandController {
      * <p>设备每次上报 slam/states 时刷新，TTL=5min；超时未上报则返回 null。
      */
     @GetMapping("/{deviceCode}/states")
-    @Operation(summary = "查询设备当前 SLAM 状态（模式 + 位姿，Redis 缓存）")
+    @Operation(summary = "查询设备当前 SLAM 状态")
     public ApiResult<Object> states(@PathVariable String deviceCode) {
         String key = DeviceConstant.SlamRedisKey.SLAM_STATES_PREFIX + deviceCode;
         Object cached = redisUtil.get(key);
