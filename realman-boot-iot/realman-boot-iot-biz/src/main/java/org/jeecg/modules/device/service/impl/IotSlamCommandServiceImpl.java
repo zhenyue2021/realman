@@ -19,6 +19,7 @@ import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.mqtt.publisher.MqttPublisher;
 import org.jeecg.modules.device.service.IIotSlamCommandService;
 import org.jeecg.modules.device.service.SlamCommandPendingService;
+import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,6 +45,7 @@ public class IotSlamCommandServiceImpl extends ServiceImpl<IotSlamCommandRecordM
     private final ObjectMapper objectMapper;
     private final RedisUtil redisUtil;
     private final SlamCommandPendingService pendingService;
+    private final DeviceWebSocketServer webSocketServer;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -161,6 +163,17 @@ public class IotSlamCommandServiceImpl extends ServiceImpl<IotSlamCommandRecordM
         this.updateById(record);
         log.info("[SlamCommand] ack 已处理: commandId={}, function={}, sequence={}/{}, status={}",
                 ack.getCommandId(), ack.getFunction(), ack.getSequence(), ack.getTotal(), record.getStatus());
+
+        // 终态时通过 WebSocket 推送结果给主控前端，type 为功能名称（如 SwitchMode）
+        if (DeviceConstant.SlamCommandStatus.COMPLETED.equals(record.getStatus())
+                || DeviceConstant.SlamCommandStatus.FAILED.equals(record.getStatus())) {
+            try {
+                webSocketServer.pushSlamAck(record.getMasterCode(), record.getFunctionName(),
+                        objectMapper.writeValueAsString(record));
+            } catch (Exception e) {
+                log.warn("[SlamCommand] WebSocket 推送失败: commandId={}", record.getCommandId(), e);
+            }
+        }
 
         // 完成 pending future，解锁 sendCommand 的等待（仅第一次 ACK 有效，之后 map 中已无此 entry）
         boolean released = pendingService.complete(ack.getCommandId(), ack);

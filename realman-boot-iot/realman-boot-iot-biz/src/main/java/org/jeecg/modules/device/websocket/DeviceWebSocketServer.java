@@ -226,6 +226,22 @@ public class DeviceWebSocketServer implements MessageListener {
         redisPublish(controllerCode, buildMsg(DeviceConstant.WebSocketType.ASSOCIATED_DEVICE_INFO, controllerCode, dataJson));
     }
 
+    /**
+     * 推送 SLAM 指令终态结果给主控前端。
+     *
+     * <p>消息 type 直接使用功能名称（如 SwitchMode / GetCurrentMap / SaveMap 等），
+     * 便于前端按 function 分别处理响应逻辑，无需再解析 data 内部字段来判断类型。
+     *
+     * @param masterCode   主控 deviceCode
+     * @param functionName SLAM 功能名称（即消息 type）
+     * @param ackJson      终态记录 JSON
+     */
+    public void pushSlamAck(String masterCode, String functionName, String ackJson) {
+        String msg = buildMsg(functionName, masterCode, ackJson);
+        redisPublish(masterCode, msg);
+        redisPublish(REALMAN_CODE, msg);
+    }
+
     // -------------------------------------------------------------------------
     // Redis Pub/Sub（MessageListener）：收到广播后推送到本节点的本地 sessions
     // -------------------------------------------------------------------------
