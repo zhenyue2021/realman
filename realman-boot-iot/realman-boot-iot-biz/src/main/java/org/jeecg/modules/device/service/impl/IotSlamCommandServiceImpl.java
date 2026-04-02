@@ -22,6 +22,7 @@ import org.jeecg.modules.device.service.SlamCommandPendingService;
 import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -46,9 +47,9 @@ public class IotSlamCommandServiceImpl extends ServiceImpl<IotSlamCommandRecordM
     private final RedisUtil redisUtil;
     private final SlamCommandPendingService pendingService;
     private final DeviceWebSocketServer webSocketServer;
+    private final TransactionTemplate transactionTemplate;
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public IotSlamCommandRecord sendCommand(String masterCode, String robotCode, String function, Map<String, Object> params) {
         String commandId = "req_" + function + "_" + IdUtil.getSnowflakeNextId();
 
@@ -59,7 +60,9 @@ public class IotSlamCommandServiceImpl extends ServiceImpl<IotSlamCommandRecordM
                 .params(params)
                 .build();
 
-        // 创建记录（先落库，保证无论 MQTT 是否成功均有记录）
+        // 在独立事务中保存记录并立即提交，确保 handleAck 线程能读到该记录。
+        // 不可使用方法级 @Transactional：若事务未提交就阻塞等待 ACK，handleAck 会因
+        // 读不到记录而走异常分支，导致状态永远停在 PENDING。
         IotSlamCommandRecord record = new IotSlamCommandRecord();
         record.setMasterCode(masterCode);
         record.setRobotCode(robotCode);
@@ -68,7 +71,7 @@ public class IotSlamCommandServiceImpl extends ServiceImpl<IotSlamCommandRecordM
         record.setParamsJson(params != null ? JSON.toJSONString(params) : null);
         record.setStatus(DeviceConstant.SlamCommandStatus.PENDING);
         record.setSendTime(LocalDateTime.now());
-        this.save(record);
+        transactionTemplate.executeWithoutResult(s -> this.save(record));
 
         // 注册 Future（在发送 MQTT 前注册，防止 ACK 先于 Future 注册到达）
         CompletableFuture<MqttMessageModel.SlamAck> future = pendingService.register(commandId);
@@ -85,7 +88,7 @@ public class IotSlamCommandServiceImpl extends ServiceImpl<IotSlamCommandRecordM
             record.setStatus(DeviceConstant.SlamCommandStatus.FAILED);
             record.setAckMessage("MQTT 发送失败: " + e.getMessage());
             record.setCompleteTime(LocalDateTime.now());
-            this.updateById(record);
+            transactionTemplate.executeWithoutResult(s -> this.updateById(record));
             return record;
         }
 
@@ -189,6 +192,13 @@ public class IotSlamCommandServiceImpl extends ServiceImpl<IotSlamCommandRecordM
             redisUtil.set(key, objectMapper.writeValueAsString(states));
             redisUtil.expire(key, SLAM_STATES_TTL);
             log.debug("[SlamStates] 状态已缓存: deviceCode={}, mode={}", deviceCode, states.getSlamNavMode());
+            Object object = redisUtil.get(DeviceConstant.RedisKey.TELEOP_ROBOT_TO_MASTER + deviceCode);
+            if (object == null) {
+                log.warn("[MasterCommandHandler] 未找到机器人 {} 对应的主控缓存，忽略消息", deviceCode);
+                return;
+            }
+            String masterCode = object.toString();
+            webSocketServer.pushSlamStates(masterCode, objectMapper.writeValueAsString(states));
         } catch (Exception e) {
             log.error("[SlamStates] 状态缓存失败: deviceCode={}", deviceCode, e);
         }

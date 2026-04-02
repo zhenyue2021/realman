@@ -250,6 +250,12 @@ public class DeviceWebSocketServer implements MessageListener {
         redisPublish(controllerCode, buildMsg(DeviceConstant.WebSocketType.ASSOCIATED_DEVICE_INFO, controllerCode, dataJson));
     }
 
+    public void pushSlamStates(String deviceCode, String jsonStr) {
+        String msg = buildMsg("SLAM_STATUS", deviceCode, jsonStr);
+        redisPublish(deviceCode, msg);
+        redisPublish(REALMAN_CODE, msg);
+    }
+
     /**
      * 推送 SLAM 指令终态结果给主控前端。
      *
@@ -344,4 +350,5 @@ public class DeviceWebSocketServer implements MessageListener {
             }
         });
     }
+
 }
