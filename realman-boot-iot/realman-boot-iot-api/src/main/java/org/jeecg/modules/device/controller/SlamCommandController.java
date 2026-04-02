@@ -11,7 +11,9 @@ import lombok.RequiredArgsConstructor;
 import org.jeecg.common.util.RedisUtil;
 import org.jeecg.modules.device.constant.DeviceConstant;
 import org.jeecg.modules.device.entity.IotSlamCommandRecord;
+import org.jeecg.modules.device.entity.IotSlamMap;
 import org.jeecg.modules.device.service.IIotSlamCommandService;
+import org.jeecg.modules.device.service.IIotSlamMapService;
 import org.jeecg.modules.device.vo.ApiResult;
 import org.springframework.web.bind.annotation.*;
 
@@ -31,6 +33,7 @@ import java.util.Objects;
 public class SlamCommandController {
 
     private final IIotSlamCommandService slamCommandService;
+    private final IIotSlamMapService slamMapService;
     private final RedisUtil redisUtil;
 
     /**
@@ -90,6 +93,18 @@ public class SlamCommandController {
         String key = DeviceConstant.SlamRedisKey.SLAM_STATES_PREFIX + deviceCode;
         Object cached = redisUtil.get(key);
         return ApiResult.ok(cached);
+    }
+
+    /**
+     * 查询机器人当前有效地图（自动刷新将过期的预签名 URL）
+     *
+     * <p>每次 GetCurrentMap 成功后异步写入，返回最新一条有效记录及可直接访问的预签名 URL。
+     * 若从未上传或上传中则返回 null。
+     */
+    @GetMapping("/{robotCode}/current-map")
+    @Operation(summary = "查询机器人当前有效 SLAM 地图")
+    public ApiResult<IotSlamMap> currentMap(@PathVariable String robotCode) {
+        return ApiResult.ok(slamMapService.getCurrentMap(robotCode));
     }
 
     @Data

@@ -14,36 +14,64 @@ import java.time.LocalDateTime;
 @Data
 @TableName("iot_slam_map")
 public class IotSlamMap implements Serializable {
+
     @TableId(value = "id", type = IdType.ASSIGN_ID)
     private String id;
-    @TableField("tenant_id")
-    private String tenantId;
-    @TableField("enterprise_id")
-    private String enterpriseId;
+
+    @TableField("robot_code")
+    private String robotCode;
+
+    @TableField("master_code")
+    private String masterCode;
+
     @TableField("map_name")
     private String mapName;
+
     @TableField("map_version")
     private String mapVersion;
-    @TableField("source_robot_id")
-    private String sourceRobotId;
-    @TableField("source_robot_code")
-    private String sourceRobotCode;
-    @TableField("file_object_key")
-    private String fileObjectKey;
-    @TableField("file_md5")
-    private String fileMd5;
+
+    /** MinIO object key: slam-maps/{robotCode}/{commandId}/{filename} */
+    @TableField("minio_path")
+    private String minioPath;
+
+    @TableField("filename")
+    private String filename;
+
+    @TableField("mime_type")
+    private String mimeType;
+
     @TableField("file_size")
-    private Long fileSize;
-    @TableField("status")
-    private Integer status;
-    @TableField("create_by")
-    private String createBy;
+    private Integer fileSize;
+
+    @TableField("yaml_content")
+    private String yamlContent;
+
+    @TableField("resolution")
+    private Double resolution;
+
+    @TableField("width")
+    private Integer width;
+
+    @TableField("height")
+    private Integer height;
+
+    @TableField("command_id")
+    private String commandId;
+
+    @TableField("presigned_url")
+    private String presignedUrl;
+
+    @TableField("presigned_url_expire_time")
+    private LocalDateTime presignedUrlExpireTime;
+
+    /** 逻辑删除：0=有效，1=已被新地图替代 */
+    @TableLogic
+    @TableField("is_deleted")
+    private Integer isDeleted;
+
     @TableField(value = "create_time", fill = FieldFill.INSERT)
     private LocalDateTime createTime;
+
     @TableField(value = "update_time", fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updateTime;
-    @TableLogic
-    @TableField("del_flag")
-    private Integer delFlag;
 }
-

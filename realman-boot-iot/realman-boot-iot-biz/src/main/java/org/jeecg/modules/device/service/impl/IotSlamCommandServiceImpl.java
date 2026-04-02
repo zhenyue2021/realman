@@ -17,6 +17,7 @@ import org.jeecg.modules.device.mapper.IotSlamCommandRecordMapper;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.mqtt.publisher.MqttPublisher;
 import org.jeecg.modules.device.service.IIotSlamCommandService;
+import org.jeecg.modules.device.service.IIotSlamMapService;
 import org.jeecg.modules.device.service.SlamCommandPendingService;
 import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -50,6 +51,7 @@ public class IotSlamCommandServiceImpl extends ServiceImpl<IotSlamCommandRecordM
     private final SlamCommandPendingService pendingService;
     private final DeviceWebSocketServer webSocketServer;
     private final TransactionTemplate transactionTemplate;
+    private final IIotSlamMapService slamMapService;
 
     @Override
     public IotSlamCommandRecord sendCommand(String masterCode, String robotCode, String function, Map<String, Object> params) {
@@ -178,6 +180,12 @@ public class IotSlamCommandServiceImpl extends ServiceImpl<IotSlamCommandRecordM
             } catch (Exception e) {
                 log.warn("[SlamCommand] WebSocket 推送失败: commandId={}", record.getCommandId(), e);
             }
+        }
+
+        // GetCurrentMap 成功完成时，异步上传地图文件到 MinIO
+        if (DeviceConstant.SlamCommandStatus.COMPLETED.equals(record.getStatus())
+                && DeviceConstant.SlamFunction.GET_CURRENT_MAP.equals(record.getFunctionName())) {
+            slamMapService.processGetCurrentMap(record);
         }
 
         // 完成 pending future，解锁 sendCommand 的等待（仅第一次 ACK 有效，之后 map 中已无此 entry）
