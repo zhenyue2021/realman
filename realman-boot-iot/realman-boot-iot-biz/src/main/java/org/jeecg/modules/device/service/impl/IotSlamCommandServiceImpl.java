@@ -18,6 +18,7 @@ import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.mqtt.publisher.MqttPublisher;
 import org.jeecg.modules.device.service.IIotSlamCommandService;
 import org.jeecg.modules.device.service.IIotSlamMapService;
+import org.jeecg.modules.device.service.NavigationPathMonitorService;
 import org.jeecg.modules.device.service.SlamCommandPendingService;
 import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -52,6 +53,7 @@ public class IotSlamCommandServiceImpl extends ServiceImpl<IotSlamCommandRecordM
     private final DeviceWebSocketServer webSocketServer;
     private final TransactionTemplate transactionTemplate;
     private final IIotSlamMapService slamMapService;
+    private final NavigationPathMonitorService navigationPathMonitorService;
 
     @Override
     public IotSlamCommandRecord sendCommand(String masterCode, String robotCode, String function, Map<String, Object> params) {
@@ -186,6 +188,21 @@ public class IotSlamCommandServiceImpl extends ServiceImpl<IotSlamCommandRecordM
         if (DeviceConstant.SlamCommandStatus.COMPLETED.equals(record.getStatus())
                 && DeviceConstant.SlamFunction.GET_CURRENT_MAP.equals(record.getFunctionName())) {
             slamMapService.processGetCurrentMap(record);
+        }
+
+        // ExecuteSinglePointNavigation 路径监控：
+        //   - 首次成功响应（PARTIAL + success）→ 启动周期路径查询监控
+        //   - 到达终态（COMPLETED / FAILED）→ 停止监控
+        if (DeviceConstant.SlamFunction.EXECUTE_SINGLE_POINT_NAVIGATION.equals(record.getFunctionName())) {
+            boolean isTerminal = DeviceConstant.SlamCommandStatus.COMPLETED.equals(record.getStatus())
+                    || DeviceConstant.SlamCommandStatus.FAILED.equals(record.getStatus());
+            if (isTerminal) {
+                navigationPathMonitorService.stopMonitor(record.getRobotCode());
+            } else if (DeviceConstant.SlamCommandStatus.PARTIAL.equals(record.getStatus())
+                    && Boolean.TRUE.equals(ack.getSuccess())) {
+                // 仅第一次 PARTIAL 成功时启动（内部幂等，重复调用不会重复注册）
+                navigationPathMonitorService.startMonitorIfAbsent(record.getRobotCode(), record.getMasterCode(), record.getCommandId());
+            }
         }
 
         // 完成 pending future，解锁 sendCommand 的等待（仅第一次 ACK 有效，之后 map 中已无此 entry）

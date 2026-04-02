@@ -351,12 +351,15 @@ public interface DeviceConstant {
      * SLAM 功能代码
      */
     interface SlamFunction {
-        String SWITCH_MODE              = "SwitchMode";
-        String GET_CURRENT_MAP          = "GetCurrentMap";
-        String SAVE_MAP                 = "SaveMap";
-        String SINGLE_POINT_NAVIGATION  = "SinglePointNavigation";
-        String MULTI_WAYPOINT_NAVIGATION = "MultiWaypointNavigation";
-        String SET_INITIAL_POSE         = "SetInitialPose";
+        String SWITCH_MODE                      = "SwitchMode";
+        String GET_CURRENT_MAP                  = "GetCurrentMap";
+        String SAVE_MAP                         = "SaveMap";
+        String SINGLE_POINT_NAVIGATION          = "SinglePointNavigation";
+        String EXECUTE_SINGLE_POINT_NAVIGATION  = "ExecuteSinglePointNavigation";
+        String MULTI_WAYPOINT_NAVIGATION        = "MultiWaypointNavigation";
+        String SET_INITIAL_POSE                 = "SetInitialPose";
+        /** 查询导航当前规划路径（由监控任务周期触发，结果实时推 WebSocket） */
+        String GET_CURRENT_PLANNED_PATH         = "GetCurrentPlannedPath";
     }
 
     /**
