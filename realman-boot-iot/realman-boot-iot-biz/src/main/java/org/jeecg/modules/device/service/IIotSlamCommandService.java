@@ -13,12 +13,13 @@ public interface IIotSlamCommandService extends IService<IotSlamCommandRecord> {
     /**
      * 向设备发送 SLAM 指令并创建请求记录（status=PENDING）。
      *
-     * @param deviceCode 设备编码
+     * @param masterCode 主控设备编码
+     * @param robotCode  机器人设备编码
      * @param function   功能代码，见 {@code DeviceConstant.SlamFunction}
      * @param params     功能参数（可为 null）
      * @return 创建的记录
      */
-    IotSlamCommandRecord sendCommand(String deviceCode, String function, Map<String, Object> params);
+    IotSlamCommandRecord sendCommand(String masterCode, String robotCode, String function, Map<String, Object> params);
 
     /**
      * 处理设备上报的 slam/ack，更新对应记录状态。

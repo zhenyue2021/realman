@@ -47,7 +47,7 @@ public class IotSlamCommandServiceImpl extends ServiceImpl<IotSlamCommandRecordM
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public IotSlamCommandRecord sendCommand(String deviceCode, String function, Map<String, Object> params) {
+    public IotSlamCommandRecord sendCommand(String masterCode, String robotCode, String function, Map<String, Object> params) {
         String commandId = "req_" + function + "_" + IdUtil.getSnowflakeNextId();
 
         // 构建下行报文
@@ -59,7 +59,8 @@ public class IotSlamCommandServiceImpl extends ServiceImpl<IotSlamCommandRecordM
 
         // 创建记录（先落库，保证无论 MQTT 是否成功均有记录）
         IotSlamCommandRecord record = new IotSlamCommandRecord();
-        record.setDeviceCode(deviceCode);
+        record.setMasterCode(masterCode);
+        record.setRobotCode(robotCode);
         record.setCommandId(commandId);
         record.setFunctionName(function);
         record.setParamsJson(params != null ? JSON.toJSONString(params) : null);
@@ -72,13 +73,13 @@ public class IotSlamCommandServiceImpl extends ServiceImpl<IotSlamCommandRecordM
 
         // 发送 MQTT
         try {
-            String topic = String.format(DeviceConstant.MqttTopic.SLAM_REQUEST, deviceCode);
+            String topic = String.format(DeviceConstant.MqttTopic.SLAM_REQUEST, robotCode);
             String payload = objectMapper.writeValueAsString(request);
-            mqttPublisher.publishToDevice(deviceCode, topic, payload, MqttConstant.MQTT_QOS.QOS_1);
-            log.info("[SlamCommand] 指令已发送: deviceCode={}, commandId={}, function={}", deviceCode, commandId, function);
+            mqttPublisher.publishToDevice(robotCode, topic, payload, MqttConstant.MQTT_QOS.QOS_1);
+            log.info("[SlamCommand] 指令已发送: robotCode={}, commandId={}, function={}", robotCode, commandId, function);
         } catch (Exception e) {
             pendingService.completeExceptionally(commandId, e);
-            log.error("[SlamCommand] MQTT 发送失败: deviceCode={}, commandId={}", deviceCode, commandId, e);
+            log.error("[SlamCommand] MQTT 发送失败: robotCode={}, commandId={}", robotCode, commandId, e);
             record.setStatus(DeviceConstant.SlamCommandStatus.FAILED);
             record.setAckMessage("MQTT 发送失败: " + e.getMessage());
             record.setCompleteTime(LocalDateTime.now());
@@ -90,15 +91,15 @@ public class IotSlamCommandServiceImpl extends ServiceImpl<IotSlamCommandRecordM
         // 若 total > 1，后续响应会在 this.handleAck 中继续更新 DB，此处只等第一次即可返回给调用方
         try {
             future.get(ACK_WAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-            log.info("[SlamCommand] 收到首次 ACK: deviceCode={}, commandId={}", deviceCode, commandId);
+            log.info("[SlamCommand] 收到首次 ACK: robotCode={}, commandId={}", robotCode, commandId);
         } catch (TimeoutException e) {
             // 超时不改变记录状态（设备可能稍后仍会响应，this.handleAck 会更新 DB）
             pendingService.completeExceptionally(commandId, e);
-            log.warn("[SlamCommand] 等待首次 ACK 超时({}s): deviceCode={}, commandId={}",
-                    ACK_WAIT_TIMEOUT_SECONDS, deviceCode, commandId);
+            log.warn("[SlamCommand] 等待首次 ACK 超时({}s): robotCode={}, commandId={}",
+                    ACK_WAIT_TIMEOUT_SECONDS, robotCode, commandId);
         } catch (Exception e) {
             pendingService.completeExceptionally(commandId, e);
-            log.error("[SlamCommand] 等待 ACK 异常: deviceCode={}, commandId={}", deviceCode, commandId, e);
+            log.error("[SlamCommand] 等待 ACK 异常: masterCode={}, commandId={}", masterCode, commandId, e);
         }
 
         // 重新读取最新状态（this.handleAck 可能已更新）
@@ -184,7 +185,7 @@ public class IotSlamCommandServiceImpl extends ServiceImpl<IotSlamCommandRecordM
     public IPage<IotSlamCommandRecord> pageRecords(Page<IotSlamCommandRecord> page, String deviceCode) {
         return this.page(page,
                 new LambdaQueryWrapper<IotSlamCommandRecord>()
-                        .eq(IotSlamCommandRecord::getDeviceCode, deviceCode)
+                        .eq(IotSlamCommandRecord::getMasterCode, deviceCode)
                         .orderByDesc(IotSlamCommandRecord::getSendTime));
     }
 }

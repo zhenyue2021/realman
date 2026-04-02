@@ -1,5 +1,6 @@
 package org.jeecg.modules.device.controller;
 
+import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.swagger.v3.oas.annotations.Operation;
@@ -15,6 +16,7 @@ import org.jeecg.modules.device.vo.ApiResult;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * 建图 / 定位 / 导航指令管理
@@ -44,12 +46,22 @@ public class SlamCommandController {
      * <p>function 枚举值：SwitchMode / GetCurrentMap / SaveMap /
      * SinglePointNavigation / MultiWaypointNavigation / SetInitialPose
      */
-    @PostMapping("/{deviceCode}/send")
+    @PostMapping("/{masterCode}/send")
     @Operation(summary = "发送 SLAM 指令")
-    public ApiResult<IotSlamCommandRecord> send(@PathVariable String deviceCode,
+    public ApiResult<IotSlamCommandRecord> send(@PathVariable String masterCode,
                                                 @RequestBody SlamCommandRequest body) {
+        // body不能为空，body.getRobotCode() 机器人编码不能为空
+        if (Objects.isNull(body)) {
+            return ApiResult.fail("请求body不能为空");
+        }
+        if (StrUtil.isBlank(body.getRobotCode())) {
+            return ApiResult.fail("robotCode-机器人编码不能为空");
+        }
+        if (StrUtil.isBlank(body.getFunctionName())) {
+            return ApiResult.fail("function-功能名称不能为空");
+        }
         IotSlamCommandRecord record = slamCommandService.sendCommand(
-                deviceCode, body.getFunctionName(), body.getParams());
+                masterCode, body.getRobotCode(), body.getFunctionName(), body.getParams());
         return ApiResult.ok(record);
     }
 
@@ -85,6 +97,8 @@ public class SlamCommandController {
         /** 功能代码，见 DeviceConstant.SlamFunction */
         @JsonAlias("function")
         private String functionName;
+        // 机器人编码
+        private String robotCode;
         /** 功能参数（依 function 不同结构不同，可为 null） */
         private Map<String, Object> params;
     }

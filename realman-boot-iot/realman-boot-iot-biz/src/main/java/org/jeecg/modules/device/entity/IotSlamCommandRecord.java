@@ -30,8 +30,13 @@ public class IotSlamCommandRecord implements Serializable {
     private String id;
 
     /** 设备编码 */
-    @TableField("device_code")
-    private String deviceCode;
+    @TableField("master_code")
+    private String masterCode;
+
+    /** 机器人设备编码 */
+    @TableField("robot_code")
+    private String robotCode;
+
 
     /** 请求唯一标识（下发到设备的 commandId） */
     @TableField("command_id")

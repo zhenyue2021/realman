@@ -417,25 +417,26 @@ CREATE TABLE IF NOT EXISTS `iot_slam_sync_task` (
 -- 每次平台向设备发送 device/{code}/slam/request 时创建一条记录
 -- 收到 device/{code}/slam/ack 后更新对应状态
 CREATE TABLE IF NOT EXISTS `iot_slam_command_record` (
-                                                         `id`            VARCHAR(32)     NOT NULL                    COMMENT '主键（雪花ID）',
-                                                         `device_code`   VARCHAR(64)     NOT NULL                    COMMENT '设备编码',
-                                                         `command_id`    VARCHAR(64)     NOT NULL                    COMMENT '请求唯一标识（下发到设备的 commandId）',
-                                                         `function_name` VARCHAR(64)     NOT NULL                    COMMENT '功能代码（SwitchMode/GetCurrentMap/SaveMap/SinglePointNavigation/MultiWaypointNavigation/SetInitialPose）',
-                                                         `params_json`   TEXT                                        COMMENT '请求参数 JSON',
-                                                         `status`        VARCHAR(16)     NOT NULL DEFAULT 'PENDING'  COMMENT '状态：PENDING（已发送等待响应）/ PARTIAL（部分响应）/ COMPLETED（成功完成）/ FAILED（失败）',
-                                                         `ack_success`   TINYINT(1)                                  COMMENT 'ack 响应 success 字段',
-                                                         `ack_code`      INT                                         COMMENT 'ack 响应 code 字段（0=成功）',
-                                                         `ack_message`   VARCHAR(512)                                COMMENT 'ack 响应 message 字段',
-                                                         `ack_sequence`  INT                                         COMMENT '当前已收到的最大响应序号',
-                                                         `ack_total`     INT                                         COMMENT '本次请求预期总响应次数',
-                                                         `ack_data_json` MEDIUMTEXT                                  COMMENT '最终 ack 的 data JSON（最后一次响应的 data 字段）',
-                                                         `send_time`     DATETIME        NOT NULL                    COMMENT '指令发送时间',
-                                                         `complete_time` DATETIME                                    COMMENT '完成时间（收到最终响应或失败响应）',
-                                                         `create_time`   DATETIME                                    COMMENT '创建时间',
-                                                         `update_time`   DATETIME                                    COMMENT '更新时间',
-                                                         PRIMARY KEY (`id`),
-                                                         UNIQUE KEY `uk_command_id` (`command_id`),
-                                                         KEY `idx_device_code_send_time` (`device_code`, `send_time`)
+    `id`            VARCHAR(32)     NOT NULL                    COMMENT '主键（雪花ID）',
+    `master_code`   VARCHAR(64)     NOT NULL                    COMMENT '主控设备编码',
+    `robot_code`    VARCHAR(64)     NOT NULL                    COMMENT '机器人设备编码',
+    `command_id`    VARCHAR(64)     NOT NULL                    COMMENT '请求唯一标识（下发到设备的 commandId）',
+    `function_name` VARCHAR(64)     NOT NULL                    COMMENT '功能代码（SwitchMode/GetCurrentMap/SaveMap/SinglePointNavigation/MultiWaypointNavigation/SetInitialPose）',
+    `params_json`   MEDIUMTEXT                                  COMMENT '请求参数 JSON',
+    `status`        VARCHAR(16)     NOT NULL DEFAULT 'PENDING'  COMMENT '状态：PENDING（已发送等待响应）/ PARTIAL（部分响应）/ COMPLETED（成功完成）/ FAILED（失败）',
+    `ack_success`   TINYINT(1)                                  COMMENT 'ack 响应 success 字段',
+    `ack_code`      INT                                         COMMENT 'ack 响应 code 字段（0=成功）',
+    `ack_message`   VARCHAR(512)                                COMMENT 'ack 响应 message 字段',
+    `ack_sequence`  INT                                         COMMENT '当前已收到的最大响应序号',
+    `ack_total`     INT                                         COMMENT '本次请求预期总响应次数',
+    `ack_data_json` MEDIUMTEXT                                  COMMENT '最终 ack 的 data JSON（最后一次响应的 data 字段）',
+    `send_time`     DATETIME        NOT NULL                    COMMENT '指令发送时间',
+    `complete_time` DATETIME                                    COMMENT '完成时间（收到最终响应或失败响应）',
+    `create_time`   DATETIME                                    COMMENT '创建时间',
+    `update_time`   DATETIME                                    COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_command_id` (`command_id`),
+    KEY `idx_device_code_send_time` (`master_code`, `robot_code`, `send_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='SLAM 指令请求/响应记录';
 
 -- 测试数据（device_secret需在平台控制台生成后下发给设备端）
