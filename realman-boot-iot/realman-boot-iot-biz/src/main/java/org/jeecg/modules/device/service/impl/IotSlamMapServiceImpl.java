@@ -18,12 +18,11 @@ import org.jeecg.modules.device.util.MinioUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.ByteArrayInputStream;
 import java.time.LocalDateTime;
 import java.util.Base64;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -37,6 +36,7 @@ public class IotSlamMapServiceImpl extends ServiceImpl<IotSlamMapMapper, IotSlam
 
     private final MinioClient minioClient;
     private final MinioUtil minioUtil;
+    private final TransactionTemplate transactionTemplate;
 
     @Value("${minio.bucket-name.slam:iot-slam}")
     private String bucketName;
@@ -50,7 +50,6 @@ public class IotSlamMapServiceImpl extends ServiceImpl<IotSlamMapMapper, IotSlam
 
     @Override
     @Async("deviceTaskExecutor")
-    @Transactional(rollbackFor = Exception.class)
     public void processGetCurrentMap(IotSlamCommandRecord record) {
         if (record.getAckDataJson() == null) {
             log.warn("[SlamMap] ackDataJson 为空，跳过地图处理: commandId={}", record.getCommandId());
@@ -73,7 +72,7 @@ public class IotSlamMapServiceImpl extends ServiceImpl<IotSlamMapMapper, IotSlam
             String mimeType  = png.getString("mime_type");
             int    fileSize  = png.getIntValue("byte_size");
 
-            // 2. 上传至 MinIO
+            // 2. 上传至 MinIO（I/O 操作保持在事务外，避免长时间持有数据库连接）
             String objectKey = "slam-maps/" + record.getRobotCode() + "/" + record.getCommandId() + "/" + filename;
             minioUtil.ensureBucketExists(bucketName);
             minioClient.putObject(PutObjectArgs.builder()
@@ -82,7 +81,7 @@ public class IotSlamMapServiceImpl extends ServiceImpl<IotSlamMapMapper, IotSlam
                     .stream(new ByteArrayInputStream(pngBytes), pngBytes.length, -1)
                     .contentType(mimeType)
                     .build());
-            log.info("[SlamMap] PNG 已上传 MinIO: key={}", objectKey);
+            log.debug("[SlamMap] PNG 已上传 MinIO: key={}", objectKey);
 
             // 3. 生成预签名 GET URL
             long expireMinutes = (long) urlExpireDays * 24 * 60;
@@ -94,44 +93,52 @@ public class IotSlamMapServiceImpl extends ServiceImpl<IotSlamMapMapper, IotSlam
                             .expiry((int) expireMinutes, TimeUnit.MINUTES)
                             .build());
 
-            // 4. 查询上一个有效版本（逻辑删除前），计算新版本号
-            IotSlamMap prev = this.getOne(new LambdaQueryWrapper<IotSlamMap>()
-                    .eq(IotSlamMap::getRobotCode, record.getRobotCode())
-                    .orderByDesc(IotSlamMap::getCreateTime)
-                    .last("LIMIT 1"));
-            String newVersion = nextVersion(prev == null ? null : prev.getMapVersion());
+            // 4. 查询版本号 + 写入 DB（独立事务，@Async 线程中 @Transactional 不生效，改用 TransactionTemplate）
+            final String[] resolvedVersion = {null};
+            final String finalPresignedUrl  = presignedUrl;
+            final String finalObjectKey     = objectKey;
+            final String finalFilename      = filename;
+            final String finalMimeType      = mimeType;
+            final int    finalFileSize      = fileSize;
 
-            // 5. 构建新记录
-            IotSlamMap map = new IotSlamMap();
-            map.setRobotCode(record.getRobotCode());
-            map.setMasterCode(record.getMasterCode());
-            map.setCommandId(record.getCommandId());
-            map.setFilename(filename);
-            map.setMapVersion(newVersion);
-            map.setMimeType(mimeType);
-            map.setFileSize(fileSize);
-            map.setMinioPath(objectKey);
-            map.setPresignedUrl(presignedUrl);
-            map.setPresignedUrlExpireTime(LocalDateTime.now().plusDays(urlExpireDays));
-            if (yaml != null) {
-                map.setYamlContent(yaml.getString("content"));
-            }
-            if (meta != null) {
-                map.setMapName(meta.getString("map_name"));
-                map.setResolution(meta.getDouble("resolution"));
-                map.setWidth(meta.getInteger("width"));
-                map.setHeight(meta.getInteger("height"));
-            }
+            transactionTemplate.executeWithoutResult(status -> {
+                IotSlamMap prev = this.getOne(new LambdaQueryWrapper<IotSlamMap>()
+                        .eq(IotSlamMap::getRobotCode, record.getRobotCode())
+                        .orderByDesc(IotSlamMap::getCreateTime)
+                        .last("LIMIT 1"));
+                resolvedVersion[0] = nextVersion(prev == null ? null : prev.getMapVersion());
 
-            // 6. 逻辑删除同机器人的历史地图（先写新记录、再删旧记录，防止新记录写失败时历史丢失）
-            this.save(map);
-            this.update(new LambdaUpdateWrapper<IotSlamMap>()
-                    .eq(IotSlamMap::getRobotCode, record.getRobotCode())
-                    .ne(IotSlamMap::getId, map.getId())
-                    .set(IotSlamMap::getDelFlag, 1));
+                IotSlamMap map = new IotSlamMap();
+                map.setRobotCode(record.getRobotCode());
+                map.setMasterCode(record.getMasterCode());
+                map.setCommandId(record.getCommandId());
+                map.setFilename(finalFilename);
+                map.setMapVersion(resolvedVersion[0]);
+                map.setMimeType(finalMimeType);
+                map.setFileSize(finalFileSize);
+                map.setMinioPath(finalObjectKey);
+                map.setPresignedUrl(finalPresignedUrl);
+                map.setPresignedUrlExpireTime(LocalDateTime.now().plusDays(urlExpireDays));
+                if (yaml != null) {
+                    map.setYamlContent(yaml.getString("content"));
+                }
+                if (meta != null) {
+                    map.setMapName(meta.getString("map_name"));
+                    map.setResolution(meta.getDouble("resolution"));
+                    map.setWidth(meta.getInteger("width"));
+                    map.setHeight(meta.getInteger("height"));
+                }
 
-            log.info("[SlamMap] 地图记录已保存: id={}, robotCode={}, mapName={}",
-                    map.getId(), map.getRobotCode(), map.getMapName());
+                // 先写新记录、再逻辑删除历史记录，两步在同一事务内保证原子性
+                this.save(map);
+                this.update(new LambdaUpdateWrapper<IotSlamMap>()
+                        .eq(IotSlamMap::getRobotCode, record.getRobotCode())
+                        .ne(IotSlamMap::getId, map.getId())
+                        .set(IotSlamMap::getDelFlag, 1));
+
+                log.info("[SlamMap] 地图记录已保存: id={}, robotCode={}, mapVersion={}",
+                        map.getId(), map.getRobotCode(), map.getMapVersion());
+            });
 
         } catch (Exception e) {
             log.error("[SlamMap] GetCurrentMap 处理失败: commandId={}", record.getCommandId(), e);
