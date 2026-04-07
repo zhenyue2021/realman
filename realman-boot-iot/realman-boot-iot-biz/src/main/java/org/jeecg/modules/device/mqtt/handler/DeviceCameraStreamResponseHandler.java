@@ -23,7 +23,7 @@ import java.util.Collections;
  *
  * <p>调用链：
  * <pre>
- *   Web → RobotDeviceController → IotDeviceServiceImpl.getCameraStreams()
+ *   Web → RobotDeviceController → {@link org.jeecg.modules.device.service.impl.device.IotDeviceCameraStreamService#getCameraStreams}
  *        → 下发 CameraStreamQuery 并在 DeviceCameraStreamPendingService 中注册 Future
  *   机器人 → device/{code}/camera/stream/ack → 本 Handler
  *        → 完成 Future，getCameraStreams() 得到摄像头流列表后返回给 Web
