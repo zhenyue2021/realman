@@ -102,7 +102,7 @@ public class SlamCommandController {
      * 若从未上传或上传中则返回 null。
      */
     @GetMapping("/{robotCode}/current-map")
-    @Operation(summary = "查询机器人当前有效 SLAM 地图")
+//    @Operation(summary = "查询机器人当前有效 SLAM 地图")
     public ApiResult<IotSlamMap> currentMap(@PathVariable String robotCode) {
         return ApiResult.ok(slamMapService.getCurrentMap(robotCode));
     }

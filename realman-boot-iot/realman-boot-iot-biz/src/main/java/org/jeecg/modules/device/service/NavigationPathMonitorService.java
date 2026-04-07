@@ -100,6 +100,7 @@ public class NavigationPathMonitorService implements MessageListener {
      * @param taskId      监控的导航指令 ID
      */
     public void startMonitorIfAbsent(String robotCode, String masterCode, String taskId) {
+        log.debug("[NavMonitor] 启动路径监控: robotCode={}", robotCode);
         // 1. 本节点内存快检（无 Redis 往返，大多数调用在此短路）
         if (activeMonitors.containsKey(robotCode)) {
             log.debug("[NavMonitor] 本节点监控已存在，跳过: robotCode={}", robotCode);
