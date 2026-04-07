@@ -38,6 +38,7 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
     private final IotDeviceCameraStreamService cameraStreamService;
     private final IotDeviceMqttCommandService mqttCommandService;
     private final IotDeviceTeleopService teleopService;
+    private final IotDeviceSupport iotDeviceSupport;
 
     public IotDeviceServiceImpl(IotDeviceMapper deviceMapper,
                                 IotDeviceLifecycleService lifecycleService,
@@ -45,7 +46,8 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
                                 IotDeviceStatusQueryService statusQueryService,
                                 IotDeviceCameraStreamService cameraStreamService,
                                 IotDeviceMqttCommandService mqttCommandService,
-                                IotDeviceTeleopService teleopService) {
+                                IotDeviceTeleopService teleopService,
+                                IotDeviceSupport iotDeviceSupport) {
         this.baseMapper = deviceMapper;
         this.lifecycleService = lifecycleService;
         this.configSyncService = configSyncService;
@@ -53,6 +55,7 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
         this.cameraStreamService = cameraStreamService;
         this.mqttCommandService = mqttCommandService;
         this.teleopService = teleopService;
+        this.iotDeviceSupport = iotDeviceSupport;
     }
 
     @Override
