@@ -23,7 +23,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.ByteArrayInputStream;
 import java.time.LocalDateTime;
 import java.util.Base64;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -154,6 +158,22 @@ public class IotSlamMapServiceImpl extends ServiceImpl<IotSlamMapMapper, IotSlam
             log.warn("[SlamMap] 版本号解析失败，重置为 V1.0.0: current={}", current);
             return "V1.0.0";
         }
+    }
+
+    @Override
+    public Map<String, IotSlamMap> batchGetLatestMaps(List<String> robotCodes) {
+        if (robotCodes == null || robotCodes.isEmpty()) {
+            return Map.of();
+        }
+        List<IotSlamMap> maps = this.list(new LambdaQueryWrapper<IotSlamMap>()
+                .in(IotSlamMap::getRobotCode, robotCodes)
+                .orderByDesc(IotSlamMap::getCreateTime));
+        // 每个 robotCode 保留 createTime 最新的一条
+        return maps.stream()
+                .collect(Collectors.toMap(
+                        IotSlamMap::getRobotCode,
+                        m -> m,
+                        (a, b) -> a.getCreateTime().isAfter(b.getCreateTime()) ? a : b));
     }
 
     @Override

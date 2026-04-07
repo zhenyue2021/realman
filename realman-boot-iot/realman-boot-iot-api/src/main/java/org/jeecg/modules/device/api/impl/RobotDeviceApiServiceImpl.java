@@ -1,7 +1,6 @@
 package org.jeecg.modules.device.api.impl;
 
 import cn.hutool.core.bean.BeanUtil;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
@@ -10,15 +9,14 @@ import org.jeecg.modules.device.constant.DeviceConstant;
 import org.jeecg.modules.device.dto.*;
 import org.jeecg.modules.device.entity.*;
 import org.jeecg.modules.device.service.IIotDeviceService;
+import org.jeecg.modules.device.service.IIotSlamMapService;
 import org.jeecg.modules.device.vo.DeviceDetailVO;
 import org.jeecg.modules.device.vo.RobotDeviceDetailVO;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -27,6 +25,7 @@ public class RobotDeviceApiServiceImpl implements RobotDeviceApiService {
     private static final int DEVICE_TYPE_ROBOT = 1;
 
     private final IIotDeviceService deviceService;
+    private final IIotSlamMapService slamMapService;
 
     @Override
     public IPage<RobotDevicePageItemDTO> pageRobots(Page<?> page, DeviceRequestDTO requestDTO) {
@@ -49,6 +48,13 @@ public class RobotDeviceApiServiceImpl implements RobotDeviceApiService {
                 .toList();
         //  授权生效/失效时间（按当前租户）
         Map<String, IotDeviceAuth> authByControllerId = deviceService.loadTenantAuth(deviceIds, dto.getCurrentTenantId(), DeviceConstant.DeviceType.ROBOT);
+        // SLAM 地图信息（批量，不刷新预签名 URL）
+        List<String> robotCodes = devices.stream()
+                .map(IotDevice::getDeviceCode)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        Map<String, IotSlamMap> slamMapByRobotCode = slamMapService.batchGetLatestMaps(robotCodes);
         List<RobotDevicePageItemDTO> records = devices.stream().map(d -> {
             RobotDevicePageItemDTO item = new RobotDevicePageItemDTO();
             BeanUtil.copyProperties(d, item);
@@ -58,6 +64,11 @@ public class RobotDeviceApiServiceImpl implements RobotDeviceApiService {
             if (auth != null) {
                 item.setAuthEffectiveTime(auth.getEffectiveTime());
                 item.setAuthExpireTime(auth.getExpireTime());
+            }
+            IotSlamMap slamMap = slamMapByRobotCode.get(d.getDeviceCode());
+            if (slamMap != null) {
+                item.setSlamVersion(slamMap.getMapVersion());
+                item.setSlamPresignedUrl(slamMap.getPresignedUrl());
             }
             return item;
         }).toList();
@@ -106,6 +117,14 @@ public class RobotDeviceApiServiceImpl implements RobotDeviceApiService {
         RobotDevicePageItemDTO item = new RobotDevicePageItemDTO();
         BeanUtil.copyProperties(device, item);
         item.setRunningStatus(device.getStatus());
+        // SLAM 地图信息（单条，自动刷新预签名 URL）
+        if (device.getDeviceCode() != null) {
+            IotSlamMap slamMap = slamMapService.getCurrentMap(device.getDeviceCode());
+            if (slamMap != null) {
+                item.setSlamVersion(slamMap.getMapVersion());
+                item.setSlamPresignedUrl(slamMap.getPresignedUrl());
+            }
+        }
         return item;
     }
 

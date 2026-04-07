@@ -43,6 +43,17 @@ public class RobotDevicePageItemDTO {
      */
     private Integer runningStatus;
 
+    /**
+     * 设备当前运行SLAM 地图版本号
+     */
+    private String slamVersion;
+
+    /**
+     * 设备当前运行SLAM 地图 预签名URL
+     */
+    private String slamPresignedUrl;
+
+
 
     /**
      * 授权生效/失效时间（来自 iot_device_auth，按当前租户筛选）

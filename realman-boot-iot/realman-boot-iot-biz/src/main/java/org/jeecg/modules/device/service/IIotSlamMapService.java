@@ -4,6 +4,9 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import org.jeecg.modules.device.entity.IotSlamMap;
 import org.jeecg.modules.device.entity.IotSlamCommandRecord;
 
+import java.util.List;
+import java.util.Map;
+
 public interface IIotSlamMapService extends IService<IotSlamMap> {
 
     /**
@@ -21,4 +24,12 @@ public interface IIotSlamMapService extends IService<IotSlamMap> {
      * @return 当前地图记录，无记录时返回 null
      */
     IotSlamMap getCurrentMap(String robotCode);
+
+    /**
+     * 批量查询多个机器人的最新有效地图（不自动刷新预签名 URL，适用于列表场景）。
+     *
+     * @param robotCodes 机器人设备编码列表
+     * @return robotCode → 最新地图记录 的映射，无记录的 robotCode 不包含在结果中
+     */
+    Map<String, IotSlamMap> batchGetLatestMaps(List<String> robotCodes);
 }
