@@ -140,7 +140,7 @@ public class IotSlamCommandServiceImpl extends ServiceImpl<IotSlamCommandRecordM
         // 已处于终态则不再更新 DB，但仍需完成 pending future（防止 sendCommand 一直阻塞）
         if (DeviceConstant.SlamCommandStatus.COMPLETED.equals(record.getStatus())
                 || DeviceConstant.SlamCommandStatus.FAILED.equals(record.getStatus())) {
-            log.info("[SlamCommand] 记录已处于终态，忽略重复 ack: commandId={}, status={}", ack.getCommandId(), record.getStatus());
+            log.warn("[SlamCommand] 记录已处于终态，忽略重复 ack: commandId={}, status={}", ack.getCommandId(), record.getStatus());
             pendingService.complete(ack.getCommandId(), ack);
             return;
         }
@@ -170,7 +170,7 @@ public class IotSlamCommandServiceImpl extends ServiceImpl<IotSlamCommandRecordM
         }
 
         this.updateById(record);
-        log.info("[SlamCommand] ack 已处理: commandId={}, function={}, sequence={}/{}, status={}",
+        log.debug("[SlamCommand] ack 已处理: commandId={}, function={}, sequence={}/{}, status={}",
                 ack.getCommandId(), ack.getFunction(), ack.getSequence(), ack.getTotal(), record.getStatus());
 
         // 终态时通过 WebSocket 推送结果给主控前端，type 为功能名称（如 SwitchMode）
@@ -208,7 +208,7 @@ public class IotSlamCommandServiceImpl extends ServiceImpl<IotSlamCommandRecordM
         // 完成 pending future，解锁 sendCommand 的等待（仅第一次 ACK 有效，之后 map 中已无此 entry）
         boolean released = pendingService.complete(ack.getCommandId(), ack);
         if (released) {
-            log.info("[SlamCommand] pending future 已释放: commandId={}", ack.getCommandId());
+            log.debug("[SlamCommand] pending future 已释放: commandId={}", ack.getCommandId());
         }
     }
 

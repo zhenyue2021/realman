@@ -61,7 +61,7 @@ public class CommandEncryptService {
      * @return 密文（ivHex:Base64），或原文（加密关闭时）
      */
     public String encryptForDevice(String deviceCode, String plain) {
-        log.info("[CommandEncryptService] -1 encryptEnabled: {}", encryptEnabled);
+        log.debug("[CommandEncryptService] -1 encryptEnabled: {}", encryptEnabled);
         if (!encryptEnabled || plain == null) return plain;
         return doEncrypt(getAesKey(deviceCode), plain);
     }
