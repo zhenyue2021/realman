@@ -16,6 +16,7 @@ import org.jeecg.modules.device.constant.DeviceConstant;
 import org.jeecg.modules.device.constant.MqttConstant;
 import org.jeecg.modules.device.dto.DeviceRequestDTO;
 import org.jeecg.modules.device.dto.DeviceUpdateDTO;
+import org.jeecg.modules.device.dto.MasterControlParamsDTO;
 import org.jeecg.modules.device.entity.*;
 import org.jeecg.modules.device.mapper.*;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
@@ -570,6 +571,14 @@ private final DeviceWebSocketServer                 deviceWebSocketServer;
         } catch (Exception e) {
             throw new RuntimeException("停止遥操失败: " + e.getMessage(), e);
         }
+    }
+
+    @Override
+    public void applyMasterControlParams(IotDevice controller, MasterControlParamsDTO dto) {
+        sendMasterForceFeedbackCommand(controller, dto.getArmLevel(), dto.getGripperLevel(), dto.getOperator(),
+                dto.getArmLevelConfigType(), dto.getGripperLevelConfigType());
+        sendMasterSportSpeedCommand(controller, dto.getMoveSpeedLevel(), dto.getLiftSpeedLevel(), dto.getOperator(),
+                dto.getMoveSpeedLevelConfigType(), dto.getLiftSpeedLevelConfigType());
     }
 
     /**

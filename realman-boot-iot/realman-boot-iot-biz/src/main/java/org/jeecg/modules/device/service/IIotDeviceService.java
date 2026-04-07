@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
 import org.jeecg.modules.device.dto.DeviceRequestDTO;
 import org.jeecg.modules.device.dto.DeviceUpdateDTO;
+import org.jeecg.modules.device.dto.MasterControlParamsDTO;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.entity.IotDeviceAuth;
 import org.jeecg.modules.device.vo.DeviceCameraStreamVO;
@@ -77,6 +78,14 @@ public interface IIotDeviceService extends IService<IotDevice> {
      * 向主控下发运动速度查询指令（值置为 null 表示查询），不等待响应
      */
     void queryMasterSportSpeed(String controllerId);
+
+    /**
+     * 一次性下发力反馈与运动/安全参数（内部依次下发 MQTT，不等待 ACK）。
+     *
+     * @param controller 已校验为主控类型的设备实体
+     * @param dto        力反馈与运动参数（与 {@code /control-params} 请求体一致）
+     */
+    void applyMasterControlParams(IotDevice controller, MasterControlParamsDTO dto);
 
     /**
      * 查询设备授权信息
