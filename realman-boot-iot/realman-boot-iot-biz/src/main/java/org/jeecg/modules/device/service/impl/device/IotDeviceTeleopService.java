@@ -230,10 +230,10 @@ public class IotDeviceTeleopService {
 
         try {
             // 获取房间（按主控编码查询或创建）
-            DeviceRoomVO room = roomService.queryOrCreate(masterDeviceCode);
-
+            MqttMessageModel.WebRtcStartCommand webRtcStartCommand = roomService.queryOrCreate(masterDeviceCode);
+            webRtcStartCommand.setCommandId(webRtcCommandId);
             // 构建 TURN 服务器列表
-            List<MqttMessageModel.WebRtcStartCommand.TurnServer> turnServers =
+            /*List<MqttMessageModel.WebRtcStartCommand.TurnServer> turnServers =
                     webRtcProperties.getTurnServers().stream()
                             .map(t -> MqttMessageModel.WebRtcStartCommand.TurnServer.builder()
                                     .url(t.getUrl())
@@ -250,13 +250,13 @@ public class IotDeviceTeleopService {
                     .turnServers(turnServers)
                     .stunServers(webRtcProperties.getStunServerList())
                     .timestamp(System.currentTimeMillis())
-                    .build();
+                    .build();*/
 
             String topic = String.format(DeviceConstant.MqttTopic.WEBRTC_START, robotDeviceCode);
             mqttPublisher.publishToDevice(robotDeviceCode, topic,
-                    objectMapper.writeValueAsString(startCmd), MqttConstant.MQTT_QOS.QOS_1);
+                    objectMapper.writeValueAsString(webRtcStartCommand), MqttConstant.MQTT_QOS.QOS_1);
             log.info("[WebRtc] 已下发 start 指令 device={} commandId={} roomId={}",
-                    robotDeviceCode, webRtcCommandId, room.getRoomId());
+                    robotDeviceCode, webRtcCommandId, webRtcStartCommand.getRoomId());
         } catch (Exception e) {
             webRtcAckPendingService.completeExceptionally(webRtcCommandId, e);
             throw new RuntimeException("WebRTC 开始指令发送失败: " + e.getMessage(), e);

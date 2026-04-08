@@ -2,6 +2,7 @@ package org.jeecg.modules.device.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import org.jeecg.modules.device.entity.IotDeviceRoom;
+import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.vo.DeviceRoomVO;
 
 import java.util.List;
@@ -24,7 +25,7 @@ public interface IIotDeviceRoomService extends IService<IotDeviceRoom> {
      * @param masterCode 主控设备编码
      * @return 房间信息
      */
-    DeviceRoomVO queryOrCreate(String masterCode);
+    MqttMessageModel.WebRtcStartCommand queryOrCreate(String masterCode);
 
     /**
      * 机器人加入房间（遥操开始时调用）

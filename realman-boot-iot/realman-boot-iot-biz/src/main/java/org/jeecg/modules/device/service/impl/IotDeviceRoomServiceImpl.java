@@ -5,10 +5,13 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jeecg.modules.device.config.WebRtcProperties;
 import org.jeecg.modules.device.constant.DeviceConstant;
 import org.jeecg.modules.device.entity.IotDeviceRoom;
 import org.jeecg.modules.device.mapper.IotDeviceRoomMapper;
+import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.service.IIotDeviceRoomService;
+import org.jeecg.modules.device.service.signaling.SignalingKeyService;
 import org.jeecg.modules.device.vo.DeviceRoomVO;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -38,6 +41,8 @@ public class IotDeviceRoomServiceImpl extends ServiceImpl<IotDeviceRoomMapper, I
 
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
+    private final SignalingKeyService signalingKeyService;
+    private final WebRtcProperties webRtcProperties;
 
     private static final long ROOM_CACHE_TTL_HOURS = 24L;
 
@@ -46,7 +51,7 @@ public class IotDeviceRoomServiceImpl extends ServiceImpl<IotDeviceRoomMapper, I
     // -------------------------------------------------------------------------
 
     @Override
-    public DeviceRoomVO queryOrCreate(String masterCode) {
+    public  MqttMessageModel.WebRtcStartCommand queryOrCreate(String masterCode) {
         // 1. 缓存命中
         DeviceRoomVO cached = getFromCache(masterCode);
         if (cached != null) {
@@ -65,8 +70,25 @@ public class IotDeviceRoomServiceImpl extends ServiceImpl<IotDeviceRoomMapper, I
         }
 
         DeviceRoomVO vo = toVO(room);
+        // 构建 TURN 服务器列表
+        List<MqttMessageModel.WebRtcStartCommand.TurnServer> turnServers =
+                webRtcProperties.getTurnServers().stream()
+                        .map(t -> MqttMessageModel.WebRtcStartCommand.TurnServer.builder()
+                                .url(t.getUrl())
+                                .username(t.getUsername())
+                                .password(t.getPassword())
+                                .build())
+                        .toList();
+        MqttMessageModel.WebRtcStartCommand startCmd = MqttMessageModel.WebRtcStartCommand.builder()
+                .roomId(room.getId())
+                .signalUrl(signalingKeyService.getServerUrl())
+                .signalKey(signalingKeyService.getCurrentKey())
+                .turnServers(turnServers)
+                .stunServers(webRtcProperties.getStunServerList())
+                .timestamp(System.currentTimeMillis())
+                .build();
         putCache(masterCode, vo);
-        return vo;
+        return startCmd;
     }
 
     @Override

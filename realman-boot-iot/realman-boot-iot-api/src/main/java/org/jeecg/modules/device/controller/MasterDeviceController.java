@@ -16,6 +16,7 @@ import org.jeecg.modules.device.api.MasterDeviceApiService;
 import org.jeecg.modules.device.dto.*;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.entity.workorder.WorkOrder;
+import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.service.IIotDeviceRoomService;
 import org.jeecg.modules.device.service.IIotDeviceService;
 import org.jeecg.modules.device.service.IMasterLoginResolveService;
@@ -293,7 +294,7 @@ public class MasterDeviceController {
      */
     @GetMapping("/{masterCode}/room")
     @Operation(summary = "查询主控房间")
-    public ApiResult<DeviceRoomVO> queryRoom(@PathVariable String masterCode) {
+    public ApiResult< MqttMessageModel.WebRtcStartCommand> queryRoom(@PathVariable String masterCode) {
         if (masterCode == null || masterCode.isBlank()) {
             return ApiResult.fail("masterCode 不能为空");
         }
