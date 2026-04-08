@@ -80,12 +80,17 @@ public class DynamicRouteLoader implements ApplicationEventPublisherAware {
 
 
     public void init(BaseMap baseMap) {
-        log.info("初始化路由模式，dataType："+ gatewayRoutersConfig.getDataType());
-        if (RouterDataType.nacos.toString().endsWith(gatewayRoutersConfig.getDataType())) {
+        String dataType = gatewayRoutersConfig.getDataType();
+        log.info("初始化路由模式 - init，dataType：{}", dataType);
+        if (StringUtils.isBlank(dataType)) {
+            log.warn("jeecg.route.config.data-type 未配置，请检查 Nacos 中 jeecg-gateway-<profile>.yaml 是否已发布且非空（需包含 jeecg.route.config.data-type）");
+            return;
+        }
+        if (RouterDataType.nacos.toString().equals(dataType)) {
             loadRoutesByNacos();
         }
         //从数据库加载路由
-        if (RouterDataType.database.toString().endsWith(gatewayRoutersConfig.getDataType())) {
+        if (RouterDataType.database.toString().equals(dataType)) {
             loadRoutesByRedis(baseMap);
         }
     }
@@ -95,8 +100,13 @@ public class DynamicRouteLoader implements ApplicationEventPublisherAware {
      * @return
      */
     public Mono<Void> refresh(BaseMap baseMap) {
-        log.info("初始化路由模式，dataType："+ gatewayRoutersConfig.getDataType());
-        if (!RouterDataType.yml.toString().endsWith(gatewayRoutersConfig.getDataType())) {
+        String dataType = gatewayRoutersConfig.getDataType();
+        log.info("初始化路由模式 - refresh，dataType：{}", dataType);
+        if (StringUtils.isBlank(dataType)) {
+            log.warn("jeecg.route.config.data-type 未配置，跳过动态路由刷新（请检查 Nacos 配置是否非空）");
+            return Mono.empty();
+        }
+        if (!RouterDataType.yml.toString().equals(dataType)) {
             this.init(baseMap);
         }
         return Mono.empty();

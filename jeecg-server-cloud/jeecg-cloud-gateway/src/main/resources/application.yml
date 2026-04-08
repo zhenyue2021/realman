@@ -7,7 +7,7 @@ knife4j:
 
 spring:
   application:
-    name: jeecg-gateway
+    name: realman-gateway
   main:
     allow-circular-references: true
   config:

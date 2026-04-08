@@ -964,7 +964,7 @@ public class ThirdAppDingtalkServiceImpl implements IThirdAppService {
 
             if(userIds!=null){
                 LambdaQueryWrapper<SysUser> queryWrapper = new LambdaQueryWrapper<>();
-                queryWrapper.in(SysUser::getId, userIds);
+                queryWrapper.in(SysUser::getId, Arrays.asList(userIds));
                 List<SysUser> userList = userMapper.selectList(queryWrapper);
                 String[] usernameList = userList.stream().map(SysUser::getUsername).toArray(String[] :: new);
 
