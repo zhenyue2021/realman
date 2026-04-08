@@ -30,7 +30,8 @@ import java.util.concurrent.TimeUnit;
  * <pre>
  * signaling:
  *   server:
- *     url: http://192.168.1.100:8091
+ *     url: 192.168.1.100
+ *     port: 8091
  * </pre>
  */
 @Slf4j
@@ -38,10 +39,13 @@ import java.util.concurrent.TimeUnit;
 public class SignalingKeyService {
 
     /**
-     * 信令服务器根地址，例如 http://192.168.1.100:8091
+     * 信令服务器根地址，例如 192.168.1.100
      */
     @Value("${signaling.server.url:}")
     private String serverUrl;
+    /**
+     * 信令服务器根服务端口，例如 8091
+     */
     @Value("${signaling.server.port:}")
     private String serverPort;
 
