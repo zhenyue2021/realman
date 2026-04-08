@@ -301,7 +301,7 @@ public interface DeviceConstant {
         /**
          * 信令服务器房间密钥：iot:signaling:key:{serverUrl}，值为 64 位 Hex 密钥，TTL=26h
          *
-         * <p>完整 Key 示例：{@code iot:signaling:key:http://192.168.1.100:8091}
+         * <p>完整 Key 示例：{@code iot:signaling:key:192.168.1.100}
          */
         String SIGNALING_KEY_PREFIX = "iot:signaling:key:";
     }

@@ -92,6 +92,14 @@ device:
   ota:
     chunk-temp-dir: /tmp/iot-ota-chunks
 
+# 信令服务器配置
+# url: 信令服务器根地址（不含路径），密钥将通过 POST http://{url}:{port}/api/set_key 推送
+# 缓存 Key = iot:signaling:key:{url}，TTL=26h，每天凌晨 2:00 自动刷新
+signaling:
+  server:
+    url: 127.0.0.1
+    port: 8091
+
 logging:
   level:
     org.jeecg.modules.device: DEBUG
