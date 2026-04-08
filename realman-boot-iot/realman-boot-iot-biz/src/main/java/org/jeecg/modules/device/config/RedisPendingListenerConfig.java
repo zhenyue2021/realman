@@ -6,6 +6,7 @@ import org.jeecg.modules.device.service.ForceFeedbackQueryPendingService;
 import org.jeecg.modules.device.service.MasterAssociatedDevicePendingService;
 import org.jeecg.modules.device.service.NavigationPathMonitorService;
 import org.jeecg.modules.device.service.SlamCommandPendingService;
+import org.jeecg.modules.device.service.WebRtcAckPendingService;
 import org.jeecg.modules.device.service.SportSpeedQueryPendingService;
 import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
 import org.springframework.context.annotation.Bean;
@@ -45,6 +46,7 @@ public class RedisPendingListenerConfig {
     private final SportSpeedQueryPendingService     sportSpeedPendingService;
     private final MasterAssociatedDevicePendingService associatedDevicePendingService;
     private final SlamCommandPendingService         slamCommandPendingService;
+    private final WebRtcAckPendingService           webRtcAckPendingService;
     private final NavigationPathMonitorService      navigationPathMonitorService;
     private final DeviceWebSocketServer             deviceWebSocketServer;
 
@@ -67,6 +69,9 @@ public class RedisPendingListenerConfig {
 
         container.addMessageListener(slamCommandPendingService,
                 new PatternTopic(SlamCommandPendingService.CHANNEL_PREFIX + "*"));
+
+        container.addMessageListener(webRtcAckPendingService,
+                new PatternTopic(WebRtcAckPendingService.CHANNEL_PREFIX + "*"));
 
         container.addMessageListener(navigationPathMonitorService,
                 new PatternTopic(NavigationPathMonitorService.STOP_CHANNEL_PREFIX + "*"));

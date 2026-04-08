@@ -154,6 +154,26 @@ public interface DeviceConstant {
         String SLAM_ACK      = "device/%s/slam/ack";
         /** 上行：设备上报 SLAM 地图模式及当前位姿 */
         String SLAM_STATES   = "device/%s/slam/states";
+        /**
+         * 下行：平台向机器人发送 WebRTC 开始指令（Topic: webrtc/{deviceCode}/command/start）
+         *
+         * <p>Payload: {@link org.jeecg.modules.device.mqtt.MqttMessageModel.WebRtcStartCommand}
+         * 机器人建立 WebRTC P2P 连接后回复 {@link #WEBRTC_ACK_SUBSCRIBE} ACK。
+         */
+        String WEBRTC_START = "webrtc/%s/command/start";
+        /**
+         * 下行：平台向机器人发送 WebRTC 停止指令（Topic: webrtc/{deviceCode}/command/stop）
+         *
+         * <p>Payload: {@link org.jeecg.modules.device.mqtt.MqttMessageModel.WebRtcStopCommand}
+         * 平台不等待 stop ACK（fire-and-forget）。
+         */
+        String WEBRTC_STOP  = "webrtc/%s/command/stop";
+        /**
+         * 上行订阅：机器人回复 WebRTC 指令 ACK（Topic: webrtc/+/command/+/ack）
+         *
+         * <p>与 {@link #WEBRTC_START} / {@link #WEBRTC_STOP} 配对使用。
+         */
+        String WEBRTC_ACK_SUBSCRIBE = "webrtc/+/command/+/ack";
 
         /** EMQX 系统事件：设备 MQTT 连接建立（clientId 从 topic 路径中提取） */
         String SYS_CONNECTED    = "$SYS/brokers/+/clients/+/connected";
@@ -259,7 +279,7 @@ public interface DeviceConstant {
     /**
      * 设备类型
      */
-    interface DEVICE_TYPE_INTEGER {
+    interface DeviceTypeInteger {
         /**
          * 主控设备
          */

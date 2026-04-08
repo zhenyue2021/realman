@@ -141,9 +141,9 @@ public class DeviceOnlineOfflineHandler {
 
             // 7. 设备离线时销毁房间：主控离线按 masterCode 销毁，机器人离线按 robotCode 反查销毁
             try {
-                if (DeviceConstant.DEVICE_TYPE_INTEGER.CONTROLLER == device.getDeviceType()) {
+                if (DeviceConstant.DeviceTypeInteger.CONTROLLER == device.getDeviceType()) {
                     roomService.destroyRoom(deviceCode);
-                } else if (DeviceConstant.DEVICE_TYPE_INTEGER.ROBOT == device.getDeviceType()) {
+                } else if (DeviceConstant.DeviceTypeInteger.ROBOT == device.getDeviceType()) {
                     roomService.destroyRoomByRobotCode(deviceCode);
                 }
             } catch (Exception roomEx) {

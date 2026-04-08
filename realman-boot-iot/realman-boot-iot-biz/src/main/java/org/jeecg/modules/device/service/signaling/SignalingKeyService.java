@@ -28,7 +28,8 @@ import java.util.concurrent.TimeUnit;
  *
  * <p>配置示例（application.yml / Nacos）：
  * <pre>
- * signaling:
+ * webrtc:
+ *  signaling:
  *   server:
  *     url: 192.168.1.100
  *     port: 8091
@@ -41,12 +42,12 @@ public class SignalingKeyService {
     /**
      * 信令服务器根地址，例如 192.168.1.100
      */
-    @Value("${signaling.server.url:}")
+    @Value("${webrtc.signaling.server.url:}")
     private String serverUrl;
     /**
      * 信令服务器根服务端口，例如 8091
      */
-    @Value("${signaling.server.port:}")
+    @Value("${webrtc.signaling.server.port:}")
     private String serverPort;
 
     /**
@@ -98,6 +99,18 @@ public class SignalingKeyService {
      */
     public String getCurrentKey() {
         return redisTemplate.opsForValue().get(redisKey());
+    }
+
+    /**
+     * 返回信令服务器 URL（供下行 WebRTC 指令填充 signalUrl 字段使用）。
+     *
+     * @return 例如 {@code 192.168.1.100}
+     */
+    public String getServerUrl() {
+        if (serverUrl == null || serverUrl.isBlank()) {
+            return null;
+        }
+        return serverUrl;
     }
 
     // -------------------------------------------------------------------------

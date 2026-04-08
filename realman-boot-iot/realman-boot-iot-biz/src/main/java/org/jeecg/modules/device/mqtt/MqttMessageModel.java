@@ -709,4 +709,84 @@ public class MqttMessageModel {
             private Double yaw;
         }
     }
+
+    // =========================================================================
+    // WebRTC 信令指令（下行：平台 → 机器人）
+    // =========================================================================
+
+    /**
+     * 下行：开始 WebRTC 会话（Topic: webrtc/{deviceCode}/command/start）
+     *
+     * <p>机器人收到后使用其中的信令/TURN/STUN 参数建立 WebRTC P2P 连接，
+     * 并回复 {@link WebRtcAck}。
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class WebRtcStartCommand {
+        /** 指令唯一 ID，ACK 回传时带回用于关联等待 Future */
+        private String commandId;
+        /** 房间号（服务端创建，按主控编码从缓存中获取） */
+        private String roomId;
+        /** 信令服务器 URL，例如192.168.1.100 */
+        private String signalUrl;
+        /** 信令服务器访问密钥（服务端生成，每日凌晨 2:00 轮换） */
+        private String signalKey;
+        /** TURN 服务器列表 */
+        private List<TurnServer> turnServers;
+        /** STUN 服务器地址列表 */
+        private List<String> stunServers;
+        /** 消息时间戳（毫秒 epoch） */
+        private long timestamp;
+
+        /** TURN 服务器配置 */
+        @Data
+        @Builder
+        @NoArgsConstructor
+        @AllArgsConstructor
+        public static class TurnServer {
+            private String url;
+            private String username;
+            private String password;
+        }
+    }
+
+    /**
+     * 下行：停止 WebRTC 会话（Topic: webrtc/{deviceCode}/command/stop）
+     *
+     * <p>机器人收到后断开 WebRTC P2P 连接，释放信令房间。
+     * 平台不等待 stop 的 ACK（fire-and-forget）。
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class WebRtcStopCommand {
+        /** 指令唯一 ID */
+        private String commandId;
+        /** 消息时间戳（毫秒 epoch） */
+        private long timestamp;
+    }
+
+    /**
+     * 上行：机器人回复 WebRTC 指令结果（Topic: webrtc/{deviceCode}/command/{start|stop}/ack）
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class WebRtcAck {
+        /** 对应指令的 commandId */
+        private String commandId;
+        /** true=成功，false=失败 */
+        private boolean success;
+        /** 失败原因或补充信息（可为 null） */
+        private String message;
+        /** 消息时间戳（毫秒 epoch） */
+        private long timestamp;
+    }
 }

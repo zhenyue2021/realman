@@ -65,6 +65,7 @@ public class MqttMessageDispatcher {
     private final SlamStatesHandler                   slamStatesHandler;
     private final ExtParamsRequestHandler             extParamsRequestHandler;
     private final MasterCommandHandler                masterCommandHandler;
+    private final WebRtcAckHandler                    webRtcAckHandler;
 
     /**
      * 分发 MQTT 消息到对应 Handler
@@ -114,7 +115,17 @@ public class MqttMessageDispatcher {
                 }
             }
 
-            // 3. 主控/机器人原始上报 Topic：{deviceCode}/master/{path} 或 {deviceCode}/slave/{path}
+            // 3. WebRTC 指令 ACK：webrtc/{deviceCode}/command/{start|stop}/ack
+            if (topic.startsWith("webrtc/") && topic.contains("/command/") && topic.endsWith("/ack")) {
+                String[] parts = topic.split("/");
+                if (parts.length == 5) {
+                    // parts: ["webrtc", masterCode, "command", cmd, "ack"]
+                    webRtcAckHandler.handle(parts[1], parts[3], payload);
+                    return;
+                }
+            }
+
+            // 4. 主控/机器人原始上报 Topic：{deviceCode}/master/{path} 或 {deviceCode}/slave/{path}
             Matcher raw = RAW_DEVICE_TOPIC.matcher(topic);
             if (raw.matches()) {
                 dispatchRawTopic(raw.group(1), raw.group(2), raw.group(3), payload);
