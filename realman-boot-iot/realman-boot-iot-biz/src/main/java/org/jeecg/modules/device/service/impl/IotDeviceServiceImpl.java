@@ -119,6 +119,12 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    public void startTeleopNoStream(String controllerId, String robotId, String operator) {
+        teleopService.startTeleopNoStream(controllerId, robotId, operator);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
     public void stopTeleop(String controllerId, String robotId, String robotCode, String operator) {
         teleopService.stopTeleop(controllerId, robotId, robotCode, operator);
     }

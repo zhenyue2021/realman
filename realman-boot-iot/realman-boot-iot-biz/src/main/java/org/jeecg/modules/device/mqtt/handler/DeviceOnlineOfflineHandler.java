@@ -8,6 +8,7 @@ import org.jeecg.modules.device.constant.DeviceConstant;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.mapper.IotDeviceMapper;
 import org.jeecg.modules.device.service.IDeviceOperationLogService;
+import org.jeecg.modules.device.service.IIotDeviceRoomService;
 import org.jeecg.modules.device.service.PendingSyncService;
 import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -58,6 +59,7 @@ public class DeviceOnlineOfflineHandler {
     private final ObjectMapper objectMapper;
     private final IDeviceOperationLogService logService;
     private final PendingSyncService pendingSyncService;
+    private final IIotDeviceRoomService roomService;
 
     /**
      * 处理设备上线事件
@@ -136,6 +138,17 @@ public class DeviceOnlineOfflineHandler {
             logService.recordLog(device.getId(), deviceCode, DeviceConstant.OperationType.DEVICE_OFFLINE,
                     "设备MQTT连接断开，离线，原因: " + reason, null,
                     DeviceConstant.OperationSource.DEVICE, "SUCCESS", null, null, null);
+
+            // 7. 设备离线时销毁房间：主控离线按 masterCode 销毁，机器人离线按 robotCode 反查销毁
+            try {
+                if (DeviceConstant.DEVICE_TYPE_INTEGER.CONTROLLER == device.getDeviceType()) {
+                    roomService.destroyRoom(deviceCode);
+                } else if (DeviceConstant.DEVICE_TYPE_INTEGER.ROBOT == device.getDeviceType()) {
+                    roomService.destroyRoomByRobotCode(deviceCode);
+                }
+            } catch (Exception roomEx) {
+                log.warn("[Offline] 房间销毁失败 deviceCode={}", deviceCode, roomEx);
+            }
         } catch (Exception e) {
             log.error("[Offline] 处理异常", e);
         }

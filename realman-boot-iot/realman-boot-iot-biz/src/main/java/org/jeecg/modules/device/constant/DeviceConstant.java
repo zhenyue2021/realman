@@ -292,6 +292,18 @@ public interface DeviceConstant {
         String TELEOP_MASTER_TO_ROBOT = "iot:teleop:master2robot:";
         /** 遥操关系缓存（机器人→主控）：iot:teleop:robot2master:{robotCode}，值为 masterCode */
         String TELEOP_ROBOT_TO_MASTER = "iot:teleop:robot2master:";
+        /** 设备房间缓存（按主控）：iot:room:master:{masterCode}，值为 JSON(DeviceRoomVO)，TTL=24h */
+        String ROOM_MASTER_PREFIX = "iot:room:master:";
+        /** 设备房间反查索引（按机器人）：iot:room:robot:{robotCode}，值为 masterCode，TTL=24h */
+        String ROOM_ROBOT_PREFIX = "iot:room:robot:";
+        /** 活跃房间集合：iot:room:active，成员为 masterCode（WAITING/ACTIVE 状态的房间） */
+        String ROOM_ACTIVE_SET = "iot:room:active";
+        /**
+         * 信令服务器房间密钥：iot:signaling:key:{serverUrl}，值为 64 位 Hex 密钥，TTL=26h
+         *
+         * <p>完整 Key 示例：{@code iot:signaling:key:http://192.168.1.100:8091}
+         */
+        String SIGNALING_KEY_PREFIX = "iot:signaling:key:";
     }
 
     /**

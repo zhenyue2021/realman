@@ -45,6 +45,8 @@ public interface IIotDeviceService extends IService<IotDevice> {
      */
     List<DeviceCameraStreamVO> startTeleop(String controllerId, String robotId, String operator);
 
+    void startTeleopNoStream(String controllerId, String robotId, String operator);
+
     /**
      * 停止遥操：通知主控与机器人停止遥操，不等待ACK。
      */

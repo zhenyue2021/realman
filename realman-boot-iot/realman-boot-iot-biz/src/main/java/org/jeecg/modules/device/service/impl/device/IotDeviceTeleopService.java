@@ -12,6 +12,7 @@ import org.jeecg.modules.device.mapper.IotDeviceMapper;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.mqtt.publisher.MqttPublisher;
 import org.jeecg.modules.device.service.IDeviceOperationLogService;
+import org.jeecg.modules.device.service.IIotDeviceRoomService;
 import org.jeecg.modules.device.vo.DeviceCameraStreamVO;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -35,6 +36,7 @@ public class IotDeviceTeleopService {
     private final IDeviceOperationLogService logService;
     private final StringRedisTemplate redisTemplate;
     private final IotDeviceCameraStreamService cameraStreamService;
+    private final IIotDeviceRoomService roomService;
 
     public List<DeviceCameraStreamVO> startTeleop(String controllerId, String robotId, String operator) {
         IotDevice controller = deviceSupport.require(controllerId);
@@ -74,6 +76,48 @@ public class IotDeviceTeleopService {
                     "主控连接设备，设备使用状态置为占用", "{commandId:" + commandId + ",controllerDeviceCode:" + controllerDeviceCode + "}",
                     DeviceConstant.OperationSource.PLATFORM, "SUCCESS", null, operator, null);
             return cameraStreamService.getCameraStreams(robot.getId(), null);
+        } catch (Exception e) {
+            throw new RuntimeException("开始遥操失败: " + e.getMessage(), e);
+        }
+    }
+    public void startTeleopNoStream(String controllerId, String robotId, String operator) {
+        IotDevice controller = deviceSupport.require(controllerId);
+        if (!Objects.equals(controller.getDeviceType(), DeviceConstant.DEVICE_TYPE_INTEGER.CONTROLLER)) {
+            throw new RuntimeException("设备类型不匹配：不是主控设备");
+        }
+        IotDevice robot = deviceSupport.require(robotId);
+        if (!Objects.equals(robot.getDeviceType(), DeviceConstant.DEVICE_TYPE_INTEGER.ROBOT)) {
+            throw new RuntimeException("设备类型不匹配：不是机器人设备");
+        }
+        if (!Objects.equals(robot.getStatus(), DeviceConstant.DeviceStatus.ONLINE)) {
+            throw new RuntimeException("当前机器人不在线");
+        }
+        String controllerDeviceCode = controller.getDeviceCode();
+        String robotDeviceCode = robot.getDeviceCode();
+        String commandId = IdUtil.fastSimpleUUID();
+        long now = System.currentTimeMillis();
+        try {
+            String topic = String.format(DeviceConstant.MqttTopic.TELEOP_ROBOT_ASSIGN, controllerDeviceCode);
+            MqttMessageModel.RobotAssignCommand assignCmd = MqttMessageModel.RobotAssignCommand.builder()
+                    .commandId(commandId)
+                    .robotCode(robotDeviceCode)
+                    .timestamp(now)
+                    .build();
+            mqttPublisher.publishToDevice(controllerDeviceCode, topic,
+                    objectMapper.writeValueAsString(assignCmd), MqttConstant.MQTT_QOS.QOS_1);
+
+            robot.setUseStatus(DeviceConstant.UseStatus.IN_USE);
+            deviceMapper.updateById(robot);
+
+            logService.recordLog(controller.getId(), controllerDeviceCode,
+                    DeviceConstant.OperationType.COMMAND_SEND,
+                    "平台通知主控关联机器人", "{commandId:" + commandId + ",robotCode:" + robotDeviceCode + "}",
+                    DeviceConstant.OperationSource.PLATFORM, "PENDING", null, operator, null);
+            logService.recordLog(robot.getId(), robotDeviceCode,
+                    DeviceConstant.OperationType.COMMAND_SEND,
+                    "主控连接设备，设备使用状态置为使用中", "{commandId:" + commandId + ",controllerDeviceCode:" + controllerDeviceCode + "}",
+                    DeviceConstant.OperationSource.PLATFORM, "SUCCESS", null, operator, null);
+            roomService.robotJoin(controllerDeviceCode, robotDeviceCode);
         } catch (Exception e) {
             throw new RuntimeException("开始遥操失败: " + e.getMessage(), e);
         }
@@ -139,6 +183,7 @@ public class IotDeviceTeleopService {
             redisTemplate.delete(DeviceConstant.RedisKey.TELEOP_MASTER_TO_ROBOT + controllerDeviceCode);
             redisTemplate.delete(DeviceConstant.RedisKey.TELEOP_ROBOT_TO_MASTER + robotDeviceCode);
             log.info("[TeleopCache] 清除遥操关系缓存: master={} robot={}", controllerDeviceCode, robotDeviceCode);
+            roomService.destroyRoom(controllerDeviceCode);
         } catch (Exception e) {
             throw new RuntimeException("停止遥操失败: " + e.getMessage(), e);
         }

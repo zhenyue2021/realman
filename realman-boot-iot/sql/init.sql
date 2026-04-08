@@ -416,7 +416,7 @@ CREATE TABLE IF NOT EXISTS `iot_slam_sync_task` (
   KEY `idx_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='SLAM同步任务';
 
--- SLAM 指令请求/响应记录表
+-- 16. SLAM 指令请求/响应记录表
 -- 每次平台向设备发送 device/{code}/slam/request 时创建一条记录
 -- 收到 device/{code}/slam/ack 后更新对应状态
 CREATE TABLE IF NOT EXISTS `iot_slam_command_record` (
@@ -441,6 +441,22 @@ CREATE TABLE IF NOT EXISTS `iot_slam_command_record` (
     UNIQUE KEY `uk_command_id` (`command_id`),
     KEY `idx_device_code_send_time` (`master_code`, `robot_code`, `send_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='SLAM 指令请求/响应记录';
+
+-- 17. 设备建联房间
+CREATE TABLE iot_device_room (
+                                 id           VARCHAR(32)  NOT NULL            COMMENT '房间号',
+                                 master_code  VARCHAR(64)  NOT NULL            COMMENT '主控设备编码',
+                                 robot_code   VARCHAR(64)  DEFAULT NULL        COMMENT '机器人设备编码（遥操开始时写入）',
+                                 status       TINYINT      NOT NULL DEFAULT 0  COMMENT '0=等待中 1=遥操中 2=已销毁',
+                                 create_time  DATETIME     NOT NULL            COMMENT '创建时间',
+                                 destroy_time DATETIME     DEFAULT NULL        COMMENT '销毁时间',
+                                 del_flag     TINYINT      NOT NULL DEFAULT 0  COMMENT '逻辑删除 0=正常 1=已删除',
+                                 PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='IoT 设备房间';
+
+CREATE INDEX idx_master_code ON iot_device_room (master_code);
+CREATE INDEX idx_robot_code  ON iot_device_room (robot_code);
+CREATE INDEX idx_status      ON iot_device_room (status);
 
 -- 测试数据（device_secret需在平台控制台生成后下发给设备端）
 INSERT INTO `iot_device` (id,device_code,device_name,device_type,product_id,device_model,firmware_version,status,device_secret,secret_create_time,description,create_by,tenant_id,create_time)

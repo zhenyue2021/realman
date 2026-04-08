@@ -16,11 +16,13 @@ import org.jeecg.modules.device.api.MasterDeviceApiService;
 import org.jeecg.modules.device.dto.*;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.entity.workorder.WorkOrder;
+import org.jeecg.modules.device.service.IIotDeviceRoomService;
 import org.jeecg.modules.device.service.IIotDeviceService;
 import org.jeecg.modules.device.service.IMasterLoginResolveService;
 import org.jeecg.modules.device.service.IMasterOperationRecordService;
 import org.jeecg.modules.device.service.IMasterUsageStatusService;
 import org.jeecg.modules.device.vo.*;
+import org.jeecg.modules.device.vo.DeviceRoomVO;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -48,6 +50,7 @@ public class MasterDeviceController {
     private final IMasterOperationRecordService operationRecordService;
     private final IMasterUsageStatusService usageStatusService;
     private final MasterDeviceApiService masterDeviceApiService;
+    private final IIotDeviceRoomService roomService;
 
     /** 新增主控设备 */
     @PostMapping("/add")
@@ -221,6 +224,16 @@ public class MasterDeviceController {
         return ApiResult.ok(cameraStreams, "开始遥操指令已下发，并尝试获取视频流");
     }
 
+    /** 开始遥操（通知主控关联目标机器人，不等待ACK） */
+    @PostMapping("/{controllerId}/teleop/startOperation")
+    @Operation(summary = "主控关联目标机器人，并开始遥操")
+    public ApiResult<List<DeviceCameraStreamVO>> startTeleopNoStream(@PathVariable String controllerId,
+                                       @RequestBody TeleopStartDTO dto) {
+        ensureDeviceType(controllerId, DEVICE_TYPE_CONTROLLER);
+        deviceService.startTeleopNoStream(controllerId, dto.getDeviceId(), dto.getOperator());
+        return ApiResult.ok(null, "主控关联目标机器人成功，开始遥操指令已下发");
+    }
+
     /** 停止遥操（通知主控与机器人，不等待ACK） */
     @PostMapping("/{controllerId}/teleop/stop")
     @Operation(summary = "停止遥操")
@@ -270,6 +283,21 @@ public class MasterDeviceController {
             throw new RuntimeException("主控设备不存在或非主控设备: " + controllerCode);
         }
         return ApiResult.ok(vo);
+    }
+
+    /**
+     * 查询主控房间（不存在则自动创建）
+     *
+     * <p>调用方拿主控设备编码查询服务器地址时使用。
+     * 返回的 roomId 即为本次会话的房间号，后续机器人加入及销毁均以此为索引。
+     */
+    @GetMapping("/{masterCode}/room")
+    @Operation(summary = "查询主控房间")
+    public ApiResult<DeviceRoomVO> queryRoom(@PathVariable String masterCode) {
+        if (masterCode == null || masterCode.isBlank()) {
+            return ApiResult.fail("masterCode 不能为空");
+        }
+        return ApiResult.ok(roomService.queryOrCreate(masterCode));
     }
 
     /** 导出主控设备列表为 Excel（条件与 list 一致，逻辑删除的不导出） */
