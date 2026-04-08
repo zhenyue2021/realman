@@ -6,6 +6,7 @@ import org.jeecg.common.aspect.annotation.Dict;
 @Data
 public class WorkOrderDeviceDTO {
 
+    @Dict(dicCode = "device_type")
     private String deviceType;
 
     private String deviceId;
