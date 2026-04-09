@@ -25,6 +25,7 @@
 14. [设备状态枚举](#14-设备状态枚举)
 15. [数据库表结构参考](#15-数据库表结构参考)
 16. [外部系统服务参数获取（STS 凭证）](#16-外部系统服务参数获取sts-凭证)
+17. [WebRTC 遥操视频通话](#17-webrtc-遥操视频通话)
 
 ---
 
@@ -251,6 +252,8 @@ def decrypt_message(device_code: str, encrypted: str) -> str:
 | `master/{controllerCode}/command/{cmd}/ack`                 | 1   | 主控设备指令 ACK（力反馈/运动与安全参数等）                | 联调完成   |
 | `{robotCode}/slave/status`                                  | 1   | 机器人原始状态上报（遥操作场景，由平台透传至 WebSocket）       | 联调完成   |
 | `device/{deviceCode}/ext-params/request`                    | 1   | 设备请求外部系统服务参数（如 STS 临时凭证，见第 16 章）        | 未联调    |
+| `webrtc/{robotCode}/command/start/ack`                      | 1   | 机器人响应 WebRTC 开始指令（5 秒超时，见第 17 章）           | 未联调    |
+| `webrtc/{robotCode}/command/stop/ack`                       | 1   | 机器人响应 WebRTC 停止指令（可选，平台仅记日志）               | 未联调    |
 
 ### 4.2 下行 Topic（平台发布 → 设备订阅）
 
@@ -265,6 +268,8 @@ def decrypt_message(device_code: str, encrypted: str) -> str:
 | `master/{controllerCode}/command/force-feedback`         | 1   | 平台向主控设置力反馈参数（机械臂/夹爪力度）           | 联调完成 |
 | `master/{controllerCode}/command/sport-speed`            | 1   | 平台向主控设置运动与安全参数（底盘/升降速度）          | 联调完成 |
 | `device/{deviceCode}/ext-params/ack`                     | 1   | 平台响应外部系统服务参数（如 STS 临时凭证，见第 16 章） | 未联调  |
+| `webrtc/{robotCode}/command/start`                       | 1   | 下发 WebRTC 开始指令（含房间信息/信令密钥/ICE 服务器，见第 17 章） | 未联调  |
+| `webrtc/{robotCode}/command/stop`                        | 1   | 下发 WebRTC 停止指令（fire-and-forget，见第 17 章）             | 未联调  |
 
 ### 4.3 系统事件 Topic（EMQX 内部，平台订阅）
 
@@ -834,6 +839,10 @@ Payload: AES-256-CBC 加密后的 JSON 字符串
 | `iot:config:sync:{deviceCode}:{commandId}` | String | 30秒     | 配置下发等待 ACK 标记                   |
 | `iot:ota:progress:{deviceCode}:{recordId}` | String | 40分钟    | OTA 断点续传进度（已下载字节数）              |
 | `iot:upload:chunk:{uploadId}`              | Hash   | —       | 固件分片上传进度                        |
+| `iot:room:master:{masterCode}`             | String | 24小时    | 主控房间信息 JSON（DeviceRoomVO）        |
+| `iot:room:robot:{robotCode}`               | String | 24小时    | 机器人 → 主控编码反查索引                  |
+| `iot:room:active`                          | Set    | 永久      | 活跃房间主控编码集合                      |
+| `iot:signaling:key:{serverUrl}`            | String | 26小时    | 信令服务器访问密钥（64位Hex，每天凌晨2点轮换）  |
 
 ---
 
@@ -976,6 +985,137 @@ QoS: 1
 
 ---
 
+## 17. WebRTC 遥操视频通话
+
+遥操开始时，平台通过 `webrtc/{robotCode}/command/start` 向**机器人**下发 WebRTC 房间信息，机器人连接信令服务器并建立 P2P 视频通道；遥操停止时，平台下发 `webrtc/{robotCode}/command/stop`（fire-and-forget）拆除连接。
+
+> **注意**：`webrtc/` Topic 中的 `{deviceCode}` 均为**机器人**设备编码（`robotCode`），非主控编码。Payload 同样使用 `AES-256-CBC` 加密（密钥由 `robotCode` 派生）。
+
+### 17.1 流程概览
+
+```
+平台                                      机器人
+  │                                          │
+  │── webrtc/{robotCode}/command/start ─────>│  1. 平台下发 WebRTC 开始指令（含房间信息）
+  │<── webrtc/{robotCode}/command/start/ack ─│  2. 机器人连接信令服务器成功后回复（5 秒超时）
+  │                                          │
+  │   （WebRTC P2P 建立，主控与机器人视频互通）│
+  │                                          │
+  │── webrtc/{robotCode}/command/stop ──────>│  3. 遥操结束，平台下发停止指令（不等待 ACK）
+  │<── webrtc/{robotCode}/command/stop/ack ──│  4. 机器人可选回复（平台仅记日志）
+```
+
+> **超时**：平台等待 `start/ack` 最多 **5 秒**，超时或 `success=false` 均中止遥操并向调用方返回错误。
+
+### 17.2 下行消息：WebRtcStartCommand（平台 → 机器人）
+
+```
+Topic: webrtc/{robotCode}/command/start
+QoS: 1
+Payload: AES-256-CBC 加密（密钥由 robotCode 派生）
+```
+
+```json
+{
+  "commandId": "550e8400-e29b-41d4-a716-446655440000",
+  "roomId": "1902887123456789012",
+  "signalUrl": "192.168.1.100",
+  "signalKey": "a3f8c2d1e4b5a6f7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f90a1b",
+  "turnServers": [
+    {
+      "url": "192.168.1.200:3478",
+      "username": "turnuser",
+      "password": "turnpass"
+    }
+  ],
+  "stunServers": ["192.168.1.200"],
+  "timestamp": 1710000000000
+}
+```
+
+**字段说明**：
+
+| 字段            | 类型            | 说明                                                      |
+|---------------|---------------|---------------------------------------------------------|
+| `commandId`   | String        | 唯一指令 ID（UUID），ACK 中必须原样带回                              |
+| `roomId`      | String        | 平台为本次遥操分配的房间号（雪花 ID 字符串）                               |
+| `signalUrl`   | String        | 信令服务器 IP 地址，机器人据此建立 WebSocket 连接                       |
+| `signalKey`   | String        | 信令服务器访问密钥（64 位十六进制字符串），每天凌晨 2 点轮换，TTL=26h             |
+| `turnServers` | Array<Object> | TURN 中继服务器`url`列表，                      |
+| `stunServers` | Array<String> | STUN 服务器 IP 列表                                          |
+| `timestamp`   | Long          | 平台下发时间，毫秒时间戳                                            |
+
+### 17.3 上行消息：WebRtcAck（机器人 → 平台）
+
+```
+Topic: webrtc/{robotCode}/command/start/ack
+QoS: 1
+Payload: AES-256-CBC 加密（密钥由 robotCode 派生）
+```
+
+**成功**：
+
+```json
+{
+  "commandId": "550e8400-e29b-41d4-a716-446655440000",
+  "success": true,
+  "message": null,
+  "timestamp": 1710000000500
+}
+```
+
+**失败**：
+
+```json
+{
+  "commandId": "550e8400-e29b-41d4-a716-446655440000",
+  "success": false,
+  "message": "信令服务器连接超时",
+  "timestamp": 1710000000500
+}
+```
+
+| 字段          | 类型      | 说明                                              |
+|-------------|---------|------------------------------------------------|
+| `commandId` | String  | 与下行 `start` 指令一致                               |
+| `success`   | Boolean | `true`=WebRTC 已成功建立；`false`=失败，平台将中断遥操         |
+| `message`   | String  | 失败原因（`success=true` 时为 `null`）                  |
+| `timestamp` | Long    | 机器人回复时间，毫秒时间戳                                  |
+
+### 17.4 下行消息：WebRtcStopCommand（平台 → 机器人）
+
+```
+Topic: webrtc/{robotCode}/command/stop
+QoS: 1
+Payload: AES-256-CBC 加密（密钥由 robotCode 派生）
+```
+
+```json
+{
+  "commandId": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+  "timestamp": 1710000060000
+}
+```
+
+### 17.5 上行消息：WebRtcAck（机器人 → 平台，可选）
+
+```
+Topic: webrtc/{robotCode}/command/stop/ack
+QoS: 1
+```
+
+平台收到后仅记录日志，不影响任何流程。Payload 结构与 `start/ack` 一致。
+
+### 17.6 设备端实现要点
+
+1. 订阅 `webrtc/{robotCode}/command/+`（`+` 匹配 `start` 和 `stop`）。
+2. 收到 `start` 后解密，根据 `signalUrl` + `signalKey` 连接信令服务器，在 **5 秒内** 完成并回复 `start/ack`（`success=true`）。
+3. 若连接失败，立即回复 `start/ack`（`success=false`，`message` 填写失败原因）。
+4. `commandId` 必须在 ACK 中原样带回，平台据此关联等待的 Future。
+5. 收到 `stop` 后主动断开 WebRTC 连接，可选回复 `stop/ack`。
+
+---
+
 ## 附录：对接快速检查清单
 
 **设备端必须实现**：
@@ -991,4 +1131,5 @@ QoS: 1
 - [ ] 设备支持摄像头：订阅 `device/{deviceCode}/camera/stream/query`，收到 CameraStreamQuery 后按 `commandId`、`cameraIndex`
   查询流地址，加密后上报到 `device/{deviceCode}/camera/stream/ack`（响应中必须带回相同 `commandId`）
 - [ ] `cleanSession = false`，确保离线期间下行消息不丢失
+- [ ] 机器人订阅 `webrtc/{robotCode}/command/+`，收到 `start` 后连接信令服务器，在 **5 秒内** 回复 `start/ack`（`commandId` 必须一致）；收到 `stop` 后断开 WebRTC 连接
 
