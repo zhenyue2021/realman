@@ -108,6 +108,8 @@ webrtc:
     server:
       url: 39.107.117.20
       port: 2233
+      auto-push:
+        enabled: false  # 测试环境禁用启动时推送，生产环境设为 true 或删除此行
 
 logging:
   level:

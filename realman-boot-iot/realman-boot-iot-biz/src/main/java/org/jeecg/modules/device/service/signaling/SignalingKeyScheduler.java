@@ -2,6 +2,7 @@ package org.jeecg.modules.device.service.signaling;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -12,7 +13,7 @@ import org.springframework.stereotype.Component;
  *
  * <p>触发时机：
  * <ul>
- *   <li>应用启动就绪后立即执行一次（保证服务启动时密钥即有效）</li>
+ *   <li>应用启动就绪后立即执行一次（可通过 {@code webrtc.signaling.server.auto-push.enabled=false} 关闭）</li>
  *   <li>每天凌晨 2:00 定时重新生成并推送（密钥有效期 24h，TTL 设为 26h 留有余量）</li>
  * </ul>
  *
@@ -26,12 +27,23 @@ public class SignalingKeyScheduler {
     private final SignalingKeyService signalingKeyService;
 
     /**
+     * 是否在应用启动时自动推送密钥，默认 true。
+     * 测试环境可在 application-dev.yml 中设为 false 跳过推送。
+     */
+    @Value("${webrtc.signaling.server.auto-push.enabled:true}")
+    private boolean autoPushOnStartup;
+
+    /**
      * 应用就绪后初始化密钥（异步，不阻塞启动流程）
      *
      * <p>使用 ApplicationReadyEvent 而非 @PostConstruct，确保 Redis / HTTP 连接均已就绪。
      */
     @EventListener(ApplicationReadyEvent.class)
     public void initOnStartup() {
+        if (!autoPushOnStartup) {
+            log.info("[Signaling] auto-push 已关闭，跳过启动时密钥初始化");
+            return;
+        }
         log.info("[Signaling] 应用启动，初始化信令服务器密钥");
         signalingKeyService.generateAndPush();
     }
