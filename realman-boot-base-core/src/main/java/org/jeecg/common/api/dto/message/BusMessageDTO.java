@@ -1,6 +1,7 @@
 package org.jeecg.common.api.dto.message;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 import java.io.Serializable;
 
@@ -11,6 +12,7 @@ import java.io.Serializable;
 * @date: 2022/8/17
 */
 @Data
+@EqualsAndHashCode(callSuper = true)
 public class BusMessageDTO extends MessageDTO implements Serializable {
 
     private static final long serialVersionUID = 9104793287983367669L;

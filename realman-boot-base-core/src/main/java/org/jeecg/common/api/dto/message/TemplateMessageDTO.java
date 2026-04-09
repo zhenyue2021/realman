@@ -1,6 +1,7 @@
 package org.jeecg.common.api.dto.message;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import java.io.Serializable;
 import java.util.Map;
 
@@ -9,6 +10,7 @@ import java.util.Map;
  * @author: jeecg-boot
  */
 @Data
+@EqualsAndHashCode(callSuper = true)
 public class TemplateMessageDTO extends TemplateDTO implements Serializable {
 
     private static final long serialVersionUID = 411137565170647585L;
