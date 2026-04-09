@@ -52,10 +52,28 @@ public class IotDeviceRoomServiceImpl extends ServiceImpl<IotDeviceRoomMapper, I
 
     @Override
     public  MqttMessageModel.WebRtcStartCommand queryOrCreate(String masterCode) {
+        // 构建 TURN 服务器列表
+        List<MqttMessageModel.WebRtcStartCommand.TurnServer> turnServers =
+                webRtcProperties.getTurnServers().stream()
+                        .map(t -> MqttMessageModel.WebRtcStartCommand.TurnServer.builder()
+                                .url(t.getUrl())
+                                .username(t.getUsername())
+                                .password(t.getPassword())
+                                .build())
+                        .toList();
+
+        MqttMessageModel.WebRtcStartCommand startCmd = MqttMessageModel.WebRtcStartCommand.builder()
+                .signalUrl(signalingKeyService.getServerUrl())
+                .signalKey(signalingKeyService.getCurrentKey())
+                .turnServers(turnServers)
+                .stunServers(webRtcProperties.getStunServerList())
+                .timestamp(System.currentTimeMillis())
+                .build();
         // 1. 缓存命中
         DeviceRoomVO cached = getFromCache(masterCode);
         if (cached != null) {
-            return cached;
+            startCmd.setRoomId(cached.getRoomId());
+            return startCmd;
         }
 
         // 2. DB 查询活跃房间
@@ -70,24 +88,8 @@ public class IotDeviceRoomServiceImpl extends ServiceImpl<IotDeviceRoomMapper, I
         }
 
         DeviceRoomVO vo = toVO(room);
-        // 构建 TURN 服务器列表
-        List<MqttMessageModel.WebRtcStartCommand.TurnServer> turnServers =
-                webRtcProperties.getTurnServers().stream()
-                        .map(t -> MqttMessageModel.WebRtcStartCommand.TurnServer.builder()
-                                .url(t.getUrl())
-                                .username(t.getUsername())
-                                .password(t.getPassword())
-                                .build())
-                        .toList();
-        MqttMessageModel.WebRtcStartCommand startCmd = MqttMessageModel.WebRtcStartCommand.builder()
-                .roomId(room.getId())
-                .signalUrl(signalingKeyService.getServerUrl())
-                .signalKey(signalingKeyService.getCurrentKey())
-                .turnServers(turnServers)
-                .stunServers(webRtcProperties.getStunServerList())
-                .timestamp(System.currentTimeMillis())
-                .build();
         putCache(masterCode, vo);
+        startCmd.setRoomId(room.getId());
         return startCmd;
     }
 

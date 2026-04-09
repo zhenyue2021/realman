@@ -2,6 +2,7 @@ package org.jeecg.modules.device.config;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -24,6 +25,7 @@ import java.util.List;
 @Data
 @Component
 @ConfigurationProperties(prefix = "webrtc")
+@RefreshScope
 public class WebRtcProperties {
 
     /** TURN 服务器列表，下发给机器人设备 */

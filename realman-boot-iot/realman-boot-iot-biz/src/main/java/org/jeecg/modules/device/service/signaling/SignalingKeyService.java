@@ -4,6 +4,7 @@ import cn.hutool.core.util.HexUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.constant.DeviceConstant;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.*;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -37,6 +38,7 @@ import java.util.concurrent.TimeUnit;
  */
 @Slf4j
 @Service
+@RefreshScope
 public class SignalingKeyService {
 
     /**

@@ -96,18 +96,18 @@ device:
 webrtc:
   # TURN 服务器列表，支持多个
   turn-servers:
-    - url: "127.0.0.1:3478"
-      username: "user"
-      password: "pass"
+    url: "39.107.117.20:3479?transport=udp"
+    username: realman
+    password: TBdWj0HhwTK56AzK
   # STUN 服务器列表（英文逗号分隔，拆分后作为数组下发）
-  stun-servers: "127.0.0.1"
+  stun-servers: "stun:stun.l.google.com:19302"
   # 信令服务器配置
   # url: 信令服务器根地址（不含路径），密钥将通过 POST http://{url}:{port}/api/set_key 推送
   # 缓存 Key = iot:signaling:key:{url}，TTL=26h，每天凌晨 2:00 自动刷新
   signaling:
     server:
-      url: 127.0.0.1
-      port: 8091
+      url: 39.107.117.20
+      port: 2233
 
 logging:
   level:
