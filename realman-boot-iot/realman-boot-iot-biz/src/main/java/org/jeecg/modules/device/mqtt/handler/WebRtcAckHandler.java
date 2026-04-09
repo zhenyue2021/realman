@@ -38,7 +38,7 @@ public class WebRtcAckHandler {
         try {
             String decrypted = encryptService.decryptFromDevice(deviceCode, payload);
             MqttMessageModel.WebRtcAck ack = objectMapper.readValue(decrypted, MqttMessageModel.WebRtcAck.class);
-            log.info("[WebRtcAck] device={} cmd={} commandId={} success={} message={}",
+            log.info("[WebRtcAck] device={} command={} commandId={} success={} message={}",
                     deviceCode, ack.getCommand(), ack.getCommandId(), ack.isSuccess(), ack.getMessage());
 
             if ("start".equals(ack.getCommand()) && ack.getCommandId() != null) {

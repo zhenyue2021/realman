@@ -109,10 +109,10 @@ public class SignalingKeyService {
      * @return 例如 {@code 192.168.1.100}
      */
     public String getServerUrl() {
-        if (serverUrl == null || serverUrl.isBlank()) {
+        if (serverUrl == null || serverUrl.isBlank() || serverPort == null || serverPort.isBlank()) {
             return null;
         }
-        return serverUrl;
+        return "ws://" + serverUrl + ":" + serverPort;
     }
 
     // -------------------------------------------------------------------------
