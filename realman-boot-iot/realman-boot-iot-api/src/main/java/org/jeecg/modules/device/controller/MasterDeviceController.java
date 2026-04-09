@@ -294,7 +294,7 @@ public class MasterDeviceController {
      */
     @GetMapping("/{masterCode}/room")
     @Operation(summary = "查询主控房间")
-    public ApiResult< MqttMessageModel.WebRtcStartCommand> queryRoom(@PathVariable String masterCode) {
+    public ApiResult< MqttMessageModel.WebRtcCommand> queryRoom(@PathVariable String masterCode) {
         if (masterCode == null || masterCode.isBlank()) {
             return ApiResult.fail("masterCode 不能为空");
         }

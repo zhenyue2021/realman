@@ -212,7 +212,7 @@ public class IotDeviceTeleopService {
      * <ol>
      *   <li>从缓存获取/创建房间，取 roomId</li>
      *   <li>从缓存获取信令服务器密钥</li>
-     *   <li>组装 {@link MqttMessageModel.WebRtcStartCommand} 并发布 MQTT</li>
+     *   <li>组装 {@link MqttMessageModel.WebRtcCommand} 并发布 MQTT</li>
      *   <li>阻塞等待机器人 ACK，超时或 success=false 时抛出异常</li>
      * </ol>
      *
@@ -229,6 +229,7 @@ public class IotDeviceTeleopService {
             // 获取房间（按主控编码查询或创建），command 字段已由 queryOrCreate 设为 "start"
             MqttMessageModel.WebRtcCommand webRtcCommand = roomService.queryOrCreate(masterDeviceCode);
             webRtcCommand.setCommandId(webRtcCommandId);
+            webRtcCommand.setCommand("start");
 
             String topic = String.format(DeviceConstant.MqttTopic.WEBRTC_COMMAND, robotDeviceCode);
             mqttPublisher.publishToDevice(robotDeviceCode, topic,

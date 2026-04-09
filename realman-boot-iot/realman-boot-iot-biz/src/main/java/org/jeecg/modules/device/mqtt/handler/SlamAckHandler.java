@@ -25,7 +25,7 @@ public class SlamAckHandler {
     public void handle(String deviceCode, String payload) throws Exception {
         String decrypted = encryptService.decryptFromDevice(deviceCode, payload);
         MqttMessageModel.SlamAck ack = objectMapper.readValue(decrypted, MqttMessageModel.SlamAck.class);
-        log.info("[SlamAck] 收到响应: deviceCode={}, commandId={}, function={}, sequence={}/{}, success={}",
+        log.debug("[SlamAck] 收到响应: deviceCode={}, commandId={}, function={}, sequence={}/{}, success={}",
                 deviceCode, ack.getCommandId(), ack.getFunction(), ack.getSequence(), ack.getTotal(), ack.getSuccess());
         slamCommandService.handleAck(deviceCode, ack);
     }
