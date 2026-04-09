@@ -155,25 +155,20 @@ public interface DeviceConstant {
         /** 上行：设备上报 SLAM 地图模式及当前位姿 */
         String SLAM_STATES   = "device/%s/slam/states";
         /**
-         * 下行：平台向机器人发送 WebRTC 开始指令（Topic: webrtc/{deviceCode}/command/start）
+         * 下行：平台向机器人发送 WebRTC 统一指令（Topic: webrtc/{deviceCode}/command）
          *
-         * <p>Payload: {@link org.jeecg.modules.device.mqtt.MqttMessageModel.WebRtcStartCommand}
-         * 机器人建立 WebRTC P2P 连接后回复 {@link #WEBRTC_ACK_SUBSCRIBE} ACK。
+         * <p>Payload: {@link org.jeecg.modules.device.mqtt.MqttMessageModel.WebRtcCommand}，
+         * 通过 payload 中 {@code command} 字段区分 start / stop。
+         * start 指令机器人建立 WebRTC P2P 连接后回复 {@link #WEBRTC_ACK_SUBSCRIBE} ACK；
+         * stop 指令平台不等待 ACK（fire-and-forget）。
          */
-        String WEBRTC_START = "webrtc/%s/command/start";
+        String WEBRTC_COMMAND = "webrtc/%s/command";
         /**
-         * 下行：平台向机器人发送 WebRTC 停止指令（Topic: webrtc/{deviceCode}/command/stop）
+         * 上行订阅：机器人回复 WebRTC 指令 ACK（Topic: webrtc/+/command/ack）
          *
-         * <p>Payload: {@link org.jeecg.modules.device.mqtt.MqttMessageModel.WebRtcStopCommand}
-         * 平台不等待 stop ACK（fire-and-forget）。
+         * <p>与 {@link #WEBRTC_COMMAND} 配对使用。
          */
-        String WEBRTC_STOP  = "webrtc/%s/command/stop";
-        /**
-         * 上行订阅：机器人回复 WebRTC 指令 ACK（Topic: webrtc/+/command/+/ack）
-         *
-         * <p>与 {@link #WEBRTC_START} / {@link #WEBRTC_STOP} 配对使用。
-         */
-        String WEBRTC_ACK_SUBSCRIBE = "webrtc/+/command/+/ack";
+        String WEBRTC_ACK_SUBSCRIBE = "webrtc/+/command/ack";
 
         /** EMQX 系统事件：设备 MQTT 连接建立（clientId 从 topic 路径中提取） */
         String SYS_CONNECTED    = "$SYS/brokers/+/clients/+/connected";

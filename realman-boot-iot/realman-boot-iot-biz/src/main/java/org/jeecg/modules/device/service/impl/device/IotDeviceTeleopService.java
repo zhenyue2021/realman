@@ -5,19 +5,18 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jeecg.modules.device.config.WebRtcProperties;
 import org.jeecg.modules.device.constant.DeviceConstant;
 import org.jeecg.modules.device.constant.MqttConstant;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.mapper.IotDeviceMapper;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.mqtt.publisher.MqttPublisher;
-import org.jeecg.modules.device.config.WebRtcProperties;
 import org.jeecg.modules.device.service.IDeviceOperationLogService;
 import org.jeecg.modules.device.service.IIotDeviceRoomService;
 import org.jeecg.modules.device.service.WebRtcAckPendingService;
 import org.jeecg.modules.device.service.signaling.SignalingKeyService;
 import org.jeecg.modules.device.vo.DeviceCameraStreamVO;
-import org.jeecg.modules.device.vo.DeviceRoomVO;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -47,8 +46,6 @@ public class IotDeviceTeleopService {
     private final IotDeviceCameraStreamService cameraStreamService;
     private final IIotDeviceRoomService roomService;
     private final WebRtcAckPendingService webRtcAckPendingService;
-    private final SignalingKeyService signalingKeyService;
-    private final WebRtcProperties webRtcProperties;
 
     public List<DeviceCameraStreamVO> startTeleop(String controllerId, String robotId, String operator) {
         IotDevice controller = deviceSupport.require(controllerId);
@@ -107,9 +104,9 @@ public class IotDeviceTeleopService {
         }
         String controllerDeviceCode = controller.getDeviceCode();
         String robotDeviceCode = robot.getDeviceCode();
-        String commandId = IdUtil.fastSimpleUUID();
-        long now = System.currentTimeMillis();
         try {
+            /*            String commandId = IdUtil.fastSimpleUUID();
+            long now = System.currentTimeMillis();
             String topic = String.format(DeviceConstant.MqttTopic.TELEOP_ROBOT_ASSIGN, controllerDeviceCode);
             MqttMessageModel.RobotAssignCommand assignCmd = MqttMessageModel.RobotAssignCommand.builder()
                     .commandId(commandId)
@@ -129,7 +126,7 @@ public class IotDeviceTeleopService {
             logService.recordLog(robot.getId(), robotDeviceCode,
                     DeviceConstant.OperationType.COMMAND_SEND,
                     "主控连接设备，设备使用状态置为使用中", "{commandId:" + commandId + ",controllerDeviceCode:" + controllerDeviceCode + "}",
-                    DeviceConstant.OperationSource.PLATFORM, "SUCCESS", null, operator, null);
+                    DeviceConstant.OperationSource.PLATFORM, "SUCCESS", null, operator, null);*/
             sendWebRtcStartAndAwait(controllerDeviceCode, robotDeviceCode);
             roomService.robotJoin(controllerDeviceCode, robotDeviceCode);
         } catch (Exception e) {
@@ -229,34 +226,15 @@ public class IotDeviceTeleopService {
                 webRtcAckPendingService.register(webRtcCommandId);
 
         try {
-            // 获取房间（按主控编码查询或创建）
-            MqttMessageModel.WebRtcStartCommand webRtcStartCommand = roomService.queryOrCreate(masterDeviceCode);
-            webRtcStartCommand.setCommandId(webRtcCommandId);
-            // 构建 TURN 服务器列表
-            /*List<MqttMessageModel.WebRtcStartCommand.TurnServer> turnServers =
-                    webRtcProperties.getTurnServers().stream()
-                            .map(t -> MqttMessageModel.WebRtcStartCommand.TurnServer.builder()
-                                    .url(t.getUrl())
-                                    .username(t.getUsername())
-                                    .password(t.getPassword())
-                                    .build())
-                            .toList();
+            // 获取房间（按主控编码查询或创建），command 字段已由 queryOrCreate 设为 "start"
+            MqttMessageModel.WebRtcCommand webRtcCommand = roomService.queryOrCreate(masterDeviceCode);
+            webRtcCommand.setCommandId(webRtcCommandId);
 
-            MqttMessageModel.WebRtcStartCommand startCmd = MqttMessageModel.WebRtcStartCommand.builder()
-                    .commandId(webRtcCommandId)
-                    .roomId(room.getRoomId())
-                    .signalUrl(signalingKeyService.getServerUrl())
-                    .signalKey(signalingKeyService.getCurrentKey())
-                    .turnServers(turnServers)
-                    .stunServers(webRtcProperties.getStunServerList())
-                    .timestamp(System.currentTimeMillis())
-                    .build();*/
-
-            String topic = String.format(DeviceConstant.MqttTopic.WEBRTC_START, robotDeviceCode);
+            String topic = String.format(DeviceConstant.MqttTopic.WEBRTC_COMMAND, robotDeviceCode);
             mqttPublisher.publishToDevice(robotDeviceCode, topic,
-                    objectMapper.writeValueAsString(webRtcStartCommand), MqttConstant.MQTT_QOS.QOS_1);
+                    objectMapper.writeValueAsString(webRtcCommand), MqttConstant.MQTT_QOS.QOS_1);
             log.info("[WebRtc] 已下发 start 指令 device={} commandId={} roomId={}",
-                    robotDeviceCode, webRtcCommandId, webRtcStartCommand.getRoomId());
+                    robotDeviceCode, webRtcCommandId, webRtcCommand.getRoomId());
         } catch (Exception e) {
             webRtcAckPendingService.completeExceptionally(webRtcCommandId, e);
             throw new RuntimeException("WebRTC 开始指令发送失败: " + e.getMessage(), e);
@@ -283,11 +261,12 @@ public class IotDeviceTeleopService {
      */
     private void sendWebRtcStop(String robotDeviceCode) {
         try {
-            MqttMessageModel.WebRtcStopCommand stopCmd = MqttMessageModel.WebRtcStopCommand.builder()
+            MqttMessageModel.WebRtcCommand stopCmd = MqttMessageModel.WebRtcCommand.builder()
+                    .command("stop")
                     .commandId(IdUtil.fastSimpleUUID())
                     .timestamp(System.currentTimeMillis())
                     .build();
-            String topic = String.format(DeviceConstant.MqttTopic.WEBRTC_STOP, robotDeviceCode);
+            String topic = String.format(DeviceConstant.MqttTopic.WEBRTC_COMMAND, robotDeviceCode);
             mqttPublisher.publishToDevice(robotDeviceCode, topic,
                     objectMapper.writeValueAsString(stopCmd), MqttConstant.MQTT_QOS.QOS_1);
             log.info("[WebRtc] 已下发 stop 指令 device={}", robotDeviceCode);

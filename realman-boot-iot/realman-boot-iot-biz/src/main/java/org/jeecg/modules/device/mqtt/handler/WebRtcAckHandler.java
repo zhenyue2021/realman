@@ -10,9 +10,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
- * WebRTC 指令 ACK 处理器（Topic: webrtc/{deviceCode}/command/{start|stop}/ack）
+ * WebRTC 指令 ACK 处理器（Topic: webrtc/{deviceCode}/command/ack）
  *
- * <p>机器人执行 WebRTC 开始/停止指令后上报本 ACK：
+ * <p>机器人执行 WebRTC 指令后上报本 ACK，通过 payload 中的 {@code command} 字段区分：
  * <ul>
  *   <li>start ACK：通过 {@link WebRtcAckPendingService} 通知等待线程</li>
  *   <li>stop ACK：仅记录日志，不需要等待</li>
@@ -32,22 +32,21 @@ public class WebRtcAckHandler {
      * 处理 WebRTC ACK
      *
      * @param deviceCode 机器人设备编码
-     * @param cmd        指令类型（start / stop）
      * @param payload    AES 加密的 Payload
      */
-    public void handle(String deviceCode, String cmd, String payload) {
+    public void handle(String deviceCode, String payload) {
         try {
             String decrypted = encryptService.decryptFromDevice(deviceCode, payload);
             MqttMessageModel.WebRtcAck ack = objectMapper.readValue(decrypted, MqttMessageModel.WebRtcAck.class);
             log.info("[WebRtcAck] device={} cmd={} commandId={} success={} message={}",
-                    deviceCode, cmd, ack.getCommandId(), ack.isSuccess(), ack.getMessage());
+                    deviceCode, ack.getCommand(), ack.getCommandId(), ack.isSuccess(), ack.getMessage());
 
-            if ("start".equals(cmd) && ack.getCommandId() != null) {
+            if ("start".equals(ack.getCommand()) && ack.getCommandId() != null) {
                 pendingService.complete(ack.getCommandId(), ack);
             }
             // stop ACK：fire-and-forget，不需要通知等待方
         } catch (Exception e) {
-            log.error("[WebRtcAck] 处理异常 deviceCode={} cmd={}", deviceCode, cmd, e);
+            log.error("[WebRtcAck] 处理异常 deviceCode={}", deviceCode, e);
         }
     }
 }

@@ -25,7 +25,7 @@ public interface IIotDeviceRoomService extends IService<IotDeviceRoom> {
      * @param masterCode 主控设备编码
      * @return 房间信息
      */
-    MqttMessageModel.WebRtcStartCommand queryOrCreate(String masterCode);
+    MqttMessageModel.WebRtcCommand queryOrCreate(String masterCode);
 
     /**
      * 机器人加入房间（遥操开始时调用）

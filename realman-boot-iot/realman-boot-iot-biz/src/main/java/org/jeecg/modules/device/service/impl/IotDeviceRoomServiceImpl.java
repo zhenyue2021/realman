@@ -51,18 +51,18 @@ public class IotDeviceRoomServiceImpl extends ServiceImpl<IotDeviceRoomMapper, I
     // -------------------------------------------------------------------------
 
     @Override
-    public  MqttMessageModel.WebRtcStartCommand queryOrCreate(String masterCode) {
+    public MqttMessageModel.WebRtcCommand queryOrCreate(String masterCode) {
         // 构建 TURN 服务器列表
-        List<MqttMessageModel.WebRtcStartCommand.TurnServer> turnServers =
+        List<MqttMessageModel.WebRtcCommand.TurnServer> turnServers =
                 webRtcProperties.getTurnServers().stream()
-                        .map(t -> MqttMessageModel.WebRtcStartCommand.TurnServer.builder()
+                        .map(t -> MqttMessageModel.WebRtcCommand.TurnServer.builder()
                                 .url(t.getUrl())
                                 .username(t.getUsername())
                                 .password(t.getPassword())
                                 .build())
                         .toList();
 
-        MqttMessageModel.WebRtcStartCommand startCmd = MqttMessageModel.WebRtcStartCommand.builder()
+        MqttMessageModel.WebRtcCommand startCmd = MqttMessageModel.WebRtcCommand.builder()
                 .signalUrl(signalingKeyService.getServerUrl())
                 .signalKey(signalingKeyService.getCurrentKey())
                 .turnServers(turnServers)

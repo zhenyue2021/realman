@@ -115,12 +115,12 @@ public class MqttMessageDispatcher {
                 }
             }
 
-            // 3. WebRTC 指令 ACK：webrtc/{deviceCode}/command/{start|stop}/ack
-            if (topic.startsWith("webrtc/") && topic.contains("/command/") && topic.endsWith("/ack")) {
+            // 3. WebRTC 指令 ACK：webrtc/{deviceCode}/command/ack
+            if (topic.startsWith("webrtc/") && topic.endsWith("/command/ack")) {
                 String[] parts = topic.split("/");
-                if (parts.length == 5) {
-                    // parts: ["webrtc", masterCode, "command", cmd, "ack"]
-                    webRtcAckHandler.handle(parts[1], parts[3], payload);
+                if (parts.length == 4) {
+                    // parts: ["webrtc", deviceCode, "command", "ack"]
+                    webRtcAckHandler.handle(parts[1], payload);
                     return;
                 }
             }
