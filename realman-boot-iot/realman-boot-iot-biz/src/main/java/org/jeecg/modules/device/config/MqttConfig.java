@@ -156,7 +156,7 @@ public class MqttConfig {
                 share + "device/+/slam/ack",                // 机器人响应建图/定位/导航指令
                 share + "device/+/slam/states",             // 机器人上报SLAM状态及位姿
                 share + "device/+/ext-params/request",      // 设备请求外部系统服务参数
-                share + "webrtc/+/command/ack",             // 机器人回复 WebRTC 指令 ACK
+                share + "device/+/webrtc/ack",              // 机器人回复 WebRTC 指令 ACK
                 "$SYS/brokers/+/clients/+/connected",       // EMQX 设备上线事件（不支持共享订阅）
                 "$SYS/brokers/+/clients/+/disconnected",    // EMQX 设备下线事件（不支持共享订阅）
                 // ========== 主控/机器人原始上报（带前导 / 兼容旧固件） ==========

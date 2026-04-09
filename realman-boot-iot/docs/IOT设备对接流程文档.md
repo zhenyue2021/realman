@@ -252,7 +252,7 @@ def decrypt_message(device_code: str, encrypted: str) -> str:
 | `master/{controllerCode}/command/{cmd}/ack`                 | 1   | 主控设备指令 ACK（力反馈/运动与安全参数等）                | 联调完成   |
 | `{robotCode}/slave/status`                                  | 1   | 机器人原始状态上报（遥操作场景，由平台透传至 WebSocket）       | 联调完成   |
 | `device/{deviceCode}/ext-params/request`                    | 1   | 设备请求外部系统服务参数（如 STS 临时凭证，见第 16 章）        | 未联调    |
-| `webrtc/{robotCode}/command/ack`                            | 1   | 机器人响应 WebRTC 指令 ACK（start/stop 统一 Topic，见第 17 章） | 未联调    |
+| `device/{robotCode}/webrtc/ack`                            | 1   | 机器人响应 WebRTC 指令 ACK（start/stop 统一 Topic，见第 17 章） | 未联调    |
 
 ### 4.2 下行 Topic（平台发布 → 设备订阅）
 
@@ -267,7 +267,7 @@ def decrypt_message(device_code: str, encrypted: str) -> str:
 | `master/{controllerCode}/command/force-feedback`         | 1   | 平台向主控设置力反馈参数（机械臂/夹爪力度）           | 联调完成 |
 | `master/{controllerCode}/command/sport-speed`            | 1   | 平台向主控设置运动与安全参数（底盘/升降速度）          | 联调完成 |
 | `device/{deviceCode}/ext-params/ack`                     | 1   | 平台响应外部系统服务参数（如 STS 临时凭证，见第 16 章） | 未联调  |
-| `webrtc/{robotCode}/command`                             | 1   | 下发 WebRTC 统一指令（payload 中 `command` 字段区分 start/stop，见第 17 章） | 未联调  |
+| `device/{robotCode}/webrtc/request`                             | 1   | 下发 WebRTC 统一指令（payload 中 `command` 字段区分 start/stop，见第 17 章） | 未联调  |
 
 ### 4.3 系统事件 Topic（EMQX 内部，平台订阅）
 
@@ -985,22 +985,22 @@ QoS: 1
 
 ## 17. WebRTC 遥操视频通话
 
-遥操开始时，平台通过 `webrtc/{robotCode}/command`（payload 中 `command="start"`）向**机器人**下发 WebRTC 房间信息，机器人连接信令服务器并建立 P2P 视频通道；遥操停止时，平台通过同一 Topic 下发 `command="stop"`（fire-and-forget）拆除连接。
+遥操开始时，平台通过 `device/{robotCode}/webrtc/request`（payload 中 `command="start"`）向**机器人**下发 WebRTC 房间信息，机器人连接信令服务器并建立 P2P 视频通道；遥操停止时，平台通过同一 Topic 下发 `command="stop"`（fire-and-forget）拆除连接。
 
-> **注意**：`webrtc/` Topic 中的 `{deviceCode}` 均为**机器人**设备编码（`robotCode`），非主控编码。Payload 同样使用 `AES-256-CBC` 加密（密钥由 `robotCode` 派生）。
+> **注意**：`device/.../webrtc/...` Topic 中的 `{deviceCode}` 均为**机器人**设备编码（`robotCode`），非主控编码。Payload 同样使用 `AES-256-CBC` 加密（密钥由 `robotCode` 派生）。
 
 ### 17.1 流程概览
 
 ```
 平台                                        机器人
   │                                            │
-  │── webrtc/{robotCode}/command ─────────────>│  1. 平台下发 WebRTC 开始指令（command="start"，含房间信息）
-  │<── webrtc/{robotCode}/command/ack ─────────│  2. 机器人连接信令服务器成功后回复（5 秒超时）
+  │── device/{robotCode}/webrtc/request ─────────────>│  1. 平台下发 WebRTC 开始指令（command="start"，含房间信息）
+  │<── device/{robotCode}/webrtc/ack ─────────│  2. 机器人连接信令服务器成功后回复（5 秒超时）
   │                                            │
   │   （WebRTC P2P 建立，主控与机器人视频互通）  │
   │                                            │
-  │── webrtc/{robotCode}/command ─────────────>│  3. 遥操结束，平台下发停止指令（command="stop"，不等待 ACK）
-  │<── webrtc/{robotCode}/command/ack ─────────│  4. 机器人可选回复（平台仅记日志）
+  │── device/{robotCode}/webrtc/request ─────────────>│  3. 遥操结束，平台下发停止指令（command="stop"，不等待 ACK）
+  │<── device/{robotCode}/webrtc/ack ─────────│  4. 机器人可选回复（平台仅记日志）
 ```
 
 > **超时**：平台等待 `command/ack`（start）最多 **5 秒**，超时或 `success=false` 均中止遥操并向调用方返回错误。
@@ -1008,7 +1008,7 @@ QoS: 1
 ### 17.2 下行消息：WebRtcCommand — start（平台 → 机器人）
 
 ```
-Topic: webrtc/{robotCode}/command
+Topic: device/{robotCode}/webrtc/request
 QoS: 1
 Payload: AES-256-CBC 加密（密钥由 robotCode 派生）
 ```
@@ -1048,7 +1048,7 @@ Payload: AES-256-CBC 加密（密钥由 robotCode 派生）
 ### 17.3 上行消息：WebRtcAck（机器人 → 平台）
 
 ```
-Topic: webrtc/{robotCode}/command/ack
+Topic: device/{robotCode}/webrtc/ack
 QoS: 1
 Payload: AES-256-CBC 加密（密钥由 robotCode 派生）
 ```
@@ -1088,7 +1088,7 @@ Payload: AES-256-CBC 加密（密钥由 robotCode 派生）
 ### 17.4 下行消息：WebRtcCommand — stop（平台 → 机器人）
 
 ```
-Topic: webrtc/{robotCode}/command
+Topic: device/{robotCode}/webrtc/request
 QoS: 1
 Payload: AES-256-CBC 加密（密钥由 robotCode 派生）
 ```
@@ -1104,7 +1104,7 @@ Payload: AES-256-CBC 加密（密钥由 robotCode 派生）
 ### 17.5 上行消息：WebRtcAck（机器人 → 平台，可选）
 
 ```
-Topic: webrtc/{robotCode}/command/ack
+Topic: device/{robotCode}/webrtc/ack
 QoS: 1
 ```
 
@@ -1112,7 +1112,7 @@ QoS: 1
 
 ### 17.6 设备端实现要点
 
-1. 订阅 `webrtc/{robotCode}/command`（单一 Topic，无通配符）。
+1. 订阅 `device/{robotCode}/webrtc/request`（单一 Topic，无通配符）。
 2. 收到消息后解密，读取 `command` 字段判断指令类型。
 3. `command="start"` 时：根据 `signalUrl` + `signalKey` 连接信令服务器，在 **5 秒内** 完成并回复 ACK（`command="start"`, `success=true`）。
 4. 若连接失败，立即回复 ACK（`command="start"`, `success=false`，`message` 填写失败原因）。
@@ -1136,5 +1136,5 @@ QoS: 1
 - [ ] 设备支持摄像头：订阅 `device/{deviceCode}/camera/stream/query`，收到 CameraStreamQuery 后按 `commandId`、`cameraIndex`
   查询流地址，加密后上报到 `device/{deviceCode}/camera/stream/ack`（响应中必须带回相同 `commandId`）
 - [ ] `cleanSession = false`，确保离线期间下行消息不丢失
-- [ ] 机器人订阅 `webrtc/{robotCode}/command`，收到后读取 payload 中 `command` 字段：`start` 时连接信令服务器，在 **5 秒内** 回复 ACK（`commandId` 必须一致）；`stop` 时断开 WebRTC 连接
+- [ ] 机器人订阅 `device/{robotCode}/webrtc/request`，收到后读取 payload 中 `command` 字段：`start` 时连接信令服务器，在 **5 秒内** 回复 ACK（`commandId` 必须一致）；`stop` 时断开 WebRTC 连接
 

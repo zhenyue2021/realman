@@ -231,7 +231,7 @@ public class IotDeviceTeleopService {
             webRtcCommand.setCommandId(webRtcCommandId);
             webRtcCommand.setCommand("start");
 
-            String topic = String.format(DeviceConstant.MqttTopic.WEBRTC_COMMAND, robotDeviceCode);
+            String topic = String.format(DeviceConstant.MqttTopic.WEBRTC_REQUEST, robotDeviceCode);
             mqttPublisher.publishToDevice(robotDeviceCode, topic,
                     objectMapper.writeValueAsString(webRtcCommand), MqttConstant.MQTT_QOS.QOS_1);
             log.info("[WebRtc] 已下发 start 指令 device={} commandId={} roomId={}",
@@ -267,7 +267,7 @@ public class IotDeviceTeleopService {
                     .commandId(IdUtil.fastSimpleUUID())
                     .timestamp(System.currentTimeMillis())
                     .build();
-            String topic = String.format(DeviceConstant.MqttTopic.WEBRTC_COMMAND, robotDeviceCode);
+            String topic = String.format(DeviceConstant.MqttTopic.WEBRTC_REQUEST, robotDeviceCode);
             mqttPublisher.publishToDevice(robotDeviceCode, topic,
                     objectMapper.writeValueAsString(stopCmd), MqttConstant.MQTT_QOS.QOS_1);
             log.info("[WebRtc] 已下发 stop 指令 device={}", robotDeviceCode);

@@ -115,17 +115,7 @@ public class MqttMessageDispatcher {
                 }
             }
 
-            // 3. WebRTC 指令 ACK：webrtc/{deviceCode}/command/ack
-            if (topic.startsWith("webrtc/") && topic.endsWith("/command/ack")) {
-                String[] parts = topic.split("/");
-                if (parts.length == 4) {
-                    // parts: ["webrtc", deviceCode, "command", "ack"]
-                    webRtcAckHandler.handle(parts[1], payload);
-                    return;
-                }
-            }
-
-            // 4. 主控/机器人原始上报 Topic：{deviceCode}/master/{path} 或 {deviceCode}/slave/{path}
+            // 3. 主控/机器人原始上报 Topic：{deviceCode}/master/{path} 或 {deviceCode}/slave/{path}
             Matcher raw = RAW_DEVICE_TOPIC.matcher(topic);
             if (raw.matches()) {
                 dispatchRawTopic(raw.group(1), raw.group(2), raw.group(3), payload);
@@ -163,6 +153,7 @@ public class MqttMessageDispatcher {
             case "slam/ack"                           -> slamAckHandler.handle(deviceCode, payload);
             case "slam/states"                        -> slamStatesHandler.handle(deviceCode, payload);
             case "ext-params/request"                 -> extParamsRequestHandler.handle(deviceCode, payload);
+            case "webrtc/ack"                         -> webRtcAckHandler.handle(deviceCode, payload);
             default -> log.warn("[Dispatcher] 未知路径: {}", topic);
         }
     }
