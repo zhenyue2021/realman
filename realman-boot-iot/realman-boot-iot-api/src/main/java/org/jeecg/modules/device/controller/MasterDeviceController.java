@@ -238,11 +238,30 @@ public class MasterDeviceController {
     /** 停止遥操（通知主控与机器人，不等待ACK） */
     @PostMapping("/{controllerId}/teleop/stop")
     @Operation(summary = "停止遥操")
-    public ApiResult<Void> stopTeleop(@PathVariable String controllerId,
+    public ApiResult<Boolean> stopTeleop(@PathVariable String controllerId,
                                       @RequestBody TeleopStopDTO dto) {
         ensureDeviceType(controllerId, DEVICE_TYPE_CONTROLLER);
         deviceService.stopTeleop(controllerId, dto.getDeviceId(), dto.getDeviceCode(), dto.getOperator());
-        return ApiResult.ok(null, "停止遥操指令已下发");
+        return ApiResult.ok(true, "停止遥操指令已下发");
+    }
+
+    /**
+     * 停止遥操并销毁房间（通过设备编码，同步等待响应结果）
+     *
+     * <p>执行流程：
+     * <ol>
+     *   <li>校验主控与机器人设备存在且类型匹配</li>
+     *   <li>向主控与机器人发送停止遥操 MQTT 指令</li>
+     *   <li>向机器人发送 WebRTC stop 指令，同步等待 ACK（最多 5s）</li>
+     *   <li>销毁房间并清理 Redis 缓存</li>
+     * </ol>
+     * 任意步骤失败均抛出异常，前端可根据异常信息提示用户。
+     */
+    @PostMapping("/check_stop")
+    @Operation(summary = "停止遥操并销毁房间（同步等待响应）")
+    public ApiResult<Void> stopTeleopByCode(@Valid @RequestBody TeleopStopByCodeDTO dto) {
+        deviceService.stopTeleopByCode(dto.getControllerCode(), dto.getDeviceCode(), dto.getOperator());
+        return ApiResult.ok(null, "遥操已停止，房间已销毁");
     }
 
     /** 操作记录分页（遥操员使用主控操控机器人完成工单的时间） */

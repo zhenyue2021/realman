@@ -201,6 +201,87 @@ public class IotDeviceTeleopService {
         }
     }
 
+    /**
+     * 通过设备编码停止遥操并销毁房间（同步等待 WebRTC stop ACK）。
+     *
+     * <p>与 {@link #stopTeleop} 的区别：
+     * <ul>
+     *   <li>入参为设备编码（而非数据库 ID），适合设备端/前端直接传码的场景</li>
+     *   <li>WebRTC stop 指令等待机器人 ACK，确认 WebRTC 连接已断开后再销毁房间</li>
+     * </ul>
+     *
+     * @throws RuntimeException 设备不存在、MQTT 发送失败、WebRTC stop 超时或失败时
+     */
+    public void stopTeleopByCode(String controllerCode, String robotCode, String operator) {
+        // 1. 校验设备
+        IotDevice controller = deviceMapper.selectOne(new LambdaQueryWrapper<IotDevice>()
+                .eq(IotDevice::getDeviceCode, controllerCode)
+                .eq(IotDevice::getDelFlag, 0)
+                .last("LIMIT 1"));
+        if (controller == null || !Objects.equals(controller.getDeviceType(), DeviceConstant.DeviceTypeInteger.CONTROLLER)) {
+            throw new RuntimeException("主控设备不存在或类型不匹配: " + controllerCode);
+        }
+
+        IotDevice robot = deviceMapper.selectOne(new LambdaQueryWrapper<IotDevice>()
+                .eq(IotDevice::getDeviceCode, robotCode)
+                .eq(IotDevice::getDelFlag, 0)
+                .last("LIMIT 1"));
+        if (robot == null || !Objects.equals(robot.getDeviceType(), DeviceConstant.DeviceTypeInteger.ROBOT)) {
+            throw new RuntimeException("机器人设备不存在或类型不匹配: " + robotCode);
+        }
+
+        String commandId = IdUtil.fastSimpleUUID();
+        long now = System.currentTimeMillis();
+
+        try {
+            // 2. 通知主控停止遥操
+            String controllerTopic = String.format(DeviceConstant.MqttTopic.MASTER_STOP_CONTROL, controllerCode);
+            mqttPublisher.publishToDevice(controllerCode, controllerTopic,
+                    objectMapper.writeValueAsString(MqttMessageModel.RobotAssignCommand.builder()
+                            .commandId(commandId).robotCode(controllerCode)
+                            .workOrderId("STOP_MASTER").timestamp(now).build()),
+                    MqttConstant.MQTT_QOS.QOS_1);
+
+            // 3. 通知机器人停止遥操
+            String robotTopic = String.format(DeviceConstant.MqttTopic.DEVICE_STOP_CONTROL, robotCode);
+            mqttPublisher.publishToDevice(robotCode, robotTopic,
+                    objectMapper.writeValueAsString(MqttMessageModel.RobotAssignCommand.builder()
+                            .commandId(commandId).robotCode(robotCode)
+                            .workOrderId("STOP_SLAVE").timestamp(now).build()),
+                    MqttConstant.MQTT_QOS.QOS_1);
+
+            // 4. 更新机器人使用状态
+            robot.setUseStatus(DeviceConstant.UseStatus.IDLE);
+            deviceMapper.updateById(robot);
+
+            // 5. 记录日志
+            logService.recordLog(controller.getId(), controllerCode,
+                    DeviceConstant.OperationType.COMMAND_SEND,
+                    "停止遥操：通知主控", "{commandId:" + commandId + ",robotCode:" + robotCode + "}",
+                    DeviceConstant.OperationSource.PLATFORM, "PENDING", null, operator, null);
+            logService.recordLog(robot.getId(), robotCode,
+                    DeviceConstant.OperationType.COMMAND_SEND,
+                    "停止遥操：设备使用状态置为空闲", "{commandId:" + commandId + "}",
+                    DeviceConstant.OperationSource.PLATFORM, "SUCCESS", null, operator, null);
+
+            // 6. 清理遥操关系缓存
+            redisTemplate.delete(DeviceConstant.RedisKey.TELEOP_MASTER_TO_ROBOT + controllerCode);
+            redisTemplate.delete(DeviceConstant.RedisKey.TELEOP_ROBOT_TO_MASTER + robotCode);
+            log.info("[TeleopCache] 清除遥操关系缓存: master={} robot={}", controllerCode, robotCode);
+
+            // 7. 下发 WebRTC stop 并同步等待 ACK
+            sendWebRtcStopAndAwait(robotCode);
+
+            // 8. 销毁房间
+            roomService.destroyRoom(controllerCode);
+
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException("停止遥操失败: " + e.getMessage(), e);
+        }
+    }
+
     // -------------------------------------------------------------------------
     // WebRTC 指令私有方法
     // -------------------------------------------------------------------------
@@ -274,6 +355,44 @@ public class IotDeviceTeleopService {
         } catch (Exception e) {
             // stop 是 fire-and-forget，失败只记录，不影响主流程
             log.warn("[WebRtc] stop 指令发送失败 device={}", robotDeviceCode, e);
+        }
+    }
+
+    /**
+     * 向机器人下发 WebRTC 停止指令，并同步等待 ACK（最多 {@value #WEBRTC_ACK_TIMEOUT_SECONDS} 秒）。
+     *
+     * @param robotDeviceCode 机器人设备编码
+     * @throws RuntimeException 超时或机器人返回失败时
+     */
+    private void sendWebRtcStopAndAwait(String robotDeviceCode) throws Exception {
+        String commandId = IdUtil.fastSimpleUUID();
+        CompletableFuture<MqttMessageModel.WebRtcAck> future =
+                webRtcAckPendingService.register(commandId);
+        try {
+            MqttMessageModel.WebRtcCommand stopCmd = MqttMessageModel.WebRtcCommand.builder()
+                    .command("stop")
+                    .commandId(commandId)
+                    .timestamp(System.currentTimeMillis())
+                    .build();
+            String topic = String.format(DeviceConstant.MqttTopic.WEBRTC_REQUEST, robotDeviceCode);
+            mqttPublisher.publishToDevice(robotDeviceCode, topic,
+                    objectMapper.writeValueAsString(stopCmd), MqttConstant.MQTT_QOS.QOS_1);
+            log.info("[WebRtc] 已下发 stop 指令（等待ACK）device={} commandId={}", robotDeviceCode, commandId);
+        } catch (Exception e) {
+            webRtcAckPendingService.completeExceptionally(commandId, e);
+            throw new RuntimeException("WebRTC 停止指令发送失败: " + e.getMessage(), e);
+        }
+
+        try {
+            MqttMessageModel.WebRtcAck ack = future.get(WEBRTC_ACK_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            if (!ack.isSuccess()) {
+                throw new RuntimeException("停止遥操失败：" +
+                        (ack.getMessage() != null ? ack.getMessage() : "机器人拒绝 WebRTC 停止"));
+            }
+            log.info("[WebRtc] 收到 stop ACK 成功 device={} commandId={}", robotDeviceCode, commandId);
+        } catch (TimeoutException e) {
+            webRtcAckPendingService.completeExceptionally(commandId, e);
+            throw new RuntimeException("停止遥操失败：WebRTC stop 指令超时（" + WEBRTC_ACK_TIMEOUT_SECONDS + "s），机器人未响应");
         }
     }
 }
