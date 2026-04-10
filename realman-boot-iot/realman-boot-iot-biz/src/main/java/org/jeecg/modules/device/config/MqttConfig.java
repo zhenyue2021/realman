@@ -160,14 +160,14 @@ public class MqttConfig {
                 "$SYS/brokers/+/clients/+/connected",       // EMQX 设备上线事件（不支持共享订阅）
                 "$SYS/brokers/+/clients/+/disconnected",    // EMQX 设备下线事件（不支持共享订阅）
                 // ========== 主控/机器人原始上报（带前导 / 兼容旧固件） ==========
-                share + "+/master/cmd",
-                share + "/+/master/cmd",
+//                share + "+/master/cmd",
+//                share + "/+/master/cmd",
                 share + "+/master/states",
                 share + "/+/master/states",
-                share + "+/master/rtsp/ctrl",
-                share + "/+/master/rtsp/ctrl",
-                share + "+/slave/cmd",
-                share + "/+/slave/cmd",
+//                share + "+/master/rtsp/ctrl",
+//                share + "/+/master/rtsp/ctrl",
+//                share + "+/slave/cmd",
+//                share + "/+/slave/cmd",
                 share + "+/slave/states",
                 share + "/+/slave/states",
         };
