@@ -41,10 +41,9 @@ public class WebRtcAckHandler {
             log.info("[WebRtcAck] device={} command={} commandId={} success={} message={}",
                     deviceCode, ack.getCommand(), ack.getCommandId(), ack.isSuccess(), ack.getMessage());
 
-            if ("start".equals(ack.getCommand()) && ack.getCommandId() != null) {
+            if (ack.getCommandId() != null) {
                 pendingService.complete(ack.getCommandId(), ack);
             }
-            // stop ACK：fire-and-forget，不需要通知等待方
         } catch (Exception e) {
             log.error("[WebRtcAck] 处理异常 deviceCode={}", deviceCode, e);
         }

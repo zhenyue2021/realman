@@ -129,6 +129,12 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
         teleopService.stopTeleop(controllerId, robotId, robotCode, operator);
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void stopTeleopByCode(String controllerCode, String deviceCode, String operator) {
+        teleopService.stopTeleopByCode(controllerCode, deviceCode, operator);
+    }
+
     /**
      * 主控参数下发：先发 MQTT 指令，成功后持久化配置。
      * 两步操作在同一事务内，MQTT 发送异常会回滚 DB 写入。
@@ -140,11 +146,11 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
         configSyncService.upsertDeviceConfig(controller.getId(), controller.getDeviceCode(),
                 "arm_level",
                 dto.getArmLevel() == null ? null : dto.getArmLevel().toString(),
-                Objects.nonNull(dto.getArmLevelConfigType()) ? dto.getArmLevelConfigType() : "0");
+                Objects.nonNull(dto.getArmLevelConfigType()) ? dto.getArmLevelConfigType() : "arm_level");
         configSyncService.upsertDeviceConfig(controller.getId(), controller.getDeviceCode(),
                 "move_speed_level",
                 dto.getMoveSpeedLevel() == null ? null : dto.getMoveSpeedLevel().toString(),
-                Objects.nonNull(dto.getMoveSpeedLevelConfigType()) ? dto.getMoveSpeedLevelConfigType() : "0");
+                Objects.nonNull(dto.getMoveSpeedLevelConfigType()) ? dto.getMoveSpeedLevelConfigType() : "move_speed_level");
     }
 
     @Override

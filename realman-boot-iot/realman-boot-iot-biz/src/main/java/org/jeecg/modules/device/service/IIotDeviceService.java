@@ -52,6 +52,16 @@ public interface IIotDeviceService extends IService<IotDevice> {
      */
     void stopTeleop(String controllerId, String robotId, String robotCode, String operator);
 
+    /**
+     * 通过设备编码停止遥操并销毁房间（同步等待 WebRTC stop ACK）。
+     *
+     * @param controllerCode 主控设备编码
+     * @param deviceCode     机器人设备编码
+     * @param operator       操作人
+     * @throws RuntimeException 设备不存在、指令发送失败、WebRTC ACK 超时时
+     */
+    void stopTeleopByCode(String controllerCode, String deviceCode, String operator);
+
     void changeDeviceStatus(String deviceId, Integer status, String operator);
 
 
