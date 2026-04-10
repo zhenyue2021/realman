@@ -5,4 +5,25 @@
         UPDATE iot_device_config SET sync_status=#{syncStatus}, sync_time=#{syncTime}
         WHERE device_code=#{deviceCode} AND sync_status=0
     </update>
+
+    <!--
+        批量 upsert：命中唯一索引 uk_device_config(device_id, config_key) 时执行 UPDATE，
+        否则执行 INSERT。id/create_time 由 INSERT 分支填充，不在 ON DUPLICATE KEY 中覆盖。
+    -->
+    <insert id="batchUpsert">
+        INSERT INTO iot_device_config
+            (id, device_id, device_code, config_key, config_value, config_type,
+             sync_status, sync_time, create_time, update_time)
+        VALUES
+        <foreach collection="list" item="c" separator=",">
+            (#{c.id}, #{c.deviceId}, #{c.deviceCode}, #{c.configKey}, #{c.configValue},
+             #{c.configType}, #{c.syncStatus}, #{c.syncTime}, #{c.createTime}, #{c.updateTime})
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+            config_value  = VALUES(config_value),
+            config_type   = VALUES(config_type),
+            sync_status   = VALUES(sync_status),
+            sync_time     = VALUES(sync_time),
+            update_time   = VALUES(update_time)
+    </insert>
 </mapper>

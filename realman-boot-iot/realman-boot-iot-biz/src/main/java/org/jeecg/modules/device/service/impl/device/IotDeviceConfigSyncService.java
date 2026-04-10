@@ -1,7 +1,6 @@
 package org.jeecg.modules.device.service.impl.device;
 
 import cn.hutool.core.util.IdUtil;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,6 +15,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -38,27 +39,24 @@ public class IotDeviceConfigSyncService {
         IotDevice device = deviceSupport.require(deviceId);
         String commandId = IdUtil.fastSimpleUUID();
 
-        params.forEach((key, value) -> {
-            IotDeviceConfig cfg = configMapper.selectOne(new LambdaQueryWrapper<IotDeviceConfig>()
-                    .eq(IotDeviceConfig::getDeviceId, deviceId)
-                    .eq(IotDeviceConfig::getConfigKey, key));
-            if (cfg != null) {
-                cfg.setConfigValue(String.valueOf(value));
-                cfg.setSyncStatus(DeviceConstant.ConfigSyncStatus.PENDING);
-                configMapper.updateById(cfg);
-            } else {
-                cfg = new IotDeviceConfig();
-                cfg.setDeviceId(deviceId);
-                cfg.setDeviceCode(device.getDeviceCode());
-                cfg.setConfigKey(key);
-                cfg.setConfigValue(String.valueOf(value));
-                cfg.setConfigType("string");
-                cfg.setSyncStatus(DeviceConstant.ConfigSyncStatus.PENDING);
-                cfg.setCreateTime(LocalDateTime.now());
-                cfg.setUpdateTime(LocalDateTime.now());
-                configMapper.insert(cfg);
-            }
-        });
+        // 构建 upsert 列表（依赖唯一索引 uk_device_config(device_id, config_key)）
+        LocalDateTime now = LocalDateTime.now();
+        List<IotDeviceConfig> upsertList = new ArrayList<>(params.size());
+        for (Map.Entry<String, Object> entry : params.entrySet()) {
+            IotDeviceConfig cfg = new IotDeviceConfig();
+            cfg.setId(IdUtil.getSnowflakeNextIdStr());
+            cfg.setDeviceId(deviceId);
+            cfg.setDeviceCode(device.getDeviceCode());
+            cfg.setConfigKey(entry.getKey());
+            cfg.setConfigValue(String.valueOf(entry.getValue()));
+            cfg.setConfigType(entry.getKey());
+            cfg.setSyncStatus(DeviceConstant.ConfigSyncStatus.PENDING);
+            cfg.setCreateTime(now);
+            cfg.setUpdateTime(now);
+            upsertList.add(cfg);
+        }
+        // 1 条 SQL 完成所有 INSERT / UPDATE
+        configMapper.batchUpsert(upsertList);
 
         if (DeviceConstant.DeviceStatus.ONLINE == device.getStatus()) {
             try {
@@ -82,29 +80,18 @@ public class IotDeviceConfigSyncService {
      */
     public void upsertDeviceConfig(String deviceId, String deviceCode,
                                    String configKey, String configValue, String configType) {
-        IotDeviceConfig existing = configMapper.selectOne(
-                new LambdaQueryWrapper<IotDeviceConfig>()
-                        .eq(IotDeviceConfig::getDeviceId, deviceId)
-                        .eq(IotDeviceConfig::getConfigKey, configKey)
-                        .last("LIMIT 1")
-        );
         LocalDateTime now = LocalDateTime.now();
-        if (existing != null) {
-            existing.setConfigValue(configValue);
-            existing.setConfigType(configType);
-            existing.setSyncStatus(0);
-            existing.setSyncTime(now);
-            configMapper.updateById(existing);
-        } else {
-            IotDeviceConfig config = new IotDeviceConfig();
-            config.setDeviceId(deviceId);
-            config.setDeviceCode(deviceCode);
-            config.setConfigKey(configKey);
-            config.setConfigValue(configValue);
-            config.setConfigType(configType);
-            config.setSyncStatus(0);
-            config.setSyncTime(now);
-            configMapper.insert(config);
-        }
+        IotDeviceConfig cfg = new IotDeviceConfig();
+        cfg.setId(IdUtil.getSnowflakeNextIdStr());
+        cfg.setDeviceId(deviceId);
+        cfg.setDeviceCode(deviceCode);
+        cfg.setConfigKey(configKey);
+        cfg.setConfigValue(configValue);
+        cfg.setConfigType(configType);
+        cfg.setSyncStatus(0);
+        cfg.setSyncTime(now);
+        cfg.setCreateTime(now);
+        cfg.setUpdateTime(now);
+        configMapper.batchUpsert(List.of(cfg));
     }
 }
