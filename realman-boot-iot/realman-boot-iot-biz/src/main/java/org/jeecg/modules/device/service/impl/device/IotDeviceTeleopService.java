@@ -145,10 +145,7 @@ public class IotDeviceTeleopService {
         if (robotId != null && !robotId.isBlank()) {
             robot = deviceSupport.require(robotId);
         } else if (robotCode != null && !robotCode.isBlank()) {
-            robot = deviceMapper.selectOne(new LambdaQueryWrapper<IotDevice>()
-                    .eq(IotDevice::getDeviceCode, robotCode)
-                    .eq(IotDevice::getDelFlag, 0)
-                    .last("LIMIT 1"));
+            robot = deviceSupport.requireByDeviceCode(robotCode);
         } else {
             throw new RuntimeException("deviceId 或 deviceCode 至少传一个");
         }
@@ -214,20 +211,14 @@ public class IotDeviceTeleopService {
      */
     public void stopTeleopByCode(String controllerCode, String robotCode, String operator) {
         // 1. 校验设备
-        IotDevice controller = deviceMapper.selectOne(new LambdaQueryWrapper<IotDevice>()
-                .eq(IotDevice::getDeviceCode, controllerCode)
-                .eq(IotDevice::getDelFlag, 0)
-                .last("LIMIT 1"));
-        if (controller == null || !Objects.equals(controller.getDeviceType(), DeviceConstant.DeviceTypeInteger.CONTROLLER)) {
-            throw new RuntimeException("主控设备不存在或类型不匹配: " + controllerCode);
+        IotDevice controller = deviceSupport.requireByDeviceCode(controllerCode);
+        if (!Objects.equals(controller.getDeviceType(), DeviceConstant.DeviceTypeInteger.CONTROLLER)) {
+            throw new RuntimeException("设备类型不匹配：[" + controllerCode + "] 不是主控设备");
         }
 
-        IotDevice robot = deviceMapper.selectOne(new LambdaQueryWrapper<IotDevice>()
-                .eq(IotDevice::getDeviceCode, robotCode)
-                .eq(IotDevice::getDelFlag, 0)
-                .last("LIMIT 1"));
-        if (robot == null || !Objects.equals(robot.getDeviceType(), DeviceConstant.DeviceTypeInteger.ROBOT)) {
-            throw new RuntimeException("机器人设备不存在或类型不匹配: " + robotCode);
+        IotDevice robot = deviceSupport.requireByDeviceCode(robotCode);
+        if (!Objects.equals(robot.getDeviceType(), DeviceConstant.DeviceTypeInteger.ROBOT)) {
+            throw new RuntimeException("设备类型不匹配：[" + robotCode + "] 不是机器人设备");
         }
 
         String commandId = IdUtil.fastSimpleUUID();

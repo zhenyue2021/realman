@@ -117,4 +117,7 @@ public interface IotDeviceMapper extends BaseMapper<IotDevice> {
     List<AuthorizedDeviceOptionDTO> listAuthorizedDevicesByEnterprise(
             @Param("enterpriseIds") List<String> enterpriseIds,
             @Param("deviceType") int deviceType);
+
+    @Select("SELECT * FROM iot_device WHERE device_code = #{deviceCode} AND del_flag = 0 LIMIT 1")
+    IotDevice selectByDeviceCode(@Param("deviceCode") String deviceCode);
 }

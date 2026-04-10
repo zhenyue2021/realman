@@ -17,13 +17,10 @@ import org.jeecg.modules.device.dto.*;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.entity.workorder.WorkOrder;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
-import org.jeecg.modules.device.service.IIotDeviceRoomService;
 import org.jeecg.modules.device.service.IIotDeviceService;
 import org.jeecg.modules.device.service.IMasterLoginResolveService;
-import org.jeecg.modules.device.service.IMasterOperationRecordService;
 import org.jeecg.modules.device.service.IMasterUsageStatusService;
 import org.jeecg.modules.device.vo.*;
-import org.jeecg.modules.device.vo.DeviceRoomVO;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -48,10 +45,8 @@ public class MasterDeviceController {
 
     private final IIotDeviceService deviceService;
     private final IMasterLoginResolveService loginResolveService;
-    private final IMasterOperationRecordService operationRecordService;
     private final IMasterUsageStatusService usageStatusService;
     private final MasterDeviceApiService masterDeviceApiService;
-    private final IIotDeviceRoomService roomService;
 
     /** 新增主控设备 */
     @PostMapping("/add")
@@ -313,11 +308,11 @@ public class MasterDeviceController {
      */
     @GetMapping("/{masterCode}/room")
     @Operation(summary = "查询主控房间")
-    public ApiResult< MqttMessageModel.WebRtcCommand> queryRoom(@PathVariable String masterCode) {
+    public ApiResult<MqttMessageModel.WebRtcCommand> queryRoom(@PathVariable String masterCode) {
         if (masterCode == null || masterCode.isBlank()) {
             return ApiResult.fail("masterCode 不能为空");
         }
-        return ApiResult.ok(roomService.queryOrCreate(masterCode));
+        return ApiResult.ok(deviceService.queryOrCreateRoom(masterCode));
     }
 
     /** 导出主控设备列表为 Excel（条件与 list 一致，逻辑删除的不导出） */
