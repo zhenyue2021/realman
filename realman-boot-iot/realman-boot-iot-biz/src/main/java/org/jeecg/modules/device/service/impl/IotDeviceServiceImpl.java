@@ -1,15 +1,19 @@
 package org.jeecg.modules.device.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.extern.slf4j.Slf4j;
+import org.jeecg.modules.device.constant.DeviceConstant;
 import org.jeecg.modules.device.dto.DeviceRequestDTO;
 import org.jeecg.modules.device.dto.DeviceUpdateDTO;
 import org.jeecg.modules.device.dto.MasterControlParamsDTO;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.entity.IotDeviceAuth;
 import org.jeecg.modules.device.mapper.IotDeviceMapper;
+import org.jeecg.modules.device.mqtt.MqttMessageModel;
+import org.jeecg.modules.device.service.IIotDeviceRoomService;
 import org.jeecg.modules.device.service.IIotDeviceService;
 import org.jeecg.modules.device.service.impl.device.*;
 import org.jeecg.modules.device.vo.DeviceCameraStreamVO;
@@ -39,6 +43,7 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
     private final IotDeviceMqttCommandService mqttCommandService;
     private final IotDeviceTeleopService teleopService;
     private final IotDeviceSupport iotDeviceSupport;
+    private final IIotDeviceRoomService roomService;
 
     public IotDeviceServiceImpl(IotDeviceMapper deviceMapper,
                                 IotDeviceLifecycleService lifecycleService,
@@ -47,7 +52,8 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
                                 IotDeviceCameraStreamService cameraStreamService,
                                 IotDeviceMqttCommandService mqttCommandService,
                                 IotDeviceTeleopService teleopService,
-                                IotDeviceSupport iotDeviceSupport) {
+                                IotDeviceSupport iotDeviceSupport,
+                                IIotDeviceRoomService roomService) {
         this.baseMapper = deviceMapper;
         this.lifecycleService = lifecycleService;
         this.configSyncService = configSyncService;
@@ -56,6 +62,7 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
         this.mqttCommandService = mqttCommandService;
         this.teleopService = teleopService;
         this.iotDeviceSupport = iotDeviceSupport;
+        this.roomService = roomService;
     }
 
     @Override
@@ -133,6 +140,15 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
     @Transactional(rollbackFor = Exception.class)
     public void stopTeleopByCode(String controllerCode, String deviceCode, String operator) {
         teleopService.stopTeleopByCode(controllerCode, deviceCode, operator);
+    }
+
+    @Override
+    public MqttMessageModel.WebRtcCommand queryOrCreateRoom(String masterCode) {
+        IotDevice device = iotDeviceSupport.requireByDeviceCode(masterCode);
+        if (!Objects.equals(device.getDeviceType(), DeviceConstant.DeviceTypeInteger.CONTROLLER)) {
+            throw new RuntimeException("设备类型不匹配：[" + masterCode + "] 不是主控设备");
+        }
+        return roomService.queryOrCreate(masterCode);
     }
 
     /**

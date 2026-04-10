@@ -8,6 +8,7 @@ import org.jeecg.modules.device.dto.DeviceUpdateDTO;
 import org.jeecg.modules.device.dto.MasterControlParamsDTO;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.entity.IotDeviceAuth;
+import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.vo.DeviceCameraStreamVO;
 import org.jeecg.modules.device.vo.DeviceDetailVO;
 
@@ -107,4 +108,15 @@ public interface IIotDeviceService extends IService<IotDevice> {
      * @return
      */
     Map<String, IotDeviceAuth> loadTenantAuth(List<String> deviceIds, String tenantId, String deviceTyp);
+
+    /**
+     * 通过主控设备编码查询（或创建）WebRTC 房间。
+     *
+     * <p>校验设备编码对应的设备存在且为主控类型（device_type=2），否则抛出异常。
+     *
+     * @param masterCode 主控设备编码
+     * @return WebRTC 房间信息（信令地址、密钥、roomId、TURN/STUN 服务器列表）
+     * @throws RuntimeException masterCode 对应设备不存在或非主控类型时
+     */
+    MqttMessageModel.WebRtcCommand queryOrCreateRoom(String masterCode);
 }

@@ -21,4 +21,12 @@ public class IotDeviceSupport {
         }
         return d;
     }
+
+    public IotDevice requireByDeviceCode(String deviceCode) {
+        IotDevice d = deviceMapper.selectByDeviceCode(deviceCode);
+        if (d == null) {
+            throw new RuntimeException("设备不存在: " + deviceCode);
+        }
+        return d;
+    }
 }
