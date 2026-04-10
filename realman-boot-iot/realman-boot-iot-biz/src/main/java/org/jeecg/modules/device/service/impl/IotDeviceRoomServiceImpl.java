@@ -17,6 +17,9 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -69,11 +72,16 @@ public class IotDeviceRoomServiceImpl extends ServiceImpl<IotDeviceRoomMapper, I
                 .stunServers(webRtcProperties.getStunServerList())
                 .timestamp(System.currentTimeMillis())
                 .build();
-        // 1. 缓存命中
+        // 1. 缓存命中 —— 同时校验 DB 记录仍存活，防止缓存脏数据
         DeviceRoomVO cached = getFromCache(masterCode);
         if (cached != null) {
-            startCmd.setRoomId(cached.getRoomId());
-            return startCmd;
+            IotDeviceRoom cachedRoom = baseMapper.selectActiveByMasterCode(masterCode);
+            if (cachedRoom != null) {
+                startCmd.setRoomId(cached.getRoomId());
+                return startCmd;
+            }
+            log.warn("[Room] 缓存命中但 DB 记录不存在，清除脏缓存 masterCode={}", masterCode);
+            evictCache(masterCode, null);
         }
 
         // 2. DB 查询活跃房间
@@ -88,7 +96,18 @@ public class IotDeviceRoomServiceImpl extends ServiceImpl<IotDeviceRoomMapper, I
         }
 
         DeviceRoomVO vo = toVO(room);
-        putCache(masterCode, vo);
+        // 若当前处于外部事务中（如 startTeleopNoStream），延迟到事务提交后再写缓存，
+        // 防止事务回滚导致 Redis 缓存与 DB 不一致。
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    putCache(masterCode, vo);
+                }
+            });
+        } else {
+            putCache(masterCode, vo);
+        }
         startCmd.setRoomId(room.getId());
         return startCmd;
     }
@@ -98,7 +117,8 @@ public class IotDeviceRoomServiceImpl extends ServiceImpl<IotDeviceRoomMapper, I
     public void robotJoin(String masterCode, String robotCode) {
         IotDeviceRoom room = baseMapper.selectActiveByMasterCode(masterCode);
         if (room == null) {
-            log.warn("[Room] robotJoin 时找不到活跃房间 masterCode={}", masterCode);
+            log.warn("[Room] robotJoin 时找不到活跃房间 masterCode={}，清除脏缓存", masterCode);
+            evictCache(masterCode, robotCode);
             return;
         }
 
