@@ -2,9 +2,9 @@ package org.jeecg.modules.device.mqtt.publisher;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.eclipse.paho.client.mqttv3.MqttClient;
-import org.eclipse.paho.client.mqttv3.MqttException;
-import org.eclipse.paho.client.mqttv3.MqttMessage;
+import org.eclipse.paho.mqttv5.client.MqttClient;
+import org.eclipse.paho.mqttv5.common.MqttException;
+import org.eclipse.paho.mqttv5.common.MqttMessage;
 import org.jeecg.modules.device.security.CommandEncryptService;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
