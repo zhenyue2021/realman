@@ -31,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 主控登录门面：协调授权校验、工单解析、登录记录、遥操缓存、WebSocket 推送。
@@ -149,10 +150,19 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
         if (robot != null) {
             String masterDeviceCode = controller.getDeviceCode();
             String robotDeviceCode = robot.getDeviceCode();
+            // 若主控之前绑定了其他机器人，清理掉旧机器人的反向缓存，避免脏数据
+            String prevRobotCode = redisTemplate.opsForValue()
+                    .get(DeviceConstant.RedisKey.TELEOP_MASTER_TO_ROBOT + masterDeviceCode);
+            if (prevRobotCode != null && !prevRobotCode.equals(robotDeviceCode)) {
+                redisTemplate.delete(DeviceConstant.RedisKey.TELEOP_ROBOT_TO_MASTER + prevRobotCode);
+                log.info("[TeleopCache] 清理旧机器人反向缓存: oldRobot={} master={}", prevRobotCode, masterDeviceCode);
+            }
             redisTemplate.opsForValue().set(
-                    DeviceConstant.RedisKey.TELEOP_MASTER_TO_ROBOT + masterDeviceCode, robotDeviceCode);
+                    DeviceConstant.RedisKey.TELEOP_MASTER_TO_ROBOT + masterDeviceCode, robotDeviceCode,
+                    24, TimeUnit.HOURS);
             redisTemplate.opsForValue().set(
-                    DeviceConstant.RedisKey.TELEOP_ROBOT_TO_MASTER + robotDeviceCode, masterDeviceCode);
+                    DeviceConstant.RedisKey.TELEOP_ROBOT_TO_MASTER + robotDeviceCode, masterDeviceCode,
+                    24, TimeUnit.HOURS);
             log.info("[TeleopCache] 写入遥操关系缓存: master={} robot={}", masterDeviceCode, robotDeviceCode);
         }
 

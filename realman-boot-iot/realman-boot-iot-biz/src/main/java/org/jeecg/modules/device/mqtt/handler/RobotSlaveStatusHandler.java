@@ -21,6 +21,7 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 
 /**
@@ -118,11 +119,17 @@ public class RobotSlaveStatusHandler {
     /** 处理主控设备原始状态上报（{robotCode}/master/states） */
     public void handleMasterStatus(String robotCode, String payload) {
         log.debug("[SlaveStatusHandler] master上报 robotCode={}", robotCode);
-        String masterCode = redisTemplate.opsForValue()
-                .get(DeviceConstant.RedisKey.TELEOP_ROBOT_TO_MASTER + robotCode);
+        String key = DeviceConstant.RedisKey.TELEOP_ROBOT_TO_MASTER + robotCode;
+        String masterCode = redisTemplate.opsForValue().get(key);
         if (masterCode == null) {
             log.warn("[MasterCommandHandler] 未找到机器人 {} 对应的主控缓存，忽略消息", robotCode);
             return;
+        }
+        // 机器人状态上报高频，仅在 TTL 低于 2h 时才续期，避免每次上报都调用 expire
+        Long ttl = redisTemplate.getExpire(key, TimeUnit.HOURS);
+        if (ttl != null && ttl < 2) {
+            redisTemplate.expire(key, 24, TimeUnit.HOURS);
+            redisTemplate.expire(DeviceConstant.RedisKey.TELEOP_MASTER_TO_ROBOT + masterCode, 24, TimeUnit.HOURS);
         }
         processStatus(masterCode, payload, deviceWebSocketServer::pushMasterStatus, false);
     }
