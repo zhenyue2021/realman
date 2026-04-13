@@ -15,6 +15,7 @@ import org.springframework.util.StringUtils;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -97,6 +98,7 @@ public class MqttMessageDispatcher {
             traceId = "mqtt-" + UUID.randomUUID().toString().replace("-", "");
         }
         MDC.put(TraceIdConst.MDC_TRACE_ID, traceId);
+        MDC.put(TraceIdConst.MDC_SPAN_ID,  generateSpanId());
         MDC.put(TraceIdConst.MDC_SERVICE,   serviceName);
         MDC.put(TraceIdConst.MDC_SOURCE,    "mqtt");
         MDC.put("mqttTopic", topic);
@@ -220,5 +222,10 @@ public class MqttMessageDispatcher {
             return;
         }
         log.debug("[Dispatcher] 原始上报 deviceCode={} role={} path={}", deviceCode, role, path);
+    }
+
+    /** 生成 16 位小写十六进制 spanId，与 Zipkin/Brave 格式一致 */
+    private static String generateSpanId() {
+        return String.format("%016x", ThreadLocalRandom.current().nextLong());
     }
 }

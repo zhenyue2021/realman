@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 
 import java.net.InetAddress;
 import java.time.Instant;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * XXL-Job 定时任务链路追踪切面
@@ -44,6 +45,7 @@ public class XxlJobTracingAspect {
         String traceId = "job-" + jobName + "-" + Instant.now().toEpochMilli();
 
         MDC.put(TraceIdConst.MDC_TRACE_ID, traceId);
+        MDC.put(TraceIdConst.MDC_SPAN_ID,  String.format("%016x", ThreadLocalRandom.current().nextLong()));
         MDC.put(TraceIdConst.MDC_SERVICE,   serviceName);
         MDC.put(TraceIdConst.MDC_INSTANCE,  resolveHostName());
         MDC.put(TraceIdConst.MDC_SOURCE,    "job");
