@@ -84,6 +84,39 @@
 			<artifactId>micrometer-registry-prometheus</artifactId>
 		</dependency>
 
+		<!-- ===== 分布式链路追踪 ===== -->
+		<!-- Micrometer Tracing - Brave 实现（Spring Boot 3.x 官方方案，Sleuth 已废弃） -->
+		<dependency>
+			<groupId>io.micrometer</groupId>
+			<artifactId>micrometer-tracing-bridge-brave</artifactId>
+		</dependency>
+		<!-- Brave → Zipkin 上报 -->
+		<dependency>
+			<groupId>io.zipkin.reporter2</groupId>
+			<artifactId>zipkin-reporter-brave</artifactId>
+		</dependency>
+
+		<!-- ===== 日志聚合 ===== -->
+		<!-- Logback → Loki 直推 Appender（免 Promtail / Filebeat） -->
+		<dependency>
+			<groupId>com.github.loki4j</groupId>
+			<artifactId>loki-logback-appender</artifactId>
+			<version>1.5.2</version>
+		</dependency>
+		<!-- JSON 结构化日志编码器 -->
+		<dependency>
+			<groupId>net.logstash.logback</groupId>
+			<artifactId>logstash-logback-encoder</artifactId>
+			<version>8.0</version>
+		</dependency>
+
+		<!-- ===== Feign 链路透传（optional：仅在 Feign 存在时生效） ===== -->
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-openfeign</artifactId>
+			<optional>true</optional>
+		</dependency>
+
 		<!-- commons -->
 		<dependency>
 			<groupId>commons-io</groupId>

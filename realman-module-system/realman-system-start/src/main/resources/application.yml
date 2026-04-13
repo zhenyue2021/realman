@@ -5,3 +5,18 @@ spring:
     import: optional:classpath:config/application-liteflow.yml
   profiles:
     active: '@profile.name@'
+
+# ===== 分布式链路追踪（P0/P1） =====
+management:
+  tracing:
+    sampling:
+      probability: ${TRACE_SAMPLING:1.0}
+    propagation:
+      type: B3_MULTI
+  zipkin:
+    tracing:
+      endpoint: ${ZIPKIN_ENDPOINT:http://172.16.44.66:9411/api/v2/spans}
+
+# Loki 推送地址（供 logback-spring.xml 的 <springProperty> 读取）
+loki:
+  url: ${LOKI_URL:http://172.16.44.66:3100/loki/api/v1/push}
