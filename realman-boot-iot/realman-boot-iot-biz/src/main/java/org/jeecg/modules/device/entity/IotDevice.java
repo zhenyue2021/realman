@@ -79,4 +79,17 @@ public class IotDevice implements Serializable {
     @TableLogic
     @TableField("del_flag")
     private Integer delFlag;
+
+    /**
+     * 设备当前运行SLAM 地图版本号
+     */
+    @TableField(exist = false)
+    private String slamVersion;
+
+    /**
+     * 设备当前运行SLAM 地图 预签名URL
+     */
+    @TableField(exist = false)
+    private String slamPresignedUrl;
+
 }
