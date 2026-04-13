@@ -69,7 +69,7 @@
 		<aliyun.oss.version>3.17.3</aliyun.oss.version>
         <tencentcloud-sdk-java-sms.version>3.1.407</tencentcloud-sdk-java-sms.version>
 		<!-- 中间件 -->
-		<paho.version>1.2.5</paho.version>
+		<paho5.version>1.2.5</paho5.version>
 		<!-- shiro -->
 		<shiro.version>2.0.5</shiro.version>
 		<shiro-redis.version>3.2.3</shiro-redis.version>
@@ -256,8 +256,8 @@
 			<!--mqtt-->
 			<dependency>
 				<groupId>org.eclipse.paho</groupId>
-				<artifactId>org.eclipse.paho.client.mqttv3</artifactId>
-				<version>${paho.version}</version>
+				<artifactId>org.eclipse.paho.mqttv5.client</artifactId>
+				<version>${paho5.version}</version>
 			</dependency>
 			<!--分库分表shardingsphere-->
 			<dependency>

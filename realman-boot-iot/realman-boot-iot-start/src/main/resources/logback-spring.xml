@@ -1,54 +1,79 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<configuration scan="true" scanPeriod="60 seconds">
-    <!-- 日志目录 -->
-    <property name="LOG_HOME" value="logs/realman-iot"/>
+<configuration>
+    <!-- 从 Spring 环境读取配置，支持 application.yml 中的占位符 -->
+    <springProperty scope="context" name="APP_NAME"
+                    source="spring.application.name" defaultValue="realman-iot"/>
+    <springProperty scope="context" name="LOG_HOME"
+                    source="logging.file.path"        defaultValue="logs/realman-iot"/>
+    <springProperty scope="context" name="LOKI_URL"
+                    source="loki.url"                 defaultValue="http://loki:3100/loki/api/v1/push"/>
 
-    <!-- 日志输出格式 -->
-    <property name="LOG_PATTERN"
-              value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{80} : %msg%n"/>
-
-    <!-- 控制台输出 -->
+    <!-- ===== 1. 控制台：开发可读格式（含 traceId / spanId） ===== -->
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>${LOG_PATTERN}</pattern>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level [%X{traceId:-N/A},%X{spanId:-N/A}] %logger{36} - %msg%n</pattern>
             <charset>UTF-8</charset>
         </encoder>
     </appender>
 
-    <!-- 按天滚动的文件日志 -->
-    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>${LOG_HOME}/app.log</file>
-        <encoder>
-            <pattern>${LOG_PATTERN}</pattern>
-            <charset>UTF-8</charset>
-        </encoder>
+    <!-- ===== 2. 本地文件：JSON 格式，Loki 故障时的兜底 ===== -->
+    <appender name="FILE_JSON" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_HOME}/${APP_NAME}.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <!-- 每天一个日志文件 -->
-            <fileNamePattern>${LOG_HOME}/realman-iot.%d{yyyy-MM-dd}.log.gz</fileNamePattern>
+            <!-- 按日滚动 + gzip 压缩 -->
+            <fileNamePattern>${LOG_HOME}/${APP_NAME}.%d{yyyy-MM-dd}.log.gz</fileNamePattern>
             <!-- 保留 30 天 -->
             <maxHistory>30</maxHistory>
+            <!-- 总容量上限 3 GB -->
+            <totalSizeCap>3GB</totalSizeCap>
         </rollingPolicy>
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <!-- 将 MDC 中的链路字段输出到 JSON -->
+            <includeMdcKeyName>traceId</includeMdcKeyName>
+            <includeMdcKeyName>spanId</includeMdcKeyName>
+            <includeMdcKeyName>service</includeMdcKeyName>
+            <includeMdcKeyName>instance</includeMdcKeyName>
+            <includeMdcKeyName>source</includeMdcKeyName>
+            <customFields>{"app":"${APP_NAME}"}</customFields>
+        </encoder>
     </appender>
 
-    <!-- 业务模块日志：IoT 设备 -->
-    <logger name="org.jeecg.modules.device" level="DEBUG" additivity="false">
-        <appender-ref ref="CONSOLE"/>
-        <appender-ref ref="FILE"/>
-    </logger>
+    <!-- ===== 3. Loki 直推：集群日志聚合（异步批量，不阻塞业务线程） ===== -->
+    <appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
+        <http>
+            <url>${LOKI_URL}</url>
+        </http>
+        <format>
+            <!-- Loki 索引标签：app / host / level（低基数，避免标签爆炸） -->
+            <label>
+                <pattern>app=${APP_NAME},host=${HOSTNAME:-unknown},level=%level</pattern>
+            </label>
+            <!-- 推送到 Loki 的日志正文（含 traceId，支持 Grafana 行过滤） -->
+            <message>
+                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [traceId=%X{traceId:-},spanId=%X{spanId:-}] %logger{50} - %msg%n%ex</pattern>
+            </message>
+        </format>
+    </appender>
 
-    <!-- Nacos 客户端日志：只输出到控制台，避免文件 appender 冲突 -->
+    <!-- ===== 包级别日志配置 ===== -->
+    <!-- IoT 业务包：DEBUG 级别（仅开发/测试环境有效，生产通过 logging.level 配置覆盖） -->
+    <logger name="org.jeecg.modules.device" level="DEBUG"/>
+
+    <!-- Nacos 客户端：只输出到控制台，避免文件 appender 冲突 -->
     <logger name="com.alibaba.nacos" level="INFO" additivity="false">
         <appender-ref ref="CONSOLE"/>
     </logger>
 
-    <!-- 其他三方组件可以按需调级 -->
-    <logger name="org.springframework" level="INFO"/>
-    <logger name="com.baomidou.mybatisplus" level="WARN"/>
+    <!-- 三方组件降噪 -->
+    <logger name="org.springframework"         level="INFO"/>
+    <logger name="com.baomidou.mybatisplus"    level="WARN"/>
+    <logger name="org.eclipse.paho"            level="WARN"/>
+    <logger name="io.micrometer"               level="WARN"/>
 
-    <!-- 根日志 -->
+    <!-- ===== 根日志：INFO 级别，三路输出 ===== -->
     <root level="INFO">
         <appender-ref ref="CONSOLE"/>
-        <appender-ref ref="FILE"/>
+        <appender-ref ref="FILE_JSON"/>
+        <appender-ref ref="LOKI"/>
     </root>
 </configuration>
-

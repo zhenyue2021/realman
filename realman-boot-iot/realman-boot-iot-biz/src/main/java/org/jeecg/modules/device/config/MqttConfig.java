@@ -1,14 +1,18 @@
 package org.jeecg.modules.device.config;
 
 import lombok.extern.slf4j.Slf4j;
-import org.eclipse.paho.client.mqttv3.*;
-import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
+import org.eclipse.paho.mqttv5.client.*;
+import org.eclipse.paho.mqttv5.client.persist.MemoryPersistence;
+import org.eclipse.paho.mqttv5.common.MqttException;
+import org.eclipse.paho.mqttv5.common.MqttMessage;
+import org.eclipse.paho.mqttv5.common.packet.MqttProperties;
 import org.jeecg.modules.device.mqtt.handler.MqttMessageDispatcher;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
 /**
@@ -92,28 +96,45 @@ public class MqttConfig {
     public MqttClient mqttClient() throws MqttException {
         MqttClient client = new MqttClient(brokerUrl, clientId, new MemoryPersistence());
 
-        MqttConnectOptions opts = new MqttConnectOptions();
-        // cleanSession=true：配合 $share 共享订阅使用。
+        MqttConnectionOptions opts = new MqttConnectionOptions();
+        // cleanStart=true：MQTT 5.0 对应 cleanSession，配合 $share 共享订阅使用。
         // 共享订阅组内只要有存活节点，EMQX 就不会丢消息（故障节点的消息会路由给其他节点）；
-        // 每个 Pod 断线重连时无需恢复旧队列，避免 cleanSession=false + 稳定 clientId 时
+        // 每个 Pod 断线重连时无需恢复旧队列，避免 cleanStart=false + 稳定 clientId 时
         // 重连后积压大量离线消息导致消息风暴。
-        opts.setCleanSession(true);
+        opts.setCleanStart(true);
         opts.setUserName(username);
-        opts.setPassword(password.toCharArray());
+        opts.setPassword(password.getBytes(StandardCharsets.UTF_8));
         opts.setKeepAliveInterval(keepAlive);  // 心跳间隔（秒）
         opts.setAutomaticReconnect(true);      // 自动重连（断线后指数退避重试）
         opts.setMaxReconnectDelay(5000);       // 最大重连间隔 5s
 
         client.setCallback(new MqttCallback() {
-            /** 连接丢失（网络中断等），自动重连机制将在后台重试 */
-            public void connectionLost(Throwable e) {
-                log.error("[MQTT] 连接丢失，等待重连", e);
+            /**
+             * 连接断开回调（替代 v3 的 connectionLost）。
+             * 异常断开时 response.getException() 非空；正常断开时为 null。
+             * 自动重连机制将在后台重试。
+             */
+            @Override
+            public void disconnected(MqttDisconnectResponse response) {
+                MqttException cause = response.getException();
+                if (cause != null) {
+                    log.error("[MQTT] 连接丢失，等待重连", cause);
+                } else {
+                    log.warn("[MQTT] 连接断开 (reasonCode={})", response.getReturnCode());
+                }
+            }
+
+            /** 客户端内部 MQTT 协议错误（如报文解析失败），记录日志即可 */
+            @Override
+            public void mqttErrorOccurred(MqttException exception) {
+                log.error("[MQTT] 客户端内部错误", exception);
             }
 
             /**
-             * 收到订阅消息，委托给 MqttMessageDispatcher 按 Topic 路由处理
-             * 通过 MqttConfigContext 延迟获取 Dispatcher，避免 Spring 循环依赖
+             * 收到订阅消息，委托给 MqttMessageDispatcher 按 Topic 路由处理。
+             * 通过 MqttConfigContext 延迟获取 Dispatcher，避免 Spring 循环依赖。
              */
+            @Override
             public void messageArrived(String topic, MqttMessage msg) {
                 MqttMessageDispatcher dispatcher = getDispatcher();
                 if (dispatcher != null) {
@@ -122,7 +143,21 @@ public class MqttConfig {
             }
 
             /** QoS1/2 消息发布完成回调（平台侧发布不需要特殊处理） */
-            public void deliveryComplete(IMqttDeliveryToken t) {
+            @Override
+            public void deliveryComplete(IMqttToken token) {
+            }
+
+            /** 重连成功回调，记录日志便于运维感知 */
+            @Override
+            public void connectComplete(boolean reconnect, String serverURI) {
+                if (reconnect) {
+                    log.info("[MQTT] 重连成功: {}", serverURI);
+                }
+            }
+
+            /** MQTT 5.0 增强认证回调，当前未启用增强认证，空实现 */
+            @Override
+            public void authPacketArrived(int reasonCode, MqttProperties properties) {
             }
         });
 

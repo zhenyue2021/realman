@@ -116,3 +116,13 @@ logging:
     org.jeecg.modules.device: DEBUG
     org.eclipse.paho: WARN
     com.baomidou.mybatisplus: WARN
+
+# ===== 链路追踪（开发环境） =====
+# 100% 采样率已在 application.yml 中设为默认值，此处无需重复。
+# Loki / Zipkin 若尚未在本地启动，可取消下方注释以静默推送失败警告：
+# loki:
+#   url: ""   # 空字符串：loki4j 跳过推送，仅保留本地文件日志
+# management:
+#   zipkin:
+#     tracing:
+#       endpoint: ""  # 空字符串：Brave 跳过 Zipkin 上报

@@ -2,11 +2,19 @@ package org.jeecg.modules.device.mqtt.handler;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.eclipse.paho.client.mqttv3.MqttMessage;
+import org.eclipse.paho.mqttv5.common.MqttMessage;
+import org.eclipse.paho.mqttv5.common.packet.MqttProperties;
+import org.eclipse.paho.mqttv5.common.packet.UserProperty;
+import org.jeecg.common.trace.TraceIdConst;
+import org.slf4j.MDC;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -46,6 +54,9 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class MqttMessageDispatcher {
 
+    @Value("${spring.application.name:unknown}")
+    private String serviceName;
+
     /** 匹配 device/{deviceCode}/{path}，group(1)=deviceCode，group(2)=path */
     private static final Pattern DEVICE_TOPIC     = Pattern.compile("^device/([^/]+)/(.+)$");
     /** 匹配 {deviceCode}/master/{path} 或 {deviceCode}/slave/{path}，group(1)=deviceCode，group(2)=role，group(3)=path */
@@ -79,6 +90,17 @@ public class MqttMessageDispatcher {
             topic = topic.substring(1);
         }
         String payload = new String(message.getPayload(), StandardCharsets.UTF_8);
+
+        // P2 链路追踪：从 MQTT 5 User Properties 提取 traceId，或生成新的
+        String traceId = extractTraceId(message);
+        if (!StringUtils.hasText(traceId)) {
+            traceId = "mqtt-" + UUID.randomUUID().toString().replace("-", "");
+        }
+        MDC.put(TraceIdConst.MDC_TRACE_ID, traceId);
+        MDC.put(TraceIdConst.MDC_SERVICE,   serviceName);
+        MDC.put(TraceIdConst.MDC_SOURCE,    "mqtt");
+        MDC.put("mqttTopic", topic);
+
         try {
             // 0. $SYS 系统事件（设备上下线）
             if (topic.contains("/clients/") && topic.contains("/connected")) {
@@ -125,7 +147,22 @@ public class MqttMessageDispatcher {
             log.warn("[Dispatcher] 未识别Topic: {}", topic);
         } catch (Exception e) {
             log.error("[Dispatcher] 处理消息异常 topic={}", topic, e);
+        } finally {
+            MDC.clear();
         }
+    }
+
+    private String extractTraceId(MqttMessage message) {
+        MqttProperties props = message.getProperties();
+        if (props == null) return null;
+        List<UserProperty> userProperties = props.getUserProperties();
+        if (userProperties == null) return null;
+        for (UserProperty prop : userProperties) {
+            if (TraceIdConst.HEADER_TRACE_ID.equals(prop.getKey())) {
+                return prop.getValue();
+            }
+        }
+        return null;
     }
 
     /**
