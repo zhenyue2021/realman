@@ -92,6 +92,13 @@ device:
   ota:
     chunk-temp-dir: /tmp/iot-ota-chunks
 
+# Zipkin 链路数据清理策略
+zipkin:
+  cleanup:
+    retention-days: 7        # 保留最近 N 天的链路数据，超期物理删除
+    database: zipkin          # Zipkin 所在的 MySQL 数据库名
+    batch-size: 5000          # 每批删除行数，避免大事务锁表
+
 # WebRTC 服务配置（TURN / STUN 服务器，下发给机器人设备）
 webrtc:
   # TURN 服务器列表，支持多个
