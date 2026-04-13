@@ -5,10 +5,17 @@ import lombok.extern.slf4j.Slf4j;
 import org.eclipse.paho.mqttv5.client.MqttClient;
 import org.eclipse.paho.mqttv5.common.MqttException;
 import org.eclipse.paho.mqttv5.common.MqttMessage;
+import org.eclipse.paho.mqttv5.common.packet.MqttProperties;
+import org.eclipse.paho.mqttv5.common.packet.UserProperty;
+import org.jeecg.common.trace.TraceIdConst;
 import org.jeecg.modules.device.security.CommandEncryptService;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 
 @Slf4j
 @Component
@@ -40,6 +47,14 @@ public class MqttPublisher {
             MqttMessage msg = new MqttMessage(payload.getBytes(StandardCharsets.UTF_8));
             msg.setQos(qos);
             msg.setRetained(retained);
+            String traceId = MDC.get(TraceIdConst.MDC_TRACE_ID);
+            if (StringUtils.hasText(traceId)) {
+                MqttProperties props = new MqttProperties();
+                List<UserProperty> userProps = new ArrayList<>();
+                userProps.add(new UserProperty(TraceIdConst.HEADER_TRACE_ID, traceId));
+                props.setUserProperties(userProps);
+                msg.setProperties(props);
+            }
             mqttClient.publish(topic, msg);
         } catch (MqttException e) {
             throw new RuntimeException("MQTT发布失败: " + e.getMessage(), e);
