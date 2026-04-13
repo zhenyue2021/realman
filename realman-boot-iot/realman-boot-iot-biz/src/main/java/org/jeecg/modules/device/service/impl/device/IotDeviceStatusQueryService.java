@@ -6,14 +6,12 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.jeecg.modules.device.constant.DeviceConstant;
-import org.jeecg.modules.device.entity.IotDevice;
-import org.jeecg.modules.device.entity.IotDeviceConfig;
-import org.jeecg.modules.device.entity.IotDeviceOperationLog;
-import org.jeecg.modules.device.entity.IotDeviceStatus;
+import org.jeecg.modules.device.entity.*;
 import org.jeecg.modules.device.mapper.IotDeviceConfigMapper;
 import org.jeecg.modules.device.mapper.IotDeviceMapper;
 import org.jeecg.modules.device.mapper.IotDeviceStatusMapper;
 import org.jeecg.modules.device.service.IDeviceOperationLogService;
+import org.jeecg.modules.device.service.IIotSlamMapService;
 import org.jeecg.modules.device.vo.DeviceDetailVO;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -24,6 +22,7 @@ import java.time.ZoneId;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -40,6 +39,7 @@ public class IotDeviceStatusQueryService {
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
     private final IDeviceOperationLogService logService;
+    private final IIotSlamMapService slamMapService;
 
     public Map<String, Object> getDeviceMonitorStatus(String deviceId) {
         IotDevice device = deviceSupport.require(deviceId);
@@ -127,6 +127,11 @@ public class IotDeviceStatusQueryService {
                 .queryLogPage(new Page<>(1, 20), deviceId, null, null, null)
                 .getRecords();
 
+        IotSlamMap slamMap = slamMapService.getCurrentMap(device.getDeviceCode());
+        if (Objects.nonNull(slamMap)) {
+            device.setSlamVersion(slamMap.getMapVersion());
+            device.setSlamPresignedUrl(slamMap.getPresignedUrl());
+        }
         DeviceDetailVO vo = new DeviceDetailVO();
         vo.setDevice(device);
         vo.setOnline(online);
