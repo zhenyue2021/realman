@@ -73,6 +73,7 @@ public class MqttMessageDispatcherEndToEndTest {
     private RedisUtil redisUtil;
     private ExtParamRecordIotMapper extParamRecordIotMapper;
     private WebRtcAckHandler webRtcAckHandler;
+    private WebRtcRestartHandler webRtcRestartHandler;
 
     // 分发器
     private MqttMessageDispatcher dispatcher;
@@ -161,6 +162,7 @@ public class MqttMessageDispatcherEndToEndTest {
         slamAckHandler = Mockito.mock(SlamAckHandler.class);
         slamStatesHandler = Mockito.mock(SlamStatesHandler.class);
         webRtcAckHandler = Mockito.mock(WebRtcAckHandler.class);
+        webRtcRestartHandler = new WebRtcRestartHandler(encryptService, objectMapper, webSocketServer);
         DeviceCameraStreamPendingService cameraStreamPendingService = Mockito.mock(DeviceCameraStreamPendingService.class);
         DeviceCameraStreamResponseHandler deviceCameraStreamResponseHandler = new DeviceCameraStreamResponseHandler(
                 encryptService,
@@ -189,7 +191,8 @@ public class MqttMessageDispatcherEndToEndTest {
                 slamStatesHandler,
                 extParamsRequestHandler,
                 masterCommandHandler,
-                webRtcAckHandler
+                webRtcAckHandler,
+                webRtcRestartHandler
         );
     }
 
