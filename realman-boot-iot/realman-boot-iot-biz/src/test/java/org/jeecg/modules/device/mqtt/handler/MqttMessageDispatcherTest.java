@@ -34,6 +34,7 @@ public class MqttMessageDispatcherTest {
     private ExtParamsRequestHandler extParamsRequestHandler;
     private MasterCommandHandler masterCommandHandler;
     private WebRtcAckHandler webRtcAckHandler;
+    private WebRtcRestartHandler webRtcRestartHandler;
 
     private MqttMessageDispatcher dispatcher;
 
@@ -54,6 +55,7 @@ public class MqttMessageDispatcherTest {
         extParamsRequestHandler = Mockito.mock(ExtParamsRequestHandler.class);
         masterCommandHandler = Mockito.mock(MasterCommandHandler.class);
         webRtcAckHandler = Mockito.mock(WebRtcAckHandler.class);
+        webRtcRestartHandler = Mockito.mock(WebRtcRestartHandler.class);
 
         dispatcher = new MqttMessageDispatcher(
                 statusHandler,
@@ -70,7 +72,8 @@ public class MqttMessageDispatcherTest {
                 slamStatesHandler,
                 extParamsRequestHandler,
                 masterCommandHandler,
-                webRtcAckHandler
+                webRtcAckHandler,
+                webRtcRestartHandler
         );
     }
 
@@ -236,6 +239,15 @@ public class MqttMessageDispatcherTest {
         String payload = "{\"slamNavMode\":\"Mapping\"}";
         dispatcher.dispatch(topic, mqttMsg(payload));
         Mockito.verify(slamStatesHandler).handle(deviceCode, payload);
+    }
+
+    @Test
+    void testWebRtcRestart() throws Exception {
+        String deviceCode = "DEV001";
+        String topic = "device/" + deviceCode + "/webrtc/restart";
+        String payload = "{\"command\":\"restart\",\"commandId\":\"97127fb9b78a4d00b217eeb42c0d5041\",\"timestamp\":1775716304420}";
+        dispatcher.dispatch(topic, mqttMsg(payload));
+        Mockito.verify(webRtcRestartHandler).handle(deviceCode, payload);
     }
 
     @Test
