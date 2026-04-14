@@ -250,6 +250,18 @@ public class DeviceWebSocketServer implements MessageListener {
         redisPublish(controllerCode, buildMsg(DeviceConstant.WebSocketType.ASSOCIATED_DEVICE_INFO, controllerCode, dataJson));
     }
 
+    /**
+     * 推送 WebRTC 信令服务重启事件（由 WebRtcRestartHandler 在收到 device/{deviceCode}/webrtc/restart 后调用）
+     *
+     * @param deviceCode   设备编码
+     * @param restartJson  解密后的原始上报 JSON（直接作为 data 字段内嵌）
+     */
+    public void pushWebRtcRestart(String deviceCode, String restartJson) {
+        String msg = buildMsg(DeviceConstant.WebSocketType.WEBRTC_RESTART, deviceCode, restartJson);
+        redisPublish(deviceCode, msg);
+        redisPublish(REALMAN_CODE, msg);
+    }
+
     public void pushSlamStates(String deviceCode, String jsonStr) {
         String msg = buildMsg("SLAM_STATUS", deviceCode, jsonStr);
         redisPublish(deviceCode, msg);
