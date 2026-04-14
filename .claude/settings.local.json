@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs grep:*)",
+      "Bash(grep -v \"^--$\")",
+      "Bash(claude:*)",
+      "Bash(grep -r \"FileUtils\\\\|Files\\\\\\\\.write\\\\|RandomAccessFile\" /d/realman/realman-boot/realman-boot-iot/realman-boot-iot-biz/src/main/java)"
+    ]
+  }
+}

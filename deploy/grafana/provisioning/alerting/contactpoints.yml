@@ -1,0 +1,35 @@
+apiVersion: 1
+
+# ===== 通知渠道：钉钉群机器人 =====
+#
+# 配置步骤：
+#   1. 打开钉钉群 → 群设置 → 智能群助手 → 添加机器人 → 自定义
+#   2. 安全设置选「加签」，复制生成的 Secret（以 SEC 开头）→ 填入下方 secret 字段
+#      （也可选「关键词」，填 RealMan，然后删除 secret 字段）
+#   3. 复制 Webhook URL 中 access_token= 后面的值 → 填入下方 token 字段
+#   4. 重启 Grafana：docker compose restart grafana
+
+contactPoints:
+  - orgId: 1
+    name: realman-ops
+    receivers:
+      - uid: dingding-main
+        type: dingding
+        disableResolveMessage: false   # 告警恢复时也发通知
+        settings:
+          url: "https://oapi.dingtalk.com/robot/send?access_token=YOUR_ACCESS_TOKEN_HERE"
+          msgType: markdown
+          title: |
+            {{ if eq .Status "firing" }}🔴 【RealMan告警】{{ else }}✅ 【RealMan恢复】{{ end }}{{ .GroupLabels.alertname }}
+          message: |
+            **状态**：{{ if eq .Status "firing" }}告警中 🔴{{ else }}已恢复 ✅{{ end }}
+            **级别**：{{ .CommonLabels.severity }}
+            **服务**：realman-iot
+            {{ range .Alerts }}
+            ---
+            **规则**：{{ .Labels.alertname }}
+            **摘要**：{{ .Annotations.summary }}
+            **详情**：{{ .Annotations.description }}
+            **触发时间**：{{ .StartsAt.Format "2006-01-02 15:04:05" }}
+            {{ if .EndsAt }}**恢复时间**：{{ .EndsAt.Format "2006-01-02 15:04:05" }}{{ end }}
+            {{ end }}

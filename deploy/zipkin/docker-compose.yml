@@ -1,0 +1,24 @@
+# Zipkin 单机部署（与 docs/集群模式下分布式链路追踪与日志管理-技术设计方案v3.md 一致）
+#
+# 方式 A — 仅服务器、不拷贝本仓库：SSH 登录后执行（需已安装 Docker）
+#   docker run -d --name zipkin -p 9411:9411 --restart unless-stopped openzipkin/zipkin:3
+#
+# 方式 B — 使用本文件：在含本文件的目录执行 docker compose up -d
+#
+# UI:     http://<服务器IP>:9411
+# 上报:   http://<服务器IP>:9411/api/v2/spans
+# 默认内存存储，重启后历史链路会清空；生产持久化见 https://zipkin.io/
+
+services:
+  zipkin:
+    image: openzipkin/zipkin:3
+    container_name: zipkin
+    restart: unless-stopped
+    ports:
+      - "9411:9411"
+    environment:
+      TZ: Asia/Shanghai
+    # 资源紧张时可取消注释
+    # deploy:
+    #   resources:
+    #     limits: { cpus: "0.5", memory: 512M }
