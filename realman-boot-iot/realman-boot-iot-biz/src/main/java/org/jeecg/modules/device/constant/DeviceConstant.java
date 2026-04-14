@@ -411,6 +411,8 @@ public interface DeviceConstant {
         String WORK_ORDER_STARTED    = "WORK_ORDER_STARTED";
         /** 主控当前关联设备信息 */
         String ASSOCIATED_DEVICE_INFO = "ASSOCIATED_DEVICE_INFO";
+        /** WebRTC 信令服务已重新启动 */
+        String WEBRTC_RESTART         = "WEBRTC_RESTART";
     }
 
     /**

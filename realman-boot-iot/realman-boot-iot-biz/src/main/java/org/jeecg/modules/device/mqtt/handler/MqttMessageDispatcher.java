@@ -78,6 +78,7 @@ public class MqttMessageDispatcher {
     private final ExtParamsRequestHandler             extParamsRequestHandler;
     private final MasterCommandHandler                masterCommandHandler;
     private final WebRtcAckHandler                    webRtcAckHandler;
+    private final WebRtcRestartHandler                webRtcRestartHandler;
 
     /**
      * 分发 MQTT 消息到对应 Handler
@@ -193,6 +194,7 @@ public class MqttMessageDispatcher {
             case "slam/states"                        -> slamStatesHandler.handle(deviceCode, payload);
             case "ext-params/request"                 -> extParamsRequestHandler.handle(deviceCode, payload);
             case "webrtc/ack"                         -> webRtcAckHandler.handle(deviceCode, payload);
+            case "webrtc/restart"                     -> webRtcRestartHandler.handle(deviceCode, payload);
             default -> log.warn("[Dispatcher] 未知路径: {}", topic);
         }
     }

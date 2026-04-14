@@ -775,4 +775,20 @@ public class MqttMessageModel {
         /** 消息时间戳（毫秒 epoch） */
         private long timestamp;
     }
+
+    /**
+     * 上行：WebRTC 信令服务启动通知（Topic: device/{deviceCode}/webrtc/restart）
+     */
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class WebRtcRestart {
+        /** 固定值 "restart" */
+        private String command;
+        /** 本次启动的唯一 ID */
+        private String commandId;
+        /** 上报时间戳（毫秒 epoch） */
+        private long timestamp;
+    }
 }
