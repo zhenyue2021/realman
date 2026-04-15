@@ -134,7 +134,9 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
 	private ISysThirdAccountService sysThirdAccountService;
 	@Autowired
 	private RedisUtil redisUtil;
-    
+	@Autowired
+	private DySmsLimit dySmsLimit;
+
     @Autowired
     private SysTenantPackUserMapper packUserMapper;
     
@@ -2201,7 +2203,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
 		}
 
 		//增加 check防止恶意刷短信接口
-		if(!DySmsLimit.canSendSms(clientIp)){
+		if(!dySmsLimit.canSendSms(clientIp)){
 			log.warn("--------[警告] IP地址:{}, 短信接口请求太多-------", clientIp);
 			throw new JeecgBootException("短信接口请求太多，请稍后再试！", CommonConstant.PHONE_SMS_FAIL_CODE);
 		}

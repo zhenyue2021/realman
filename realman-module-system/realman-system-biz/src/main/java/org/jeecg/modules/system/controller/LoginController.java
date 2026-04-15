@@ -63,6 +63,8 @@ public class LoginController {
 	@Autowired
     private RedisUtil redisUtil;
 	@Autowired
+    private DySmsLimit dySmsLimit;
+	@Autowired
     private ISysDepartService sysDepartService;
 	@Autowired
     private ISysDictService sysDictService;
@@ -330,7 +332,7 @@ public class LoginController {
 
 		//-------------------------------------------------------------------------------------
 		//增加 check防止恶意刷短信接口
-		if(!DySmsLimit.canSendSms(clientIp)){
+		if(!dySmsLimit.canSendSms(clientIp)){
 			log.warn("--------[警告] IP地址:{}, 短信接口请求太多-------", clientIp);
 			result.setMessage("短信接口请求太多，请稍后再试！");
 			result.setCode(CommonConstant.PHONE_SMS_FAIL_CODE);
@@ -897,7 +899,7 @@ public class LoginController {
 		}
 		String clientIp = IpUtils.getIpAddr(request);
 		//清空短信记录数量
-		DySmsLimit.clearSendSmsCount(clientIp);
+		dySmsLimit.clearSendSmsCount(clientIp);
 		redisUtil.removeAll(realKey);
 		return Result.ok();
 	}
