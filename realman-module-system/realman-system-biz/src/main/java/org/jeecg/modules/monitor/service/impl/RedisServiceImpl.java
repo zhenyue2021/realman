@@ -1,6 +1,7 @@
 package org.jeecg.modules.monitor.service.impl;
 
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 import jakarta.annotation.Resource;
 
@@ -14,6 +15,7 @@ import org.jeecg.modules.monitor.exception.RedisConnectException;
 import org.jeecg.modules.monitor.service.RedisService;
 import org.springframework.cglib.beans.BeanMap;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -30,6 +32,13 @@ public class RedisServiceImpl implements RedisService {
 
 	@Resource
 	private RedisConnectionFactory redisConnectionFactory;
+
+	@Resource
+	private StringRedisTemplate stringRedisTemplate;
+
+	/** 分布式锁：防止多节点重复采集，TTL 略小于采集间隔（60s）以防锁泄漏 */
+	private static final String METRICS_LOCK_KEY = "monitor:redis:metrics:lock";
+	private static final long   METRICS_LOCK_TTL = 55L;
 
     /**
      * redis信息
@@ -148,6 +157,13 @@ public class RedisServiceImpl implements RedisService {
 	 */
 	@Scheduled(fixedRate = 60000)
 	public void recordCustomMetric() throws RedisConnectException {
+		Boolean locked = stringRedisTemplate.opsForValue()
+				.setIfAbsent(METRICS_LOCK_KEY, "1", METRICS_LOCK_TTL, TimeUnit.SECONDS);
+		if (!Boolean.TRUE.equals(locked)) {
+			log.debug("[Redis监控] 其他节点已持有采集锁，跳过本次采集");
+			return;
+		}
+
 		List<Map<String, Object>> list= new ArrayList<>();
 		if(REDIS_METRICS.containsKey("dbSize")){
 			list = REDIS_METRICS.get("dbSize");
