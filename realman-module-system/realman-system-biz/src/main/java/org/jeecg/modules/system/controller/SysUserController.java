@@ -113,6 +113,8 @@ public class SysUserController {
     private JeecgRedisClient jeecgRedisClient;
     @Autowired
     private JeecgBaseConfig jeecgBaseConfig;
+    @Autowired
+    private DySmsLimit dySmsLimit;
     
     /**
      * 获取租户下用户数据（支持租户隔离）
@@ -431,7 +433,7 @@ public class SysUserController {
         //-------------------------------------------------------------------------------------
         //增加 check防止恶意刷短信接口
         String clientIp = IpUtils.getIpAddr(request);
-        if(!DySmsLimit.canSendSms(clientIp)){
+        if(!dySmsLimit.canSendSms(clientIp)){
             log.warn("-------- IP地址:{}, 短信接口请求太多，有攻击风险！", clientIp);
             return Result.error("短信接口请求太多，请稍后再试！");
         }
