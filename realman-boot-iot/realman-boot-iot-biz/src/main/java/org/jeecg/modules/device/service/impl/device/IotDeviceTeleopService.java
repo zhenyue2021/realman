@@ -261,7 +261,7 @@ public class IotDeviceTeleopService {
             log.info("[TeleopCache] 清除遥操关系缓存: master={} robot={}", controllerCode, robotCode);
 
             // 7. 下发 WebRTC stop 并同步等待 ACK
-            sendWebRtcStopAndAwait(robotCode);
+//            sendWebRtcStopAndAwait(robotCode);
 
             // 8. 销毁房间
             roomService.destroyRoom(controllerCode);
