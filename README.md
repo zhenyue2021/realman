@@ -232,7 +232,8 @@ RealmanBoot 低代码开发平台
 
 
 #### 微服务架构图
-![微服务架构图](/system-architecture.html "在这里输入图片标题")
+
+![微服务架构图](/system-architecture.png "在这里输入图片标题")
 
 
 
