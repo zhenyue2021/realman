@@ -741,9 +741,9 @@ public class SysDepartServiceImpl extends ServiceImpl<SysDepartMapper, SysDepart
         Consumer<LambdaQueryWrapper<SysDepart>> square = i -> {
             if (oConvertUtils.isNotEmpty(ids)) {
                 if (CommonConstant.DEPART_KEY_ORG_CODE.equals(primaryKey)) {
-                    i.in(SysDepart::getOrgCode, ids.split(SymbolConstant.COMMA));
+                    i.in(SysDepart::getOrgCode, Arrays.asList(ids.split(SymbolConstant.COMMA)));
                 } else {
-                    i.in(SysDepart::getId, ids.split(SymbolConstant.COMMA));
+                    i.in(SysDepart::getId, Arrays.asList(ids.split(SymbolConstant.COMMA)));
                 }
             } else {
                 if(oConvertUtils.isEmpty(parentId)){

@@ -295,7 +295,7 @@ public class SysDepartController {
 	public Result<SysDepart> deleteBatch(@RequestParam(name = "ids", required = true) String ids) {
 
 		Result<SysDepart> result = new Result<SysDepart>();
-		if (ids == null || "".equals(ids.trim())) {
+		if (ids == null || ids.trim().isEmpty()) {
 			result.error500("参数不识别！");
 		} else {
 			this.sysDepartService.deleteBatchWithChildren(Arrays.asList(ids.split(",")));
@@ -362,7 +362,7 @@ public class SysDepartController {
 			departIds = user.getDepartIds();
 		}
 		List<SysDepartTreeModel> treeList = this.sysDepartService.searchByKeyWord(keyWord,myDeptSearch,departIds,orgCategory,depIds);
-		if (treeList == null || treeList.size() == 0) {
+		if (treeList == null || treeList.isEmpty()) {
 			result.setSuccess(false);
 			result.setMessage("未查询匹配数据！");
 			return result;
@@ -529,7 +529,7 @@ public class SysDepartController {
 		query.orderByAsc(SysDepart::getOrgCode);
 		if(oConvertUtils.isNotEmpty(id)){
 			String[] arr = id.split(",");
-			query.in(SysDepart::getId,arr);
+			query.in(SysDepart::getId,Arrays.asList(arr));
 		}
 		List<SysDepart> ls = this.sysDepartService.list(query);
 		result.setSuccess(true);

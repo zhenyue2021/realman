@@ -109,7 +109,7 @@ public class EmailSendMsgHandle implements ISendMsgHandle {
      */
     public void sendEmailMessage(MessageDTO messageDTO) {
         String[] arr = messageDTO.getToUser().split(",");
-        LambdaQueryWrapper<SysUser> query = new LambdaQueryWrapper<SysUser>().in(SysUser::getUsername, arr);
+        LambdaQueryWrapper<SysUser> query = new LambdaQueryWrapper<SysUser>().in(SysUser::getUsername, (Object) arr);
         List<SysUser> list = sysUserMapper.selectList(query);
         String content = messageDTO.getContent();
         String title = messageDTO.getTitle();
@@ -125,7 +125,7 @@ public class EmailSendMsgHandle implements ISendMsgHandle {
         
         // 代码逻辑说明: QQYUN-5557【简流】通知节点 发送邮箱 表单上有一个邮箱字段，流程中，邮件发送节点，邮件接收人 不可选择邮箱
         Set<String> toEmailList = messageDTO.getToEmailList();
-        if(toEmailList!=null && toEmailList.size()>0){
+        if(toEmailList!=null && !toEmailList.isEmpty()){
             for(String email: toEmailList){
                 if (ObjectUtils.isEmpty(email)) {
                     continue;
@@ -146,7 +146,7 @@ public class EmailSendMsgHandle implements ISendMsgHandle {
     public void sendMessageToCopyUser(MessageDTO messageDTO) {
         String copyToUser = messageDTO.getCopyToUser();
         if(ObjectUtils.isNotEmpty(copyToUser)) {
-            LambdaQueryWrapper<SysUser> query = new LambdaQueryWrapper<SysUser>().in(SysUser::getUsername, copyToUser.split(","));
+            LambdaQueryWrapper<SysUser> query = new LambdaQueryWrapper<SysUser>().in(SysUser::getUsername, (Object) copyToUser.split(","));
             List<SysUser> list = sysUserMapper.selectList(query);
             String content = messageDTO.getContent();
             String title = messageDTO.getTitle();

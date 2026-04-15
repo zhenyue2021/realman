@@ -50,7 +50,8 @@ public class SysUserDepartServiceImpl extends ServiceImpl<SysUserDepartMapper, S
 	private SysUserMapper sysUserMapper;
 	@Autowired
     private SysUserTenantMapper userTenantMapper;
-	
+
+	private static final String COMMA = ",";
 
 	/**
 	 * 根据用户id查询部门信息
@@ -168,10 +169,9 @@ public class SysUserDepartServiceImpl extends ServiceImpl<SysUserDepartMapper, S
             query.eq(SysUser::getStatus,Integer.parseInt(CommonConstant.STATUS_1));
 			// 代码逻辑说明: 逗号分割多个用户翻译问题------------
 			if(oConvertUtils.isNotEmpty(username)){
-				String COMMA = ",";
 				if(oConvertUtils.isNotEmpty(isMultiTranslate) && username.contains(COMMA)){
 					String[] usernameArr = username.split(COMMA);
-					query.in(SysUser::getUsername,usernameArr);
+					query.in(SysUser::getUsername,Arrays.asList(usernameArr));
 				}else {
 					query.like(SysUser::getUsername, username);
 				}
@@ -179,10 +179,8 @@ public class SysUserDepartServiceImpl extends ServiceImpl<SysUserDepartMapper, S
 
 			// 代码逻辑说明: JHHB-304 流程转办 人员选择时，加姓名搜索------------
 			if(oConvertUtils.isNotEmpty(realname)){
-				String COMMA = ",";
 				if(oConvertUtils.isNotEmpty(isMultiTranslate) && realname.contains(COMMA)){
-					String[] realnameArr = realname.split(COMMA);
-					query.in(SysUser::getRealname,realnameArr);
+					query.in(SysUser::getRealname,Arrays.asList(realname.split(COMMA)));
 				}else {
 					query.like(SysUser::getRealname, realname);
 				}
@@ -191,7 +189,6 @@ public class SysUserDepartServiceImpl extends ServiceImpl<SysUserDepartMapper, S
             // 代码逻辑说明: [VUEN-1238]邮箱回复时，发送到显示的为用户id------------
             if(oConvertUtils.isNotEmpty(id)){
 				// 代码逻辑说明: 【TV360X-1482】写信，选择用户后第一次回显没翻译------------
-				String COMMA = ",";
 				if(oConvertUtils.isNotEmpty(isMultiTranslate) && id.contains(COMMA)){
 					String[] idArr = id.split(COMMA);
 					query.in(SysUser::getId, Arrays.asList(idArr));
@@ -210,7 +207,7 @@ public class SysUserDepartServiceImpl extends ServiceImpl<SysUserDepartMapper, S
 				String tenantId = oConvertUtils.getString(TenantContext.getTenant(), "0");
                 // 代码逻辑说明: [QQYUN-3371]租户逻辑改造，改成关系表------------
 				List<String> userIdList = userTenantMapper.getUserIdsByTenantId(Integer.valueOf(tenantId));
-				if(null!=userIdList && userIdList.size()>0){
+				if(null!=userIdList && !userIdList.isEmpty()){
                     query.in(SysUser::getId,userIdList);
                 }
 			}
@@ -222,10 +219,10 @@ public class SysUserDepartServiceImpl extends ServiceImpl<SysUserDepartMapper, S
 			pageList = this.baseMapper.queryDepartUserPageList(page, sysDepart.getOrgCode(), username, realname);
 		}
 		List<SysUser> userList = pageList.getRecords();
-		if(userList!=null && userList.size()>0){
+		if(userList!=null && !userList.isEmpty()){
 			List<String> userIds = userList.stream().map(SysUser::getId).collect(Collectors.toList());
-			Map<String, SysUser> map = new LinkedHashMap(5);
-			if(userIds!=null && userIds.size()>0){
+			Map<String, SysUser> map = new LinkedHashMap<>(5);
+			if(!userIds.isEmpty()){
 				// 查部门名称
 				Map<String,String>  useDepNames = this.getDepNamesByUserIds(userIds);
 				userList.forEach(item->{
@@ -306,7 +303,7 @@ public class SysUserDepartServiceImpl extends ServiceImpl<SysUserDepartMapper, S
 			LambdaQueryWrapper<SysUser> query = new LambdaQueryWrapper<>();
 			query.eq(SysUser::getStatus,Integer.parseInt(CommonConstant.STATUS_1));
 			query.ne(SysUser::getUsername,"_reserve_user_external");
-			if(inUsernameList!=null && inUsernameList.size()>0){
+			if(!inUsernameList.isEmpty()){
 				query.in(SysUser::getUsername, inUsernameList);
 			}
 		
@@ -338,7 +335,7 @@ public class SysUserDepartServiceImpl extends ServiceImpl<SysUserDepartMapper, S
 		// step.1 先拿到全部的 useids
 		// step.2 通过 useids，一次性查询用户的所属部门名字
 		List<String> userIds = pageList.getRecords().stream().map(SysUser::getId).collect(Collectors.toList());
-		if (userIds.size() > 0) {
+		if (!userIds.isEmpty()) {
 			Map<String, String> useDepNames = sysUserService.getDepNamesByUserIds(userIds);
 			pageList.getRecords().forEach(item -> item.setOrgCodeTxt(useDepNames.get(item.getId())));
 		}
@@ -358,13 +355,9 @@ public class SysUserDepartServiceImpl extends ServiceImpl<SysUserDepartMapper, S
 	private Map<String, String> getDepNamesByUserIds(List<String> userIds) {
 		List<SysUserDepVo> list = sysUserMapper.getDepNamesByUserIds(userIds);
 
-		Map<String, String> res = new HashMap(5);
+		Map<String, String> res = new HashMap<>(5);
 		list.forEach(item -> {
-					if (res.get(item.getUserId()) == null) {
-						res.put(item.getUserId(), item.getDepartName());
-					} else {
-						res.put(item.getUserId(), res.get(item.getUserId()) + "," + item.getDepartName());
-					}
+					res.merge(item.getUserId(), item.getDepartName(), (a, b) -> a + "," + b);
 				}
 		);
 		return res;
@@ -410,7 +403,6 @@ public class SysUserDepartServiceImpl extends ServiceImpl<SysUserDepartMapper, S
         String userId = "";
         String userName = "";
         if (oConvertUtils.isNotEmpty(username)) {
-            String COMMA = ",";
             if (oConvertUtils.isNotEmpty(isMultiTranslate) && username.contains(COMMA)) {
                 String[] usernameArr = username.split(COMMA);
                 userNameList.addAll(Arrays.asList(usernameArr));
@@ -419,7 +411,6 @@ public class SysUserDepartServiceImpl extends ServiceImpl<SysUserDepartMapper, S
             }
         }
         if (oConvertUtils.isNotEmpty(id)) {
-            String COMMA = ",";
             if (oConvertUtils.isNotEmpty(isMultiTranslate) && id.contains(COMMA)) {
                 String[] idArr = id.split(COMMA);
                 userIdList.addAll(Arrays.asList(idArr));

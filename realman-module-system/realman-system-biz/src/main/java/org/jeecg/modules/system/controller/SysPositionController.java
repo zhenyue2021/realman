@@ -242,7 +242,7 @@ public class SysPositionController {
         // 代码逻辑说明: [03]职务导出，如果选择数据则只导出相关数据--------------------
         String selections = request.getParameter("selections");
         if(!oConvertUtils.isEmpty(selections)){
-            queryWrapper.in("id",selections.split(","));
+            queryWrapper.in("id", Arrays.asList(selections.split(",")));
         }
         //Step.2 AutoPoi 导出Excel
         ModelAndView mv = new ModelAndView(new JeecgEntityExcelView());
@@ -338,7 +338,7 @@ public class SysPositionController {
     public Result<List<SysPosition>> queryByIds(@RequestParam(name = "ids") String ids) {
         Result<List<SysPosition>> result = new Result<>();
         QueryWrapper<SysPosition> queryWrapper = new QueryWrapper<>();
-        queryWrapper.in(true,"id",ids.split(","));
+        queryWrapper.in(true,"id", Arrays.asList(ids.split(",")) );
         List<SysPosition> list = sysPositionService.list(queryWrapper);
         if (list == null) {
             result.error500("未找到对应实体");
@@ -367,7 +367,7 @@ public class SysPositionController {
         Page<SysUser> page = new Page<>(pageNo, pageSize);
         IPage<SysUser> pageList = userPositionService.getPositionUserList(page, positionId);
         List<String> userIds = pageList.getRecords().stream().map(SysUser::getId).collect(Collectors.toList());
-        if (null != userIds && userIds.size() > 0) {
+        if (!userIds.isEmpty()) {
             Map<String, String> useDepNames = userService.getDepNamesByUserIds(userIds);
             pageList.getRecords().forEach(item -> {
                 item.setOrgCodeTxt(useDepNames.get(item.getId()));

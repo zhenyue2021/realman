@@ -183,8 +183,7 @@ public class SysBaseApiImpl implements ISysBaseAPI {
 		if (oConvertUtils.isEmpty(username)) {
 			return null;
 		}
-		String userId = userMapper.getUserIdByName(username);
-		return userId;
+        return userMapper.getUserIdByName(username);
 	}
 	
 
@@ -923,7 +922,7 @@ public class SysBaseApiImpl implements ISysBaseAPI {
 	@Override
 	public List<UserAccountInfo> queryAllUserByIds(String[] userIds) {
 		QueryWrapper<SysUser> queryWrapper = new QueryWrapper<SysUser>().eq("status",1).eq("del_flag",0);
-		queryWrapper.in("id",userIds);
+		queryWrapper.in("id",Arrays.asList(userIds));
 		List<UserAccountInfo> loginUsers = new ArrayList<>();
 		List<SysUser> sysUsers = userMapper.selectList(queryWrapper);
 		for (SysUser user:sysUsers) {
@@ -950,7 +949,7 @@ public class SysBaseApiImpl implements ISysBaseAPI {
 	@Override
 	public List<UserAccountInfo> queryUserByNames(String[] userNames) {
 		QueryWrapper<SysUser> queryWrapper = new QueryWrapper<SysUser>().eq("status",1).eq("del_flag",0);
-		queryWrapper.in("username",userNames);
+		queryWrapper.in("username", Arrays.asList(userNames));
 		List<UserAccountInfo> loginUsers = new ArrayList<>();
 		List<SysUser> sysUsers = userMapper.selectList(queryWrapper);
 		for (SysUser user:sysUsers) {
@@ -1307,14 +1306,14 @@ public class SysBaseApiImpl implements ISysBaseAPI {
 	@Override
 	public List<JSONObject> queryUsersByUsernames(String usernames) {
 		LambdaQueryWrapper<SysUser> queryWrapper =  new LambdaQueryWrapper<>();
-		queryWrapper.in(SysUser::getUsername,usernames.split(","));
+		queryWrapper.in(SysUser::getUsername,Arrays.asList(usernames.split(",")));
 		return JSON.parseArray(JSON.toJSONString(userMapper.selectList(queryWrapper))).toJavaList(JSONObject.class);
 	}
 
 	@Override
 	public List<JSONObject> queryUsersByIds(String ids) {
 		LambdaQueryWrapper<SysUser> queryWrapper =  new LambdaQueryWrapper<>();
-		queryWrapper.in(SysUser::getId,ids.split(","));
+		queryWrapper.in(SysUser::getId,Arrays.asList(ids.split(",")));
 		return JSON.parseArray(JSON.toJSONString(userMapper.selectList(queryWrapper))).toJavaList(JSONObject.class);
 	}
 
@@ -1326,14 +1325,14 @@ public class SysBaseApiImpl implements ISysBaseAPI {
 	@Override
 	public List<JSONObject> queryDepartsByOrgcodes(String orgCodes) {
 		LambdaQueryWrapper<SysDepart> queryWrapper =  new LambdaQueryWrapper<>();
-		queryWrapper.in(SysDepart::getOrgCode,orgCodes.split(","));
+		queryWrapper.in(SysDepart::getOrgCode,Arrays.asList(orgCodes.split(",")));
 		return JSON.parseArray(JSON.toJSONString(sysDepartService.list(queryWrapper))).toJavaList(JSONObject.class);
 	}
 
 	@Override
 	public List<JSONObject> queryDepartsByIds(String ids) {
 		LambdaQueryWrapper<SysDepart> queryWrapper =  new LambdaQueryWrapper<>();
-		queryWrapper.in(SysDepart::getId,ids.split(","));
+		queryWrapper.in(SysDepart::getId,Arrays.asList(ids.split(",")));
 		return JSON.parseArray(JSON.toJSONString(sysDepartService.list(queryWrapper))).toJavaList(JSONObject.class);
 	}
 

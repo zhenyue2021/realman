@@ -530,7 +530,7 @@ public class SysDictController {
 		ModelAndView mv = new ModelAndView(new JeecgEntityExcelView());
 		String selections = request.getParameter("selections");
 		if(!oConvertUtils.isEmpty(selections)){
-			queryWrapper.in("id",selections.split(","));
+			queryWrapper.in("id", Arrays.asList(selections.split(",")));
 		}
 		List<SysDictPage> pageList = new ArrayList<SysDictPage>();
 
