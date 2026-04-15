@@ -278,6 +278,30 @@ jeecg:
     password:
     type: STANDALONE
     enabled: true
+  # Spring Cache TTL 配置（单位：秒）
+  # JeecgBoot 的 RedisConfigCacheManager 已自动启用 Redis 作为 Spring Cache 后端，
+  # 各缓存 key 即 CacheConstant / CommonConstant / DefIndexConst 中的常量值。
+  # 生产环境请将此配置迁移到 Nacos，以便不重启应用即可调整 TTL。
+  redis:
+    cache-ttls:
+      # 用户信息（SYS_USERS_CACHE）：30 分钟，改密/禁用后 @CacheEvict 即时清除
+      "sys:cache:encrypt:user": 1800
+      # 字典数据（SYS_DICT_CACHE）：1 小时
+      "sys:cache:dict": 3600
+      # 启用字典（SYS_ENABLE_DICT_CACHE）：1 小时
+      "sys:cache:dictEnable": 3600
+      # 字典表查询（SYS_DICT_TABLE_CACHE）：1 小时
+      "sys:cache:dictTable": 3600
+      # 数据权限规则（SYS_DATA_PERMISSIONS_CACHE）：1 小时
+      "sys:cache:permission:datarules": 3600
+      # 部门树数据（SYS_DEPARTS_CACHE）：1 小时
+      "sys:cache:depart:alldata": 3600
+      # 部门 ID 列表（SYS_DEPART_IDS_CACHE）：1 小时
+      "sys:cache:depart:allids": 3600
+      # 默认首页配置（DefIndexConst.CACHE_KEY）：24 小时，极少变更
+      "sys:cache:def_index": 86400
+      # 用户名 → userId 映射（SYS_USER_ID_MAPPING_CACHE）：1 小时
+      "sys:cache:user:id_mapping": 3600
   # 百度开放API配置
   baidu-api:
     app-id: ??
