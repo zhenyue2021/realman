@@ -1,0 +1,30 @@
+apiVersion: 1
+
+datasources:
+  # ===== Loki 日志数据源 =====
+  - name: Loki
+    uid: loki-realman          # 固定 UID，供告警规则引用
+    type: loki
+    access: proxy
+    url: http://172.16.44.66:3100
+    isDefault: true
+    jsonData:
+      maxLines: 1000
+      # derivedFields：从日志行提取 traceId，生成可点击的 Zipkin 跳转链接
+      derivedFields:
+        # 匹配 loki4j 推送的日志正文中 "traceId=xxxx" 的格式
+        # 格式示例：[traceId=abc123def456,spanId=789xyz]
+        - name: TraceID
+          matcherRegex: 'traceId=([a-zA-Z0-9\-]+)'
+          url: 'http://172.16.44.66:9411/zipkin/traces/${__value.raw}'
+          urlDisplayLabel: "Zipkin 链路详情"
+          # datasourceUid 留空时为外部 URL；若 Zipkin 也作为 Grafana 数据源则填其 UID
+          datasourceUid: ''
+
+  # ===== Zipkin 链路追踪数据源（用于 Explore 查询，非必需） =====
+  - name: Zipkin
+    type: zipkin
+    access: proxy
+    url: http://172.16.44.66:9411
+    isDefault: false
+    jsonData: {}
