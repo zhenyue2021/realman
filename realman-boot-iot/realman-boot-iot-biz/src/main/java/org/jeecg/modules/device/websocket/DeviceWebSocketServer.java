@@ -1,5 +1,6 @@
 package org.jeecg.modules.device.websocket;
 
+import jakarta.annotation.PostConstruct;
 import jakarta.websocket.*;
 import jakarta.websocket.server.PathParam;
 import jakarta.websocket.server.ServerEndpoint;
@@ -62,6 +63,9 @@ public class DeviceWebSocketServer implements MessageListener {
      * 高频状态消息节流缓存，Key = targetCode，Value = 待推送的最新消息。
      * 设备每 10ms 上报一次时，中间帧对前端无意义，只推最新一帧即可。
      * 定时任务每 100ms 将缓存中的最新消息推出并清空，避免消息积压与前端收到过时数据。
+     *
+     * <p>集群安全：flush 时调用 {@link #redisPublish} 而非 {@code send}，消息经 Redis Pub/Sub
+     * 广播到所有节点，各节点的 {@link #onMessage} 再推送本地 sessions，保证跨节点推达。
      */
     private static final Map<String, String> latestMessages = new ConcurrentHashMap<>();
     private static final ScheduledExecutorService throttleScheduler =
@@ -71,15 +75,11 @@ public class DeviceWebSocketServer implements MessageListener {
                 return t;
             });
 
-    static {
-        // 每 100ms 将各 deviceCode 的最新消息推送一次，推完移除，保证前端看到的始终是最新帧
-        throttleScheduler.scheduleAtFixedRate(() -> {
-            latestMessages.forEach((targetCode, msg) -> {
-                latestMessages.remove(targetCode);
-                send(targetCode, msg);
-            });
-        }, 100, 100, TimeUnit.MILLISECONDS);
-    }
+    /**
+     * Spring 管理的单例实例引用，供节流调度器线程调用实例方法 {@link #redisPublish}。
+     * volatile 保证多线程可见性。
+     */
+    private static volatile DeviceWebSocketServer instance;
 
     /**
      * field 注入（@ServerEndpoint 与构造器注入存在兼容性问题，统一使用 @Autowired field 注入）。
@@ -88,6 +88,25 @@ public class DeviceWebSocketServer implements MessageListener {
      */
     @Autowired
     private StringRedisTemplate redisTemplate;
+
+    /**
+     * Spring 初始化完成后启动节流调度器。
+     *
+     * <p>使用 {@link PostConstruct} 而非 static 块，确保调度器 flush 时能通过 {@link #instance}
+     * 访问已完成依赖注入的单例，调用 {@link #redisPublish} 走 Redis Pub/Sub 广播路径，
+     * 实现集群内所有节点推送到各自的本地 WebSocket sessions。
+     */
+    @PostConstruct
+    public void startThrottleScheduler() {
+        DeviceWebSocketServer.instance = this;
+        // 每 100ms 将各 targetCode 的最新消息发布到 Redis，推完移除，保证前端看到的始终是最新帧
+        throttleScheduler.scheduleAtFixedRate(() -> {
+            latestMessages.forEach((targetCode, msg) -> {
+                latestMessages.remove(targetCode);
+                instance.redisPublish(targetCode, msg);
+            });
+        }, 100, 100, TimeUnit.MILLISECONDS);
+    }
 
     // -------------------------------------------------------------------------
     // WebSocket 生命周期回调（由 WebSocket 框架在连接实例上调用，只操作 static sessions）
