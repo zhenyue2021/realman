@@ -144,7 +144,7 @@ public class SysDepartServiceImpl extends ServiceImpl<SysDepartMapper, SysDepart
         // 代码逻辑说明: 【QQYUN-13427】部门选择组件修改:需要过滤掉岗位 只保留 公司 子公司 部门---
          query.ne(SysDepart::getOrgCategory,DepartCategoryEnum.DEPART_CATEGORY_POST.getValue());
 		if(oConvertUtils.isNotEmpty(ids)){
-			query.in(true,SysDepart::getId,ids.split(","));
+			query.in(true,SysDepart::getId,Arrays.asList(ids.split(",")));
 		}
 		//------------------------------------------------------------------------------------------------
 		//是否开启系统管理模块的多租户数据隔离【SAAS多租户模式】
@@ -232,7 +232,8 @@ public class SysDepartServiceImpl extends ServiceImpl<SysDepartMapper, SysDepart
 	 * @param parentId
 	 * @return
 	 */
-	private String[] generateOrgCode(String parentId) {	
+	@Deprecated
+	private String[] generateOrgCode(String parentId) {
 				// 代码逻辑说明: 组织机构添加数据代码调整
 				LambdaQueryWrapper<SysDepart> query = new LambdaQueryWrapper<SysDepart>();
 				LambdaQueryWrapper<SysDepart> query1 = new LambdaQueryWrapper<SysDepart>();
