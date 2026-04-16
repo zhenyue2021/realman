@@ -19,9 +19,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
+ * <p>
  * 使用 MockMvc 模拟 EMQX 对 HTTP 接口的真实调用，
  * 包括 MD5(deviceCode) 密码计算以及 peerhost 按 application-dev.yml 中 MQTT Broker IP 设置。
- *
+ * </p>
  * 鉴权模型：
  *   clientid = deviceCode
  *   username = deviceCode
