@@ -1,11 +1,12 @@
 package org.jeecg.common.util;
 
+import cn.hutool.core.util.StrUtil;
+import lombok.extern.slf4j.Slf4j;
 import org.jeecg.common.constant.SymbolConstant;
 import org.springframework.util.StringUtils;
 
 import java.beans.PropertyEditorSupport;
 import java.sql.Timestamp;
-import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.Duration;
@@ -26,58 +27,31 @@ import java.util.GregorianCalendar;
  * @Date:2012-12-8 12:15:03
  * @Version 1.0
  */
+@Slf4j
 public class DateUtils extends PropertyEditorSupport {
 
-    public static ThreadLocal<SimpleDateFormat> date_sdf = new ThreadLocal<SimpleDateFormat>() {
-        @Override
-        protected SimpleDateFormat initialValue() {
-            return new SimpleDateFormat("yyyy-MM-dd");
-        }
-    };
-    public static ThreadLocal<SimpleDateFormat> yyyyMMdd = new ThreadLocal<SimpleDateFormat>() {
-        @Override
-        protected SimpleDateFormat initialValue() {
-            return new SimpleDateFormat("yyyyMMdd");
-        }
-    };
-    public static ThreadLocal<SimpleDateFormat> date_sdf_wz = new ThreadLocal<SimpleDateFormat>() {
-        @Override
-        protected SimpleDateFormat initialValue() {
-            return new SimpleDateFormat("yyyy年MM月dd日");
-        }
-    };
-    public static ThreadLocal<SimpleDateFormat> time_sdf = new ThreadLocal<SimpleDateFormat>() {
-        @Override
-        protected SimpleDateFormat initialValue() {
-            return new SimpleDateFormat("yyyy-MM-dd HH:mm");
-        }
-    };
-    public static ThreadLocal<SimpleDateFormat> yyyymmddhhmmss = new ThreadLocal<SimpleDateFormat>() {
-        @Override
-        protected SimpleDateFormat initialValue() {
-            return new SimpleDateFormat("yyyyMMddHHmmss");
-        }
-    };
-    public static ThreadLocal<SimpleDateFormat> short_time_sdf = new ThreadLocal<SimpleDateFormat>() {
-        @Override
-        protected SimpleDateFormat initialValue() {
-            return new SimpleDateFormat("HH:mm");
-        }
-    };
-    public static ThreadLocal<SimpleDateFormat> datetimeFormat = new ThreadLocal<SimpleDateFormat>() {
-        @Override
-        protected SimpleDateFormat initialValue() {
-            return new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-        }
-    };
+    public static final ThreadLocal<SimpleDateFormat> date_sdf =
+            ThreadLocal.withInitial(() -> new SimpleDateFormat("yyyy-MM-dd"));
+    public static final ThreadLocal<SimpleDateFormat> yyyyMMdd =
+            ThreadLocal.withInitial(() -> new SimpleDateFormat("yyyyMMdd"));
+    public static final ThreadLocal<SimpleDateFormat> date_sdf_wz =
+            ThreadLocal.withInitial(() -> new SimpleDateFormat("yyyy年MM月dd日"));
+    public static final ThreadLocal<SimpleDateFormat> time_sdf =
+            ThreadLocal.withInitial(() -> new SimpleDateFormat("yyyy-MM-dd HH:mm"));
+    public static final ThreadLocal<SimpleDateFormat> yyyymmddhhmmss =
+            ThreadLocal.withInitial(() -> new SimpleDateFormat("yyyyMMddHHmmss"));
+    public static final ThreadLocal<SimpleDateFormat> short_time_sdf =
+            ThreadLocal.withInitial(() -> new SimpleDateFormat("HH:mm"));
+    public static final ThreadLocal<SimpleDateFormat> datetimeFormat =
+            ThreadLocal.withInitial(() -> new SimpleDateFormat("yyyy-MM-dd HH:mm:ss"));
 
     /**
      * 以毫秒表示的时间
      */
-    private static final long DAY_IN_MILLIS = 24 * 3600 * 1000;
-    private static final long HOUR_IN_MILLIS = 3600 * 1000;
-    private static final long MINUTE_IN_MILLIS = 60 * 1000;
-    private static final long SECOND_IN_MILLIS = 1000;
+    private static final long DAY_IN_MILLIS = 24L * 3600 * 1000;
+    private static final long HOUR_IN_MILLIS = 3600L * 1000;
+    private static final long MINUTE_IN_MILLIS = 60L * 1000;
+    private static final long SECOND_IN_MILLIS = 1000L;
 
     /**
      * 指定模式的时间格式
@@ -105,7 +79,6 @@ public class DateUtils extends PropertyEditorSupport {
      */
     public static Calendar getCalendar(long millis) {
         Calendar cal = Calendar.getInstance();
-        // --------------------cal.setTimeInMillis(millis);
         cal.setTime(new Date(millis));
         return cal;
     }
@@ -131,8 +104,7 @@ public class DateUtils extends PropertyEditorSupport {
      * @return 系统当前日期（不带时分秒）
      */
     public static LocalDate getLocalDate() {
-        LocalDate today = LocalDate.now();
-        return today;
+        return LocalDate.now();
     }
 
     /**
@@ -156,7 +128,7 @@ public class DateUtils extends PropertyEditorSupport {
         if (null != time) {
             date = new Date(time.getTime());
         }
-        return date2Str(date_sdf.get());
+        return date2Str(date, date_sdf.get());
     }
 
     /**
@@ -167,6 +139,9 @@ public class DateUtils extends PropertyEditorSupport {
      */
     public static Timestamp str2Timestamp(String str) {
         Date date = str2Date(str, date_sdf.get());
+        if (date == null) {
+            return null;
+        }
         return new Timestamp(date.getTime());
     }
 
@@ -178,7 +153,7 @@ public class DateUtils extends PropertyEditorSupport {
      * @return
      */
     public static Date str2Date(String str, SimpleDateFormat sdf) {
-        if (null == str || "".equals(str)) {
+        if (StrUtil.isBlank(str)) {
             return null;
         }
         Date date = null;
@@ -186,7 +161,7 @@ public class DateUtils extends PropertyEditorSupport {
             date = sdf.parse(str);
             return date;
         } catch (ParseException e) {
-            e.printStackTrace();
+            log.warn("str2Date parse failed: {}", str, e);
         }
         return null;
     }
@@ -199,11 +174,7 @@ public class DateUtils extends PropertyEditorSupport {
      */
     public static String date2Str(SimpleDateFormat dateSdf) {
         synchronized (dateSdf) {
-            Date date = getDate();
-            if (null == date) {
-                return null;
-            }
-            return dateSdf.format(date);
+            return dateSdf.format(getDate());
         }
     }
 
@@ -215,15 +186,17 @@ public class DateUtils extends PropertyEditorSupport {
      * @return
      */
     public static String dateformat(String date, String format) {
-        SimpleDateFormat sformat = new SimpleDateFormat(format);
-        Date nowDate = null;
-        try {
-            nowDate = sformat.parse(date);
-        } catch (ParseException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
+        if (!StringUtils.hasText(date) || !StringUtils.hasText(format)) {
+            return null;
         }
-        return sformat.format(nowDate);
+        SimpleDateFormat sformat = new SimpleDateFormat(format);
+        try {
+            Date nowDate = sformat.parse(date);
+            return sformat.format(nowDate);
+        } catch (ParseException e) {
+            log.warn("dateformat parse failed: date={}, format={}", date, format, e);
+            return null;
+        }
     }
 
     /**
@@ -249,12 +222,8 @@ public class DateUtils extends PropertyEditorSupport {
      * @return 字符串
      */
     public static String getDate(String format) {
-        Date date = new Date();
-        if (null == date) {
-            return null;
-        }
         SimpleDateFormat sdf = new SimpleDateFormat(format);
-        return sdf.format(date);
+        return sdf.format(new Date());
     }
 
     /**
@@ -274,7 +243,15 @@ public class DateUtils extends PropertyEditorSupport {
      * @return 以字符形式表示的时间戳
      */
     public static Timestamp getTimestamp(String time) {
-        return new Timestamp(Long.parseLong(time));
+        if (!StringUtils.hasText(time)) {
+            return null;
+        }
+        try {
+            return new Timestamp(Long.parseLong(time.trim()));
+        } catch (NumberFormatException e) {
+            log.warn("getTimestamp invalid millis string: {}", time, e);
+            return null;
+        }
     }
 
     /**
@@ -312,16 +289,12 @@ public class DateUtils extends PropertyEditorSupport {
      * @return 指定日历的时间戳
      */
     public static Timestamp getCalendarTimestamp(Calendar cal) {
-        // ---------------------return new Timestamp(cal.getTimeInMillis());
-        return new Timestamp(cal.getTime().getTime());
+        return new Timestamp(cal.getTimeInMillis());
     }
 
     public static Timestamp gettimestamp() {
-        Date dt = new Date();
-        DateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-        String nowTime = df.format(dt);
-        java.sql.Timestamp buydate = java.sql.Timestamp.valueOf(nowTime);
-        return buydate;
+        String nowTime = datetimeFormat.get().format(new Date());
+        return Timestamp.valueOf(nowTime);
     }
 
     // ////////////////////////////////////////////////////////////////////////////
@@ -345,8 +318,7 @@ public class DateUtils extends PropertyEditorSupport {
      * @return 指定日历的毫秒数
      */
     public static long getMillis(Calendar cal) {
-        // --------------------return cal.getTimeInMillis();
-        return cal.getTime().getTime();
+        return cal.getTimeInMillis();
     }
 
     /**
@@ -668,7 +640,7 @@ public class DateUtils extends PropertyEditorSupport {
                 int length19 = 19;
                 if (text.indexOf(SymbolConstant.COLON) == -1 && text.length() == length10) {
                     setValue(DateUtils.date_sdf.get().parse(text));
-                } else if (text.indexOf(SymbolConstant.COLON) > 0 && text.length() == length19) {
+                } else if (text.indexOf(SymbolConstant.COLON) >= 0 && text.length() == length19) {
                     setValue(DateUtils.datetimeFormat.get().parse(text));
                 } else {
                     throw new IllegalArgumentException("Could not parse date, date format is error ");
@@ -694,12 +666,16 @@ public class DateUtils extends PropertyEditorSupport {
      * @param str
      * @return
      */
-    public static Date parseDatetime(String str){
-        try {
-            return datetimeFormat.get().parse(str);
-        }catch (Exception e){
+    public static Date parseDatetime(String str) {
+        if (!StringUtils.hasText(str)) {
+            return null;
         }
-        return null;
+        try {
+            return datetimeFormat.get().parse(str.trim());
+        } catch (ParseException e) {
+            log.warn("parseDatetime failed: {}", str, e);
+            return null;
+        }
     }
 
     /**
@@ -729,19 +705,16 @@ public class DateUtils extends PropertyEditorSupport {
      * @return
      */
     public static long calculateTimeDifference(Date targetDate) {
+        if (targetDate == null) {
+            return 0L;
+        }
         // 获取当前时间
         LocalDateTime currentTime = LocalDateTime.now();
 
         // 将java.util.Date转换为java.time.LocalDateTime
         LocalDateTime convertedTargetDate = targetDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime();
 
-        // 计算时间差
-        Duration duration = Duration.between(currentTime, convertedTargetDate);
-
-        // 获取时间差的毫秒数
-        long timeDifferenceInMillis = duration.toMillis();
-
-        return timeDifferenceInMillis;
+        return Duration.between(currentTime, convertedTargetDate).toMillis();
     }
 
     /**
@@ -751,13 +724,15 @@ public class DateUtils extends PropertyEditorSupport {
      * @return
      */
     public static long calculateDaysDifference(Date targetDate) {
+        if (targetDate == null) {
+            return 0L;
+        }
         // 获取当前日期
         LocalDate currentDate = LocalDate.now();
         // 将java.util.Date转换为java.time.LocalDate
         LocalDate convertedTargetDate = targetDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
         // 计算日期差
-        long daysDifference = ChronoUnit.DAYS.between(currentDate, convertedTargetDate);
-        return daysDifference;
+        return ChronoUnit.DAYS.between(currentDate, convertedTargetDate);
     }
 
     /**
