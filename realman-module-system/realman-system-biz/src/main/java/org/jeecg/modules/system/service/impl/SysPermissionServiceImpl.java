@@ -19,11 +19,11 @@ import org.jeecg.modules.system.model.TreeModel;
 import org.jeecg.modules.system.service.ISysPermissionDataRuleService;
 import org.jeecg.modules.system.service.ISysPermissionService;
 import org.jeecg.modules.system.service.ISysRoleIndexService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
 
 import jakarta.annotation.Resource;
 import java.util.*;
@@ -54,7 +54,7 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
 	@Resource
 	private SysDepartRolePermissionMapper sysDepartRolePermissionMapper;
 
-	@Autowired
+	@Resource
 	private ISysRoleIndexService roleIndexService;
 
 	@Override
@@ -91,7 +91,7 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
 		// 该节点可能是子节点但也可能是其它节点的父节点,所以需要级联删除
 		this.removeChildrenBy(sysPermission.getId());
 		//关联删除
-		Map map = new HashMap(5);
+		Map<String, Object> map = HashMap.newHashMap(5);
 		map.put("permission_id",id);
 		//删除数据规则
 		this.deletePermRuleByPermId(id);
@@ -108,24 +108,20 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
 	 * 
 	 * @return
 	 */
-	public void removeChildrenBy(String parentId) {
+	private void removeChildrenBy(String parentId) {
 		LambdaQueryWrapper<SysPermission> query = new LambdaQueryWrapper<>();
 		// 封装查询条件parentId为主键,
 		query.eq(SysPermission::getParentId, parentId);
 		// 查出该主键下的所有子级
 		List<SysPermission> permissionList = this.list(query);
-		if (permissionList != null && permissionList.size() > 0) {
-            // id
-			String id = "";
-            // 查出的子级数量
-			Long num = Long.valueOf(0);
+		if (!CollectionUtils.isEmpty(permissionList)) {
 			// 如果查出的集合不为空, 则先删除所有
 			this.remove(query);
 			// 再遍历刚才查出的集合, 根据每个对象,查找其是否仍有子级
-			for (int i = 0, len = permissionList.size(); i < len; i++) {
-				id = permissionList.get(i).getId();
-				Map map = new HashMap(5);
-				map.put("permission_id",id);
+			for (SysPermission perm : permissionList) {
+				String id = perm.getId();
+				Map<String, Object> map = HashMap.newHashMap(5);
+				map.put("permission_id", id);
 				//删除数据规则
 				this.deletePermRuleByPermId(id);
 				//删除角色授权表
@@ -134,7 +130,7 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
 				sysDepartPermissionMapper.deleteByMap(map);
 				//删除部门角色授权
 				sysDepartRolePermissionMapper.deleteByMap(map);
-				num = this.count(new LambdaQueryWrapper<SysPermission>().eq(SysPermission::getParentId, id));
+				long num = this.count(new LambdaQueryWrapper<SysPermission>().eq(SysPermission::getParentId, id));
 				// 如果有, 则递归
 				if (num > 0) {
 					this.removeChildrenBy(id);
@@ -155,10 +151,12 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
 			throw new JeecgBootException("未找到菜单信息");
 		}
 		String pid = sysPermission.getParentId();
-		Long count = this.count(new QueryWrapper<SysPermission>().lambda().eq(SysPermission::getParentId, pid));
-		if(count==1) {
-			//若父节点无其他子节点，则该父节点是叶子节点
-			this.sysPermissionMapper.setMenuLeaf(pid, 1);
+		if (oConvertUtils.isNotEmpty(pid)) {
+			Long count = this.count(new QueryWrapper<SysPermission>().lambda().eq(SysPermission::getParentId, pid));
+			if(count==1) {
+				//若父节点无其他子节点，则该父节点是叶子节点
+				this.sysPermissionMapper.setMenuLeaf(pid, 1);
+			}
 		}
 		sysPermission.setDelFlag(1);
 		this.updateById(sysPermission);
@@ -188,49 +186,45 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
 	@CacheEvict(value = CacheConstant.SYS_DATA_PERMISSIONS_CACHE,allEntries=true)
 	public void editPermission(SysPermission sysPermission) throws JeecgBootException {
 		SysPermission p = this.getById(sysPermission.getId());
-		//TODO 该节点判断是否还有子节点
-		if(p==null) {
+		if (p == null) {
 			throw new JeecgBootException("未找到菜单信息");
-		}else {
-			sysPermission.setUpdateTime(new Date());
-			//----------------------------------------------------------------------
-			//Step1.判断是否是一级菜单，是的话清空父菜单ID
-			if(CommonConstant.MENU_TYPE_0.equals(sysPermission.getMenuType())) {
-				sysPermission.setParentId("");
-			}
-			//Step2.判断菜单下级是否有菜单，无则设置为叶子节点
-			Long count = this.count(new QueryWrapper<SysPermission>().lambda().eq(SysPermission::getParentId, sysPermission.getId()));
-			if(count==0) {
-				sysPermission.setLeaf(true);
-			}
-			//----------------------------------------------------------------------
-			this.updateById(sysPermission);
-			
-			//如果当前菜单的父菜单变了，则需要修改新父菜单和老父菜单的，叶子节点状态
-			String pid = sysPermission.getParentId();
-            boolean flag = (oConvertUtils.isNotEmpty(pid) && !pid.equals(p.getParentId())) || oConvertUtils.isEmpty(pid)&&oConvertUtils.isNotEmpty(p.getParentId());
-            if (flag) {
-				//a.设置新的父菜单不为叶子节点
-				this.sysPermissionMapper.setMenuLeaf(pid, 0);
-				//b.判断老的菜单下是否还有其他子菜单，没有的话则设置为叶子节点
-				Long cc = this.count(new QueryWrapper<SysPermission>().lambda().eq(SysPermission::getParentId, p.getParentId()));
-				if(cc==0) {
-					if(oConvertUtils.isNotEmpty(p.getParentId())) {
-						this.sysPermissionMapper.setMenuLeaf(p.getParentId(), 1);
-					}
-				}
-				
-			}
-
-			// 同步更改默认菜单
-			SysRoleIndex defIndexCfg = this.roleIndexService.queryDefaultIndex();
-			boolean isDefIndex = defIndexCfg.getUrl().equals(p.getUrl());
-			if (isDefIndex) {
-				this.roleIndexService.updateDefaultIndex(sysPermission.getUrl(), sysPermission.getComponent(), sysPermission.isRoute());
-			}
-
 		}
-		
+		sysPermission.setUpdateTime(new Date());
+		// Step1.判断是否是一级菜单，是的话清空父菜单ID
+		if (CommonConstant.MENU_TYPE_0.equals(sysPermission.getMenuType())) {
+			sysPermission.setParentId("");
+		}
+		// Step2.判断菜单下级是否有菜单，无则设置为叶子节点
+		Long count = this.count(new QueryWrapper<SysPermission>().lambda().eq(SysPermission::getParentId, sysPermission.getId()));
+		if (count == 0) {
+			sysPermission.setLeaf(true);
+		}
+		this.updateById(sysPermission);
+		applyParentLeafFlagsWhenParentChanged(sysPermission, p);
+		syncDefaultHomeIfUrlMatches(sysPermission, p);
+	}
+
+	/** 父级变更时同步新旧父菜单的叶子状态 */
+	private void applyParentLeafFlagsWhenParentChanged(SysPermission sysPermission, SysPermission before) {
+		String pid = sysPermission.getParentId();
+		boolean parentChanged = (oConvertUtils.isNotEmpty(pid) && !pid.equals(before.getParentId()))
+				|| (oConvertUtils.isEmpty(pid) && oConvertUtils.isNotEmpty(before.getParentId()));
+		if (!parentChanged) {
+			return;
+		}
+		this.sysPermissionMapper.setMenuLeaf(pid, 0);
+		long cc = this.count(new QueryWrapper<SysPermission>().lambda().eq(SysPermission::getParentId, before.getParentId()));
+		if (cc == 0 && oConvertUtils.isNotEmpty(before.getParentId())) {
+			this.sysPermissionMapper.setMenuLeaf(before.getParentId(), 1);
+		}
+	}
+
+	/** 若编辑的是默认首页菜单，同步首页配置 */
+	private void syncDefaultHomeIfUrlMatches(SysPermission sysPermission, SysPermission before) {
+		SysRoleIndex defIndexCfg = this.roleIndexService.queryDefaultIndex();
+		if (defIndexCfg != null && Objects.equals(defIndexCfg.getUrl(), before.getUrl())) {
+			this.roleIndexService.updateDefaultIndex(sysPermission.getUrl(), sysPermission.getComponent(), sysPermission.isRoute());
+		}
 	}
 
 	@Override
@@ -278,24 +272,14 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
 
 	@Override
 	public boolean hasPermission(String username, SysPermission sysPermission) {
-		int count = baseMapper.queryCountByUsername(username,sysPermission);
-		if(count>0){
-			return true;
-		}else{
-			return false;
-		}
+		return baseMapper.queryCountByUsername(username, sysPermission) > 0;
 	}
 
 	@Override
 	public boolean hasPermission(String username, String url) {
 		SysPermission sysPermission = new SysPermission();
 		sysPermission.setUrl(url);
-		int count = baseMapper.queryCountByUsername(username,sysPermission);
-		if(count>0){
-			return true;
-		}else{
-			return false;
-		}
+		return baseMapper.queryCountByUsername(username, sysPermission) > 0;
 	}
 
 	@Override
@@ -305,7 +289,7 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
 
 	@Override
 	public boolean checkPermDuplication(String id, String url,Boolean alwaysShow) {
-		QueryWrapper<SysPermission> qw=new QueryWrapper();
+		QueryWrapper<SysPermission> qw = new QueryWrapper<>();
 		qw.lambda().eq(true,SysPermission::getUrl,url).ne(oConvertUtils.isNotEmpty(id),SysPermission::getId,id).eq(true,SysPermission::isAlwaysShow,alwaysShow);
 		return count(qw)==0;
 	}

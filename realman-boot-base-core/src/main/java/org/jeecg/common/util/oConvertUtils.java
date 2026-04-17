@@ -17,13 +17,16 @@ import org.springframework.beans.BeanWrapperImpl;
 import java.beans.PropertyDescriptor;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
-import java.math.BigInteger;
-import java.net.*;
-import java.sql.Date;
+import java.math.RoundingMode;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.SocketException;
+import java.net.URLDecoder;
+import java.net.UnknownHostException;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -38,23 +41,20 @@ import java.util.stream.Stream;
 public class oConvertUtils {
 	public static boolean isEmpty(Object object) {
 		if (object == null) {
-			return (true);
+			return true;
 		}
 		if ("".equals(object)) {
-			return (true);
+			return true;
 		}
 		if (CommonConstant.STRING_NULL.equals(object)) {
-			return (true);
+			return true;
 		}
-		return (false);
+		return false;
 	}
 	
 	public static boolean isNotEmpty(Object object) {
-		if (object != null && !"".equals(object) && !object.equals(CommonConstant.STRING_NULL)) {
-			return (true);
-		}
-		return (false);
-	}
+        return object != null && !"".equals(object) && !object.equals(CommonConstant.STRING_NULL);
+    }
 
 	
 	/**
@@ -69,10 +69,10 @@ public class oConvertUtils {
 		}
 
 		try {
-			inStr = URLDecoder.decode(inStr, "UTF-8");
+			inStr = URLDecoder.decode(inStr, StandardCharsets.UTF_8);
 		} catch (Exception e) {
 			// 解决：URLDecoder: Illegal hex characters in escape (%) pattern - For input string: "自动"
-			//e.printStackTrace();
+			log.debug("URL解码失败，返回原始字符串: {}", inStr, e);
 		}
 		return inStr;
 	}
@@ -84,65 +84,61 @@ public class oConvertUtils {
 
 	@SuppressWarnings("AlibabaLowerCamelCaseVariableNaming")
     public static String StrToUTF(String strIn, String sourceCode, String targetCode) {
-		strIn = "";
-		try {
-			strIn = new String(strIn.getBytes("ISO-8859-1"), "GBK");
-		} catch (UnsupportedEncodingException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+		if (strIn == null) {
+			return null;
 		}
-		return strIn;
-
+		String src = StringUtils.isNotEmpty(sourceCode) ? sourceCode : StandardCharsets.ISO_8859_1.name();
+		String tgt = StringUtils.isNotEmpty(targetCode) ? targetCode : "GBK";
+		String out = code2code(strIn, src, tgt);
+		return out != null ? out : strIn;
 	}
 
 	private static String code2code(String strIn, String sourceCode, String targetCode) {
 		String strOut = null;
-		if (strIn == null || "".equals(strIn.trim())) {
+		if (strIn == null || strIn.trim().isEmpty()) {
 			return strIn;
 		}
 		try {
 			byte[] b = strIn.getBytes(sourceCode);
-			for (int i = 0; i < b.length; i++) {
-				System.out.print(b[i] + "  ");
-			}
 			strOut = new String(b, targetCode);
 		} catch (Exception e) {
-			e.printStackTrace();
+			log.error("字符串编码转换失败: sourceCode={}, targetCode={}", sourceCode, targetCode, e);
 			return null;
 		}
 		return strOut;
 	}
 
 	public static int getInt(String s, int defval) {
-		if (s == null || "".equals(s)) {
-			return (defval);
+		if (s == null || s.isEmpty()) {
+			return defval;
 		}
 		try {
-			return (Integer.parseInt(s));
+			return Integer.parseInt(s);
 		} catch (NumberFormatException e) {
-			return (defval);
+			return defval;
 		}
 	}
 
 	public static int getInt(String s) {
-		if (s == null || "".equals(s)) {
+		if (s == null || s.isEmpty()) {
 			return 0;
 		}
 		try {
-			return (Integer.parseInt(s));
+			return Integer.parseInt(s);
 		} catch (NumberFormatException e) {
 			return 0;
 		}
 	}
 
 	public static int getInt(String s, Integer df) {
-		if (s == null || "".equals(s)) {
-			return df;
+		int defaultVal = df != null ? df : 0;
+		if (s == null || s.isEmpty()) {
+			return defaultVal;
 		}
 		try {
-			return (Integer.parseInt(s));
+			return Integer.parseInt(s);
 		} catch (NumberFormatException e) {
-			return 0;
+			return defaultVal;
 		}
 	}
 
@@ -152,26 +148,33 @@ public class oConvertUtils {
 		}
 		Integer[] integer = new Integer[s.length];
 		for (int i = 0; i < s.length; i++) {
-			integer[i] = Integer.parseInt(s[i]);
+			if (s[i] == null) {
+				return null;
+			}
+			try {
+				integer[i] = Integer.parseInt(s[i].trim());
+			} catch (NumberFormatException e) {
+				return null;
+			}
 		}
 		return integer;
 
 	}
 
 	public static double getDouble(String s, double defval) {
-		if (s == null || "".equals(s)) {
-			return (defval);
+		if (s == null || s.isEmpty()) {
+			return defval;
 		}
 		try {
-			return (Double.parseDouble(s));
+			return Double.parseDouble(s);
 		} catch (NumberFormatException e) {
-			return (defval);
+			return defval;
 		}
 	}
 
 	public static double getDou(Double s, double defval) {
 		if (s == null) {
-			return (defval);
+			return defval;
 		}
 		return s;
 	}
@@ -186,23 +189,23 @@ public class oConvertUtils {
 
 	public static int getInt(Object object, int defval) {
 		if (isEmpty(object)) {
-			return (defval);
+			return defval;
 		}
 		try {
-			return (Integer.parseInt(object.toString()));
+			return Integer.parseInt(object.toString());
 		} catch (NumberFormatException e) {
-			return (defval);
+			return defval;
 		}
 	}
 	
 	public static Integer getInteger(Object object, Integer defval) {
 		if (isEmpty(object)) {
-			return (defval);
+			return defval;
 		}
 		try {
-			return (Integer.parseInt(object.toString()));
+			return Integer.parseInt(object.toString());
 		} catch (NumberFormatException e) {
-			return (defval);
+			return defval;
 		}
 	}
 	
@@ -211,7 +214,7 @@ public class oConvertUtils {
 			return null;
 		}
 		try {
-			return (Integer.parseInt(object.toString()));
+			return Integer.parseInt(object.toString());
 		} catch (NumberFormatException e) {
 			return null;
 		}
@@ -219,12 +222,15 @@ public class oConvertUtils {
 
 	public static int getInt(BigDecimal s, int defval) {
 		if (s == null) {
-			return (defval);
+			return defval;
 		}
 		return s.intValue();
 	}
 
 	public static Integer[] getIntegerArry(String[] object) {
+		if (object == null) {
+			return null;
+		}
 		int len = object.length;
 		Integer[] result = new Integer[len];
 		try {
@@ -238,32 +244,28 @@ public class oConvertUtils {
 	}
 
 	public static String getString(String s) {
-		return (getString(s, ""));
+		return getString(s, "");
 	}
 
-	/**
-	 * 转义成Unicode编码
-	 * @param s
-	 * @return
-	 */
-	/*public static String escapeJava(Object s) {
-		return StringEscapeUtils.escapeJava(getString(s));
-	}*/
-	
 	public static String getString(Object object) {
 		if (isEmpty(object)) {
 			return "";
 		}
-		return (object.toString().trim());
+		return object.toString().trim();
 	}
 
 	public static String getString(int i) {
-		return (String.valueOf(i));
+		return String.valueOf(i);
 	}
 
 	public static String getString(float i) {
-		return (String.valueOf(i));
+		return String.valueOf(i);
 	}
+
+
+	private static final Pattern NORMAL_STRING_PATTERN = Pattern.compile("[^0-9a-zA-Z\\u4e00-\\u9fa5]");
+
+	private static final java.security.SecureRandom SECURE_RANDOM = new java.security.SecureRandom();
 
 	/**
 	 * 返回常规字符串（只保留字符串中的数字、字母、中文）
@@ -275,29 +277,30 @@ public class oConvertUtils {
 		if (oConvertUtils.isEmpty(input)) {
 			return null;
 		}
-		String result = input.replaceAll("[^0-9a-zA-Z\\u4e00-\\u9fa5]", "");
-		return result;
+		Matcher matcher = NORMAL_STRING_PATTERN.matcher(input);
+		return matcher.replaceAll("");
 	}
 
 	public static String getString(String s, String defval) {
 		if (isEmpty(s)) {
-			return (defval);
+			return defval;
 		}
-		return (s.trim());
+		return s.trim();
 	}
 
 	public static String getString(Object s, String defval) {
 		if (isEmpty(s)) {
-			return (defval);
+			return defval;
 		}
-		return (s.toString().trim());
+		return s.toString().trim();
 	}
 
 	public static long stringToLong(String str) {
 		long test = 0L;
 		try {
-			test = Long.valueOf(str);
+			test = Long.parseLong(str);
 		} catch (Exception e) {
+			log.warn("字符串转换为Long类型失败: {}", str, e);
 		}
 		return test;
 	}
@@ -312,20 +315,9 @@ public class oConvertUtils {
 			ip = address.getHostAddress();
 
 		} catch (UnknownHostException e) {
-			e.printStackTrace();
+			log.error("获取本机IP失败", e);
 		}
 		return ip;
-	}
-
-	/**
-	 * 判断一个类是否为基本数据类型。
-	 * 
-	 * @param clazz
-	 *            要判断的类。
-	 * @return true 表示为基本数据类型。
-	 */
-	private static boolean isBaseDataType(Class clazz) throws Exception {
-		return (clazz.equals(String.class) || clazz.equals(Integer.class) || clazz.equals(Byte.class) || clazz.equals(Long.class) || clazz.equals(Double.class) || clazz.equals(Float.class) || clazz.equals(Character.class) || clazz.equals(Short.class) || clazz.equals(BigDecimal.class) || clazz.equals(BigInteger.class) || clazz.equals(Boolean.class) || clazz.equals(Date.class) || clazz.isPrimitive());
 	}
 
 	/**
@@ -335,12 +327,14 @@ public class oConvertUtils {
 	 * @return 被加密后的字符串
 	 */
 	public static String decodeBase64Str(String base64Str) {
-		byte[] byteContent = Base64.decodeBase64(base64Str);
-		if (byteContent == null) {
+		if (base64Str == null) {
 			return null;
 		}
-		String decodedString = new String(byteContent);
-		return decodedString;
+		byte[] byteContent = Base64.decodeBase64(base64Str);
+		if (byteContent == null || byteContent.length == 0) {
+			return null;
+		}
+		return new String(byteContent, StandardCharsets.UTF_8);
 	}
 	
 	
@@ -351,13 +345,13 @@ public class oConvertUtils {
 	 */
 	public static String getIpAddrByRequest(HttpServletRequest request) {
 		String ip = request.getHeader("x-forwarded-for");
-		if (ip == null || ip.length() == 0 || CommonConstant.UNKNOWN.equalsIgnoreCase(ip)) {
+		if (ip == null || ip.isEmpty() || CommonConstant.UNKNOWN.equalsIgnoreCase(ip)) {
 			ip = request.getHeader("Proxy-Client-IP");
 		}
-		if (ip == null || ip.length() == 0 || CommonConstant.UNKNOWN.equalsIgnoreCase(ip)) {
+		if (ip == null || ip.isEmpty() || CommonConstant.UNKNOWN.equalsIgnoreCase(ip)) {
 			ip = request.getHeader("WL-Proxy-Client-IP");
 		}
-		if (ip == null || ip.length() == 0 || CommonConstant.UNKNOWN.equalsIgnoreCase(ip)) {
+		if (ip == null || ip.isEmpty() || CommonConstant.UNKNOWN.equalsIgnoreCase(ip)) {
 			ip = request.getRemoteAddr();
 		}
 		return ip;
@@ -383,11 +377,11 @@ public class oConvertUtils {
 			while (address.hasMoreElements()) {
 				ip = address.nextElement();
                 // 外网IP
-				if (!ip.isSiteLocalAddress() && !ip.isLoopbackAddress() && ip.getHostAddress().indexOf(":") == -1) {
+				if (!ip.isSiteLocalAddress() && !ip.isLoopbackAddress() && !ip.getHostAddress().contains(":")) {
 					netip = ip.getHostAddress();
 					finded = true;
 					break;
-				} else if (ip.isSiteLocalAddress() && !ip.isLoopbackAddress() && ip.getHostAddress().indexOf(":") == -1) {
+				} else if (ip.isSiteLocalAddress() && !ip.isLoopbackAddress() && !ip.getHostAddress().contains(":")) {
                     // 内网IP
 				    localip = ip.getHostAddress();
 				}
@@ -407,12 +401,12 @@ public class oConvertUtils {
 	 * @param str
 	 * @return
 	 */
+	private static final Pattern BLANK_PATTERN = Pattern.compile("\\s*|\t|\r|\n");
+	
 	public static String replaceBlank(String str) {
 		String dest = "";
 		if (str != null) {
-		    String reg = "\\s*|\t|\r|\n";
-			Pattern p = Pattern.compile(reg);
-			Matcher m = p.matcher(str);
+			Matcher m = BLANK_PATTERN.matcher(str);
 			dest = m.replaceAll("");
 		}
 		return dest;
@@ -430,9 +424,8 @@ public class oConvertUtils {
 		if (all == null || all.length == 0) {
 			return false;
 		}
-		for (int i = 0; i < all.length; i++) {
-			String aSource = all[i];
-			if (aSource.equals(child)) {
+		for (String aSource : all) {
+			if (Objects.equals(child, aSource)) {
 				return true;
 			}
 		}
@@ -469,9 +462,12 @@ public class oConvertUtils {
 		if (all == null || all.length == 0) {
 			return false;
 		}
+		if (childArray == null || childArray.isEmpty()) {
+			return false;
+		}
 
-		List<String> childs = childArray.toJavaList(String.class);
-		for (String v : childs) {
+		List<String> children = childArray.toJavaList(String.class);
+		for (String v : children) {
 			if (!isIn(v, all)) {
 				return false;
 			}
@@ -509,42 +505,16 @@ public class oConvertUtils {
 	 * @param str
 	 * @return
 	 */
-	public static Map<Object, Object> setToMap(Set<Object> setobj) {
+	@SuppressWarnings("unchecked")
+	public static Map<Object, Object> setToMap(Set<?> setobj) {
 		Map<Object, Object> map = getHashMap();
-		for (Iterator iterator = setobj.iterator(); iterator.hasNext();) {
-			Map.Entry<Object, Object> entry = (Map.Entry<Object, Object>) iterator.next();
-			map.put(entry.getKey().toString(), entry.getValue() == null ? "" : entry.getValue().toString().trim());
+		for (Object obj : setobj) {
+			if (obj instanceof Map.Entry) {
+				Map.Entry<Object, Object> entry = (Map.Entry<Object, Object>) obj;
+				map.put(entry.getKey().toString(), entry.getValue() == null ? "" : entry.getValue().toString().trim());
+			}
 		}
 		return map;
-
-	}
-
-	public static boolean isInnerIp(String ipAddress) {
-		boolean isInnerIp = false;
-		long ipNum = getIpNum(ipAddress);
-		/**
-		 * 私有IP：A类 10.0.0.0-10.255.255.255 B类 172.16.0.0-172.31.255.255 C类 192.168.0.0-192.168.255.255 当然，还有127这个网段是环回地址
-		 **/
-		long aBegin = getIpNum("10.0.0.0");
-		long aEnd = getIpNum("10.255.255.255");
-		long bBegin = getIpNum("172.16.0.0");
-		long bEnd = getIpNum("172.31.255.255");
-		long cBegin = getIpNum("192.168.0.0");
-		long cEnd = getIpNum("192.168.255.255");
-		String localIp = "127.0.0.1";
-		isInnerIp = isInner(ipNum, aBegin, aEnd) || isInner(ipNum, bBegin, bEnd) || isInner(ipNum, cBegin, cEnd) || localIp.equals(ipAddress);
-		return isInnerIp;
-	}
-
-	private static long getIpNum(String ipAddress) {
-		String[] ip = ipAddress.split("\\.");
-		long a = Integer.parseInt(ip[0]);
-		long b = Integer.parseInt(ip[1]);
-		long c = Integer.parseInt(ip[2]);
-		long d = Integer.parseInt(ip[3]);
-
-		long ipNum = a * 256 * 256 * 256 + b * 256 * 256 + c * 256 + d;
-		return ipNum;
 	}
 
 	private static boolean isInner(long userIp, long begin, long end) {
@@ -579,12 +549,12 @@ public class oConvertUtils {
 				continue;
 			}
 			// 处理真正的驼峰片段
-			if (result.length() == 0) {
+			if (result.isEmpty()) {
 				// 第一个驼峰片段，全部字母都小写
 				result.append(camel.toLowerCase());
 			} else {
 				// 其他的驼峰片段，首字母大写
-				result.append(camel.substring(0, 1).toUpperCase());
+				result.append(Character.toUpperCase(camel.charAt(0)));
 				result.append(camel.substring(1).toLowerCase());
 			}
 		}
@@ -601,14 +571,14 @@ public class oConvertUtils {
 	 * @return 转换后的驼峰式命名的字符串
 	 */
 	public static String camelNames(String names) {
-		if(names==null||"".equals(names)){
+		if(names==null|| names.isEmpty()){
 			return null;
 		}
-		StringBuffer sf = new StringBuffer();
+		StringBuilder sf = new StringBuilder();
 		String[] fs = names.split(",");
 		for (String field : fs) {
 			field = camelName(field);
-			sf.append(field + ",");
+			sf.append(field).append(",");
 		}
 		String result = sf.toString();
 		return result.substring(0, result.length() - 1);
@@ -631,7 +601,7 @@ public class oConvertUtils {
 			return "";
 		} else if (!name.contains(SymbolConstant.UNDERLINE)) {
 			// 不含下划线，仅将首字母小写
-			return name.substring(0, 1).toUpperCase() + name.substring(1).toLowerCase();
+			return Character.toUpperCase(name.charAt(0)) + name.substring(1).toLowerCase();
 		}
 		// 用下划线将原始字符串分割
 		String[] camels = name.split("_");
@@ -641,7 +611,7 @@ public class oConvertUtils {
 				continue;
 			}
 			// 其他的驼峰片段，首字母大写
-			result.append(camel.substring(0, 1).toUpperCase());
+			result.append(Character.toUpperCase(camel.charAt(0)));
 			result.append(camel.substring(1).toLowerCase());
 		}
 		return result.toString();
@@ -653,6 +623,9 @@ public class oConvertUtils {
 	 * @return
 	 */
 	public static String camelToUnderline(String para){
+		if (para == null || para.isEmpty()) {
+			return para;
+		}
 	    int length = 3;
         if(para.length()<length){
         	return para.toLowerCase(); 
@@ -675,11 +648,13 @@ public class oConvertUtils {
 	 * @param place 定义随机数的位数
 	 */
 	public static String randomGen(int place) {
+		if (place <= 0) {
+			return "";
+		}
 		String base = "qwertyuioplkjhgfdsazxcvbnmQAZWSXEDCRFVTGBYHNUJMIKLOP0123456789";
-		StringBuffer sb = new StringBuffer();
-		Random rd = new Random();
-		for(int i=0;i<place;i++) {
-			sb.append(base.charAt(rd.nextInt(base.length())));
+		StringBuilder sb = new StringBuilder(place);
+		for (int i = 0; i < place; i++) {
+			sb.append(base.charAt(SECURE_RANDOM.nextInt(base.length())));
 		}
 		return sb.toString();
 	}
@@ -694,7 +669,7 @@ public class oConvertUtils {
 		Class<?> clazz = object.getClass();
 		List<Field> fieldList = new ArrayList<>();
 		while (clazz != null) {
-			fieldList.addAll(new ArrayList<>(Arrays.asList(clazz.getDeclaredFields())));
+			fieldList.addAll(Arrays.asList(clazz.getDeclaredFields()));
 			clazz = clazz.getSuperclass();
 		}
 		Field[] fields = new Field[fieldList.size()];
@@ -749,11 +724,12 @@ public class oConvertUtils {
 		}
 
 		try {
-			model = modelClass.newInstance();
-		} catch (InstantiationException e) {
+			model = modelClass.getDeclaredConstructor().newInstance();
+		} catch (ReflectiveOperationException e) {
 			log.error("entityToModel : 实例化异常", e);
-		} catch (IllegalAccessException e) {
-			log.error("entityToModel : 安全权限异常", e);
+		}
+		if (model == null) {
+			return null;
 		}
 		BeanUtils.copyProperties(entity, model);
 		return (T)model;
@@ -767,8 +743,8 @@ public class oConvertUtils {
 	 * list == null		: true
 	 * list.size() == 0	: true
 	 */
-	public static boolean listIsEmpty(Collection list) {
-		return (list == null || list.size() == 0);
+	public static boolean listIsEmpty(Collection<?> list) {
+		return list == null || list.isEmpty();
 	}
 
 	/**
@@ -779,31 +755,29 @@ public class oConvertUtils {
 	 * @return
 	 */
 	public static boolean isEqual(Object oldVal, Object newVal) {
-		if (oldVal != null && newVal != null) {
-			if (isArray(oldVal)) {
-				return equalityOfArrays((Object[]) oldVal, (Object[]) newVal);
-			}else if(oldVal instanceof JSONArray){
-				if(newVal instanceof JSONArray){
-					return equalityOfJSONArray((JSONArray) oldVal, (JSONArray) newVal);
-				}else{
-					if (isEmpty(newVal) && (oldVal == null || ((JSONArray) oldVal).size() == 0)) {
-						return true;
-					}
-					String[] strArray = newVal.toString().split(",");
-					List<String> arrayStr = Arrays.asList(strArray);
-					JSONArray newValArray = new JSONArray(arrayStr);
-					return equalityOfJSONArray((JSONArray) oldVal, newValArray);
-				}
+		if (oldVal == null && newVal == null) {
+			return true;
+		}
+		if (oldVal == null || newVal == null) {
+			return false;
+		}
+		// 两个都不为null
+		if (isArray(oldVal)) {
+			return equalityOfArrays((Object[]) oldVal, (Object[]) newVal);
+		} else if(oldVal instanceof JSONArray){
+			if(newVal instanceof JSONArray){
+				return equalityOfJSONArray((JSONArray) oldVal, (JSONArray) newVal);
 			}else{
-				return oldVal.equals(newVal);
+				if (isEmpty(newVal) && ((JSONArray) oldVal).size() == 0) {
+					return true;
+				}
+				String[] strArray = newVal.toString().split(",");
+				List<String> arrayStr = Arrays.asList(strArray);
+				JSONArray newValArray = new JSONArray(arrayStr);
+				return equalityOfJSONArray((JSONArray) oldVal, newValArray);
 			}
-			
 		} else {
-			if (oldVal == null && newVal == null) {
-				return true;
-			} else {
-				return false;
-			}
+			return oldVal.equals(newVal);
 		}
 	}
 
@@ -861,10 +835,16 @@ public class oConvertUtils {
 	 * @return
 	 */
 	public static boolean equalityOfStringArrays(String oldVal, String newVal) {
-		if(oldVal.equals(newVal)){
+		if (oldVal == null && newVal == null) {
 			return true;
 		}
-		if(oldVal.indexOf(",")>=0 && newVal.indexOf(",")>=0){
+		if (oldVal == null || newVal == null) {
+			return false;
+		}
+		if (oldVal.equals(newVal)) {
+			return true;
+		}
+		if(oldVal.contains(",") && newVal.contains(",")){
 			String[] arr1 = oldVal.split(",");
 			String[] arr2 = newVal.split(",");
 			if(arr1.length == arr2.length){
@@ -894,9 +874,13 @@ public class oConvertUtils {
 	 */
 	public static boolean equalityOfArrays(Object[] oldVal, Object newVal[]) {
 		if (oldVal != null && newVal != null) {
-			Arrays.sort(oldVal);
-			Arrays.sort(newVal);
-			return Arrays.equals(oldVal, newVal);
+			if (oldVal.length != newVal.length) {
+				return false;
+			}
+			// 使用Set比较，避免修改原数组且提高性能
+			Set<Object> oldSet = new HashSet<>(Arrays.asList(oldVal));
+			Set<Object> newSet = new HashSet<>(Arrays.asList(newVal));
+			return oldSet.equals(newSet);
 		} else {
 			if ((oldVal == null || oldVal.length == 0) && (newVal == null || newVal.length == 0)) {
 				return true;
@@ -906,14 +890,7 @@ public class oConvertUtils {
 		}
 	}
 
-//	public static void main(String[] args) {
-////		String[] a = new String[]{"1", "2"};
-////		String[] b = new String[]{"2", "1"};
-//		Integer a = null;
-//		Integer b = 1;
-//		System.out.println(oConvertUtils.isEqual(a, b));
-//	}
-	
+
 	/**
 	 * 判断 list 是否不为空
 	 *
@@ -922,7 +899,7 @@ public class oConvertUtils {
 	 * list == null		: false
 	 * list.size() == 0	: false
 	 */
-	public static boolean listIsNotEmpty(Collection list) {
+	public static boolean listIsNotEmpty(Collection<?> list) {
 		return !listIsEmpty(list);
 	}
 
@@ -932,15 +909,20 @@ public class oConvertUtils {
 	 * @return
 	 */
 	public static String readStatic(String url) {
-		String json = "";
-		try {
-			//换个写法，解决springboot读取jar包中文件的问题
-			InputStream stream = oConvertUtils.class.getClassLoader().getResourceAsStream(url.replace("classpath:", ""));
-			json = IOUtils.toString(stream,"UTF-8");
-		} catch (IOException e) {
-			log.error(e.getMessage(),e);
+		if (url == null) {
+			return "";
 		}
-		return json;
+		String path = url.replace("classpath:", "");
+		try (InputStream stream = oConvertUtils.class.getClassLoader().getResourceAsStream(path)) {
+			if (stream == null) {
+				log.warn("Classpath resource not found: {}", path);
+				return "";
+			}
+			return IOUtils.toString(stream, StandardCharsets.UTF_8);
+		} catch (IOException e) {
+			log.error("readStatic failed: {}", path, e);
+			return "";
+		}
 	}
 
 	/**
@@ -952,9 +934,7 @@ public class oConvertUtils {
 			return null;
 		}
 		JSONArray array = new JSONArray();
-		for(String str: list){
-			array.add(str);
-		}
+        array.addAll(list);
 		return array;
 	}
 
@@ -964,22 +944,19 @@ public class oConvertUtils {
 	 * @return
 	 */
 	public static boolean isEqList(List<String> list1, List<String> list2){
-		if(list1.size() != list2.size()){
+		if (list1 == null && list2 == null) {
+			return true;
+		}
+		if (list1 == null || list2 == null) {
 			return false;
 		}
-		for(String str1: list1){
-			boolean flag = false;
-			for(String str2: list2){
-				if(str1.equals(str2)){
-					flag = true;
-					break;
-				}
-			}
-			if(!flag){
-				return false;
-			}
+		if (list1.size() != list2.size()) {
+			return false;
 		}
-		return true;
+		// 使用Set提高比较效率，从O(n²)优化到O(n)
+		Set<String> set1 = new HashSet<>(list1);
+		Set<String> set2 = new HashSet<>(list2);
+		return set1.equals(set2);
 	}
 
 
@@ -992,15 +969,13 @@ public class oConvertUtils {
 	 * @return 如果sourceList中有任何元素在targetList中存在则返回true，否则返回false
 	 */
 	public static boolean isInList(List<String> sourceList, List<String> targetList){
+		if (sourceList == null || sourceList.isEmpty() || targetList == null || targetList.isEmpty()) {
+			return false;
+		}
+		// 使用HashSet提高查找效率，从O(n*m)优化到O(n+m)
+		Set<String> targetSet = new HashSet<>(targetList);
 		for(String sourceItem: sourceList){
-			boolean flag = false;
-			for(String targetItem: targetList){
-				if(sourceItem.equals(targetItem)){
-					flag = true;
-					break;
-				}
-			}
-			if(flag){
+			if (sourceItem != null && targetSet.contains(sourceItem)) {
 				return true;
 			}
 		}
@@ -1021,15 +996,10 @@ public class oConvertUtils {
 			return false; // 目标列表为空，源列表非空时返回false
 		}
 
+		// 使用HashSet提高查找效率，从O(n*m)优化到O(n+m)
+		Set<String> targetSet = new HashSet<>(targetList);
 		for(String sourceItem: sourceList){
-			boolean found = false;
-			for(String targetItem: targetList){
-				if(sourceItem.equals(targetItem)){
-					found = true;
-					break;
-				}
-			}
-			if(!found){
+			if (sourceItem == null || !targetSet.contains(sourceItem)) {
 				return false; // 有任何一个元素不在目标列表中，返回false
 			}
 		}
@@ -1041,16 +1011,67 @@ public class oConvertUtils {
 	 * @param uploadCount
 	 * @return
 	 */
-	public static Double calculateFileSizeToMb(Long uploadCount){
-		double count = 0.0;
-		if(uploadCount>0) {
-			BigDecimal bigDecimal = new BigDecimal(uploadCount);
-			//换算成MB
-			BigDecimal divide = bigDecimal.divide(new BigDecimal(1048576));
-			count = divide.setScale(2, BigDecimal.ROUND_HALF_UP).doubleValue();
-			return count;
+	private static final BigDecimal BYTES_PER_MB = new BigDecimal(1048576);
+	private static final long PRIVATE_IP_A_BEGIN = getIpNumStatic("10.0.0.0");
+	private static final long PRIVATE_IP_A_END = getIpNumStatic("10.255.255.255");
+	private static final long PRIVATE_IP_B_BEGIN = getIpNumStatic("172.16.0.0");
+	private static final long PRIVATE_IP_B_END = getIpNumStatic("172.31.255.255");
+	private static final long PRIVATE_IP_C_BEGIN = getIpNumStatic("192.168.0.0");
+	private static final long PRIVATE_IP_C_END = getIpNumStatic("192.168.255.255");
+	private static final String LOCAL_IP = "127.0.0.1";
+	
+	private static long getIpNumStatic(String ipAddress) {
+		String[] ip = ipAddress.split("\\.");
+		long a = Integer.parseInt(ip[0]);
+		long b = Integer.parseInt(ip[1]);
+		long c = Integer.parseInt(ip[2]);
+		long d = Integer.parseInt(ip[3]);
+		return a * 256 * 256 * 256 + b * 256 * 256 + c * 256 + d;
+	}
+	
+	public static boolean isInnerIp(String ipAddress) {
+		if (ipAddress == null || ipAddress.trim().isEmpty()) {
+			return false;
 		}
-		return count;
+		long ipNum = getIpNum(ipAddress);
+		return isInner(ipNum, PRIVATE_IP_A_BEGIN, PRIVATE_IP_A_END) 
+			|| isInner(ipNum, PRIVATE_IP_B_BEGIN, PRIVATE_IP_B_END) 
+			|| isInner(ipNum, PRIVATE_IP_C_BEGIN, PRIVATE_IP_C_END) 
+			|| LOCAL_IP.equals(ipAddress);
+	}
+
+	private static long getIpNum(String ipAddress) {
+		if (ipAddress == null) {
+			throw new IllegalArgumentException("IP地址不能为空");
+		}
+		String[] ip = ipAddress.split("\\.");
+		if (ip.length != 4) {
+			throw new IllegalArgumentException("IP地址格式错误: " + ipAddress);
+		}
+		try {
+			long a = Integer.parseInt(ip[0]);
+			long b = Integer.parseInt(ip[1]);
+			long c = Integer.parseInt(ip[2]);
+			long d = Integer.parseInt(ip[3]);
+			return a * 256 * 256 * 256 + b * 256 * 256 + c * 256 + d;
+		} catch (NumberFormatException e) {
+			throw new IllegalArgumentException("IP地址格式错误: " + ipAddress, e);
+		}
+	}
+	
+	/**
+	 * 计算文件大小转成MB
+	 * @param uploadCount
+	 * @return
+	 */
+	public static Double calculateFileSizeToMb(Long uploadCount){
+		if(uploadCount == null || uploadCount <= 0) {
+			return 0.0;
+		}
+		BigDecimal bigDecimal = new BigDecimal(uploadCount);
+		//换算成MB
+		BigDecimal divide = bigDecimal.divide(BYTES_PER_MB, 10, RoundingMode.HALF_UP);
+		return divide.setScale(2, RoundingMode.HALF_UP).doubleValue();
 	}
 
 	/**
@@ -1060,24 +1081,24 @@ public class oConvertUtils {
 	 * @return
 	 */
 	public static String mapToString(Map<String, String[]> map) {
-		if (map == null || map.size() == 0) {
+		if (map == null || map.isEmpty()) {
 			return null;
 		}
 
 		StringBuilder sb = new StringBuilder();
+		boolean first = true;
 		for (Map.Entry<String, String[]> entry : map.entrySet()) {
+			if (!first) {
+				sb.append("&");
+			}
 			String key = entry.getKey();
 			String[] values = entry.getValue();
 			sb.append(key).append("=");
 			sb.append(values != null ? StringUtils.join(values, ",") : "");
-			sb.append("&");
+			first = false;
 		}
 
-		String result = sb.toString();
-		if (result.endsWith("&")) {
-			result = result.substring(0, sb.length() - 1);
-		}
-		return result;
+		return sb.toString();
 	}
 
 	/**
@@ -1115,7 +1136,7 @@ public class oConvertUtils {
 	 * @return 是否为空
 	 */
 	public static boolean isEmptyIterator(Iterator<?> iterator) {
-		return null == iterator || false == iterator.hasNext();
+		return null == iterator || !iterator.hasNext();
 	}
 
 
@@ -1144,10 +1165,7 @@ public class oConvertUtils {
 		if (null == src || null == des) {
 			throw new IllegalArgumentException("参数不能为空");
 		}
-		if (src.doubleValue() > des.doubleValue()) {
-			return true;
-		}
-		return false;
+		return src.doubleValue() > des.doubleValue();
 	}
 
 	/**
@@ -1163,10 +1181,7 @@ public class oConvertUtils {
 		if (null == src || null == des) {
 			throw new IllegalArgumentException("参数不能为空");
 		}
-		if (src.doubleValue() < des.doubleValue()) {
-			return false;
-		}
-		return true;
+		return src.doubleValue() >= des.doubleValue();
 	}
 
 
@@ -1198,7 +1213,8 @@ public class oConvertUtils {
 	 * @return
 	 */
 	public static boolean isEffectiveTenant(String tenantId) {
-		return MybatisPlusSaasConfig.OPEN_SYSTEM_TENANT_CONTROL && isNotEmpty(tenantId) && !("0").equals(tenantId);
+		return Boolean.TRUE.equals(MybatisPlusSaasConfig.OPEN_SYSTEM_TENANT_CONTROL)
+				&& isNotEmpty(tenantId) && !"0".equals(tenantId);
 	}
 
     /**
@@ -1243,7 +1259,7 @@ public class oConvertUtils {
     public static long getLong(Object v, long def) {
         if (v == null) {
             return def;
-        };
+        }
         if (v instanceof Number) {
             return ((Number) v).longValue();
         }

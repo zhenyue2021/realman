@@ -304,7 +304,7 @@ public class SysTenantController {
         LambdaQueryWrapper<SysTenant> query = new LambdaQueryWrapper<>();
         query.eq(SysTenant::getStatus, 1);
         if(oConvertUtils.isNotEmpty(ids)){
-            query.in(SysTenant::getId, ids.split(","));
+            query.in(SysTenant::getId, Arrays.asList(ids.split(",")));
         }
         //此处查询忽略时间条件
         List<SysTenant> ls = sysTenantService.list(query);

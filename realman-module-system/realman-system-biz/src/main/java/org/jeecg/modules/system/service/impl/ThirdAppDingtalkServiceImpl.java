@@ -115,7 +115,7 @@ public class ThirdAppDingtalkServiceImpl implements IThirdAppService {
             if (!departmentRes.isSuccess()) {
                 syncInfo.addFailInfo(departmentRes.getErrmsg());
                 // 88 是 ip 不在白名单的错误码，如果遇到此错误码，后面的操作都可以不用进行了，因为肯定都是失败的
-                if (new Integer(88).equals(departmentRes.getErrcode())) {
+                if (Integer.valueOf(88).equals(departmentRes.getErrcode())) {
                     return syncInfo;
                 }
                 continue;

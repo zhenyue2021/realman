@@ -151,7 +151,7 @@ public class OpenApiController extends JeecgController<OpenApi, OpenApiService> 
         HttpHeaders httpHeaders = new HttpHeaders();
         if (StrUtil.isNotEmpty(openApi.getHeadersJson())) {
             List<OpenApiHeader> headers = JSON.parseArray(openApi.getHeadersJson(),OpenApiHeader.class);
-            if (headers.size()>0) {
+            if (!headers.isEmpty()) {
                 for (OpenApiHeader header : headers) {
                     httpHeaders.put(header.getHeaderKey(), Lists.newArrayList(request.getHeader(header.getHeaderKey())));
                 }
@@ -168,7 +168,7 @@ public class OpenApiController extends JeecgController<OpenApi, OpenApiService> 
         httpHeaders.put("Content-Type",Lists.newArrayList("application/json"));
         HttpEntity<String> httpEntity = new HttpEntity<>(json, httpHeaders);
         url = RestUtil.getBaseUrl() +  url;
-        UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(url);
+        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(url);
         if (HttpMethod.GET.matches(method)
                 || HttpMethod.DELETE.matches(method)
                 || HttpMethod.OPTIONS.matches(method)
@@ -177,7 +177,7 @@ public class OpenApiController extends JeecgController<OpenApi, OpenApiService> 
             if (!request.getParameterMap().isEmpty()) {
                 if (StrUtil.isNotEmpty(openApi.getParamsJson())) {
                     List<OpenApiParam> params = JSON.parseArray(openApi.getParamsJson(),OpenApiParam.class);
-                    if (params.size()>0) {
+                    if (!params.isEmpty()) {
                         Map<String, OpenApiParam> openApiParamMap = params.stream().collect(Collectors.toMap(p -> p.getParamKey(), p -> p, (e, r) -> e));
                         request.getParameterMap().forEach((k, v) -> {
                             OpenApiParam openApiParam = openApiParamMap.get(k);
@@ -186,7 +186,7 @@ public class OpenApiController extends JeecgController<OpenApi, OpenApiService> 
                                     builder.queryParam(openApiParam.getParamKey(), openApiParam.getDefaultValue());
                                 }
                                 if (v!=null){
-                                    builder.queryParam(openApiParam.getParamKey(), v);
+                                    builder.queryParam(openApiParam.getParamKey(), (Object) v);
                                 }
                             }
                         });

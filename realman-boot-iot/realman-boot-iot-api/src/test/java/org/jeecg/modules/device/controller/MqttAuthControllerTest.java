@@ -7,8 +7,8 @@ import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -19,9 +19,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
+ * <p>
  * 使用 MockMvc 模拟 EMQX 对 HTTP 接口的真实调用，
  * 包括 MD5(deviceCode) 密码计算以及 peerhost 按 application-dev.yml 中 MQTT Broker IP 设置。
- *
+ * </p>
  * 鉴权模型：
  *   clientid = deviceCode
  *   username = deviceCode
@@ -34,7 +35,7 @@ public class MqttAuthControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
+    @MockitoBean
     private DeviceSecretService secretService;
 
     /**

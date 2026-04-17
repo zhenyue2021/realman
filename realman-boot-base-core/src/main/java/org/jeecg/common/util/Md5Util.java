@@ -1,47 +1,65 @@
 package org.jeecg.common.util;
 
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
+
+import lombok.extern.slf4j.Slf4j;
 
 /**
- * @Description: 加密工具
- * @author: jeecg-boot
+ * MD5 摘要工具（输出小写十六进制字符串）。
+ * <p>
+ * MD5 已不适合用于口令存储或抗碰撞安全场景；本类仅用于校验、签名辅助、历史兼容等非强安全用途。
  */
-public class Md5Util {
+@Slf4j
+public final class Md5Util {
 
-    private static final String[] HEXDIGITS = { "0", "1", "2", "3", "4", "5",
-            "6", "7", "8", "9", "a", "b", "c", "d", "e", "f" };
+	private static final HexFormat HEX = HexFormat.of();
 
+	private Md5Util() {
+	}
+
+	/**
+	 * 将字节数组转为小写十六进制字符串。
+	 *
+	 * @param b 字节数组；{@code null} 时返回 {@code null}
+	 */
 	public static String byteArrayToHexString(byte[] b) {
-		StringBuffer resultSb = new StringBuffer();
-		for (int i = 0; i < b.length; i++){
-			resultSb.append(byteToHexString(b[i]));
+		if (b == null) {
+			return null;
 		}
-		return resultSb.toString();
+		return HEX.formatHex(b);
 	}
 
-	private static String byteToHexString(byte b) {
-		int n = b;
-		if (n < 0) {
-			n += 256;
-		}
-		int d1 = n / 16;
-		int d2 = n % 16;
-		return HEXDIGITS[d1] + HEXDIGITS[d2];
-	}
-
+	/**
+	 * 对字符串做 MD5 摘要并返回十六进制字符串。
+	 *
+	 * @param origin      原文；{@code null} 时返回 {@code null}
+	 * @param charsetname 字符集名称；{@code null} 或空串时使用 {@link StandardCharsets#UTF_8}
+	 * @return 32 位小写十六进制；摘要失败时返回 {@code null}
+	 */
 	public static String md5Encode(String origin, String charsetname) {
-		String resultString = null;
-		try {
-			resultString = new String(origin);
-			MessageDigest md = MessageDigest.getInstance("MD5");
-			if (charsetname == null || "".equals(charsetname)) {
-				resultString = byteArrayToHexString(md.digest(resultString.getBytes()));
-			} else {
-				resultString = byteArrayToHexString(md.digest(resultString.getBytes(charsetname)));
-			}
-		} catch (Exception exception) {
+		if (origin == null) {
+			return null;
 		}
-		return resultString;
+		try {
+			MessageDigest md = MessageDigest.getInstance("MD5");
+			byte[] data;
+			if (charsetname == null || charsetname.isEmpty()) {
+				data = origin.getBytes(StandardCharsets.UTF_8);
+			} else {
+				data = origin.getBytes(Charset.forName(charsetname));
+			}
+			return byteArrayToHexString(md.digest(data));
+		} catch (NoSuchAlgorithmException e) {
+			log.error("MD5 algorithm not available", e);
+			return null;
+		} catch (Exception e) {
+			log.warn("MD5 digest failed: {}", e.toString());
+			return null;
+		}
 	}
 
 }

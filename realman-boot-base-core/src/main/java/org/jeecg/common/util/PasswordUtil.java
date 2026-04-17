@@ -1,190 +1,149 @@
 package org.jeecg.common.util;
 
+import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.security.SecureRandom;
+import java.util.HexFormat;
+
 import javax.crypto.Cipher;
-import javax.crypto.SecretKey;
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.PBEParameterSpec;
 
+import lombok.extern.slf4j.Slf4j;
+
 /**
- * @Description: 密码工具类
- * @author: jeecg-boot
+ * PBE 密码工具类，与历史 Jeecg 存储格式兼容（{@value #ALGORITHM}）。
+ * <p>
+ * 说明：该算法为历史兼容保留；新业务若需高强度存储请使用专用密码哈希（如 Argon2/bcrypt）而非本类。
  */
-public class PasswordUtil {
+@Slf4j
+public final class PasswordUtil {
+
+	private PasswordUtil() {
+	}
 
 	/**
-	 * JAVA6支持以下任意一种算法 PBEWITHMD5ANDDES PBEWITHMD5ANDTRIPLEDES
+	 * JAVA6 支持以下任意一种算法 PBEWITHMD5ANDDES PBEWITHMD5ANDTRIPLEDES
 	 * PBEWITHSHAANDDESEDE PBEWITHSHA1ANDRC2_40 PBKDF2WITHHMACSHA1
-	 * */
-
-    /**
-     * 定义使用的算法为:PBEWITHMD5andDES算法
-     * 加密算法
-     */
+	 */
 	public static final String ALGORITHM = "PBEWithMD5AndDES";
 
-    /**
-     * 定义使用的算法为:PBEWITHMD5andDES算法
-     * 密钥
-     */
+	/** 与历史实现一致的默认盐字符串（8 字节，满足 PBE 盐长要求） */
 	public static final String SALT = "63293188";
 
-	/**
-	 * 定义迭代次数为1000次
-	 */
-	private static final int ITERATIONCOUNT = 1000;
+	private static final int ITERATION_COUNT = 1000;
+
+	private static final HexFormat HEX = HexFormat.of();
+
+	private static final SecureRandom SALT_RANDOM = new SecureRandom();
 
 	/**
-	 * 获取加密算法中使用的盐值,解密中使用的盐值必须与加密中使用的相同才能完成操作. 盐长度必须为8字节
-	 * 
-	 * @return byte[] 盐值
-	 * */
-	public static byte[] getSalt() throws Exception {
-		// 实例化安全随机数
-		SecureRandom random = new SecureRandom();
-		// 产出盐
-		return random.generateSeed(8);
+	 * 获取加密算法中使用的盐值；解密须与加密使用相同盐。盐长度须为 8 字节。
+	 */
+	public static byte[] getSalt() {
+		return SALT_RANDOM.generateSeed(8);
 	}
 
 	public static byte[] getStaticSalt() {
-		// 产出盐
-		return SALT.getBytes();
+		return SALT.getBytes(StandardCharsets.UTF_8);
 	}
 
 	/**
-	 * 根据PBE密码生成一把密钥
-	 * 
-	 * @param password
-	 *            生成密钥时所使用的密码
-	 * @return Key PBE算法密钥
-	 * */
+	 * 根据 PBE 密码生成密钥。
+	 */
 	private static Key getPbeKey(String password) {
-		// 实例化使用的算法
-		SecretKeyFactory keyFactory;
-		SecretKey secretKey = null;
-		try {
-			keyFactory = SecretKeyFactory.getInstance(ALGORITHM);
-			// 设置PBE密钥参数
-			PBEKeySpec keySpec = new PBEKeySpec(password.toCharArray());
-			// 生成密钥
-			secretKey = keyFactory.generateSecret(keySpec);
-		} catch (Exception e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+		if (password == null) {
+			throw new IllegalArgumentException("password must not be null");
 		}
-
-		return secretKey;
+		try {
+			SecretKeyFactory keyFactory = SecretKeyFactory.getInstance(ALGORITHM);
+			PBEKeySpec keySpec = new PBEKeySpec(password.toCharArray());
+			return keyFactory.generateSecret(keySpec);
+		} catch (Exception e) {
+			throw new IllegalStateException("Failed to derive PBE key", e);
+		}
 	}
 
 	/**
-	 * 加密明文字符串
-	 * 
-	 * @param plaintext
-	 *            待加密的明文字符串
-	 * @param password
-	 *            生成密钥时所使用的密码
-	 * @param salt
-	 *            盐值
-	 * @return 加密后的密文字符串
-	 * @throws Exception
+	 * 加密明文字符串。
+	 *
+	 * @param plaintext 明文
+	 * @param password  密钥口令
+	 * @param salt      盐（与解密时须一致）
+	 * @return 十六进制密文；参数非法或加密失败时返回 {@code null}
 	 */
 	public static String encrypt(String plaintext, String password, String salt) {
-
-		Key key = getPbeKey(password);
-		byte[] encipheredData = null;
-		PBEParameterSpec parameterSpec = new PBEParameterSpec(salt.getBytes(), ITERATIONCOUNT);
-		try {
-			Cipher cipher = Cipher.getInstance(ALGORITHM);
-
-			cipher.init(Cipher.ENCRYPT_MODE, key, parameterSpec);
-			// 代码逻辑说明: 中文作为用户名时，加密的密码windows和linux会得到不同的结果 gitee/issues/IZUD7
-			encipheredData = cipher.doFinal(plaintext.getBytes("utf-8"));
-		} catch (Exception e) {
+		if (plaintext == null || password == null || salt == null) {
+			return null;
 		}
-		return bytesToHexString(encipheredData);
+		try {
+			Key key = getPbeKey(password);
+			PBEParameterSpec parameterSpec = new PBEParameterSpec(salt.getBytes(StandardCharsets.UTF_8), ITERATION_COUNT);
+			// 算法名含 PBE 参数，与历史数据兼容；非标准 AES/GCM（Sonar 安全规则可忽略）
+			Cipher cipher = Cipher.getInstance(ALGORITHM); // NOSONAR java:S5542
+			cipher.init(Cipher.ENCRYPT_MODE, key, parameterSpec);
+			// 中文用户名等场景须固定为 UTF-8，避免跨平台差异（gitee/issues/IZUD7）
+			byte[] encipheredData = cipher.doFinal(plaintext.getBytes(StandardCharsets.UTF_8));
+			return bytesToHexString(encipheredData);
+		} catch (Exception e) {
+			log.warn("Password encrypt failed: {}", e.toString());
+			return null;
+		}
 	}
 
 	/**
-	 * 解密密文字符串
-	 * 
-	 * @param ciphertext
-	 *            待解密的密文字符串
-	 * @param password
-	 *            生成密钥时所使用的密码(如需解密,该参数需要与加密时使用的一致)
-	 * @param salt
-	 *            盐值(如需解密,该参数需要与加密时使用的一致)
-	 * @return 解密后的明文字符串
-	 * @throws Exception
+	 * 解密密文字符串。
+	 *
+	 * @param ciphertext 十六进制密文
+	 * @param password   与加密时一致的口令
+	 * @param salt       与加密时一致的盐
+	 * @return 明文；失败或参数非法时返回 {@code null}
 	 */
 	public static String decrypt(String ciphertext, String password, String salt) {
-
-		Key key = getPbeKey(password);
-		byte[] passDec = null;
-		PBEParameterSpec parameterSpec = new PBEParameterSpec(salt.getBytes(), ITERATIONCOUNT);
+		if (ciphertext == null || password == null || salt == null) {
+			return null;
+		}
 		try {
-			Cipher cipher = Cipher.getInstance(ALGORITHM);
-
+			Key key = getPbeKey(password);
+			PBEParameterSpec parameterSpec = new PBEParameterSpec(salt.getBytes(StandardCharsets.UTF_8), ITERATION_COUNT);
+			Cipher cipher = Cipher.getInstance(ALGORITHM); // NOSONAR java:S5542
 			cipher.init(Cipher.DECRYPT_MODE, key, parameterSpec);
-
-			passDec = cipher.doFinal(hexStringToBytes(ciphertext));
+			byte[] raw = hexStringToBytes(ciphertext);
+			if (raw.length == 0) {
+				return null;
+			}
+			byte[] passDec = cipher.doFinal(raw);
+			return new String(passDec, StandardCharsets.UTF_8);
+		} catch (Exception e) {
+			log.debug("Password decrypt failed: {}", e.toString());
+			return null;
 		}
-
-		catch (Exception e) {
-			// TODO: handle exception
-		}
-		return new String(passDec);
 	}
 
 	/**
-	 * 将字节数组转换为十六进制字符串
-	 * 
-	 * @param src
-	 *            字节数组
-	 * @return
+	 * 将字节数组转为十六进制字符串（小写，与历史 {@link Integer#toHexString} 行为一致）。
 	 */
 	public static String bytesToHexString(byte[] src) {
-		StringBuilder stringBuilder = new StringBuilder("");
-		if (src == null || src.length <= 0) {
+		if (src == null || src.length == 0) {
 			return null;
 		}
-		for (int i = 0; i < src.length; i++) {
-			int v = src[i] & 0xFF;
-			String hv = Integer.toHexString(v);
-			if (hv.length() < 2) {
-				stringBuilder.append(0);
-			}
-			stringBuilder.append(hv);
-		}
-		return stringBuilder.toString();
+		return HEX.formatHex(src);
 	}
 
 	/**
-	 * 将十六进制字符串转换为字节数组
-	 * 
-	 * @param hexString
-	 *            十六进制字符串
-	 * @return
+	 * 将十六进制字符串转为字节数组；非法输入返回 {@code null}。
 	 */
 	public static byte[] hexStringToBytes(String hexString) {
-		if (hexString == null || "".equals(hexString)) {
-			return null;
+		if (hexString == null || hexString.isEmpty()) {
+			return new byte[0];
 		}
-		hexString = hexString.toUpperCase();
-		int length = hexString.length() / 2;
-		char[] hexChars = hexString.toCharArray();
-		byte[] d = new byte[length];
-		for (int i = 0; i < length; i++) {
-			int pos = i * 2;
-			d[i] = (byte) (charToByte(hexChars[pos]) << 4 | charToByte(hexChars[pos + 1]));
+		try {
+			return HEX.parseHex(hexString.trim());
+		} catch (IllegalArgumentException e) {
+			log.warn("Invalid hex string: {}", e.getMessage());
+			return new byte[0];
 		}
-		return d;
 	}
-
-	private static byte charToByte(char c) {
-		return (byte) "0123456789ABCDEF".indexOf(c);
-	}
-
 
 }

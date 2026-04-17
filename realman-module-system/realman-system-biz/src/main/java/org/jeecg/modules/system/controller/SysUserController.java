@@ -569,7 +569,7 @@ public class SysUserController {
         // 代码逻辑说明: [03]用户导出，如果选择数据则只导出相关数据--------------------
         String selections = request.getParameter("selections");
        if(!oConvertUtils.isEmpty(selections)){
-           queryWrapper.in("id",selections.split(","));
+           queryWrapper.in("id", Arrays.asList(selections.split(",")));
        }
         //是否存在部门id
         boolean izDepartId = true;
@@ -658,8 +658,8 @@ public class SysUserController {
     public Result<Collection<SysUser>> queryByNames(@RequestParam(name = "userNames") String userNames) {
         Result<Collection<SysUser>> result = new Result<>();
         String[] names = userNames.split(",");
-        QueryWrapper<SysUser> queryWrapper=new QueryWrapper();
-        queryWrapper.lambda().in(true,SysUser::getUsername,names);
+        QueryWrapper<SysUser> queryWrapper=new QueryWrapper<>();
+        queryWrapper.lambda().in(true,SysUser::getUsername,Arrays.asList(names));
         Collection<SysUser> userRole = sysUserService.list(queryWrapper);
         result.setSuccess(true);
         result.setResult(userRole);
@@ -1377,7 +1377,7 @@ public class SysUserController {
 			query.eq(SysUser::getDelFlag,CommonConstant.DEL_FLAG_0);
 			if(oConvertUtils.isNotEmpty(username)){
 			    if(username.contains(",")){
-                    query.in(SysUser::getUsername,username.split(","));
+                    query.in(SysUser::getUsername,Arrays.asList(username.split(",")));
                 }else{
                     query.eq(SysUser::getUsername,username);
                 }
@@ -1589,7 +1589,7 @@ public class SysUserController {
         //增加 username传参
         if(oConvertUtils.isNotEmpty(username)){
             if(username.contains(",")){
-                queryWrapper.in(SysUser::getUsername,username.split(","));
+                queryWrapper.in(SysUser::getUsername,Arrays.asList(username.split(",")));
             }else{
                 queryWrapper.eq(SysUser::getUsername,username);
             }
