@@ -14,6 +14,7 @@ import org.jeecg.common.constant.enums.DySmsEnum;
 import org.jeecg.common.constant.enums.EmailTemplateEnum;
 import org.jeecg.common.desensitization.util.SensitiveInfoUtil;
 import org.jeecg.common.system.vo.*;
+import org.jeecg.config.shiro.IgnoreAuth;
 import org.jeecg.modules.system.entity.SysDepart;
 import org.jeecg.modules.system.entity.SysTenant;
 import org.jeecg.modules.system.entity.SysUser;
@@ -188,6 +189,7 @@ public class SystemApiController {
      * @param userId
      * @return 部门 id
      */
+    @IgnoreAuth
     @GetMapping("/getDepartIdsByUserId")
     List<String> getDepartIdsByUserId(@RequestParam("userId") String userId){
         return sysBaseApi.getDepartIdsByUserId(userId);
@@ -433,6 +435,7 @@ public class SystemApiController {
      * @param username
      * @return
      */
+    @IgnoreAuth
     @GetMapping("/getUserRoleSet")
     public Set<String> getUserRoleSet(@RequestParam("username")String username){
         return sysBaseApi.getUserRoleSet(username);
@@ -1127,6 +1130,7 @@ public class SystemApiController {
      * 对应 IoT 侧 SysDepartLiteMapper.listEnterpriseTreeRows()
      * 返回字段：id / parentId / name(departName) / orgCategory
      */
+    @IgnoreAuth
     @GetMapping("/listEnterpriseTreeRows")
     public List<JSONObject> listEnterpriseTreeRows() {
         List<SysDepart> list = sysDepartService.list(
@@ -1154,6 +1158,7 @@ public class SystemApiController {
      * 对应 IoT 侧 SysTenantLiteMapper.listAllTenants()
      * 返回字段：id(String) / name
      */
+    @IgnoreAuth
     @GetMapping("/listActiveTenants")
     public List<DictModel> listActiveTenants() {
         List<SysTenant> list = sysTenantService.list(
@@ -1172,6 +1177,7 @@ public class SystemApiController {
      * 根据用户名查询其所属的全部有效企业/部门 ID（del_flag='0' AND status='1'）。
      * 对应 IoT 侧 SysUserDepartLiteMapper.listValidEnterpriseIdsByUsername()
      */
+    @IgnoreAuth
     @GetMapping("/listValidEnterpriseIdsByUsername")
     public List<String> listValidEnterpriseIdsByUsername(@RequestParam("username") String username) {
         List<SysDepart> departs = sysDepartService.queryDepartsByUsername(username);
@@ -1189,6 +1195,7 @@ public class SystemApiController {
      * 对应 IoT 侧 SysUserDepartLiteMapper.listUsersByDepartId()
      * 返回字段：value=userId / text=realname
      */
+    @IgnoreAuth
     @GetMapping("/listUserOptionsByDepartId")
     public List<DictModel> listUserOptionsByDepartId(@RequestParam("departId") String departId) {
         List<SysUserDepart> udList = sysUserDepartService.list(
@@ -1217,6 +1224,7 @@ public class SystemApiController {
      * 对应 IoT 侧 SysUserTenantLiteMapper.listUsersByTenantId()
      * 返回字段：value=userId / text=username
      */
+    @IgnoreAuth
     @GetMapping("/listUserOptionsByTenantId")
     public List<DictModel> listUserOptionsByTenantId(@RequestParam("tenantId") Integer tenantId) {
         List<String> userIds = sysBaseApi.selectUserIdByTenantId(String.valueOf(tenantId));
