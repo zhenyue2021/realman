@@ -1,13 +1,14 @@
 package org.jeecg.modules.device.service.impl.master;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.jeecg.modules.device.constant.DeviceConstant;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.entity.IotDeviceAuth;
 import org.jeecg.modules.device.mapper.IotDeviceAuthMapper;
 import org.jeecg.modules.device.mapper.IotDeviceMapper;
-import org.jeecg.modules.device.mapper.SysUserDepartLiteMapper;
+import org.jeecg.modules.device.feign.SysAuthFeignClient;
 import org.jeecg.modules.device.vo.UsageStatusVO;
 import org.springframework.stereotype.Service;
 
@@ -30,7 +31,7 @@ public class MasterAuthValidateService {
 
     private final IotDeviceMapper deviceMapper;
     private final IotDeviceAuthMapper deviceAuthMapper;
-    private final SysUserDepartLiteMapper sysUserDepartLiteMapper;
+    private final SysAuthFeignClient sysAuthFeignClient;
 
     /**
      * 通过设备编码查询主控设备，不存在或类型不符则抛异常。
@@ -63,7 +64,7 @@ public class MasterAuthValidateService {
         if (operatorId == null || operatorId.isEmpty()) {
             throw new RuntimeException("缺少操作员ID（operatorId）");
         }
-        List<String> departIds = sysUserDepartLiteMapper.listDepartIdsByUserId(operatorId);
+        List<String> departIds = sysAuthFeignClient.getDepartIdsByUserId(operatorId);
         if (departIds == null || departIds.isEmpty()) {
             throw new RuntimeException("无权限：当前用户未绑定企业");
         }

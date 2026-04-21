@@ -1,32 +1,34 @@
 package org.jeecg.modules.device.api.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
+import org.jeecg.common.system.vo.DictModel;
 import org.jeecg.modules.device.api.WorkOrderComplianceApiService;
 import org.jeecg.modules.device.component.DeviceServiceComponent;
+import org.jeecg.modules.device.dto.EnterpriseNodeRowDTO;
 import org.jeecg.modules.device.dto.OptionDTO;
 import org.jeecg.modules.device.dto.OptionTreeDTO;
 import org.jeecg.modules.device.dto.workorder.WorkOrderComplianceConfigDetailDTO;
 import org.jeecg.modules.device.dto.workorder.WorkOrderComplianceConfigPageVo;
 import org.jeecg.modules.device.dto.workorder.WorkOrderComplianceQueryDTO;
 import org.jeecg.modules.device.entity.workorder.WorkOrderComplianceConfig;
-import org.jeecg.modules.device.mapper.SysDepartLiteMapper;
-import org.jeecg.modules.device.mapper.SysTenantLiteMapper;
+import org.jeecg.modules.device.feign.SysAuthFeignClient;
 import org.jeecg.modules.device.service.workorder.IWorkOrderComplianceConfigService;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class WorkOrderComplianceApiServiceImpl implements WorkOrderComplianceApiService {
 
     private final IWorkOrderComplianceConfigService configService;
-    private final SysTenantLiteMapper tenantMapper;
-    private final SysDepartLiteMapper departMapper;
     private final DeviceServiceComponent deviceComponent;
+    private final SysAuthFeignClient sysAuthFeignClient;
 
     @Override
     public IPage<WorkOrderComplianceConfigPageVo> pageConfigs(Page<WorkOrderComplianceConfigPageVo> page,
@@ -92,12 +94,38 @@ public class WorkOrderComplianceApiServiceImpl implements WorkOrderComplianceApi
 
     @Override
     public List<OptionTreeDTO> enterpriseOptionsTree() {
-        return deviceComponent.buildEnterpriseTree(departMapper.listEnterpriseTreeRows());
+        return deviceComponent.buildEnterpriseTree(toEnterpriseRows(sysAuthFeignClient.listEnterpriseTreeRows()));
     }
 
     @Override
     public List<OptionDTO> tenantOptions() {
-        return tenantMapper.listAllTenants();
+        return toOptionList(sysAuthFeignClient.listActiveTenants());
+    }
+
+    // ── 转换工具 ─────────────────────────────────────────────────────────
+
+    /** DictModel(value=id, text=name) → OptionDTO(id, name) */
+    private static List<OptionDTO> toOptionList(List<DictModel> models) {
+        if (models == null || models.isEmpty()) {
+            return List.of();
+        }
+        return models.stream()
+                .map(m -> new OptionDTO(m.getValue(), m.getText()))
+                .collect(Collectors.toList());
+    }
+
+    /** JSONObject{id,parentId,name,orgCategory} → EnterpriseNodeRowDTO */
+    private static List<EnterpriseNodeRowDTO> toEnterpriseRows(List<JSONObject> items) {
+        if (items == null || items.isEmpty()) {
+            return List.of();
+        }
+        return items.stream().map(j -> {
+            EnterpriseNodeRowDTO r = new EnterpriseNodeRowDTO();
+            r.setId(j.getString("id"));
+            r.setParentId(j.getString("parentId"));
+            r.setName(j.getString("name"));
+            r.setOrgCategory(j.getString("orgCategory"));
+            return r;
+        }).collect(Collectors.toList());
     }
 }
-

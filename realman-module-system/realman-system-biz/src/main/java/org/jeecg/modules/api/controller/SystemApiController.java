@@ -1,6 +1,7 @@
 package org.jeecg.modules.api.controller;
 
 import com.alibaba.fastjson.JSONObject;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
@@ -13,14 +14,24 @@ import org.jeecg.common.constant.enums.DySmsEnum;
 import org.jeecg.common.constant.enums.EmailTemplateEnum;
 import org.jeecg.common.desensitization.util.SensitiveInfoUtil;
 import org.jeecg.common.system.vo.*;
+import org.jeecg.config.shiro.IgnoreAuth;
+import org.jeecg.modules.system.entity.SysDepart;
+import org.jeecg.modules.system.entity.SysTenant;
+import org.jeecg.modules.system.entity.SysUser;
+import org.jeecg.modules.system.entity.SysUserDepart;
+import org.jeecg.modules.system.service.ISysDepartService;
+import org.jeecg.modules.system.service.ISysTenantService;
+import org.jeecg.modules.system.service.ISysUserDepartService;
 import org.jeecg.modules.system.service.ISysUserService;
 import org.jeecg.modules.system.service.impl.SysBaseApiImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 
 /**
@@ -37,6 +48,12 @@ public class SystemApiController {
     private SysBaseApiImpl sysBaseApi;
     @Autowired
     private ISysUserService sysUserService;
+    @Autowired
+    private ISysDepartService sysDepartService;
+    @Autowired
+    private ISysTenantService sysTenantService;
+    @Autowired
+    private ISysUserDepartService sysUserDepartService;
 
     /**
      * 发送系统消息
@@ -172,6 +189,7 @@ public class SystemApiController {
      * @param userId
      * @return 部门 id
      */
+    @IgnoreAuth
     @GetMapping("/getDepartIdsByUserId")
     List<String> getDepartIdsByUserId(@RequestParam("userId") String userId){
         return sysBaseApi.getDepartIdsByUserId(userId);
@@ -417,6 +435,7 @@ public class SystemApiController {
      * @param username
      * @return
      */
+    @IgnoreAuth
     @GetMapping("/getUserRoleSet")
     public Set<String> getUserRoleSet(@RequestParam("username")String username){
         return sysBaseApi.getUserRoleSet(username);
@@ -1100,5 +1119,129 @@ public class SystemApiController {
     @PostMapping("/uniPushMsgToUser")
     public void uniPushMsgToUser(@RequestBody PushMessageDTO pushMessageDTO){
        sysBaseApi.uniPushMsgToUser(pushMessageDTO);
+    }
+
+    // ===================================================================
+    // SaaS 平台内部接口：供 IoT 等业务服务通过 Feign 调用，替代直连 system 库
+    // ===================================================================
+
+    /**
+     * 查询企业/子公司树节点（orgCategory IN '1','4'，状态正常）。
+     * 对应 IoT 侧 SysDepartLiteMapper.listEnterpriseTreeRows()
+     * 返回字段：id / parentId / name(departName) / orgCategory
+     */
+    @IgnoreAuth
+    @GetMapping("/listEnterpriseTreeRows")
+    public List<JSONObject> listEnterpriseTreeRows() {
+        List<SysDepart> list = sysDepartService.list(
+                new LambdaQueryWrapper<SysDepart>()
+                        .in(SysDepart::getOrgCategory, "1", "4")
+                        .eq(SysDepart::getDelFlag, "0")
+                        .eq(SysDepart::getStatus, "1")
+                        .orderByAsc(SysDepart::getDepartOrder)
+                        .orderByDesc(SysDepart::getCreateTime)
+        );
+        List<JSONObject> result = new ArrayList<>(list.size());
+        for (SysDepart d : list) {
+            JSONObject item = new JSONObject();
+            item.put("id", d.getId());
+            item.put("parentId", d.getParentId());
+            item.put("name", d.getDepartName());
+            item.put("orgCategory", d.getOrgCategory());
+            result.add(item);
+        }
+        return result;
+    }
+
+    /**
+     * 查询所有有效租户列表（status=1）。
+     * 对应 IoT 侧 SysTenantLiteMapper.listAllTenants()
+     * 返回字段：id(String) / name
+     */
+    @IgnoreAuth
+    @GetMapping("/listActiveTenants")
+    public List<DictModel> listActiveTenants() {
+        List<SysTenant> list = sysTenantService.list(
+                new LambdaQueryWrapper<SysTenant>()
+                        .eq(SysTenant::getStatus, 1)
+                        .orderByAsc(SysTenant::getId)
+        );
+        List<DictModel> result = new ArrayList<>(list.size());
+        for (SysTenant t : list) {
+            result.add(new DictModel(String.valueOf(t.getId()), t.getName()));
+        }
+        return result;
+    }
+
+    /**
+     * 根据用户名查询其所属的全部有效企业/部门 ID（del_flag='0' AND status='1'）。
+     * 对应 IoT 侧 SysUserDepartLiteMapper.listValidEnterpriseIdsByUsername()
+     */
+    @IgnoreAuth
+    @GetMapping("/listValidEnterpriseIdsByUsername")
+    public List<String> listValidEnterpriseIdsByUsername(@RequestParam("username") String username) {
+        List<SysDepart> departs = sysDepartService.queryDepartsByUsername(username);
+        if (departs == null || departs.isEmpty()) {
+            return List.of();
+        }
+        return departs.stream()
+                .filter(d -> "0".equals(d.getDelFlag()) && "1".equals(d.getStatus()))
+                .map(SysDepart::getId)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 查询指定部门下的用户列表（id + realname），状态正常。
+     * 对应 IoT 侧 SysUserDepartLiteMapper.listUsersByDepartId()
+     * 返回字段：value=userId / text=realname
+     */
+    @IgnoreAuth
+    @GetMapping("/listUserOptionsByDepartId")
+    public List<DictModel> listUserOptionsByDepartId(@RequestParam("departId") String departId) {
+        List<SysUserDepart> udList = sysUserDepartService.list(
+                new LambdaQueryWrapper<SysUserDepart>().eq(SysUserDepart::getDepId, departId)
+        );
+        if (udList == null || udList.isEmpty()) {
+            return List.of();
+        }
+        List<String> userIds = udList.stream().map(SysUserDepart::getUserId).collect(Collectors.toList());
+        List<SysUser> users = sysUserService.list(
+                new LambdaQueryWrapper<SysUser>()
+                        .in(SysUser::getId, userIds)
+                        .eq(SysUser::getDelFlag, 0)
+                        .eq(SysUser::getStatus, 1)
+                        .orderByAsc(SysUser::getCreateTime)
+        );
+        List<DictModel> result = new ArrayList<>(users.size());
+        for (SysUser u : users) {
+            result.add(new DictModel(u.getId(), u.getRealname()));
+        }
+        return result;
+    }
+
+    /**
+     * 查询指定租户下的用户列表（id + username），状态正常。
+     * 对应 IoT 侧 SysUserTenantLiteMapper.listUsersByTenantId()
+     * 返回字段：value=userId / text=username
+     */
+    @IgnoreAuth
+    @GetMapping("/listUserOptionsByTenantId")
+    public List<DictModel> listUserOptionsByTenantId(@RequestParam("tenantId") Integer tenantId) {
+        List<String> userIds = sysBaseApi.selectUserIdByTenantId(String.valueOf(tenantId));
+        if (userIds == null || userIds.isEmpty()) {
+            return List.of();
+        }
+        List<SysUser> users = sysUserService.list(
+                new LambdaQueryWrapper<SysUser>()
+                        .in(SysUser::getId, userIds)
+                        .eq(SysUser::getDelFlag, 0)
+                        .eq(SysUser::getStatus, 1)
+                        .orderByAsc(SysUser::getUsername)
+        );
+        List<DictModel> result = new ArrayList<>(users.size());
+        for (SysUser u : users) {
+            result.add(new DictModel(u.getId(), u.getUsername()));
+        }
+        return result;
     }
 }

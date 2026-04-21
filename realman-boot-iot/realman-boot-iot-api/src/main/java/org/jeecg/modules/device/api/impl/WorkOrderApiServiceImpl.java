@@ -14,13 +14,12 @@ import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.entity.workorder.WorkOrder;
 import org.jeecg.modules.device.entity.workorder.WorkOrderDevice;
 import org.jeecg.modules.device.entity.workorder.WorkOrderComplianceConfig;
+import org.jeecg.modules.device.feign.SysAuthFeignClient;
 import org.jeecg.modules.device.mapper.IotDeviceMapper;
-import org.jeecg.modules.device.mapper.SysUserDepartLiteMapper;
 import org.jeecg.modules.device.mapper.workorder.WorkOrderDeviceMapper;
 import org.jeecg.modules.device.service.IIotDeviceService;
 import org.jeecg.modules.device.service.workorder.IWorkOrderService;
 import org.jeecg.modules.device.service.workorder.IWorkOrderComplianceConfigService;
-import org.springframework.context.annotation.Bean;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -47,7 +46,7 @@ public class WorkOrderApiServiceImpl implements WorkOrderApiService {
     private final IWorkOrderComplianceConfigService complianceConfigService;
     private final WorkOrderDeviceMapper workOrderDeviceMapper;
     private final IotDeviceMapper iotDeviceMapper;
-    private final SysUserDepartLiteMapper sysUserDepartLiteMapper;
+    private final SysAuthFeignClient sysAuthFeignClient;
 
     @Override
     public WorkOrder create(WorkOrderCreateDTO dto, String operator) {
@@ -430,7 +429,7 @@ public class WorkOrderApiServiceImpl implements WorkOrderApiService {
         if (StrUtil.isBlank(username)) {
             return List.of();
         }
-        List<String> ids = sysUserDepartLiteMapper.listValidEnterpriseIdsByUsername(username);
+        List<String> ids = sysAuthFeignClient.listValidEnterpriseIdsByUsername(username);
         return ids == null ? List.of() : ids;
     }
 

@@ -1,12 +1,14 @@
 package org.jeecg.modules.device.api.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.common.exception.JeecgBootException;
+import org.jeecg.common.system.vo.DictModel;
 import org.jeecg.common.util.ContentDispositionUtil;
 import org.jeecg.common.system.util.JwtUtil;
 import org.jeecg.modules.device.api.DeviceAuthApiService;
@@ -18,11 +20,8 @@ import org.jeecg.modules.device.dto.EnterpriseNodeRowDTO;
 import org.jeecg.modules.device.dto.OptionDTO;
 import org.jeecg.modules.device.dto.OptionTreeDTO;
 import org.jeecg.modules.device.entity.IotDeviceAuth;
+import org.jeecg.modules.device.feign.SysAuthFeignClient;
 import org.jeecg.modules.device.mapper.IotDeviceMapper;
-import org.jeecg.modules.device.mapper.SysDepartLiteMapper;
-import org.jeecg.modules.device.mapper.SysTenantLiteMapper;
-import org.jeecg.modules.device.mapper.SysUserDepartLiteMapper;
-import org.jeecg.modules.device.mapper.SysUserTenantLiteMapper;
 import org.jeecg.modules.device.service.IIotDeviceAuthService;
 import org.jeecg.modules.device.service.security.IDeviceSecurityService;
 import org.springframework.http.HttpHeaders;
@@ -30,10 +29,8 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -41,13 +38,10 @@ import java.util.Map;
 public class DeviceAuthApiServiceImpl implements DeviceAuthApiService {
 
     private final IIotDeviceAuthService authService;
-    private final SysTenantLiteMapper tenantMapper;
-    private final SysDepartLiteMapper departMapper;
-    private final SysUserTenantLiteMapper userTenantLiteMapper;
-    private final SysUserDepartLiteMapper userDepartLiteMapper;
     private final IotDeviceMapper iotDeviceMapper;
     private final IDeviceSecurityService deviceSecurityService;
     private final DeviceServiceComponent deviceComponent;
+    private final SysAuthFeignClient sysAuthFeignClient;
 
     @Override
     public IPage<DeviceAuthDTO> page(HttpServletRequest request, DeviceAuthQueryDTO query) {
@@ -109,25 +103,25 @@ public class DeviceAuthApiServiceImpl implements DeviceAuthApiService {
     @Override
     public List<OptionDTO> tenantOptions(HttpServletRequest request) {
         assertAdminOrOps(request);
-        return tenantMapper.listAllTenants();
+        return toOptionList(sysAuthFeignClient.listActiveTenants());
     }
 
     @Override
     public List<OptionDTO> tenantUserOptions(HttpServletRequest request, Integer tenantId) {
         assertAdminOrOps(request);
-        return userTenantLiteMapper.listUsersByTenantId(tenantId);
+        return toOptionList(sysAuthFeignClient.listUserOptionsByTenantId(tenantId));
     }
 
     @Override
     public List<OptionDTO> enterpriseUserOptions(HttpServletRequest request, String enterpriseId) {
         assertAdminOrOps(request);
-        return userDepartLiteMapper.listUsersByDepartId(enterpriseId);
+        return toOptionList(sysAuthFeignClient.listUserOptionsByDepartId(enterpriseId));
     }
 
     @Override
     public List<OptionTreeDTO> enterpriseOptionsTree(HttpServletRequest request) {
         assertAdminOrOps(request);
-        return deviceComponent.buildEnterpriseTree(departMapper.listEnterpriseTreeRows());
+        return deviceComponent.buildEnterpriseTree(toEnterpriseRows(sysAuthFeignClient.listEnterpriseTreeRows()));
     }
 
     @Override
@@ -167,6 +161,29 @@ public class DeviceAuthApiServiceImpl implements DeviceAuthApiService {
                 .body(bytes);
     }
 
+    // ── 转换工具 ───────────────────────────────────────────────────────────
+
+    /** DictModel(value=id, text=name) → OptionDTO(id, name) */
+    private static List<OptionDTO> toOptionList(List<DictModel> models) {
+        if (models == null || models.isEmpty()) return List.of();
+        return models.stream()
+                .map(m -> new OptionDTO(m.getValue(), m.getText()))
+                .collect(Collectors.toList());
+    }
+
+    /** JSONObject{id,parentId,name,orgCategory} → EnterpriseNodeRowDTO */
+    private static List<EnterpriseNodeRowDTO> toEnterpriseRows(List<JSONObject> items) {
+        if (items == null || items.isEmpty()) return List.of();
+        return items.stream().map(j -> {
+            EnterpriseNodeRowDTO r = new EnterpriseNodeRowDTO();
+            r.setId(j.getString("id"));
+            r.setParentId(j.getString("parentId"));
+            r.setName(j.getString("name"));
+            r.setOrgCategory(j.getString("orgCategory"));
+            return r;
+        }).collect(Collectors.toList());
+    }
+
     private DeviceAuthDTO toDto(IotDeviceAuth auth) {
         if (auth == null) return null;
         DeviceAuthDTO dto = new DeviceAuthDTO();
@@ -203,6 +220,4 @@ public class DeviceAuthApiServiceImpl implements DeviceAuthApiService {
     private void assertAdminOrOps(HttpServletRequest request) {
         deviceSecurityService.assertAdminOrOps(request == null ? null : safeUsername(request));
     }
-
 }
-
