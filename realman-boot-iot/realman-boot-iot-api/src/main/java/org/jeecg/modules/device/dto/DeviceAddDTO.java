@@ -9,7 +9,7 @@ public class DeviceAddDTO {
     private String deviceCode;
     @NotBlank(message = "设备名称不能为空")
     private String deviceName;
-    private Integer deviceType;
+    private String deviceType;
     private String productId;
     private String deviceModel;
     private String serialNumber;
