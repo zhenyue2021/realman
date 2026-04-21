@@ -57,4 +57,3 @@ public interface SysAuthFeignClient {
     @GetMapping("/sys/api/listUserOptionsByTenantId")
     List<DictModel> listUserOptionsByTenantId(@RequestParam("tenantId") Integer tenantId);
 }
-
