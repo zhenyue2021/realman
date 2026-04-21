@@ -73,6 +73,13 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
 
     @Override
     public IPage<IotDevice> queryDevicePage(Page<IotDevice> page, DeviceRequestDTO request) {
+        // 如果授权时间为空，设置默认值
+        if (request.getAuthEffectiveTime() == null) {
+            request.setAuthEffectiveTime(java.time.LocalDateTime.of(1900, 1, 1, 0, 0, 0));
+        }
+        if (request.getAuthExpireTime() == null) {
+            request.setAuthExpireTime(java.time.LocalDateTime.of(2099, 12, 31, 23, 59, 59));
+        }
         return lifecycleService.queryDevicePage(page, request);
     }
 
