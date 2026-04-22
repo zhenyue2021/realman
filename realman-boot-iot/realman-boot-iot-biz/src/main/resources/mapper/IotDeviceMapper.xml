@@ -40,8 +40,8 @@
                 AND d.status = #{status}
             </if>
 
-            <!-- 仅当传入授权时间查询条件时，才关联 iot_device_auth 表进行过滤 -->
-            <if test="authEffectiveTime != null or authExpireTime != null">
+            <!-- superAdmin=false 时需要检查授权，superAdmin=true 时查询全量 -->
+            <if test="superAdmin != null and !superAdmin">
                 AND EXISTS (
                 SELECT 1 FROM iot_device_auth a
                 <include refid="deviceListAuthExistsWhere"/>
