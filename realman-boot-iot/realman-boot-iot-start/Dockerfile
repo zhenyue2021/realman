@@ -10,7 +10,7 @@ RUN apk add --no-cache tzdata && \
     echo "Asia/Shanghai" > /etc/timezone && \
     rm -rf /var/cache/apk/*
 
-COPY target/realman-system-start-*.jar app.jar
+COPY target/realman-boot-iot-start-*.jar app.jar
 
 ENV JAVA_OPTS="-XX:+UseContainerSupport \
     -XX:MaxRAMPercentage=70.0 \
@@ -20,6 +20,6 @@ ENV JAVA_OPTS="-XX:+UseContainerSupport \
     -Xlog:gc*:file=/app/logs/gc.log:time,uptime:filecount=5,filesize=20m \
     -Djava.security.egd=file:/dev/./urandom"
 
-EXPOSE 8080
+EXPOSE 8085
 
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
