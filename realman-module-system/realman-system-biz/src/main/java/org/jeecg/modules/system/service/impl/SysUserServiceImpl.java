@@ -12,6 +12,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.CollectionUtils;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.extern.slf4j.Slf4j;
@@ -119,6 +120,8 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
 	ISysRoleIndexService sysRoleIndexService;
 	@Autowired
 	SysTenantMapper sysTenantMapper;
+	@Autowired
+	SysUserTenantMapper sysUserTenantMapper;
 	@Autowired
     private SysUserTenantMapper relationMapper;
 	@Autowired
@@ -3146,4 +3149,14 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
 		return result;
 	}
 
+
+	@Override
+	public SysUser queryById(String userId) {
+		SysUser sysUser = this.getById(userId);
+		SysUserTenant sysUserTenant = sysUserTenantMapper.selectOne(Wrappers.lambdaQuery(SysUserTenant.class).eq(SysUserTenant::getUserId, sysUser.getId()));
+		if (sysUserTenant != null) {
+			sysUser.setRelTenantIds(String.valueOf(sysUserTenant.getTenantId()));
+		}
+		return sysUser;
+	}
 }

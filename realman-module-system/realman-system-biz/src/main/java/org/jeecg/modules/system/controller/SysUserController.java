@@ -360,11 +360,10 @@ public class SysUserController {
     @RequestMapping(value = "/queryById", method = RequestMethod.GET)
     @Operation(summary="用户详情")
     public Result<SysUser> queryById(@RequestParam(name = "id", required = true) String id) {
-        SysUser sysUser = sysUserService.getById(id);
+        SysUser sysUser = sysUserService.queryById(id);
         if (sysUser == null) {
             return Result.error("未找到对应实体");
         } else {
-            sysUser.setRelTenantIds(String.valueOf(sysUser.getLoginTenantId()));
             return Result.OK(sysUser);
         }
     }

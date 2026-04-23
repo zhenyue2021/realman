@@ -13,9 +13,9 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * system 侧对外接口 Feign 客户端。
- * Token 由 FeignHeaderForwardConfig 拦截器透传，无需显式传参。
- * 仅 queryUserRoles 保留显式 token，用于定时任务/异步线程等无 HTTP 上下文的场景。
+ * system 模块内部查询接口（Feign）。对应 {@code SystemApiController} 上已标注 {@code @IgnoreAuth} 的方法：
+ * 不要求登录 Token、不要求 X-Sign 验签（且未列入 {@code jeecg.signUrls}）。
+ * 仍可能透传租户等头（见 {@code FeignHeaderForwardConfig}）；生产环境请配合内网/集群网络隔离。
  */
 @FeignClient(
         contextId = "sysAuthFeignClient",
@@ -29,7 +29,7 @@ public interface SysAuthFeignClient {
     Set<String> queryUserRoles(@RequestHeader(CommonConstant.X_ACCESS_TOKEN) String token,
                                @RequestParam("username") String username);
 
-    /** 查询用户角色 code 集合（有 HTTP 上下文时使用，token 由拦截器自动注入） */
+    /** 查询用户角色 code 集合（经 SysBaseApi，与 queryUserRoles 入口不同） */
     @GetMapping("/sys/api/getUserRoleSet")
     Set<String> getUserRoleSet(@RequestParam("username") String username);
 
