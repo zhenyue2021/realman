@@ -121,7 +121,8 @@ public class DeviceAuthApiServiceImpl implements DeviceAuthApiService {
     @Override
     public List<OptionTreeDTO> enterpriseOptionsTree(HttpServletRequest request) {
         assertAdminOrOps(request);
-        return deviceComponent.buildEnterpriseTree(toEnterpriseRows(sysAuthFeignClient.listEnterpriseTreeRows()));
+        List<JSONObject> jsonObjects = sysAuthFeignClient.listEnterpriseTreeRows();
+        return deviceComponent.buildEnterpriseTree(toEnterpriseRows(jsonObjects));
     }
 
     @Override

@@ -402,7 +402,7 @@
    - 国家/城市/区/街道/楼宇若需独立字段，可在 iot_device 表扩展或使用 JSON 字段/扩展表。
 
 6. **iot_device_auth 表**  
-   - **已实现**：init.sql 中已包含 `iot_device_auth`、`iot_controller_login_log` 建表及 `iot_device.last_login_time` 字段。
+   - **已实现**：iot_init.sql 中已包含 `iot_device_auth`、`iot_controller_login_log` 建表及 `iot_device.last_login_time` 字段。
 
 7. **操作记录与使用状态**  
    - **已实现**：表 `controller_operation_record`，对应实体 `MasterOperationRecord` 与服务接口 `IMasterOperationRecordService`；工单开启/提交/超时/关闭时自动写入或更新操作记录；POST `/api/teleop/operation-record/page` 分页、POST `/api/teleop/operation-record/export` 导出；GET `/api/teleop/usage-status/{controllerCode}` 通过 `IMasterUsageStatusService` 返回 `UsageStatusVO`（lastLoginTime、lastRemoteOperationStartTime、currentDevice、availableRobots）。

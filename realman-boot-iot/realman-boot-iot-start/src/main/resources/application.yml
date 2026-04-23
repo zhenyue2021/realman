@@ -9,14 +9,23 @@ spring:
   cloud:
     nacos:
       config:
-        # 与 Nacos 控制台「Group」一致；DataId 一般为 ${spring.application.name}.yaml
-        group: REALMAN_GROUP
+        # 必须在主 application.yml 中配置，否则 NacosConfigData 解析 import 时 server-addr 未就绪，会报 config is empty
+        server-addr: ${NACOS_SERVER_ADDR:realman-nacos:8848}
+        # 与 Nacos 控制台「Group」一致；DataId 为 ${spring.application.name}.yaml
+        group: ${NACOS_GROUP:REALMAN_GROUP}
+        # 与 DataId 后缀一致；不指定时部分版本默认按 properties 处理导致拉错/为空
+        file-extension: yaml
+        # 2.x 默认开启鉴权时须与控制台账号一致，否则易拉取失败、日志里表现为 empty
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:nacos}
         refresh-enabled: true
+        # 命名空间填控制台「Namespace ID」；使用 public 时请勿填 public 字样，直接省略本项
+        # namespace: ${NACOS_NAMESPACE:}
   config:
     import:
       # liteflow 等本地片段
       - optional:classpath:config/application-liteflow.yml
-      # 远程配置变更会触发 Refresh；消费 @Value 的类需配合 @RefreshScope 才拿到新值
+      # 远程配置：DataId/Group/Namespace 以 spring.cloud.nacos.config 为准（勿在 import URI 中写未解析的占位符）
       - optional:nacos:${spring.application.name}.yaml?refreshEnabled=true
   profiles:
     active: '@profile.name@'

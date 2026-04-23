@@ -541,4 +541,6 @@ public interface ISysUserService extends IService<SysUser> {
     void updateClientId(String clientId,String userId);
 
 	Result<IPage<SysUser>> queryAllPageList(HttpServletRequest req, SysUserDTO user, Integer pageSize, Integer pageNo);
+
+	SysUser queryById(String userId);
 }

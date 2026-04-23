@@ -1,18 +1,25 @@
-FROM registry.cn-hangzhou.aliyuncs.com/dockerhub_mirror/java:17-anolis
+FROM eclipse-temurin:21-jre-alpine
 
-MAINTAINER jeecgos@163.com
+LABEL maintainer="realman@realman-robot.com"
 
-RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
+WORKDIR /app
 
-#RUN mkdir -p /jeecg-boot/config/jeecg/
+ENV TZ=Asia/Shanghai
+RUN apk add --no-cache tzdata && \
+    cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
+    echo "Asia/Shanghai" > /etc/timezone && \
+    rm -rf /var/cache/apk/*
 
-WORKDIR /realman-boot
+COPY target/realman-system-start-*.jar app.jar
+
+ENV JAVA_OPTS="-XX:+UseContainerSupport \
+    -XX:MaxRAMPercentage=70.0 \
+    -XX:InitialRAMPercentage=50.0 \
+    -XX:+UseG1GC \
+    -XX:MaxGCPauseMillis=200 \
+    -Xlog:gc*:file=/app/logs/gc.log:time,uptime:filecount=5,filesize=20m \
+    -Djava.security.egd=file:/dev/./urandom"
 
 EXPOSE 8080
 
-#ADD ./src/main/resources/jeecg ./config/jeecg
-ADD ./target/realman-system-start-3.9.1.jar ./
-
-RUN mkdir -p /realman-boot/config
-
-CMD sleep 60;java -Dfile.encoding=UTF-8 -Djava.security.egd=file:/dev/./urandom -jar realman-system-start-3.9.1.jar
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

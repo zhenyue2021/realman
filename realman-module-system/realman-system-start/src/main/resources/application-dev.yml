@@ -110,9 +110,13 @@ spring:
   cloud:
     nacos:
       discovery:
-        server-addr: 172.16.44.66:8848   # Nacos 地址
-        namespace: public                # 先用 public，后面需要再拆 namespace
-        group: REALMAN_GROUP             # 可自定义，比如 REALMAN_GROUP
+        server-addr: 172.16.44.66:8848
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${NACOS_GROUP:REALMAN_GROUP}
+      config:
+        server-addr: 172.16.44.66:8848
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${NACOS_GROUP:REALMAN_GROUP}
   autoconfigure:
     exclude:
       - com.alibaba.druid.spring.boot3.autoconfigure.DruidDataSourceAutoConfigure
@@ -222,7 +226,7 @@ jeecg:
     #webapp文件路径
     webapp: /opt/webapp
   shiro:
-    excludeUrls: /sys/api/translateManyDict
+    excludeUrls: /sys/api/**
   # 短信发送方式 aliyun阿里云短信 tencent腾讯云短信
   smsSendType: aliyun
   #阿里云oss存储和大鱼短信秘钥配置
