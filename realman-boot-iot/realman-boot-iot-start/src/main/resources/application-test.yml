@@ -1,0 +1,145 @@
+
+spring:
+  application:
+    name: realman-iot
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.quartz.QuartzAutoConfiguration
+  cloud:
+    nacos:
+      # namespace 须填控制台「命名空间 ID」；默认 public 对应 ID 为空，勿填 public 字样否则拉取为空
+      discovery:
+        server-addr: ${NACOS_SERVER_ADDR:realman-nacos:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${NACOS_GROUP:REALMAN_GROUP}
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:nacos}
+      config:
+        server-addr: ${NACOS_SERVER_ADDR:realman-nacos:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${NACOS_GROUP:REALMAN_GROUP}
+        file-extension: yaml
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:nacos}
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://realman-mysql:3306/realman-boot?characterEncoding=UTF-8&useUnicode=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
+    username: root
+    password: root@123456
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 20
+      connection-timeout: 30000
+  data:
+    redis:
+      host: realman-redis
+      port: 6379
+      password:
+      database: 0
+      lettuce:
+        pool:
+          min-idle: 2
+          max-active: 20
+          max-idle: 10
+  servlet:
+    multipart:
+      max-file-size: 500MB
+      max-request-size: 500MB
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: GMT+8
+
+mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml
+  configuration:
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      logic-delete-field: delFlag
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+# mqtt（enabled 勿在此写 false，否则会覆盖 Nacos 的 realman-iot.yaml；仅作无 Nacos 时的 broker 兜底）
+mqtt:
+  enabled: true
+  broker:
+    url: tcp://realman-emqx:1883
+    username: iot-platform
+    password: realman123
+    client-id: iot-platform-server
+    qos: 1
+    keep-alive: 60
+
+# 文件存储
+minio:
+  endpoint: http://realman-minio:9001
+  access-key: minioadmin
+  secret-key: realman123
+  bucket-name:
+    firmware: iot-firmware
+    slam: iot-slam
+  url-expire-days: 7
+
+# 定时任务
+xxl:
+  job:
+    enabled: true
+    admin:
+      addresses: http://realman-xxljob:8080/xxl-job-admin
+    executor:
+      appname: ${spring.application.name}
+      port: 30007
+    accessToken:
+
+jeecg:
+  shiro:
+    excludeUrls: /internal/mqtt/**,/api/device/**,/api/ota/**
+
+device:
+  encrypt:
+    enabled: false
+  ota:
+    chunk-temp-dir: /tmp/iot-ota-chunks
+
+# Zipkin 链路数据清理策略
+zipkin:
+  cleanup:
+    retention-days: 7        # 保留最近 N 天的链路数据，超期物理删除
+    database: zipkin          # Zipkin 所在的 MySQL 数据库名
+    batch-size: 5000          # 每批删除行数，避免大事务锁表
+
+# WebRTC 服务配置（TURN / STUN 服务器，下发给机器人设备）
+webrtc:
+  # TURN 服务器列表，支持多个
+  turn-servers:
+    - url: "39.107.117.20:3479?transport=udp"
+      username: "realman"
+      password: "TBdWj0HhwTK56AzK"
+  # STUN 服务器列表（英文逗号分隔，拆分后作为数组下发）
+  stun-servers: "stun:stun.l.google.com:19302"
+  # 信令服务器配置
+  # url: 信令服务器根地址（不含路径），密钥将通过 POST http://{url}:{port}/api/set_key 推送
+  # 缓存 Key = iot:signaling:key:{url}，TTL=26h，每天凌晨 2:00 自动刷新
+  signaling:
+    server:
+      url: 39.107.117.20
+      port: 2233
+      auto-push:
+        enabled: false  # 测试环境禁用启动时推送，生产环境设为 true 或删除此行
+
+logging:
+  level:
+    org.jeecg.modules.device: DEBUG
+    org.eclipse.paho: WARN
+    com.baomidou.mybatisplus: WARN
+
+# ===== 链路追踪（开发环境） =====
+# 100% 采样率已在 application.yml 中设为默认值，此处无需重复。
+# Loki / Zipkin 若尚未在本地启动，可取消下方注释以静默推送失败警告：
+# loki:
+#   url: ""   # 空字符串：loki4j 跳过推送，仅保留本地文件日志
+# management:
+#   zipkin:
+#     tracing:
+#       endpoint: ""  # 空字符串：Brave 跳过 Zipkin 上报

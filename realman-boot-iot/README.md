@@ -7,7 +7,7 @@ device-management/
 ├── device-api/       ← 对外 REST 接口层（Controller / DTO / VO）
 ├── device-biz/       ← 业务实现层（MQTT / OTA / Security / WebSocket / Scheduler）
 ├── device-start/     ← 主启动类 + application.yml
-└── sql/init.sql      ← 数据库初始化脚本
+└── sql/iot_init.sql      ← 数据库初始化脚本
 ```
 
 ## 设备鉴权架构
@@ -48,7 +48,7 @@ deviceAesKey = SHA256(masterKey + ":" + deviceSecret)[0..31]
 ### 2. 数据库初始化
 
 ```bash
-mysql -u root -p < sql/init.sql
+mysql -u root -p < sql/iot_init.sql
 ```
 
 ### 3. 修改配置
