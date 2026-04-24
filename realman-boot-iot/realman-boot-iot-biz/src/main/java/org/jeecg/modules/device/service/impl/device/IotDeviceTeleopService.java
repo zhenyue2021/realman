@@ -260,8 +260,8 @@ public class IotDeviceTeleopService {
 //            redisTemplate.delete(DeviceConstant.RedisKey.TELEOP_ROBOT_TO_MASTER + robotCode);
             log.info("[TeleopCache] 清除遥操关系缓存: master={} robot={}", controllerCode, robotCode);
 
-            // 7. 下发 WebRTC stop 并同步等待 ACK
-//            sendWebRtcStopAndAwait(robotCode);
+            // 7. 下发 WebRTC stop 不等待 ACK
+            sendWebRtcStopFireAndForget(robotCode);
 
             // 8. 销毁房间
             roomService.destroyRoom(controllerCode);
@@ -346,6 +346,28 @@ public class IotDeviceTeleopService {
         } catch (Exception e) {
             // stop 是 fire-and-forget，失败只记录，不影响主流程
             log.warn("[WebRtc] stop 指令发送失败 device={}", robotDeviceCode, e);
+        }
+    }
+
+    /**
+     * 向机器人下发 WebRTC 停止指令，不等待 ACK（fire-and-forget）。
+     * 适用于已无法等待响应的兜底清理场景（如超时回滚）。
+     *
+     * @param robotDeviceCode 机器人设备编码
+     */
+    private void sendWebRtcStopFireAndForget(String robotDeviceCode) {
+        try {
+            MqttMessageModel.WebRtcCommand stopCmd = MqttMessageModel.WebRtcCommand.builder()
+                    .command("stop")
+                    .commandId(IdUtil.fastSimpleUUID())
+                    .timestamp(System.currentTimeMillis())
+                    .build();
+            String topic = String.format(DeviceConstant.MqttTopic.WEBRTC_REQUEST, robotDeviceCode);
+            mqttPublisher.publishToDevice(robotDeviceCode, topic,
+                    objectMapper.writeValueAsString(stopCmd), MqttConstant.MQTT_QOS.QOS_1);
+            log.info("[WebRtc] 已下发 stop 指令（不等待ACK）device={}", robotDeviceCode);
+        } catch (Exception e) {
+            log.warn("[WebRtc] fire-and-forget stop 指令发送失败 device={}", robotDeviceCode, e);
         }
     }
 
