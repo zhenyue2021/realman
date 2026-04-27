@@ -9,9 +9,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.constant.DeviceConstant;
 import org.jeecg.modules.device.constant.WorkOrderConstant;
+import org.jeecg.modules.device.darwin.dto.DarwinWorkOrderCreateDTO;
+import org.jeecg.modules.device.darwin.entity.DarwinWorkOrderMapping;
+import org.jeecg.modules.device.darwin.mapper.DarwinWorkOrderMappingMapper;
 import org.jeecg.modules.device.dto.WorkOrderOperationRecordDTO;
+import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.entity.workorder.WorkOrder;
 import org.jeecg.modules.device.entity.workorder.WorkOrderDevice;
+import org.jeecg.modules.device.mapper.IotDeviceMapper;
 import org.jeecg.modules.device.mapper.workorder.WorkOrderDeviceMapper;
 import org.jeecg.modules.device.mapper.workorder.WorkOrderMapper;
 import org.jeecg.modules.device.service.workorder.IWorkOrderService;
@@ -21,6 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -34,6 +40,8 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
     private final WorkOrderDeviceMapper workOrderDeviceMapper;
     private final DeviceWebSocketServer deviceWebSocketServer;
     private final IWorkOrderStateMachineService workOrderStateMachine;
+    private final IotDeviceMapper iotDeviceMapper;
+    private final DarwinWorkOrderMappingMapper darwinMappingMapper;
 
     @Override
     public IPage<WorkOrder> pageWorkOrders(Page<WorkOrder> page, String agentId, String status) {
@@ -237,5 +245,65 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
             Page<WorkOrder> page,
             String controllerCode) {
         return workOrderMapper.pageWorkOrderOperationRecords(page, controllerCode);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public WorkOrder createWorkOrderFromDarwin(DarwinWorkOrderCreateDTO dto) {
+        WorkOrder order = new WorkOrder();
+        order.setTaskName(dto.getTaskName());
+        order.setPlanStartTime(dto.getPlanStartTime());
+        order.setPlanEndTime(dto.getPlanEndTime());
+        order.setUnitPrice(dto.getUnitPrice());
+        order.setRemark(dto.getRemark());
+        order.setStatus(WorkOrderConstant.ORDER_STATUS.PENDING);
+        order.setSource(2); // 达尔文来源
+        order.setCreateBy("darwin");
+        order.setUpdateBy("darwin");
+        this.save(order);
+
+        // 根据 deviceCode 查询设备并绑定
+        List<WorkOrderDevice> devices = new ArrayList<>();
+        if (dto.getDeviceCodes() != null) {
+            for (String code : dto.getDeviceCodes()) {
+                IotDevice device = iotDeviceMapper.selectOne(
+                        new LambdaQueryWrapper<IotDevice>().eq(IotDevice::getDeviceCode, code));
+                if (device == null) {
+                    log.warn("[Darwin] 设备不存在，跳过绑定 deviceCode={} darwinOrderId={}",
+                            code, dto.getDarwinOrderId());
+                    continue;
+                }
+                WorkOrderDevice wd = new WorkOrderDevice();
+                wd.setWorkOrderId(order.getId());
+                wd.setDeviceCode(device.getDeviceCode());
+                wd.setDeviceId(device.getId());
+                wd.setDeviceName(device.getDeviceName());
+                wd.setDeviceType(String.valueOf(device.getDeviceType()));
+                wd.setCreateTime(LocalDateTime.now());
+                devices.add(wd);
+            }
+        }
+        if (!devices.isEmpty()) {
+            bindDevices(order.getId(), devices);
+        }
+
+        // 写入达尔文映射记录
+        DarwinWorkOrderMapping mapping = new DarwinWorkOrderMapping();
+        mapping.setWorkOrderId(order.getId());
+        mapping.setDarwinOrderId(dto.getDarwinOrderId());
+        mapping.setDarwinAgentId(dto.getDarwinAgentId());
+        mapping.setDarwinAgentName(dto.getDarwinAgentName());
+        mapping.setDarwinDeptId(dto.getDarwinDeptId());
+        mapping.setDarwinDeptName(dto.getDarwinDeptName());
+        mapping.setCreateBy("darwin");
+        mapping.setUpdateBy("darwin");
+        try {
+            mapping.setRawMessage(objectMapper.writeValueAsString(dto));
+        } catch (Exception ignored) {}
+        darwinMappingMapper.insert(mapping);
+
+        log.info("[Darwin] 工单创建完成 workOrderId={} darwinOrderId={} devices={}",
+                order.getId(), dto.getDarwinOrderId(), devices.size());
+        return order;
     }
 }

@@ -81,6 +81,7 @@
 		<qiniu-java-sdk.version>7.4.0</qiniu-java-sdk.version>
 		<jedis.version>3.8.0</jedis.version>
 		<baidu-java-sdk.version>4.16.19</baidu-java-sdk.version>
+		<rocketmq-spring.version>2.3.1</rocketmq-spring.version>
 		<!-- 默认跳过单元测试；显式执行测试时使用: mvn test -DskipTests=false -->
 		<skipTests>true</skipTests>
 		<!-- Surefire/JaCoCo：子模块可拼接 ${argLine}；无 JaCoCo 时为空 -->
