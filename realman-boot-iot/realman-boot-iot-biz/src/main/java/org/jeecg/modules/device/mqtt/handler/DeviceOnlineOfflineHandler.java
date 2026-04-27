@@ -5,12 +5,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.constant.DeviceConstant;
+import org.jeecg.modules.device.darwin.producer.DarwinDeviceStatusProducer;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.mapper.IotDeviceMapper;
 import org.jeecg.modules.device.service.IDeviceOperationLogService;
 import org.jeecg.modules.device.service.IIotDeviceRoomService;
 import org.jeecg.modules.device.service.PendingSyncService;
 import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
+import org.slf4j.MDC;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
@@ -61,6 +64,10 @@ public class DeviceOnlineOfflineHandler {
     private final PendingSyncService pendingSyncService;
     private final IIotDeviceRoomService roomService;
 
+    /** Darwin 集成未启用时为 null */
+    @Autowired(required = false)
+    private DarwinDeviceStatusProducer darwinProducer;
+
     /**
      * 处理设备上线事件
      *
@@ -98,6 +105,12 @@ public class DeviceOnlineOfflineHandler {
 
             // 设备上线后补推离线期间待同步的配置/OTA 指令
             pendingSyncService.flushPendingMessages(deviceCode);
+
+            // 向达尔文数采平台推送上线事件（Darwin 集成未启用时 darwinProducer 为 null）
+            if (darwinProducer != null) {
+                String deviceType = resolveDeviceType(device.getDeviceType());
+                darwinProducer.sendOnlineEvent(deviceCode, deviceType, MDC.get("traceId"));
+            }
         } catch (Exception e) {
             log.error("[Online] 处理异常", e);
         }
@@ -149,6 +162,12 @@ public class DeviceOnlineOfflineHandler {
             } catch (Exception roomEx) {
                 log.warn("[Offline] 房间销毁失败 deviceCode={}", deviceCode, roomEx);
             }
+
+            // 向达尔文数采平台推送下线事件
+            if (darwinProducer != null) {
+                String deviceType = resolveDeviceType(device.getDeviceType());
+                darwinProducer.sendOfflineEvent(deviceCode, deviceType, reason, MDC.get("traceId"));
+            }
         } catch (Exception e) {
             log.error("[Offline] 处理异常", e);
         }
@@ -199,5 +218,10 @@ public class DeviceOnlineOfflineHandler {
             log.warn("[OnlineOffline] 未知设备 deviceCode={}", deviceCode);
         }
         return device;
+    }
+
+    private String resolveDeviceType(Integer deviceType) {
+        if (deviceType == null) return "UNKNOWN";
+        return DeviceConstant.DeviceTypeInteger.CONTROLLER == deviceType ? "MASTER" : "SLAVE";
     }
 }

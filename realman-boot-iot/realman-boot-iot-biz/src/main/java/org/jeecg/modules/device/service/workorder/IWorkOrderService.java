@@ -3,6 +3,7 @@ package org.jeecg.modules.device.service.workorder;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
+import org.jeecg.modules.device.darwin.dto.DarwinWorkOrderCreateDTO;
 import org.jeecg.modules.device.dto.WorkOrderOperationRecordDTO;
 import org.jeecg.modules.device.entity.workorder.WorkOrder;
 import org.jeecg.modules.device.entity.workorder.WorkOrderDevice;
@@ -57,5 +58,11 @@ public interface IWorkOrderService extends IService<WorkOrder> {
     IPage<WorkOrderOperationRecordDTO> pageWorkOrderOperationRecords(
             Page<WorkOrder> page,
             String controllerCode);
+
+    /**
+     * 由达尔文平台工单消息创建内部工单，同时写入映射表。
+     * 调用方需确保 darwinOrderId 幂等性已前置校验。
+     */
+    WorkOrder createWorkOrderFromDarwin(DarwinWorkOrderCreateDTO dto);
 }
 

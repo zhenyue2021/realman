@@ -41,7 +41,7 @@ import java.net.UnknownHostException;
 })
 @SpringBootApplication(exclude = {DynamicDataSourceAutoConfiguration.class})
 @ComponentScan(basePackages = "org.jeecg", excludeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = MybatisPlusSaasConfig.class))
-@MapperScan({"org.jeecg.modules.device.mapper", "org.jeecg.modules.base.mapper"})
+@MapperScan({"org.jeecg.modules.device.mapper", "org.jeecg.modules.device.darwin.mapper", "org.jeecg.modules.base.mapper"})
 @EnableAsync
 @EnableScheduling
 public class RealmanDeviceApplication {

@@ -123,5 +123,9 @@ public class WorkOrder implements Serializable {
 
     @TableField("tenant_id")
     private String tenantId;
+
+    /** 来源：1=内部创建 2=达尔文平台 */
+    @TableField("source")
+    private Integer source;
 }
 
