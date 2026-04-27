@@ -162,7 +162,7 @@ public class MqttMessageDispatcherEndToEndTest {
         slamAckHandler = Mockito.mock(SlamAckHandler.class);
         slamStatesHandler = Mockito.mock(SlamStatesHandler.class);
         webRtcAckHandler = Mockito.mock(WebRtcAckHandler.class);
-        webRtcRestartHandler = new WebRtcRestartHandler(encryptService, objectMapper, webSocketServer);
+        webRtcRestartHandler = new WebRtcRestartHandler(encryptService, objectMapper, webSocketServer, logService);
         DeviceCameraStreamPendingService cameraStreamPendingService = Mockito.mock(DeviceCameraStreamPendingService.class);
         DeviceCameraStreamResponseHandler deviceCameraStreamResponseHandler = new DeviceCameraStreamResponseHandler(
                 encryptService,
