@@ -5,7 +5,6 @@
 
 本文档由 `docs/runbook/realman-boot-aliyun-runbook.md`（完整运行手册）与 `docs/runbook/aliyun-deployment-guide.md`（IoT/EMQX 补充说明）合并而成：以运行手册为骨架，并入设备加密环境变量、一机一密 EMQX HTTP 认证、IoT 库表与 MinIO 策略、生产风险等增量内容；冲突处以可执行步骤与仓库实际路径为准。
 
-
 ## 目录
 
 1. [服务器规格建议](#1-服务器规格建议)
@@ -29,28 +28,32 @@
 
 ### 资源评估
 
-| 服务 | 内存估算 | CPU |
-|---|---|---|
-| MySQL 8.0（buffer-pool 512M） | ~1.5 GB | 1-2 core |
-| Redis 7.2 | ~512 MB | 0.5 core |
-| Nacos v2.3.2（JVM 512M） | ~768 MB | 0.5 core |
-| EMQX 5.8 | ~512 MB | 1 core |
-| MinIO | ~512 MB | 0.5 core |
-| XXL-Job Admin | ~384 MB | 0.5 core |
-| realman-system（Spring Boot 3） | ~1.5 GB | 1-2 core |
-| realman-iot（Spring Boot 3） | ~1.5 GB | 1-2 core |
-| Zipkin | ~512 MB | 0.5 core |
-| Loki | ~512 MB | 0.5 core |
-| Grafana | ~512 MB | 0.5 core |
-| OS + Docker Daemon 开销 | ~2 GB | 1 core |
-| **合计** | **~11.2 GB** | **~9 core** |
+
+| 服务                            | 内存估算         | CPU         |
+| ----------------------------- | ------------ | ----------- |
+| MySQL 8.0（buffer-pool 512M）   | ~1.5 GB      | 1-2 core    |
+| Redis 7.2                     | ~512 MB      | 0.5 core    |
+| Nacos v2.3.2（JVM 512M）        | ~768 MB      | 0.5 core    |
+| EMQX 5.8                      | ~512 MB      | 1 core      |
+| MinIO                         | ~512 MB      | 0.5 core    |
+| XXL-Job Admin                 | ~384 MB      | 0.5 core    |
+| realman-system（Spring Boot 3） | ~1.5 GB      | 1-2 core    |
+| realman-iot（Spring Boot 3）    | ~1.5 GB      | 1-2 core    |
+| Zipkin                        | ~512 MB      | 0.5 core    |
+| Loki                          | ~512 MB      | 0.5 core    |
+| Grafana                       | ~512 MB      | 0.5 core    |
+| OS + Docker Daemon 开销         | ~2 GB        | 1 core      |
+| **合计**                        | **~11.2 GB** | **~9 core** |
+
 
 ### 推荐规格
 
-| 场景 | ECS 规格 | 系统盘 | 数据盘 | 公网带宽 |
-|---|---|---|---|---|
-| 开发/测试 | ecs.g7.xlarge（4C/16G） | ESSD PL0 100GB | ESSD PL1 200GB | 3Mbps |
+
+| 场景         | ECS 规格                     | 系统盘            | 数据盘                | 公网带宽           |
+| ---------- | -------------------------- | -------------- | ------------------ | -------------- |
+| 开发/测试      | ecs.g7.xlarge（4C/16G）      | ESSD PL0 100GB | ESSD PL1 200GB     | 3Mbps          |
 | **生产（推荐）** | **ecs.g7.2xlarge（8C/32G）** | ESSD PL0 100GB | **ESSD PL1 500GB** | 5Mbps 或 EIP 按量 |
+
 
 > - 持久化数据统一写入 `/opt/realman`（系统盘；若后续挂载独立数据盘，将 `/opt/realman` 整体迁移或软链接到挂载点即可）
 > - 设备规模超 1,000 台后，评估将 MySQL/EMQX 拆分到独立机器
@@ -59,24 +62,26 @@
 
 > 引入 Nginx 后，运维控制台统一经 `:80` 访问，大幅收窄对外暴露端口。
 
-| 端口 | 服务 | 安全组规则 |
-|---|---|---|
-| 22 | SSH | **仅限运维 IP 白名单** |
-| 80 | Nginx（统一入口） | 公网开放（运维访问所有控制台） |
-| 9999 | Spring Cloud Gateway | 公网开放（前端/API） |
-| 1883 | EMQX MQTT TCP | 公网开放（设备接入） |
-| 8083 | EMQX MQTT WebSocket | 公网开放（设备接入） |
-| 8883 | EMQX MQTT TLS | 公网开放（可选，需证书） |
-| 3306 | MySQL | **关闭**（SSH 隧道访问） |
-| 6379 | Redis | **关闭**（容器内访问） |
-| 8848 / 9848 | Nacos | **关闭**（经 Nginx /nacos 访问） |
-| 18083 | EMQX Dashboard | **关闭**（经 Nginx /emqx 访问） |
-| 3000 | Grafana | **关闭**（经 Nginx /grafana 访问） |
-| 9411 | Zipkin UI | **关闭**（经 Nginx /zipkin 访问） |
-| 9001 | MinIO S3 API | **关闭**（容器内访问） |
-| 9090 | MinIO Console | **关闭**（经 Nginx /minio/ 访问） |
-| 9080 | XXL-Job Admin | **关闭**（经 Nginx /xxl-job-admin 访问） |
-| 3100 | Loki | **关闭**（容器内访问） |
+
+| 端口          | 服务                   | 安全组规则                             |
+| ----------- | -------------------- | --------------------------------- |
+| 22          | SSH                  | **仅限运维 IP 白名单**                   |
+| 80          | Nginx（统一入口）          | 公网开放（运维访问所有控制台）                   |
+| 9999        | Spring Cloud Gateway | 公网开放（前端/API）                      |
+| 1883        | EMQX MQTT TCP        | 公网开放（设备接入）                        |
+| 8083        | EMQX MQTT WebSocket  | 公网开放（设备接入）                        |
+| 8883        | EMQX MQTT TLS        | 公网开放（可选，需证书）                      |
+| 3306        | MySQL                | **关闭**（SSH 隧道访问）                  |
+| 6379        | Redis                | **关闭**（容器内访问）                     |
+| 8848 / 9848 | Nacos                | **关闭**（经 Nginx /nacos 访问）         |
+| 18083       | EMQX Dashboard       | **关闭**（经 Nginx /emqx 访问）          |
+| 3000        | Grafana              | **关闭**（经 Nginx /grafana 访问）       |
+| 9411        | Zipkin UI            | **关闭**（经 Nginx /zipkin 访问）        |
+| 9001        | MinIO S3 API         | **关闭**（容器内访问）                     |
+| 9090        | MinIO Console        | **关闭**（经 Nginx /minio/ 访问）        |
+| 9080        | XXL-Job Admin        | **关闭**（经 Nginx /xxl-job-admin 访问） |
+| 3100        | Loki                 | **关闭**（容器内访问）                     |
+
 
 ---
 
@@ -134,48 +139,48 @@ Zipkin（链路详情）
 
 ### 3.1 代码与配置
 
-- [ ] 所有代码已合并到 `master` 分支，CI 构建通过
-- [ ] 生产 Nacos 配置已确认以下项：
+- 所有代码已合并到 `master` 分支，CI 构建通过
+- 生产 Nacos 配置已确认以下项：
   - `TRACE_SAMPLING=0.1`（生产采样率 10%）
   - `knife4j.production: true`（关闭 Swagger 公网访问）
   - `jeecg.firewall.lowCodeMode: prod`（关闭在线开发功能）
   - `server.error.include-stacktrace: NEVER`
   - `jeecg.signatureSecret` 已替换为生产专用密钥
-- [ ] **IoT 设备通信**：宿主机 `/opt/realman/app/.env` 中已准备 `DEVICE_ENCRYPT_MASTER_KEY`（32 字节随机串，用于一机一密；丢失将导致已注册设备无法鉴权）；按需配置 `DEVICE_STREAM_SECRET`（流媒体相关）
+- **IoT 设备通信**：宿主机 `/opt/realman/app/.env` 中已准备 `DEVICE_ENCRYPT_MASTER_KEY`（32 字节随机串，用于一机一密；丢失将导致已注册设备无法鉴权）；按需配置 `DEVICE_STREAM_SECRET`（流媒体相关）
 
 ### 3.2 数据库
 
-- [ ] 本次迭代正向 DDL 脚本已准备
-- [ ] 对应回滚 DDL 脚本已准备
-- [ ] 已在测试环境执行验证通过
-- [ ] **首次部署**：`jeecg-boot`、`nacos`、`xxl_job` 数据库初始化 SQL 已就绪
-- [ ] **IoT 业务库**：已准备 `realman-boot-iot/sql/` 下初始化脚本（至少包含 `iot_init.sql`；若仓库另有 SLAM/OTA 等增量脚本，一并纳入发布包并在测试环境验证）
-- [ ] **更新部署**：已对生产库执行备份（见 [9.2](#92-生产数据库备份更新部署必做首次跳过)）
+- 本次迭代正向 DDL 脚本已准备
+- 对应回滚 DDL 脚本已准备
+- 已在测试环境执行验证通过
+- **首次部署**：`jeecg-boot`、`nacos`、`xxl_job` 数据库初始化 SQL 已就绪
+- **IoT 业务库**：已准备 `realman-boot-iot/sql/` 下初始化脚本（至少包含 `iot_init.sql`；若仓库另有 SLAM/OTA 等增量脚本，一并纳入发布包并在测试环境验证）
+- **更新部署**：已对生产库执行备份（见 [9.2](#92-生产数据库备份更新部署必做首次跳过)）
 
 ### 3.3 中间件依赖确认
 
-- [ ] MySQL 健康，三个库已创建
-- [ ] Redis 健康，密码已配置并同步到 Nacos
-- [ ] Nacos 健康，`REALMAN_GROUP` 下配置已录入
-- [ ] EMQX 认证用户 `iot-platform` 已创建
-- [ ] MinIO Bucket 已创建：`iot-firmware`、`iot-slam`
-- [ ] Loki 健康（`/ready` 返回 200）
-- [ ] Grafana 健康，Loki / Zipkin 数据源已自动注入
+- MySQL 健康，三个库已创建
+- Redis 健康，密码已配置并同步到 Nacos
+- Nacos 健康，`REALMAN_GROUP` 下配置已录入
+- EMQX 认证用户 `iot-platform` 已创建
+- MinIO Bucket 已创建：`iot-firmware`、`iot-slam`
+- Loki 健康（`/ready` 返回 200）
+- Grafana 健康，Loki / Zipkin 数据源已自动注入
 
 ### 3.4 集群安全（对照 `docs/改造清单.md`）
 
-- [ ] P0-1 Session 分布式：单机豁免，后续扩容前必须完成
-- [ ] P0-2 OTA 分片本地存储（`/tmp/iot-ota-chunks`）：单机可运行，扩容前改用 MinIO
-- [ ] P0-3 短信限流本地 Map（`DySmsLimit.java`）：评估是否已修复
-- [ ] 确认无新增 `static Map` 本地缓存
-- [ ] 确认 `@Cacheable` 指向 Redis
+- P0-1 Session 分布式：单机豁免，后续扩容前必须完成
+- P0-2 OTA 分片本地存储（`/tmp/iot-ota-chunks`）：单机可运行，扩容前改用 MinIO
+- P0-3 短信限流本地 Map（`DySmsLimit.java`）：评估是否已修复
+- 确认无新增 `static Map` 本地缓存
+- 确认 `@Cacheable` 指向 Redis
 
 ### 3.5 安全核查
 
-- [ ] 代码中无硬编码密钥
-- [ ] 日志不含密码、手机号等敏感字段
-- [ ] 文件上传接口已配置 MIME 校验和大小限制
-- [ ] Grafana 默认密码（admin/admin）首次登录后已修改
+- 代码中无硬编码密钥
+- 日志不含密码、手机号等敏感字段
+- 文件上传接口已配置 MIME 校验和大小限制
+- Grafana 默认密码（admin/admin）首次登录后已修改
 
 ---
 
@@ -440,7 +445,9 @@ SPRING_PROFILES_ACTIVE=prod
 DEVICE_ENCRYPT_MASTER_KEY=your-32-bytes-secure-random-string 
 EOF
 ```
+
 > `env` IoT：设备通信加密 DEVICE_ENCRYPT_MASTER_KEY：按需配置
+
 ---
 
 ## 6. Docker Compose（完整生产版）
@@ -459,6 +466,7 @@ services:
   #   Zipkin:     http://<host>/zipkin
   #   EMQX Dashboard: http://<host>/emqx
   #   MinIO Console:  http://<host>/minio/
+  #   gln_teleop / gln_admin 静态页: http://<host>/gln_teleop/ 、http://<host>/gln_admin/（见 volumes）
   # ============================================================
   nginx:
     image: nginx:1.25-alpine
@@ -468,6 +476,9 @@ services:
       - "80:80"
     volumes:
       - /opt/realman/app/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      # 前端静态站：宿主机根目录须含 index.html，分别映射到 /usr/share/nginx/html/<子路径>/
+      - /opt/realman/app/frontend/gln_teleop:/usr/share/nginx/html/gln_teleop:ro
+      - /opt/realman/app/frontend/gln_admin:/usr/share/nginx/html/gln_admin:ro
     depends_on:
       - nacos
       - grafana
@@ -771,6 +782,8 @@ networks:
     name: realman-net
 ```
 
+**gln_teleop / gln_admin 访问 404：** 在 `nginx` 服务中已挂载 `frontend/gln_teleop`、`frontend/gln_admin` 到容器内 `.../gln_teleop`、`.../gln_admin` 后，执行 `docker compose up -d nginx`；`docker exec realman-nginx ls /usr/share/nginx/html/gln_teleop` 与 `.../gln_admin` 下应能分别看到 `index.html`。构建时各项目 `base` 须为 `/gln_teleop/` 与 `/gln_admin/`，与 Nginx 子路径一致。
+
 ---
 
 ## 7. Dockerfile
@@ -887,6 +900,7 @@ echo "上传完成"
 ```
 
 > 首次部署还需上传 SQL 脚本：
+>
 > ```bash
 > scp sql/jeecg_boot_init.sql sql/nacos_init.sql sql/xxljob_init.sql \
 >     ${SERVER}:/opt/realman/app/sql/
@@ -1029,9 +1043,10 @@ echo "Grafana 已启动：http://localhost:3000"
 ### 9.8 EMQX 初始化（首次部署）
 
 访问 `http://<服务器IP>:18083`（admin / public）：
+
 1. **立即修改 Dashboard 默认密码**
 2. `Access Control → Authentication → Built-in Database → 添加用户`
-   - 用户名：`iot-platform`，密码：`realman123`
+  - 用户名：`iot-platform`，密码：`realman123`
 
 #### 9.8.1 一机一密：EMQX HTTP 认证与 ACL（与 realman-iot 联调时配置）
 
@@ -1311,16 +1326,13 @@ if results:
 
 1. 浏览器访问 `http://<服务器IP>:3000`，用 admin 账号登录（**登录后立即修改密码**）
 2. 进入 `Connections → Data Sources`，确认：
-   - **Loki** 数据源状态为绿色 `Data source connected and labels found`
-   - **Zipkin** 数据源状态为绿色
+  - **Loki** 数据源状态为绿色 `Data source connected and labels found`
+  - **Zipkin** 数据源状态为绿色
 3. 进入 `Explore`，选择 Loki 数据源，输入 LogQL：
-
-   ```logql
+  ```logql
    {app="realman-iot-szy"} |= "Started"
-   ```
-
+  ```
    确认能查到应用启动日志。
-
 4. 选择一条含 `traceId=` 的日志行，点击 `traceId` 超链接，确认跳转到 Zipkin 对应链路详情。
 
 ### 10.6 Zipkin 链路追踪验证
@@ -1474,12 +1486,14 @@ crontab -e
 
 以下与 `docs/改造清单.md`、集群化设计文档及 [第 12 节](#12-日常运维参考) 对照阅读；单机 Compose 可运行，多实例前须逐项消除单点假设。
 
-| 风险点 | 说明 | 建议动作 |
-| :--- | :--- | :--- |
-| **OTA 固件分片** | 默认可能使用本地路径（如 `/tmp/iot-ota-chunks`） | 扩容多实例前改为共享存储或 MinIO 等统一对象存储 |
-| **SLAM 指令状态** | 内存级等待 ACK | 服务重启可能导致 PENDING 丢失；可配合 XXL-Job 补偿或业务幂等设计 |
-| **WebSocket / Session** | 本地 Session Map | 多机需 Redis Pub/Sub、统一会话或网关粘性会话等方案 |
-| **磁盘空间** | 日志、SLAM 地图、备份 | 监控 `/opt`，定期清理 `backup/` 中过期文件；Loki 按保留策略 Compaction |
+
+| 风险点                     | 说明                                  | 建议动作                                                 |
+| ----------------------- | ----------------------------------- | ---------------------------------------------------- |
+| **OTA 固件分片**            | 默认可能使用本地路径（如 `/tmp/iot-ota-chunks`） | 扩容多实例前改为共享存储或 MinIO 等统一对象存储                          |
+| **SLAM 指令状态**           | 内存级等待 ACK                           | 服务重启可能导致 PENDING 丢失；可配合 XXL-Job 补偿或业务幂等设计            |
+| **WebSocket / Session** | 本地 Session Map                      | 多机需 Redis Pub/Sub、统一会话或网关粘性会话等方案                     |
+| **磁盘空间**                | 日志、SLAM 地图、备份                       | 监控 `/opt`，定期清理 `backup/` 中过期文件；Loki 按保留策略 Compaction |
+
 
 ---
 
@@ -1529,26 +1543,31 @@ crontab -e
 
 ### 附录 B：端口速查表
 
-| 容器名 | 宿主机端口 | 访问地址 / 说明 |
-|---|---|---|
-| realman-mysql | 3306 | 内网访问 |
-| realman-redis | 6379 | 内网访问 |
-| realman-nacos | 8848 / 9848 | `http://<IP>:8848/nacos` |
-| realman-emqx | 1883 / 8083 / 18083 | Dashboard: `http://<IP>:18083` |
-| realman-minio | 9001 / 9090 | Console: `http://<IP>:9090` |
-| realman-xxljob | 9080 | `http://<IP>:9080/xxl-job-admin` |
-| realman-zipkin | 9411 | `http://<IP>:9411` |
-| realman-loki | 3100 | 内网（容器间），不对外暴露 |
-| realman-grafana | 3000 | `http://<IP>:3000` |
-| realman-system | 8080 | `http://<IP>:8080/realman-boot` |
-| realman-iot | 8085 | `http://<IP>:8085/realman-iot` |
+
+| 容器名             | 宿主机端口               | 访问地址 / 说明                        |
+| --------------- | ------------------- | -------------------------------- |
+| realman-mysql   | 3306                | 内网访问                             |
+| realman-redis   | 6379                | 内网访问                             |
+| realman-nacos   | 8848 / 9848         | `http://<IP>:8848/nacos`         |
+| realman-emqx    | 1883 / 8083 / 18083 | Dashboard: `http://<IP>:18083`   |
+| realman-minio   | 9001 / 9090         | Console: `http://<IP>:9090`      |
+| realman-xxljob  | 9080                | `http://<IP>:9080/xxl-job-admin` |
+| realman-zipkin  | 9411                | `http://<IP>:9411`               |
+| realman-loki    | 3100                | 内网（容器间），不对外暴露                    |
+| realman-grafana | 3000                | `http://<IP>:3000`               |
+| realman-system  | 8080                | `http://<IP>:8080/realman-boot`  |
+| realman-iot     | 8085                | `http://<IP>:8085/realman-iot`   |
+
 
 ### 附录 C：后续扩容评估节点
 
-| 触发条件 | 建议动作 |
-|---|---|
-| 在线设备 > 1,000 台 | EMQX 独立部署，应用机与基础设施机拆分 |
-| MySQL CPU > 70% 持续 5min | 升级规格或开读写分离 |
-| 整机内存 > 80% | 升级到 ecs.g7.4xlarge（16C/64G） |
-| Loki 数据目录 > 100GB | 评估迁移到阿里云 OSS 作为 Loki 存储后端 |
-| 需要多节点高可用 | 完成 `docs/改造清单.md` 全部集群化改造 |
+
+| 触发条件                    | 建议动作                        |
+| ----------------------- | --------------------------- |
+| 在线设备 > 1,000 台          | EMQX 独立部署，应用机与基础设施机拆分       |
+| MySQL CPU > 70% 持续 5min | 升级规格或开读写分离                  |
+| 整机内存 > 80%              | 升级到 ecs.g7.4xlarge（16C/64G） |
+| Loki 数据目录 > 100GB       | 评估迁移到阿里云 OSS 作为 Loki 存储后端   |
+| 需要多节点高可用                | 完成 `docs/改造清单.md` 全部集群化改造   |
+
+
