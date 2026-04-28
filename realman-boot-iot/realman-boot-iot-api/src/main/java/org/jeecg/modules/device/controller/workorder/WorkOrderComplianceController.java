@@ -6,20 +6,22 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
-import org.jeecg.common.exception.JeecgBootException;
-import org.jeecg.common.system.util.JwtUtil;
 import org.jeecg.common.util.ContentDispositionUtil;
+import org.jeecg.modules.device.util.RequestUtil;
 import org.jeecg.modules.device.api.WorkOrderComplianceApiService;
 import org.jeecg.modules.device.dto.OptionDTO;
 import org.jeecg.modules.device.dto.OptionTreeDTO;
 import org.jeecg.modules.device.dto.workorder.WorkOrderComplianceConfigDetailDTO;
 import org.jeecg.modules.device.dto.workorder.WorkOrderComplianceConfigPageVo;
+import org.jeecg.modules.device.dto.workorder.WorkOrderComplianceCreateDTO;
 import org.jeecg.modules.device.dto.workorder.WorkOrderComplianceQueryDTO;
 import org.jeecg.modules.device.entity.workorder.WorkOrderComplianceConfig;
+import org.jeecg.modules.device.util.WorkOrderExcelExportUtil;
 import org.jeecg.modules.device.vo.ApiResult;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -46,13 +48,9 @@ public class WorkOrderComplianceController {
 
     @PostMapping("/add")
     @Operation(summary = "新增工单合规配置")
-    public ApiResult<WorkOrderComplianceConfig> create(@RequestBody WorkOrderComplianceConfig config,
+    public ApiResult<WorkOrderComplianceConfig> create(@RequestBody @Validated WorkOrderComplianceCreateDTO config,
                                                        HttpServletRequest request) {
-        String operator = null;
-        try {
-            operator = JwtUtil.getUserNameByToken(request);
-        } catch (JeecgBootException ignored) {
-        }
+        String operator = RequestUtil.safeUsername(request);
         WorkOrderComplianceConfig created = apiService.create(config, operator);
         return ApiResult.ok(created);
     }
@@ -78,13 +76,9 @@ public class WorkOrderComplianceController {
     @PutMapping("/{id}")
     @Operation(summary = "修改工单合规配置")
     public ApiResult<WorkOrderComplianceConfig> update(@PathVariable String id,
-                                                       @RequestBody WorkOrderComplianceConfig config,
+                                                       @RequestBody @Validated WorkOrderComplianceCreateDTO config,
                                                        HttpServletRequest request) {
-        String operator = null;
-        try {
-            operator = JwtUtil.getUserNameByToken(request);
-        } catch (JeecgBootException ignored) {
-        }
+        String operator = RequestUtil.safeUsername(request);
         WorkOrderComplianceConfig updated = apiService.update(id, config, operator);
         return ApiResult.ok(updated);
     }
@@ -100,7 +94,7 @@ public class WorkOrderComplianceController {
     @Operation(summary = "导出工单合规配置Excel")
     public ResponseEntity<byte[]> export(@RequestBody WorkOrderComplianceQueryDTO query) {
         List<WorkOrderComplianceConfig> list = apiService.listForExport(query);
-        byte[] bytes = org.jeecg.modules.device.util.WorkOrderExcelExportUtil.exportComplianceConfigs(list);
+        byte[] bytes = WorkOrderExcelExportUtil.exportComplianceConfigs(list);
         String filename = "work_order_compliance_" + System.currentTimeMillis() + ".xlsx";
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
