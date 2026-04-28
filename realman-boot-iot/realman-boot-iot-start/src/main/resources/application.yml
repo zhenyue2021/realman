@@ -2,6 +2,9 @@ server:
   port: 8085
   servlet:
     context-path: /realman-iot
+  # framework 会启用 ForwardedHeaderFilter，在部分反代链路与 WebSocket 握手组合下可能导致 Upgrade 等头异常；按需改为 framework
+  forward-headers-strategy: none
+
 
 spring:
   application:
