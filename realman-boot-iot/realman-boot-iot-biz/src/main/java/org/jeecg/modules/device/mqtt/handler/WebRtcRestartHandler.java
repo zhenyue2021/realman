@@ -3,8 +3,10 @@ package org.jeecg.modules.device.mqtt.handler;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jeecg.modules.device.constant.DeviceConstant;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.security.CommandEncryptService;
+import org.jeecg.modules.device.service.IDeviceOperationLogService;
 import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -33,6 +35,7 @@ public class WebRtcRestartHandler {
     private final CommandEncryptService encryptService;
     private final ObjectMapper          objectMapper;
     private final DeviceWebSocketServer webSocketServer;
+    private final IDeviceOperationLogService logService;
 
     /**
      * 处理 WebRTC 信令服务重启通知
@@ -48,6 +51,11 @@ public class WebRtcRestartHandler {
             log.info("[WebRtcRestart] 信令服务已重启 deviceCode={} commandId={} timestamp={}",
                     deviceCode, restart.getCommandId(), restart.getTimestamp());
             webSocketServer.pushWebRtcRestart(deviceCode, decrypted);
+            logService.recordLog(null, deviceCode,
+                    DeviceConstant.OperationType.COMMAND_SEND,
+                    "设备上报WebRTC信令服务重启",
+                    "{commandId:" + restart.getCommandId() + "}",
+                    DeviceConstant.OperationSource.DEVICE, "SUCCESS", null, null, null);
         } catch (Exception e) {
             log.error("[WebRtcRestart] 处理异常 deviceCode={}", deviceCode, e);
         }

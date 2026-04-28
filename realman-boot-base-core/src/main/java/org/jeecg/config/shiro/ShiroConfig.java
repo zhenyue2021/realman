@@ -155,6 +155,9 @@ public class ShiroConfig {
         filterChainDefinitionMap.put("/websocket/**", "anon");//系统通知和公告
         filterChainDefinitionMap.put("/newsWebsocket/**", "anon");//CMS模块
         filterChainDefinitionMap.put("/vxeSocket/**", "anon");//JVxeTable无痕刷新示例
+        filterChainDefinitionMap.put("/ws/**", "anon");//IoT 设备 WebSocket（DeviceWebSocketServer）
+        // 部分容器 / 代理路径下 Shiro 可能按「含 context-path 的 servletPath」匹配；与 /ws/** 并存，避免误落到 /** → jwt
+        filterChainDefinitionMap.put("/realman-iot/ws/**", "anon");//IoT 设备 WS（与 context-path 对齐的兜底）
         //App vue3版本查询版本接口
         filterChainDefinitionMap.put("/sys/version/app3version", "anon");
         //仪表盘（按钮通信）

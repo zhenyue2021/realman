@@ -1,11 +1,9 @@
 package org.jeecg.modules.device.service.impl.device;
 
 import cn.hutool.core.util.IdUtil;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jeecg.modules.device.config.WebRtcProperties;
 import org.jeecg.modules.device.constant.DeviceConstant;
 import org.jeecg.modules.device.constant.MqttConstant;
 import org.jeecg.modules.device.entity.IotDevice;
@@ -15,11 +13,11 @@ import org.jeecg.modules.device.mqtt.publisher.MqttPublisher;
 import org.jeecg.modules.device.service.IDeviceOperationLogService;
 import org.jeecg.modules.device.service.IIotDeviceRoomService;
 import org.jeecg.modules.device.service.WebRtcAckPendingService;
-import org.jeecg.modules.device.service.signaling.SignalingKeyService;
 import org.jeecg.modules.device.vo.DeviceCameraStreamVO;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -127,7 +125,7 @@ public class IotDeviceTeleopService {
                     DeviceConstant.OperationType.COMMAND_SEND,
                     "主控连接设备，设备使用状态置为使用中", "{commandId:" + commandId + ",controllerDeviceCode:" + controllerDeviceCode + "}",
                     DeviceConstant.OperationSource.PLATFORM, "SUCCESS", null, operator, null);*/
-            sendWebRtcStartAndAwait(controllerDeviceCode, robotDeviceCode);
+            sendWebRtcStartAndAwait(controllerDeviceCode, robotDeviceCode, robotId, operator);
             roomService.robotJoin(controllerDeviceCode, robotDeviceCode);
         } catch (Exception e) {
             throw new RuntimeException("开始遥操失败: " + e.getMessage(), e);
@@ -289,10 +287,12 @@ public class IotDeviceTeleopService {
      * </ol>
      *
      * @param masterDeviceCode 主控设备编码
-     * @param robotDeviceCode   机器人设备编码
+     * @param robotDeviceCode  机器人设备编码
+     * @param robotId           机器人设备id
      * @throws RuntimeException 机器人未响应或返回失败时
      */
-    private void sendWebRtcStartAndAwait(String masterDeviceCode, String robotDeviceCode) throws Exception {
+    private void sendWebRtcStartAndAwait(String masterDeviceCode, String robotDeviceCode,
+                                          String robotId, String operator) throws Exception {
         String webRtcCommandId = IdUtil.fastSimpleUUID();
         CompletableFuture<MqttMessageModel.WebRtcAck> future =
                 webRtcAckPendingService.register(webRtcCommandId);
@@ -304,10 +304,16 @@ public class IotDeviceTeleopService {
             webRtcCommand.setCommand("start");
 
             String topic = String.format(DeviceConstant.MqttTopic.WEBRTC_REQUEST, robotDeviceCode);
+            String payload = objectMapper.writeValueAsString(webRtcCommand);
             mqttPublisher.publishToDevice(robotDeviceCode, topic,
-                    objectMapper.writeValueAsString(webRtcCommand), MqttConstant.MQTT_QOS.QOS_1);
+                    payload, MqttConstant.MQTT_QOS.QOS_1);
             log.info("[WebRtc] 已下发 start 指令 device={} commandId={} roomId={}",
                     robotDeviceCode, webRtcCommandId, webRtcCommand.getRoomId());
+            logService.recordLog(robotId, robotDeviceCode,
+                    DeviceConstant.OperationType.COMMAND_SEND,
+                    "平台下发WebRTC start指令，等待机器人建立连接",
+                    "{commandId:" + webRtcCommandId + ",masterCode:" + masterDeviceCode +  ",robotDeviceCode:" + robotDeviceCode + "}",
+                    DeviceConstant.OperationSource.PLATFORM, "SUCCESS", null, operator, LocalDateTime.now());
         } catch (Exception e) {
             webRtcAckPendingService.completeExceptionally(webRtcCommandId, e);
             throw new RuntimeException("WebRTC 开始指令发送失败: " + e.getMessage(), e);

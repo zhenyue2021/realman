@@ -460,13 +460,14 @@ services:
   # ============================================================
   # 反向代理 — Nginx（统一入口，端口 80）
   # 各服务访问地址：
+  #   GLN Teleop: http://<host>/gln_teleop/
   #   Nacos:      http://<host>/nacos
   #   XXL-Job:    http://<host>/xxl-job-admin
   #   Grafana:    http://<host>/grafana
   #   Zipkin:     http://<host>/zipkin
   #   EMQX Dashboard: http://<host>/emqx
   #   MinIO Console:  http://<host>/minio/
-  #   gln_teleop / gln_admin 静态页: http://<host>/gln_teleop/ 、http://<host>/gln_admin/（见 volumes）
+  #   device whoami: http://<host>/api/v1/device/whoami（反代宿主机 9091，见 nginx + extra_hosts）
   # ============================================================
   nginx:
     image: nginx:1.25-alpine
@@ -476,7 +477,6 @@ services:
       - "80:80"
     volumes:
       - /opt/realman/app/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      # 前端静态站：宿主机根目录须含 index.html，分别映射到 /usr/share/nginx/html/<子路径>/
       - /opt/realman/app/frontend/gln_teleop:/usr/share/nginx/html/gln_teleop:ro
       - /opt/realman/app/frontend/gln_admin:/usr/share/nginx/html/gln_admin:ro
     depends_on:
@@ -486,6 +486,9 @@ services:
       - emqx
       - minio
       - xxl-job-admin
+    # 供 nginx 访问「宿主机」上的服务（如 device whoami :9091）；127.0.0.1 在容器内指向容器自身
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - realman-net
 
@@ -608,7 +611,7 @@ services:
       TZ: Asia/Shanghai
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: realman123
-      MINIO_BROWSER_REDIRECT_URL: http://10.10.17.237/minio
+      MINIO_BROWSER_REDIRECT_URL: http://10.10.17.237/minio/
     ports:
       - "9001:9000"     # S3 API（应用内网访问）
       # Console 经 Nginx /minio/ 代理，无需对外暴露

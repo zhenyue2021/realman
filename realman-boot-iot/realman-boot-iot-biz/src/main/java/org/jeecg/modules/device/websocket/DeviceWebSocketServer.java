@@ -1,9 +1,7 @@
 package org.jeecg.modules.device.websocket;
 
 import jakarta.annotation.PostConstruct;
-import jakarta.websocket.*;
-import jakarta.websocket.server.PathParam;
-import jakarta.websocket.server.ServerEndpoint;
+import jakarta.websocket.Session;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.connection.Message;
@@ -12,7 +10,6 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import org.jeecg.modules.device.constant.DeviceConstant;
 
-import java.io.EOFException;
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -41,14 +38,12 @@ import java.util.concurrent.TimeUnit;
  * </pre>
  * 无论浏览器连接到哪个节点，该节点的 {@link #onMessage} 都会触发并推送，保证消息必达。
  *
- * <p>注意：{@link ServerEndpoint} 的 WebSocket 框架会为每个连接创建新实例，
- * 因此 {@link #sessions} 必须是 {@code static} 共享的；
- * {@link #redisTemplate} 通过 {@link Autowired} 注入到 Spring 管理的单例实例上，
- * {@code pushXxx()} 方法均在该单例上调用，injection 正确可用。
+ * <p>长连接由 Spring {@link org.springframework.web.socket.WebSocketHandler}
+ *（{@link org.jeecg.modules.device.config.DeviceWebSocketMvcConfig}）注册；{@link #sessions} 仍为 {@code static}。
+ * {@link #redisTemplate} 注入在 Spring 单例上，{@code pushXxx()} 均在单例实例上调用。
  */
 @Slf4j
 @Component
-@ServerEndpoint("/ws/device/{deviceCode}")
 public class DeviceWebSocketServer implements MessageListener {
 
     /** Redis 广播频道前缀：iot:ws:push:{targetCode}（targetCode 可为 deviceCode 或 {@code realman}） */
@@ -81,11 +76,7 @@ public class DeviceWebSocketServer implements MessageListener {
      */
     private static volatile DeviceWebSocketServer instance;
 
-    /**
-     * field 注入（@ServerEndpoint 与构造器注入存在兼容性问题，统一使用 @Autowired field 注入）。
-     * 仅在 Spring 管理的单例实例上有效，WebSocket 框架创建的连接实例无此注入，
-     * 但连接实例只使用 static sessions，不需要 redisTemplate。
-     */
+    /** field 注入：推送与 Redis Pub/Sub 均在本 Spring 单例上执行 */
     @Autowired
     private StringRedisTemplate redisTemplate;
 
@@ -109,40 +100,18 @@ public class DeviceWebSocketServer implements MessageListener {
     }
 
     // -------------------------------------------------------------------------
-    // WebSocket 生命周期回调（由 WebSocket 框架在连接实例上调用，只操作 static sessions）
+    // Spring WebSocket 建立/释放（由 DeviceWebSocketChannelHandler 调用，只操作 static sessions）
     // -------------------------------------------------------------------------
 
-    @OnOpen
-    public void onOpen(Session session, @PathParam("deviceCode") String deviceCode) {
+    /** 供 {@link DeviceWebSocketChannelHandler} 在握手成功后登记本节点会话 */
+    public static void registerManagedSession(String deviceCode, Session session) {
         sessions.put(deviceCode + ":" + session.getId(), session);
         log.info("[WS] 客户端连接 deviceCode={}, sessionId={}", deviceCode, session.getId());
     }
 
-    /**
-     * 客户端断开 WebSocket 连接时触发（正常关闭或网络异常均会触发）
-     *
-     * @param session    WebSocket 会话对象
-     * @param deviceCode URL 路径参数
-     */
-    @OnClose
-    public void onClose(Session session, @PathParam("deviceCode") String deviceCode) {
+    public static void removeManagedSession(String deviceCode, Session session) {
         sessions.remove(deviceCode + ":" + session.getId());
         log.debug("[WS] 客户端断开 deviceCode={}, sessionId={}", deviceCode, session.getId());
-    }
-
-    /**
-     * WebSocket 通信发生错误时触发
-     *
-     * @param session WebSocket 会话对象
-     * @param e       异常信息
-     */
-    @OnError
-    public void onError(Session session, Throwable e) {
-        if (e instanceof EOFException) {
-            log.info("[WS] 客户端中断连接 sessionId={}", session.getId());
-            return;
-        }
-        log.error("[WS] 错误 sessionId={}", session != null ? session.getId() : "null", e);
     }
 
     // -------------------------------------------------------------------------
