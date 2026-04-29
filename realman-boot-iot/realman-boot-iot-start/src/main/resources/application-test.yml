@@ -113,7 +113,7 @@ zipkin:
 webrtc:
   # TURN 服务器列表，支持多个
   turn-servers:
-    - url: "39.107.117.20:3479?transport=udp"
+    - url: "turn:39.107.117.20:3479?transport=udp"
       username: "realman"
       password: "TBdWj0HhwTK56AzK"
   # STUN 服务器列表（英文逗号分隔，拆分后作为数组下发）
@@ -124,9 +124,9 @@ webrtc:
   signaling:
     server:
       url: 39.107.117.20
-      port: 2233
+      port: 8091
       auto-push:
-        enabled: false  # 测试环境禁用启动时推送，生产环境设为 true 或删除此行
+        enabled: true  # 测试环境禁用启动时推送，生产环境设为 true 或删除此行
 
 logging:
   level:
