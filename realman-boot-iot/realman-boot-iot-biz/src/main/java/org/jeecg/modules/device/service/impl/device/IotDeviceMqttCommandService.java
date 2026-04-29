@@ -151,8 +151,9 @@ public class IotDeviceMqttCommandService {
             throw new RuntimeException("主控设备不在线");
         }
         try {
+            String commandId = IdUtil.fastSimpleUUID();
             MqttMessageModel.MasterForceFeedbackCommand cmd = MqttMessageModel.MasterForceFeedbackCommand.builder()
-                    .commandId(IdUtil.fastSimpleUUID())
+                    .commandId(commandId)
                     .armLevel(null)
                     .gripperLevel(null)
                     .timestamp(System.currentTimeMillis())
@@ -160,6 +161,10 @@ public class IotDeviceMqttCommandService {
             String payload = objectMapper.writeValueAsString(cmd);
             String topic = String.format(DeviceConstant.MqttTopic.MASTER_FORCE_FEEDBACK, device.getDeviceCode());
             mqttPublisher.publishToDevice(device.getDeviceCode(), topic, payload, MqttConstant.MQTT_QOS.QOS_1);
+            logService.recordLog(device.getId(), device.getDeviceCode(),
+                    DeviceConstant.OperationType.COMMAND_SEND,
+                    "查询力反馈参数", "{commandId:" + commandId + "}",
+                    DeviceConstant.OperationSource.PLATFORM, "PENDING", null, null, null);
         } catch (Exception e) {
             throw new RuntimeException("发送力反馈查询指令失败: " + e.getMessage(), e);
         }
@@ -171,8 +176,9 @@ public class IotDeviceMqttCommandService {
             throw new RuntimeException("主控设备不在线");
         }
         try {
+            String commandId = IdUtil.fastSimpleUUID();
             MqttMessageModel.MasterSportSpeedCommand cmd = MqttMessageModel.MasterSportSpeedCommand.builder()
-                    .commandId(IdUtil.fastSimpleUUID())
+                    .commandId(commandId)
                     .moveSpeedLevel(null)
                     .liftSpeedLevel(null)
                     .timestamp(System.currentTimeMillis())
@@ -180,6 +186,10 @@ public class IotDeviceMqttCommandService {
             String payload = objectMapper.writeValueAsString(cmd);
             String topic = String.format(DeviceConstant.MqttTopic.MASTER_SPORT_SPEED, device.getDeviceCode());
             mqttPublisher.publishToDevice(device.getDeviceCode(), topic, payload, MqttConstant.MQTT_QOS.QOS_1);
+            logService.recordLog(device.getId(), device.getDeviceCode(),
+                    DeviceConstant.OperationType.COMMAND_SEND,
+                    "查询运动速度参数", "{commandId:" + commandId + "}",
+                    DeviceConstant.OperationSource.PLATFORM, "PENDING", null, null, null);
         } catch (Exception e) {
             throw new RuntimeException("发送运动速度查询指令失败: " + e.getMessage(), e);
         }

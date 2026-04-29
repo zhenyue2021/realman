@@ -16,6 +16,7 @@ import org.jeecg.modules.device.entity.IotSlamCommandRecord;
 import org.jeecg.modules.device.mapper.IotSlamCommandRecordMapper;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.mqtt.publisher.MqttPublisher;
+import org.jeecg.modules.device.service.IDeviceOperationLogService;
 import org.jeecg.modules.device.service.IIotSlamCommandService;
 import org.jeecg.modules.device.service.IIotSlamMapService;
 import org.jeecg.modules.device.service.NavigationPathMonitorService;
@@ -54,6 +55,7 @@ public class IotSlamCommandServiceImpl extends ServiceImpl<IotSlamCommandRecordM
     private final TransactionTemplate transactionTemplate;
     private final IIotSlamMapService slamMapService;
     private final NavigationPathMonitorService navigationPathMonitorService;
+    private final IDeviceOperationLogService logService;
 
     @Override
     public IotSlamCommandRecord sendCommand(String masterCode, String robotCode, String function, Map<String, Object> params) {
@@ -88,6 +90,11 @@ public class IotSlamCommandServiceImpl extends ServiceImpl<IotSlamCommandRecordM
             String payload = objectMapper.writeValueAsString(request);
             mqttPublisher.publishToDevice(robotCode, topic, payload, MqttConstant.MQTT_QOS.QOS_1);
             log.info("[SlamCommand] 指令已发送: robotCode={}, commandId={}, function={}", robotCode, commandId, function);
+            logService.recordLog(null, robotCode,
+                    DeviceConstant.OperationType.COMMAND_SEND,
+                    "SLAM指令下发: " + function,
+                    "{commandId:" + commandId + ",masterCode:" + masterCode + "}",
+                    DeviceConstant.OperationSource.PLATFORM, "PENDING", null, null, null);
         } catch (Exception e) {
             pendingService.completeExceptionally(commandId, e);
             log.error("[SlamCommand] MQTT 发送失败: robotCode={}, commandId={}", robotCode, commandId, e);
@@ -95,6 +102,11 @@ public class IotSlamCommandServiceImpl extends ServiceImpl<IotSlamCommandRecordM
             record.setAckMessage("MQTT 发送失败: " + e.getMessage());
             record.setCompleteTime(LocalDateTime.now());
             transactionTemplate.executeWithoutResult(s -> this.updateById(record));
+            logService.recordLog(null, robotCode,
+                    DeviceConstant.OperationType.COMMAND_SEND,
+                    "SLAM指令下发失败: " + function,
+                    "{commandId:" + commandId + ",masterCode:" + masterCode + "}",
+                    DeviceConstant.OperationSource.PLATFORM, "FAIL", e.getMessage(), null, null);
             return record;
         }
 
@@ -172,6 +184,19 @@ public class IotSlamCommandServiceImpl extends ServiceImpl<IotSlamCommandRecordM
         this.updateById(record);
         log.debug("[SlamCommand] ack 已处理: commandId={}, function={}, sequence={}/{}, status={}",
                 ack.getCommandId(), ack.getFunction(), ack.getSequence(), ack.getTotal(), record.getStatus());
+
+        // 终态时记录操作日志并通过 WebSocket 推送结果给主控前端
+        if (DeviceConstant.SlamCommandStatus.COMPLETED.equals(record.getStatus())
+                || DeviceConstant.SlamCommandStatus.FAILED.equals(record.getStatus())) {
+            boolean isSuccess = DeviceConstant.SlamCommandStatus.COMPLETED.equals(record.getStatus());
+            logService.recordLog(null, deviceCode,
+                    DeviceConstant.OperationType.COMMAND_SEND,
+                    "SLAM指令" + (isSuccess ? "执行完成" : "执行失败") + ": " + record.getFunctionName(),
+                    "{commandId:" + record.getCommandId() + ",masterCode:" + record.getMasterCode() + "}",
+                    DeviceConstant.OperationSource.DEVICE,
+                    isSuccess ? "SUCCESS" : "FAIL",
+                    isSuccess ? null : ack.getMessage(), null, null);
+        }
 
         // 终态时通过 WebSocket 推送结果给主控前端，type 为功能名称（如 SwitchMode）
         if (DeviceConstant.SlamCommandStatus.COMPLETED.equals(record.getStatus())

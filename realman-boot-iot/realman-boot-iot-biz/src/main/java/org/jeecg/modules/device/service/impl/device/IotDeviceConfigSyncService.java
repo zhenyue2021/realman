@@ -11,6 +11,7 @@ import org.jeecg.modules.device.entity.IotDeviceConfig;
 import org.jeecg.modules.device.mapper.IotDeviceConfigMapper;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.mqtt.publisher.MqttPublisher;
+import org.jeecg.modules.device.service.IDeviceOperationLogService;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -34,6 +35,7 @@ public class IotDeviceConfigSyncService {
     private final MqttPublisher mqttPublisher;
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
+    private final IDeviceOperationLogService logService;
 
     public void setAndSyncConfig(String deviceId, Map<String, Object> params) {
         IotDevice device = deviceSupport.require(deviceId);
@@ -67,11 +69,21 @@ public class IotDeviceConfigSyncService {
                 redisTemplate.opsForValue().set(
                         DeviceConstant.RedisKey.CONFIG_SYNC_PREFIX + device.getDeviceCode() + ":" + commandId,
                         "pending", DeviceConstant.Timeout.CONFIG_SYNC_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                logService.recordLog(deviceId, device.getDeviceCode(),
+                        DeviceConstant.OperationType.PARAM_MODIFY,
+                        "平台下发配置同步: " + params.keySet(),
+                        "{commandId:" + commandId + "}",
+                        DeviceConstant.OperationSource.PLATFORM, "PENDING", null, null, null);
             } catch (Exception e) {
                 throw new RuntimeException("配置推送失败: " + e.getMessage());
             }
         } else {
             log.warn("[Config] 设备[{}]离线，配置已保存待上线后同步", device.getDeviceCode());
+            logService.recordLog(deviceId, device.getDeviceCode(),
+                    DeviceConstant.OperationType.PARAM_MODIFY,
+                    "配置已保存，设备离线待上线后同步: " + params.keySet(),
+                    null,
+                    DeviceConstant.OperationSource.PLATFORM, "PENDING", null, null, null);
         }
     }
 

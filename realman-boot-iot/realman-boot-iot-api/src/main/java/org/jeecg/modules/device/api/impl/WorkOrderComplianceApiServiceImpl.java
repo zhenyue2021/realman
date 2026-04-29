@@ -13,12 +13,14 @@ import org.jeecg.modules.device.dto.OptionDTO;
 import org.jeecg.modules.device.dto.OptionTreeDTO;
 import org.jeecg.modules.device.dto.workorder.WorkOrderComplianceConfigDetailDTO;
 import org.jeecg.modules.device.dto.workorder.WorkOrderComplianceConfigPageVo;
+import org.jeecg.modules.device.dto.workorder.WorkOrderComplianceCreateDTO;
 import org.jeecg.modules.device.dto.workorder.WorkOrderComplianceQueryDTO;
 import org.jeecg.modules.device.entity.workorder.WorkOrderComplianceConfig;
 import org.jeecg.modules.device.feign.SysAuthFeignClient;
 import org.jeecg.modules.device.service.workorder.IWorkOrderComplianceConfigService;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -60,14 +62,20 @@ public class WorkOrderComplianceApiServiceImpl implements WorkOrderComplianceApi
     }
 
     @Override
-    public WorkOrderComplianceConfig create(WorkOrderComplianceConfig config, String operator) {
-        config.setCreateBy(operator);
-        return configService.createConfig(config);
+    public WorkOrderComplianceConfig create(WorkOrderComplianceCreateDTO config, String operator) {
+        WorkOrderComplianceConfig complianceConfig = new WorkOrderComplianceConfig();
+        BeanUtil.copyProperties(config, complianceConfig);
+        complianceConfig.setCreateBy(operator);
+        complianceConfig.setCreateTime(LocalDateTime.now());
+        return configService.createConfig(complianceConfig);
     }
 
     @Override
-    public WorkOrderComplianceConfig update(String id, WorkOrderComplianceConfig config, String operator) {
+    public WorkOrderComplianceConfig update(String id, WorkOrderComplianceCreateDTO configDto, String operator) {
+        WorkOrderComplianceConfig config = new WorkOrderComplianceConfig();
+        BeanUtil.copyProperties(configDto, config);
         config.setUpdateBy(operator);
+        config.setUpdateTime(LocalDateTime.now());
         return configService.updateConfig(id, config);
     }
 
