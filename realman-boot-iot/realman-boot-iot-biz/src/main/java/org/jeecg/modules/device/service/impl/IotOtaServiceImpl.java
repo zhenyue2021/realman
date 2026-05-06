@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.minio.GetPresignedObjectUrlArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
+import io.minio.RemoveObjectArgs;
 import io.minio.http.Method;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +27,7 @@ import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 import java.io.*;
 import java.time.LocalDateTime;
@@ -66,6 +68,7 @@ public class IotOtaServiceImpl extends ServiceImpl<IotOtaFirmwareMapper, IotOtaF
     private final MinioClient                minioClient;
     private final MinioUtil minioUtil;
     private final IDeviceOperationLogService logService;
+    private final TransactionTemplate        transactionTemplate;
 
     /** MinIO 存储桶名称 */
     @Value("${minio.bucket-name.firmware:iot-firmware}")
@@ -193,13 +196,23 @@ public class IotOtaServiceImpl extends ServiceImpl<IotOtaFirmwareMapper, IotOtaF
             throw new RuntimeException("生成下载URL失败: " + e.getMessage());
         }
 
-        // 6. 写入固件记录
+        // 6. 写入固件记录（失败时回滚并删除已上传的 MinIO 对象，避免孤立文件）
         IotOtaFirmware fw = new IotOtaFirmware();
         fw.setFirmwareName(firmwareName); fw.setVersion(version); fw.setProductId(productId);
         fw.setFilePath(obj); fw.setFileName(mergedName); fw.setFileSize(size);
         fw.setFileMd5(md5); fw.setDownloadUrl(url); fw.setDescription(description);
         fw.setStatus(1); fw.setForceUpgrade(0); fw.setCreateTime(LocalDateTime.now());
-        firmwareMapper.insert(fw);
+        try {
+            firmwareMapper.insert(fw);
+        } catch (Exception e) {
+            try {
+                minioClient.removeObject(RemoveObjectArgs.builder().bucket(bucketName).object(obj).build());
+                log.warn("[OTA] DB写入失败，已清理 MinIO 对象: bucket={} object={}", bucketName, obj);
+            } catch (Exception ex) {
+                log.error("[OTA] MinIO 清理失败，对象可能孤立: bucket={} object={}", bucketName, obj, ex);
+            }
+            throw e;
+        }
 
         // 7. 清理临时目录和 Redis 分片记录
         try {
@@ -280,7 +293,6 @@ public class IotOtaServiceImpl extends ServiceImpl<IotOtaFirmwareMapper, IotOtaF
      * @throws RuntimeException 任务不存在或已执行时抛出
      */
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public void executeUpgradeTask(String taskId) {
         IotOtaUpgradeTask task = taskMapper.selectById(taskId);
         if (task == null || task.getTaskStatus() != 0) throw new RuntimeException("任务不存在或已执行");
@@ -292,10 +304,12 @@ public class IotOtaServiceImpl extends ServiceImpl<IotOtaFirmwareMapper, IotOtaF
                         .eq(IotOtaUpgradeRecord::getTaskId, taskId)
                         .eq(IotOtaUpgradeRecord::getUpgradeStatus, DeviceConstant.OtaUpgradeStatus.PENDING));
 
-        // 标记任务为执行中
-        task.setTaskStatus(1);
-        task.setActualStartTime(LocalDateTime.now());
-        taskMapper.updateById(task);
+        // 立即提交：标记任务为执行中，使其他节点可见
+        transactionTemplate.executeWithoutResult(s -> {
+            task.setTaskStatus(1);
+            task.setActualStartTime(LocalDateTime.now());
+            taskMapper.updateById(task);
+        });
 
         for (IotOtaUpgradeRecord rec : pending) {
             IotDevice device = deviceMapper.selectById(rec.getDeviceId());
@@ -307,8 +321,11 @@ public class IotOtaServiceImpl extends ServiceImpl<IotOtaFirmwareMapper, IotOtaF
                 String resumeStr = redisTemplate.opsForValue().get(resumeKey);
                 long resumeBytes = resumeStr != null ? Long.parseLong(resumeStr) : 0L;
                 if (resumeBytes > 0) {
-                    rec.setDownloadedBytes(resumeBytes);
-                    recordMapper.updateById(rec);
+                    final long bytes = resumeBytes;
+                    transactionTemplate.executeWithoutResult(s -> {
+                        rec.setDownloadedBytes(bytes);
+                        recordMapper.updateById(rec);
+                    });
                 }
 
                 // 构造并加密发送 OTA 通知（含固件下载 URL、MD5、文件大小、断点字节数）
@@ -320,10 +337,12 @@ public class IotOtaServiceImpl extends ServiceImpl<IotOtaFirmwareMapper, IotOtaF
                 mqttPublisher.publishToDevice(device.getDeviceCode(),
                         String.format(DeviceConstant.MqttTopic.OTA_NOTIFY, device.getDeviceCode()), payload, MqttConstant.MQTT_QOS.QOS_1);
 
-                // 更新记录状态为 NOTIFIED
-                rec.setUpgradeStatus(DeviceConstant.OtaUpgradeStatus.NOTIFIED);
-                rec.setNotifyTime(LocalDateTime.now());
-                recordMapper.updateById(rec);
+                // MQTT 发送成功后立即提交状态变更，避免整批设备因单节点异常全部回滚
+                transactionTemplate.executeWithoutResult(s -> {
+                    rec.setUpgradeStatus(DeviceConstant.OtaUpgradeStatus.NOTIFIED);
+                    rec.setNotifyTime(LocalDateTime.now());
+                    recordMapper.updateById(rec);
+                });
 
                 logService.recordLog(device.getId(), device.getDeviceCode(),
                         DeviceConstant.OperationType.FIRMWARE_UPGRADE,
@@ -333,9 +352,11 @@ public class IotOtaServiceImpl extends ServiceImpl<IotOtaFirmwareMapper, IotOtaF
             } catch (Exception e) {
                 // 发送失败：标记当前记录为 FAILED，继续处理其他设备
                 log.error("[OTA] 通知设备[{}]失败", device.getDeviceCode(), e);
-                rec.setUpgradeStatus(DeviceConstant.OtaUpgradeStatus.FAILED);
-                rec.setFailReason("通知失败: " + e.getMessage());
-                recordMapper.updateById(rec);
+                transactionTemplate.executeWithoutResult(s -> {
+                    rec.setUpgradeStatus(DeviceConstant.OtaUpgradeStatus.FAILED);
+                    rec.setFailReason("通知失败: " + e.getMessage());
+                    recordMapper.updateById(rec);
+                });
             }
         }
     }

@@ -28,6 +28,8 @@ import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -146,24 +148,29 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
         IotMasterLoginLog loginLog = recordLogin(logDto);
         vo.setLoginLogId(loginLog != null ? loginLog.getId() : null);
 
-        // 5. 写入遥操关系缓存
+        // 5. 写入遥操关系缓存（事务提交后执行，避免回滚后 Redis 留脏数据）
         if (robot != null) {
-            String masterDeviceCode = controller.getDeviceCode();
-            String robotDeviceCode = robot.getDeviceCode();
-            // 若主控之前绑定了其他机器人，清理掉旧机器人的反向缓存，避免脏数据
-            String prevRobotCode = redisTemplate.opsForValue()
-                    .get(DeviceConstant.RedisKey.TELEOP_MASTER_TO_ROBOT + masterDeviceCode);
-            if (prevRobotCode != null && !prevRobotCode.equals(robotDeviceCode)) {
-                redisTemplate.delete(DeviceConstant.RedisKey.TELEOP_ROBOT_TO_MASTER + prevRobotCode);
-                log.info("[TeleopCache] 清理旧机器人反向缓存: oldRobot={} master={}", prevRobotCode, masterDeviceCode);
-            }
-            redisTemplate.opsForValue().set(
-                    DeviceConstant.RedisKey.TELEOP_MASTER_TO_ROBOT + masterDeviceCode, robotDeviceCode,
-                    24, TimeUnit.HOURS);
-            redisTemplate.opsForValue().set(
-                    DeviceConstant.RedisKey.TELEOP_ROBOT_TO_MASTER + robotDeviceCode, masterDeviceCode,
-                    24, TimeUnit.HOURS);
-            log.info("[TeleopCache] 写入遥操关系缓存: master={} robot={}", masterDeviceCode, robotDeviceCode);
+            final String masterDeviceCode = controller.getDeviceCode();
+            final String robotDeviceCode = robot.getDeviceCode();
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    // 若主控之前绑定了其他机器人，清理掉旧机器人的反向缓存，避免脏数据
+                    String prevRobotCode = redisTemplate.opsForValue()
+                            .get(DeviceConstant.RedisKey.TELEOP_MASTER_TO_ROBOT + masterDeviceCode);
+                    if (prevRobotCode != null && !prevRobotCode.equals(robotDeviceCode)) {
+                        redisTemplate.delete(DeviceConstant.RedisKey.TELEOP_ROBOT_TO_MASTER + prevRobotCode);
+                        log.info("[TeleopCache] 清理旧机器人反向缓存: oldRobot={} master={}", prevRobotCode, masterDeviceCode);
+                    }
+                    redisTemplate.opsForValue().set(
+                            DeviceConstant.RedisKey.TELEOP_MASTER_TO_ROBOT + masterDeviceCode, robotDeviceCode,
+                            24, TimeUnit.HOURS);
+                    redisTemplate.opsForValue().set(
+                            DeviceConstant.RedisKey.TELEOP_ROBOT_TO_MASTER + robotDeviceCode, masterDeviceCode,
+                            24, TimeUnit.HOURS);
+                    log.info("[TeleopCache] 写入遥操关系缓存: master={} robot={}", masterDeviceCode, robotDeviceCode);
+                }
+            });
         }
 
         // 6. WebSocket 推送工单与关联设备信息
