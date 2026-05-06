@@ -11,6 +11,7 @@ import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.mqtt.publisher.MqttPublisher;
 import org.jeecg.modules.device.service.IDeviceOperationLogService;
+import org.jeecg.modules.device.service.IIotDeviceCommandRecordService;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
@@ -30,6 +31,7 @@ public class IotDeviceMqttCommandService {
     private final MqttPublisher mqttPublisher;
     private final ObjectMapper objectMapper;
     private final IDeviceOperationLogService logService;
+    private final IIotDeviceCommandRecordService commandRecordService;
 
     public String sendCommand(String deviceId, String cmd, String reason, String operator) {
         IotDevice device = deviceSupport.require(deviceId);
@@ -62,8 +64,10 @@ public class IotDeviceMqttCommandService {
             String desc = "发送指令[" + cmd + "]" + (reason != null ? (": " + reason) : "");
             logService.recordLog(deviceId, device.getDeviceCode(),
                     opType,
-                    desc, "{commandId:" + commandId + "}",
+                    desc, "{\"commandId\":\"" + commandId + "\"}",
                     DeviceConstant.OperationSource.PLATFORM, "PENDING", null, operator, null);
+            commandRecordService.recordSend(commandId, deviceId, device.getDeviceCode(),
+                    cmd, DeviceConstant.CommandDeviceType.DEVICE, operator, payload);
         } catch (Exception e) {
             throw new RuntimeException("发送指令[" + cmd + "]失败: " + e.getMessage());
         }
@@ -106,8 +110,10 @@ public class IotDeviceMqttCommandService {
             String desc = "设置力反馈参数: armLevel=" + armLevel + ", gripperLevel=" + gripperLevel;
             logService.recordLog(master.getId(), master.getDeviceCode(),
                     DeviceConstant.OperationType.COMMAND_SEND,
-                    desc, "{commandId:" + commandId + "}",
+                    desc, "{\"commandId\":\"" + commandId + "\"}",
                     DeviceConstant.OperationSource.PLATFORM, "PENDING", null, operator, null);
+            commandRecordService.recordSend(commandId, master.getId(), master.getDeviceCode(),
+                    "force-feedback", DeviceConstant.CommandDeviceType.MASTER, operator, payload);
         } catch (Exception e) {
             throw new RuntimeException("发送力反馈指令失败: " + e.getMessage(), e);
         }
@@ -137,8 +143,10 @@ public class IotDeviceMqttCommandService {
             String desc = "设置运动与安全参数: moveSpeedLevel=" + moveSpeedLevel + ", liftSpeedLevel=" + liftSpeedLevel;
             logService.recordLog(controller.getId(), controller.getDeviceCode(),
                     DeviceConstant.OperationType.COMMAND_SEND,
-                    desc, "{commandId:" + commandId + "}",
+                    desc, "{\"commandId\":\"" + commandId + "\"}",
                     DeviceConstant.OperationSource.PLATFORM, "PENDING", null, operator, null);
+            commandRecordService.recordSend(commandId, controller.getId(), controller.getDeviceCode(),
+                    "sport-speed", DeviceConstant.CommandDeviceType.MASTER, operator, payload);
         } catch (Exception e) {
             throw new RuntimeException("发送运动与安全参数指令失败: " + e.getMessage(), e);
         }
@@ -163,8 +171,10 @@ public class IotDeviceMqttCommandService {
             mqttPublisher.publishToDevice(device.getDeviceCode(), topic, payload, MqttConstant.MQTT_QOS.QOS_1);
             logService.recordLog(device.getId(), device.getDeviceCode(),
                     DeviceConstant.OperationType.COMMAND_SEND,
-                    "查询力反馈参数", "{commandId:" + commandId + "}",
+                    "查询力反馈参数", "{\"commandId\":\"" + commandId + "\"}",
                     DeviceConstant.OperationSource.PLATFORM, "PENDING", null, null, null);
+            commandRecordService.recordSend(commandId, device.getId(), device.getDeviceCode(),
+                    "force-feedback", DeviceConstant.CommandDeviceType.MASTER, null, payload);
         } catch (Exception e) {
             throw new RuntimeException("发送力反馈查询指令失败: " + e.getMessage(), e);
         }
@@ -188,8 +198,10 @@ public class IotDeviceMqttCommandService {
             mqttPublisher.publishToDevice(device.getDeviceCode(), topic, payload, MqttConstant.MQTT_QOS.QOS_1);
             logService.recordLog(device.getId(), device.getDeviceCode(),
                     DeviceConstant.OperationType.COMMAND_SEND,
-                    "查询运动速度参数", "{commandId:" + commandId + "}",
+                    "查询运动速度参数", "{\"commandId\":\"" + commandId + "\"}",
                     DeviceConstant.OperationSource.PLATFORM, "PENDING", null, null, null);
+            commandRecordService.recordSend(commandId, device.getId(), device.getDeviceCode(),
+                    "sport-speed", DeviceConstant.CommandDeviceType.MASTER, null, payload);
         } catch (Exception e) {
             throw new RuntimeException("发送运动速度查询指令失败: " + e.getMessage(), e);
         }

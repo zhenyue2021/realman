@@ -222,6 +222,31 @@ public interface DeviceConstant {
     }
 
     /**
+     * 指令下发记录状态（iot_device_command_record.status）
+     * <pre>
+     *   PENDING → SUCCESS（收到设备 ACK code=0）
+     *   PENDING → FAIL   （收到设备 ACK code≠0）
+     *   PENDING → TIMEOUT（超时任务扫描后标记）
+     * </pre>
+     */
+    interface CommandRecordStatus {
+        String PENDING = "PENDING";
+        String SUCCESS = "SUCCESS";
+        String FAIL    = "FAIL";
+        String TIMEOUT = "TIMEOUT";
+    }
+
+    /**
+     * 指令记录中的设备角色（与 MQTT Topic 前缀对应）
+     */
+    interface CommandDeviceType {
+        /** 机器人设备（Topic 前缀 device/） */
+        String DEVICE = "device";
+        /** 主控设备（Topic 前缀 master/） */
+        String MASTER = "master";
+    }
+
+    /**
      * 设备操作类型（用于操作日志分类）
      */
     interface OperationType {
@@ -331,6 +356,8 @@ public interface DeviceConstant {
         long CONFIG_SYNC_TIMEOUT_SECONDS      = 30L;
         /** 设备离线判定阈值（分钟）：状态 Redis Key 的 TTL，Key 消失即视为设备离线 */
         long DEVICE_OFFLINE_THRESHOLD_MINUTES = 5L;
+        /** 通用指令 ACK 超时阈值（秒）：超过此时间 PENDING 未收到 ACK 则标记为 TIMEOUT */
+        long COMMAND_ACK_TIMEOUT_SECONDS = 60L;
         /** SLAM 上传许可有效期（分钟） */
         long SLAM_UPLOAD_PERMIT_MINUTES = 30L;
     }

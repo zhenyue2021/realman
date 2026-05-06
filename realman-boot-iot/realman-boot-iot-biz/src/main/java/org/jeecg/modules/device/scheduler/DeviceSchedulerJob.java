@@ -17,6 +17,7 @@ import org.jeecg.modules.device.mapper.IotDeviceStatusMapper;
 import org.jeecg.modules.device.mapper.IotOtaUpgradeRecordMapper;
 import org.jeecg.modules.device.mapper.IotOtaUpgradeTaskMapper;
 import org.jeecg.modules.device.mqtt.handler.RobotSlaveStatusHandler;
+import org.jeecg.modules.device.service.IIotDeviceCommandRecordService;
 import org.jeecg.modules.device.service.workorder.IWorkOrderService;
 import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -28,24 +29,24 @@ import java.util.List;
 /**
  * IoT 设备定时任务
  *
- * <p>包含两个定时任务，均通过 XXL-Job 调度：
+ * <p>包含多个定时任务，均通过 XXL-Job 调度：
  * <ul>
  *   <li>{@link #checkOfflineDevices}：每分钟检测离线设备</li>
  *   <li>{@link #checkOtaTimeout}：每5分钟检测 OTA 升级超时</li>
+ *   <li>{@link #checkCommandAckTimeout}：每分钟检测指令 ACK 超时</li>
  *   <li>{@link #compactTodayDeviceStatus}：当天状态每小时压缩</li>
  *   <li>{@link #compactDeviceStatusHistory}：最近7天及更早历史压缩</li>
  *   <li>{@link #flushRobotStatusJob}：每分钟将机器人/主控高频上报状态落库</li>
- *   <li>{@link #pushStartedWorkOrderJob}：每分钟推送进行中工单到前端</li>
  * </ul>
  *
  * <p>XXL-Job 配置（在 XXL-Job Admin 后台注册）：
  * <pre>
- *   deviceOfflineCheckJob     Cron: 0 * * * * ?    每分钟执行
- *   otaUpgradeTimeoutCheckJob Cron: 0 0/5 * * * ?  每5分钟执行
- *   compactTodayDeviceStatusJob Cron: 0 30 * * * ?  每小时第30分钟执行
- *   compactDeviceStatusJob    Cron: 0 20 2 * * ?   每天 02:20 执行
- *   flushRobotStatusJob       Cron: 0 * * * * ?    每分钟执行
- *   pushStartedWorkOrderJob   Cron: 0 * * * * ?    每分钟执行
+ *   deviceOfflineCheckJob       Cron: 0 * * * * ?    每分钟执行
+ *   otaUpgradeTimeoutCheckJob   Cron: 0 0/5 * * * ?  每5分钟执行
+ *   commandAckTimeoutCheckJob   Cron: 0 * * * * ?    每分钟执行
+ *   compactTodayDeviceStatusJob Cron: 0 30 * * * ?   每小时第30分钟执行
+ *   compactDeviceStatusJob      Cron: 0 20 2 * * ?   每天 02:20 执行
+ *   flushRobotStatusJob         Cron: 0 * * * * ?    每分钟执行
  * </pre>
  */
 @Slf4j
@@ -53,13 +54,14 @@ import java.util.List;
 @RequiredArgsConstructor
 public class DeviceSchedulerJob {
 
-    private final IotDeviceMapper           deviceMapper;
-    private final IotDeviceStatusMapper     statusMapper;
-    private final IotOtaUpgradeRecordMapper recordMapper;
-    private final IotOtaUpgradeTaskMapper   taskMapper;
-    private final StringRedisTemplate       redisTemplate;
-    private final DeviceWebSocketServer     webSocketServer;
-    private final IWorkOrderService workOrderService;
+    private final IotDeviceMapper                deviceMapper;
+    private final IotDeviceStatusMapper          statusMapper;
+    private final IotOtaUpgradeRecordMapper      recordMapper;
+    private final IotOtaUpgradeTaskMapper        taskMapper;
+    private final StringRedisTemplate            redisTemplate;
+    private final DeviceWebSocketServer          webSocketServer;
+    private final IWorkOrderService              workOrderService;
+    private final IIotDeviceCommandRecordService commandRecordService;
     /** mqtt.enabled=false 时 Bean 不存在，注入 null，任务方法内做空判断 */
     @Autowired(required = false)
     private RobotSlaveStatusHandler robotSlaveStatusHandler;
@@ -212,6 +214,35 @@ public class DeviceSchedulerJob {
         XxlJobHelper.log("[StatusCompact-History] 本次主表压缩/删除 {} 条，归档到历史表 {} 条，历史表清理 {} 条（设备数={}）",totalDeletedMain, totalArchived, historyDeleted, deviceIds.size());
         log.info("[StatusCompact-History] 本次主表压缩/删除 {} 条，归档到历史表 {} 条，历史表清理 {} 条（设备数={}）",
                 totalDeletedMain, totalArchived, historyDeleted, deviceIds.size());
+    }
+
+    /**
+     * 指令 ACK 超时检测任务
+     *
+     * <p>检测逻辑：单条 UPDATE SQL 批量将所有满足条件的 PENDING 记录标记为 TIMEOUT：
+     * <pre>
+     *   status = 'PENDING'
+     *   AND send_time &lt; NOW() - {@link DeviceConstant.Timeout#COMMAND_ACK_TIMEOUT_SECONDS} 秒
+     * </pre>
+     *
+     * <p>与 ACK 更新的并发安全说明：
+     * <ul>
+     *   <li>UPDATE 语句带 {@code status = 'PENDING'} 条件，若 ACK 已先到达将记录改为 SUCCESS/FAIL，
+     *       此处 UPDATE 命中零行，不会覆盖 ACK 结果</li>
+     *   <li>反之若超时任务先执行，随后 ACK 到达，{@link IIotDeviceCommandRecordService#ack} 内
+     *       同样带 {@code status = 'PENDING'} 条件，会命中零行并打印 WARN 日志，不产生脏写</li>
+     * </ul>
+     *
+     * <p>XXL-Job Handler Name：{@code commandAckTimeoutCheckJob}，建议 Cron：{@code 0 * * * * ?}
+     */
+    @XxlJob("commandAckTimeoutCheckJob")
+    public void checkCommandAckTimeout() {
+        int count = commandRecordService.markTimeout();
+        if (count > 0) {
+            String msg = "[CommandAckTimeout] 本次标记 " + count + " 条超时未 ACK 的指令记录";
+            XxlJobHelper.log(msg);
+            log.warn(msg);
+        }
     }
 
     /**
