@@ -4,6 +4,8 @@ import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.extensions.Extension;
+import io.swagger.v3.oas.annotations.extensions.ExtensionProperty;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -50,7 +52,9 @@ public class MasterDeviceController {
 
     /** 新增主控设备 */
     @PostMapping("/add")
-    @Operation(summary = "新增主控设备")
+    @Operation(summary = "新增主控设备", extensions = @Extension(properties = {
+            @ExtensionProperty(name = "x-order", value = "1")
+    }))
     public ApiResult<IotDevice> add(@Valid @RequestBody DeviceAddDTO dto) {
         IotDevice d = new IotDevice();
         d.setDeviceCode(dto.getDeviceCode());
@@ -64,9 +68,34 @@ public class MasterDeviceController {
         return ApiResult.ok(deviceService.addDevice(d), "设备添加成功");
     }
 
+    /** 编辑主控设备 */
+    @PutMapping("/{controllerId}")
+    @Operation(summary = "编辑主控设备", extensions = @Extension(properties = {
+            @ExtensionProperty(name = "x-order", value = "2")
+    }))
+    public ApiResult<Void> update(@PathVariable String controllerId,
+                                  @RequestBody DeviceUpdateDTO dto) {
+        ensureDeviceType(controllerId, DEVICE_TYPE_CONTROLLER);
+        deviceService.updateDevice(controllerId, dto);
+        return ApiResult.ok(null, "更新成功");
+    }
+
+    /** 删除主控设备（逻辑删除） */
+    @DeleteMapping("/{controllerId}")
+    @Operation(summary = "删除主控设备", extensions = @Extension(properties = {
+            @ExtensionProperty(name = "x-order", value = "4")
+    }))
+    public ApiResult<Void> delete(@PathVariable String controllerId) {
+        ensureDeviceType(controllerId, DEVICE_TYPE_CONTROLLER);
+        deviceService.removeById(controllerId);
+        return ApiResult.ok(null, "已删除");
+    }
+
     /** 分页查询主控设备列表 */
     @PostMapping("/list")
-    @Operation(summary = "分页查询主控设备列表")
+    @Operation(summary = "分页查询主控设备列表", extensions = @Extension(properties = {
+            @ExtensionProperty(name = "x-order", value = "3")
+    }))
     public ApiResult<IPage<MasterDevicePageItemDTO>> list(HttpServletRequest request,
                                            @RequestBody DeviceRequestDTO requestDTO) {
         fillAuthContext(request, requestDTO);
@@ -79,7 +108,9 @@ public class MasterDeviceController {
 
     /** 查询主控设备详情（聚合） */
     @GetMapping("/{controllerId}/detail")
-    @Operation(summary = "查询主控设备详情（聚合）")
+    @Operation(summary = "查询主控设备详情", extensions = @Extension(properties = {
+            @ExtensionProperty(name = "x-order", value = "5")
+    }))
     public ApiResult<DeviceDetailVO> detailAgg(@PathVariable String controllerId) {
         DeviceDetailVO vo = deviceService.getDeviceDetail(controllerId);
         if (vo != null && vo.getDevice() != null && !Objects.equals(vo.getDevice().getDeviceType(), DEVICE_TYPE_CONTROLLER)) {
@@ -100,7 +131,7 @@ public class MasterDeviceController {
 
     /** 获取实时监控状态 */
     @GetMapping("/{controllerId}/monitor")
-    @Operation(summary = "获取主控设备实时监控状态")
+    @Operation(summary = "获取主控设备实时监控状态", hidden = true)
     public ApiResult<Map<String, Object>> monitor(@PathVariable String controllerId) {
         ensureDeviceType(controllerId, DEVICE_TYPE_CONTROLLER);
         return ApiResult.ok(deviceService.getDeviceMonitorStatus(controllerId));
@@ -108,7 +139,7 @@ public class MasterDeviceController {
 
     /** 远程重启主控 */
     @PostMapping("/{controllerId}/restart")
-    @Operation(summary = "远程重启主控设备")
+    @Operation(summary = "远程重启主控设备", hidden = true)
     public ApiResult<Void> restart(@PathVariable String controllerId,
                                    @RequestBody DeviceRestartDTO dto) {
         ensureDeviceType(controllerId, DEVICE_TYPE_CONTROLLER);
@@ -118,7 +149,7 @@ public class MasterDeviceController {
 
     /** 紧急停机（通过MQTT向设备发送AES加密指令，设备需上行 ACK 确认） */
     @PostMapping("/{controllerId}/emergency-stop")
-    @Operation(summary = "紧急停机主控设备")
+    @Operation(summary = "紧急停机主控设备", hidden = true)
     public ApiResult<Void> emergencyStop(@PathVariable String controllerId,
                                          @RequestBody EmergencyStopDTO dto) {
         ensureDeviceType(controllerId, DEVICE_TYPE_CONTROLLER);
@@ -145,28 +176,10 @@ public class MasterDeviceController {
         return ApiResult.ok(null, "参数已下发，等待主控设备确认");
     }
 
-    /** 编辑主控设备 */
-    @PutMapping("/{controllerId}")
-    @Operation(summary = "编辑主控设备")
-    public ApiResult<Void> update(@PathVariable String controllerId,
-                                  @RequestBody DeviceUpdateDTO dto) {
-        ensureDeviceType(controllerId, DEVICE_TYPE_CONTROLLER);
-        deviceService.updateDevice(controllerId, dto);
-        return ApiResult.ok(null, "更新成功");
-    }
-
-    /** 删除主控设备（逻辑删除） */
-    @DeleteMapping("/{controllerId}")
-    @Operation(summary = "删除主控设备（逻辑删除）")
-    public ApiResult<Void> delete(@PathVariable String controllerId) {
-        ensureDeviceType(controllerId, DEVICE_TYPE_CONTROLLER);
-        deviceService.removeById(controllerId);
-        return ApiResult.ok(null, "已删除");
-    }
 
     /** 禁用/启用主控设备 */
     @PutMapping("/{controllerId}/status/{status}")
-    @Operation(summary = "禁用或启用主控设备")
+    @Operation(summary = "禁用或启用主控设备", hidden = true)
     public ApiResult<Void> changeStatus(@PathVariable String controllerId,
                                         @PathVariable Integer status,
                                         @RequestParam(defaultValue = "system") String operator) {
@@ -177,14 +190,14 @@ public class MasterDeviceController {
 
     /** 批量查询在线状态 */
     @PostMapping("/batch/online-status")
-    @Operation(summary = "批量查询主控设备在线状态")
+    @Operation(summary = "批量查询主控设备在线状态", hidden = true)
     public ApiResult<List<Map<String, Object>>> batchOnline(@RequestBody List<String> controllerIds) {
         return ApiResult.ok(deviceService.batchGetOnlineStatus(controllerIds));
     }
 
     /** 主控端登录记录 */
     @PostMapping("/login")
-    @Operation(summary = "主控端登录记录")
+    @Operation(summary = "主控端登录记录", hidden = true)
     public ApiResult<Void> recordControllerLogin(@RequestBody MasterLoginDTO dto) {
         loginResolveService.recordLogin(dto);
         return ApiResult.ok(null, "登录记录已保存");
@@ -212,7 +225,7 @@ public class MasterDeviceController {
 
     /** 开始遥操（通知主控关联目标机器人，不等待ACK） */
     @PostMapping("/{controllerId}/teleop/start")
-    @Operation(summary = "主控关联目标机器人，并获取视频流")
+    @Operation(summary = "主控关联目标机器人，并获取视频流", hidden = true)
     public ApiResult<List<DeviceCameraStreamVO>> startTeleop(@PathVariable String controllerId,
                                        @RequestBody TeleopStartDTO dto) {
         ensureDeviceType(controllerId, DEVICE_TYPE_CONTROLLER);
@@ -261,7 +274,7 @@ public class MasterDeviceController {
 
     /** 操作记录分页（遥操员使用主控操控机器人完成工单的时间） */
     @PostMapping("/operation-record/page")
-    @Operation(summary = "主控设备关联工单操作记录分页")
+    @Operation(summary = "主控设备关联工单操作记录分页", hidden = true)
     public ApiResult<IPage<WorkOrderOperationRecordVO>> workOrderRecords(@RequestBody OperationRecordQueryDTO query) {
         if (Objects.isNull(query)) {
             return ApiResult.fail("请求体 不能为空");
@@ -276,7 +289,7 @@ public class MasterDeviceController {
 
     /** 操作记录导出 Excel */
     @PostMapping("/operation-record/export")
-    @Operation(summary = "操作记录导出")
+    @Operation(summary = "操作记录导出", hidden = true)
     public ResponseEntity<byte[]> operationRecordExport(@RequestBody OperationRecordQueryDTO query) {
         if (Objects.isNull(query)) {
            throw new RuntimeException("请求体 不能为空");
@@ -291,7 +304,7 @@ public class MasterDeviceController {
 
     /** 使用状态：最近登录时间、最近一次遥操开始时间、当前设备、可使用的机器人 */
     @GetMapping("/usage-status/{controllerCode}")
-    @Operation(summary = "主控使用状态")
+    @Operation(summary = "主控使用状态", hidden = true)
     public ApiResult<UsageStatusVO> usageStatus(@PathVariable String controllerCode) {
         UsageStatusVO vo = usageStatusService.getUsageStatusByCode(controllerCode);
         if (vo == null) {
@@ -369,7 +382,7 @@ public class MasterDeviceController {
      * 由机器人返回所有已配置摄像头的流地址列表。接口为同步调用，最长等待 10 秒。
      */
     @GetMapping("/{deviceId}/camera/stream")
-    @Operation(summary = "获取机器人全部摄像头视频流地址")
+    @Operation(summary = "获取机器人全部摄像头视频流地址", hidden = true)
     public ApiResult<List<DeviceCameraStreamVO>> getCameraStreams(@PathVariable String deviceId) {
         ensureDeviceType(deviceId, DEVICE_TYPE_ROBOT);
         return ApiResult.ok(deviceService.getCameraStreams(deviceId, null));
@@ -382,7 +395,7 @@ public class MasterDeviceController {
      * Service 仍按列表形式返回，Controller 只取第一条作为“当前摄像头”的视频流信息。
      */
     @GetMapping("/{deviceId}/camera/stream/{cameraIndex}")
-    @Operation(summary = "获取机器人指定路数摄像头视频流地址")
+    @Operation(summary = "获取机器人指定路数摄像头视频流地址", hidden = true)
     public ApiResult<DeviceCameraStreamVO> getCameraStreamByIndex(@PathVariable String deviceId,
                                                                   @PathVariable Integer cameraIndex) {
         ensureDeviceType(deviceId, DEVICE_TYPE_ROBOT);
