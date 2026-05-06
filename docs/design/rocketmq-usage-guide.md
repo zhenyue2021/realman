@@ -3,6 +3,8 @@
 - **适用场景**：达尔文数采平台对接（`darwin/` 集成包）
 - **日期**：2026-04-27
 
+**版本约定**（单一来源：父工程 `pom.xml`）：Java 侧 **`rocketmq-spring-boot-starter`** 使用属性 `rocketmq-spring.version`（当前 **2.3.1**）；独立部署 Broker / NameServer 时 Docker 镜像使用 **`apache/rocketmq:${rocketmq-broker-docker.version}`**（属性 `rocketmq-broker-docker.version`，当前 **5.3.2**）。NameServer与 Broker **必须**同一镜像 tag，且与达尔文侧 Broker  major 对齐（均为 5.x）。
+
 ---
 
 ## 一、核心概念速览
@@ -202,9 +204,9 @@ DARWIN_FILE_REPORT
 
 ## 七、开发调试步骤
 
-1. 启动 RocketMQ（`docker compose up rocketmq`，或连达尔文测试环境）
+1. 启动 RocketMQ（`docker compose` 中 **`apache/rocketmq:5.3.2`**（与父 pom `rocketmq-broker-docker.version` 一致），或连达尔文测试环境）
 2. 在 Nacos 设置 `darwin.integration.enabled=true` 并填写 `rocketmq.name-server`
-3. 打开 RocketMQ Dashboard（通常 `localhost:8080`）
+3. 打开 RocketMQ Dashboard（`localhost:18088`）
 4. 在 Dashboard「消息发送」手动向 `DARWIN_WORKORDER_IN` 发一条 JSON：
 
 ```json

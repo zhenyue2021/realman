@@ -59,6 +59,32 @@ mybatis-plus:
       logic-delete-value: 1
       logic-not-delete-value: 0
 
+# RocketMQ（达尔文对接；开发机直连 172.16.44.66 上 NameServer）
+# Broker：容器镜像版本与父 pom 中 rocketmq-broker-docker.version 对齐（当前 apache/rocketmq:5.3.2）
+# 监听 10911；Docker 部署须在 broker.conf 设置 brokerIP1 为本机 IP，否则客户端会拿到容器内网地址而连不上
+rocketmq:
+  name-server: ${ROCKETMQ_NAME_SERVER:172.16.44.66:9876}
+  producer:
+    group: REALMAN_IOT_PRODUCER_GROUP
+    send-message-timeout: 3000
+    retry-times-when-send-failed: 3
+    access-key: ${ROCKETMQ_ACCESS_KEY:}
+    secret-key: ${ROCKETMQ_SECRET_KEY:}
+  consumer:
+    group: REALMAN_IOT_CONSUMER_GROUP
+    access-key: ${ROCKETMQ_ACCESS_KEY:}
+    secret-key: ${ROCKETMQ_SECRET_KEY:}
+
+# 设为 true 时加载 Darwin RocketMQ Bean；未部署 RocketMQ 时请保持 false 或使用环境变量覆盖
+darwin:
+  integration:
+    enabled: ${DARWIN_INTEGRATION_ENABLED:false}
+    file-upload:
+      upload-url-prefix: ${DARWIN_UPLOAD_URL_PREFIX:http://172.16.44.66:8085/realman-iot}
+      upload-bucket: darwin-files
+      max-file-size-mb: 50
+      url-expire-days: 7
+
 # mqtt
 mqtt:
   enabled: false  # 临时禁用，避免启动失败
