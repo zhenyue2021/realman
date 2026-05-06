@@ -39,7 +39,7 @@ public class DeviceAuthController {
     @Operation(summary = "新增设备授权")
     public ApiResult<DeviceAuthDTO> create(@RequestBody DeviceAuthDTO dto,
                                            HttpServletRequest request) {
-        return ApiResult.ok(deviceAuthApiService.create(request, dto));
+        return ApiResult.ok(deviceAuthApiService.create(request, dto), "授权成功");
     }
 
     @PutMapping("/{id}")
@@ -47,14 +47,14 @@ public class DeviceAuthController {
     public ApiResult<DeviceAuthDTO> update(@PathVariable String id,
                                            @RequestBody DeviceAuthDTO dto,
                                            HttpServletRequest request) {
-        return ApiResult.ok(deviceAuthApiService.update(request, id, dto));
+        return ApiResult.ok(deviceAuthApiService.update(request, id, dto), "修改成功");
     }
 
     @DeleteMapping("/{id}")
     @Operation(summary = "删除设备授权（逻辑删除）")
     public ApiResult<Void> delete(@PathVariable String id, HttpServletRequest request) {
         deviceAuthApiService.delete(request, id);
-        return ApiResult.ok(null);
+        return ApiResult.ok(null, "删除成功");
     }
 
     @GetMapping("/{id}")

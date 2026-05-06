@@ -362,6 +362,11 @@ public interface DeviceConstant {
         long SLAM_UPLOAD_PERMIT_MINUTES = 30L;
     }
 
+    interface DelFlag {
+        int NORMAL = 0;
+        int DELETED = 1;
+    }
+
     interface SlamMapStatus {
         int UPLOADING = 0;
         int READY = 1;

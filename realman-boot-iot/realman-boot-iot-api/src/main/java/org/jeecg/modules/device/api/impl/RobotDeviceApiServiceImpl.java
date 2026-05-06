@@ -12,6 +12,7 @@ import org.jeecg.modules.device.service.IIotDeviceService;
 import org.jeecg.modules.device.service.IIotSlamMapService;
 import org.jeecg.modules.device.vo.DeviceDetailVO;
 import org.jeecg.modules.device.vo.RobotDeviceDetailVO;
+import org.springframework.context.annotation.Bean;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -93,12 +94,17 @@ public class RobotDeviceApiServiceImpl implements RobotDeviceApiService {
     @Override
     public RobotDeviceDetailVO getRobotDeviceDetailAgg(String deviceId) {
         DeviceDetailVO vo = deviceService.getDeviceDetail(deviceId);
-        if (vo != null && vo.getDevice() != null && !Objects.equals(vo.getDevice().getDeviceType(), DEVICE_TYPE_ROBOT)) {
+        if (vo == null || vo.getDevice() == null) {
+            throw new RuntimeException("设备不存在或信息不完整: " + deviceId);
+        }
+        if (!Objects.equals(vo.getDevice().getDeviceType(), DEVICE_TYPE_ROBOT)) {
             throw new RuntimeException("设备类型不匹配：该ID不是机器人设备");
         }
+        IotDevice device = new IotDevice();
         RobotDeviceDetailVO out = new RobotDeviceDetailVO();
         if (vo.getDevice() != null) {
-            out.setDevice(toPageItem(vo.getDevice()));
+            BeanUtil.copyProperties(vo.getDevice(), device);
+            out.setDevice(toPageItem(device));
         }
         out.setOnline(vo.getOnline());
         out.setLastHeartbeatTime(vo.getLastHeartbeatTime());
