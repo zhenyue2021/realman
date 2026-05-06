@@ -5,8 +5,8 @@ public final class DarwinTopicConstant {
     private DarwinTopicConstant() {}
 
     // Topics
-    public static final String DEVICE_STATUS      = "DARWIN_DEVICE_STATUS";
-    public static final String WORKORDER_IN        = "DARWIN_WORKORDER_IN";
+    public static final String DEVICE_STATUS       = "DARWIN_DEVICE_STATUS";
+    public static final String WORK_ORDER_IN       = "DARWIN_WORKORDER_IN";
     public static final String OSS_AUTH_REQUEST    = "DARWIN_OSS_AUTH_REQUEST";
     public static final String OSS_AUTH_RESPONSE   = "DARWIN_OSS_AUTH_RESPONSE";
     public static final String FILE_REPORT         = "DARWIN_FILE_REPORT";
