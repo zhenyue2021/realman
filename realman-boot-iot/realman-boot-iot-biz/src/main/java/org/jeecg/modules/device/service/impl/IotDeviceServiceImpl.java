@@ -20,6 +20,8 @@ import org.jeecg.modules.device.vo.DeviceCameraStreamVO;
 import org.jeecg.modules.device.vo.DeviceDetailVO;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
 import java.util.Map;
@@ -159,13 +161,12 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
     }
 
     /**
-     * 主控参数下发：先发 MQTT 指令，成功后持久化配置。
-     * 两步操作在同一事务内，MQTT 发送异常会回滚 DB 写入。
+     * 主控参数下发：先持久化配置到 DB，事务提交后再发 MQTT 指令。
+     * DB 写入失败时事务回滚，MQTT 不会发出；MQTT 发送失败不影响已持久化的配置记录。
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void applyMasterControlParams(IotDevice controller, MasterControlParamsDTO dto) {
-        mqttCommandService.applyMasterControlParams(controller, dto);
         configSyncService.upsertDeviceConfig(controller.getId(), controller.getDeviceCode(),
                 "arm_level",
                 dto.getArmLevel() == null ? null : dto.getArmLevel().toString(),
@@ -174,6 +175,12 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
                 "move_speed_level",
                 dto.getMoveSpeedLevel() == null ? null : dto.getMoveSpeedLevel().toString(),
                 Objects.nonNull(dto.getMoveSpeedLevelConfigType()) ? dto.getMoveSpeedLevelConfigType() : "move_speed_level");
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                mqttCommandService.applyMasterControlParams(controller, dto);
+            }
+        });
     }
 
     @Override

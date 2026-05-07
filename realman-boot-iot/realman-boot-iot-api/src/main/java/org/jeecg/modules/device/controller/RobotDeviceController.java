@@ -10,6 +10,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.jeecg.common.exception.JeecgBootException;
 import org.jeecg.common.system.util.JwtUtil;
 import org.jeecg.common.util.ContentDispositionUtil;
@@ -53,6 +54,7 @@ public class RobotDeviceController {
     private final DeviceWebSocketServer webSocketServer;
 
     /** 新增机器人设备 */
+    @RequiresPermissions("robot:add")
     @PostMapping("/add")
     @Operation(summary = "新增机器人设备")
     public ApiResult<RobotDevicePageItemDTO> addDevice(@Valid @RequestBody DeviceAddDTO dto) {
@@ -83,7 +85,7 @@ public class RobotDeviceController {
 
     /** 查询机器人设备详情 */
     @GetMapping("/{deviceId}")
-    @Operation(summary = "查询机器人设备详情")
+    @Operation(summary = "查询机器人设备详情", hidden = true)
     public ApiResult<RobotDevicePageItemDTO> detail(@PathVariable String deviceId) {
         return ApiResult.ok(robotDeviceApiService.getRobotDeviceView(deviceId));
     }
@@ -111,7 +113,7 @@ public class RobotDeviceController {
 
     /** 获取实时监控状态（优先Redis，降级DB） */
     @GetMapping("/{deviceId}/monitor")
-    @Operation(summary = "获取机器人设备实时监控状态")
+    @Operation(summary = "获取机器人设备实时监控状态", hidden = true)
     public ApiResult<Map<String, Object>> monitor(@PathVariable String deviceId) {
         ensureDeviceType(deviceId, DEVICE_TYPE_ROBOT);
         return ApiResult.ok(deviceService.getDeviceMonitorStatus(deviceId));
@@ -119,7 +121,7 @@ public class RobotDeviceController {
 
     /** 远程重启 */
     @PostMapping("/{deviceId}/restart")
-    @Operation(summary = "远程重启机器人设备")
+    @Operation(summary = "远程重启机器人设备", hidden = true)
     public ApiResult<Void> restart(@PathVariable String deviceId,
                                    @RequestBody DeviceRestartDTO dto) {
         ensureDeviceType(deviceId, DEVICE_TYPE_ROBOT);
@@ -129,7 +131,7 @@ public class RobotDeviceController {
 
     /** 紧急停机（通过MQTT向设备发送AES加密指令，设备需上行 ACK 确认） */
     @PostMapping("/{deviceId}/emergency-stop")
-    @Operation(summary = "紧急停机机器人设备")
+    @Operation(summary = "紧急停机机器人设备", hidden = true)
     public ApiResult<Void> emergencyStop(@PathVariable String deviceId,
                                          @RequestBody EmergencyStopDTO dto) {
         ensureDeviceType(deviceId, DEVICE_TYPE_ROBOT);
@@ -138,6 +140,7 @@ public class RobotDeviceController {
     }
 
     /** 编辑机器人设备 */
+    @RequiresPermissions("robot:edit")
     @PutMapping("/{deviceId}")
     @Operation(summary = "编辑机器人设备")
     public ApiResult<Void> update(@PathVariable String deviceId,
@@ -148,6 +151,7 @@ public class RobotDeviceController {
     }
 
     /** 删除机器人设备（逻辑删除） */
+    @RequiresPermissions("robot:delete")
     @DeleteMapping("/{deviceId}")
     @Operation(summary = "删除机器人设备（逻辑删除）")
     public ApiResult<Void> delete(@PathVariable String deviceId) {
@@ -158,7 +162,7 @@ public class RobotDeviceController {
 
     /** 禁用/启用机器人设备 */
     @PutMapping("/{deviceId}/status/{status}")
-    @Operation(summary = "禁用或启用机器人设备")
+    @Operation(summary = "禁用或启用机器人设备", hidden = true)
     public ApiResult<Void> changeStatus(@PathVariable String deviceId,
                                         @PathVariable Integer status,
                                         @RequestParam(defaultValue = "system") String operator) {
@@ -169,7 +173,7 @@ public class RobotDeviceController {
 
     /** 批量查询在线状态 */
     @PostMapping("/batch/online-status")
-    @Operation(summary = "批量查询机器人设备在线状态")
+    @Operation(summary = "批量查询机器人设备在线状态", hidden = true)
     public ApiResult<List<Map<String, Object>>> batchOnline(@RequestBody List<String> deviceIds) {
         return ApiResult.ok(deviceService.batchGetOnlineStatus(deviceIds));
     }

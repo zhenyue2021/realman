@@ -39,6 +39,7 @@ public class IotDevice implements Serializable {
      * 0-未激活 1-在线 2-离线 3-禁用
      */
     @TableField("status")
+    @Dict(dicCode = "device_status")
     private Integer status;
     /**
      * 使用状态：0-空闲 1-占用（使用中）

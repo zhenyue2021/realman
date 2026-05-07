@@ -21,7 +21,7 @@ import java.util.Map;
 @Data
 public class DeviceDetailVO {
     /** 设备基础信息 */
-    private IotDevice device;
+    private IotDeviceDetail device;
 
     /** 是否在线（Redis在线集合） */
     private Boolean online;

@@ -14,6 +14,7 @@ import org.jeecg.modules.device.mapper.IotDeviceMapper;
 import org.jeecg.modules.device.security.CommandEncryptService;
 import org.jeecg.modules.device.service.ForceFeedbackQueryPendingService;
 import org.jeecg.modules.device.service.IDeviceOperationLogService;
+import org.jeecg.modules.device.service.IIotDeviceCommandRecordService;
 import org.jeecg.modules.device.vo.ForceFeedbackVO;
 import org.springframework.stereotype.Component;
 
@@ -30,9 +31,10 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class DeviceCommandAckHandler {
 
-    private final CommandEncryptService      encryptService;
-    private final ObjectMapper               objectMapper;
-    private final IDeviceOperationLogService logService;
+    private final CommandEncryptService           encryptService;
+    private final ObjectMapper                    objectMapper;
+    private final IDeviceOperationLogService      logService;
+    private final IIotDeviceCommandRecordService  commandRecordService;
     private final IotDeviceConfigMapper           configMapper;
     private final IotDeviceMapper                 deviceMapper;
 
@@ -50,11 +52,11 @@ public class DeviceCommandAckHandler {
 
         logService.recordLog(null, deviceCode, opType,
                 "设备收到指令[" + cmd + "]" + (code == 0 ? "并执行" : "失败"),
-                "{commandId:" + (commandId == null ? "" : commandId) + "}",
+                "{\"commandId\":\"" + (commandId == null ? "" : commandId) + "\"}",
                 DeviceConstant.OperationSource.DEVICE,
                 code == 0 ? "SUCCESS" : "FAIL",
                 message, null, null);
-
+        commandRecordService.ack(commandId, code == 0, message, decrypted);
     }
 
 

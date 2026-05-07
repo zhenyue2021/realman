@@ -1,6 +1,9 @@
 package org.jeecg.modules.device.service.impl.device;
 
+import cn.hutool.core.bean.BeanUtil;
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -11,8 +14,10 @@ import org.jeecg.modules.device.mapper.IotDeviceConfigMapper;
 import org.jeecg.modules.device.mapper.IotDeviceMapper;
 import org.jeecg.modules.device.mapper.IotDeviceStatusMapper;
 import org.jeecg.modules.device.service.IDeviceOperationLogService;
+import org.jeecg.modules.device.service.IIotDeviceAuthService;
 import org.jeecg.modules.device.service.IIotSlamMapService;
 import org.jeecg.modules.device.vo.DeviceDetailVO;
+import org.jeecg.modules.device.vo.IotDeviceDetail;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -40,6 +45,7 @@ public class IotDeviceStatusQueryService {
     private final ObjectMapper objectMapper;
     private final IDeviceOperationLogService logService;
     private final IIotSlamMapService slamMapService;
+    private final IIotDeviceAuthService deviceAuthService;
 
     public Map<String, Object> getDeviceMonitorStatus(String deviceId) {
         IotDevice device = deviceSupport.require(deviceId);
@@ -81,7 +87,8 @@ public class IotDeviceStatusQueryService {
 
     public DeviceDetailVO getDeviceDetail(String deviceId) {
         IotDevice device = deviceSupport.require(deviceId);
-
+        IotDeviceDetail deviceDetail = new IotDeviceDetail();
+        BeanUtil.copyProperties(device, deviceDetail);
         boolean online = Boolean.TRUE.equals(redisTemplate.opsForSet()
                 .isMember(DeviceConstant.RedisKey.DEVICE_ONLINE_SET, device.getDeviceCode()));
 
@@ -123,17 +130,34 @@ public class IotDeviceStatusQueryService {
             }
         });
 
+        Integer deviceType = device.getDeviceType();
         List<IotDeviceOperationLog> recentLogs = logService
                 .queryLogPage(new Page<>(1, 20), deviceId, null, null, null)
                 .getRecords();
-
-        IotSlamMap slamMap = slamMapService.getCurrentMap(device.getDeviceCode());
-        if (Objects.nonNull(slamMap)) {
-            device.setSlamVersion(slamMap.getMapVersion());
-            device.setSlamPresignedUrl(slamMap.getPresignedUrl());
+        if (DeviceConstant.DeviceTypeInteger.ROBOT == deviceType) {
+            IotSlamMap slamMap = slamMapService.getCurrentMap(device.getDeviceCode());
+            if (Objects.nonNull(slamMap)) {
+                deviceDetail.setSlamVersion(slamMap.getMapVersion());
+                deviceDetail.setSlamPresignedUrl(slamMap.getPresignedUrl());
+            }
+        }
+        // 查询设备授权时间及被授权的单位
+        LambdaQueryWrapper<IotDeviceAuth> queryWrapper = new LambdaQueryWrapper<IotDeviceAuth>().eq(IotDeviceAuth::getDelFlag, DeviceConstant.DelFlag.NORMAL);
+        if (DeviceConstant.DeviceTypeInteger.ROBOT == deviceType) {
+            queryWrapper.eq(IotDeviceAuth::getDeviceId, deviceId);
+        }
+        if (DeviceConstant.DeviceTypeInteger.CONTROLLER == deviceType) {
+            queryWrapper.eq(IotDeviceAuth::getControllerId, deviceId);
+        }
+        queryWrapper.last("LIMIT 1");
+        IotDeviceAuth auth = deviceAuthService.getOne(queryWrapper);
+        if (Objects.nonNull(auth)) {
+            deviceDetail.setAuthEffectiveTime(auth.getEffectiveTime());
+            deviceDetail.setAuthExpireTime(auth.getExpireTime());
+            deviceDetail.setAuthEnterpriseName(auth.getEnterpriseName());
         }
         DeviceDetailVO vo = new DeviceDetailVO();
-        vo.setDevice(device);
+        vo.setDevice(deviceDetail);
         vo.setOnline(online);
         vo.setRealtimeStatus(realtime);
         vo.setDeviceConfigs(deviceConfigs);

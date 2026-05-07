@@ -10,6 +10,7 @@ import org.jeecg.modules.device.dto.workorder.WorkOrderComplianceCreateDTO;
 import org.jeecg.modules.device.dto.workorder.WorkOrderComplianceQueryDTO;
 import org.jeecg.modules.device.entity.workorder.WorkOrderComplianceConfig;
 
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 
 public interface WorkOrderComplianceApiService {
@@ -27,8 +28,8 @@ public interface WorkOrderComplianceApiService {
 
     List<WorkOrderComplianceConfig> listForExport(WorkOrderComplianceQueryDTO query);
 
-    List<OptionDTO> tenantOptions();
+    List<OptionDTO> tenantOptions(HttpServletRequest request);
 
-    List<OptionTreeDTO> enterpriseOptionsTree();
+    List<OptionTreeDTO> enterpriseOptionsTree(HttpServletRequest request);
 }
 

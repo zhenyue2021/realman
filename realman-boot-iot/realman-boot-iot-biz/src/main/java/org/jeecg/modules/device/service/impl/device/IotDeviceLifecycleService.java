@@ -137,8 +137,6 @@ public class IotDeviceLifecycleService {
                 .eq(IotDeviceAuth::getTenantId, tenantId)
                 .eq(IotDeviceAuth::getStatus, 1)
                 .eq(IotDeviceAuth::getDelFlag, 0)
-                .and(x -> x.isNull(IotDeviceAuth::getEffectiveTime).or().le(IotDeviceAuth::getEffectiveTime, now))
-                .and(x -> x.isNull(IotDeviceAuth::getExpireTime).or().ge(IotDeviceAuth::getExpireTime, now))
                 .orderByDesc(IotDeviceAuth::getEffectiveTime);
         if (Objects.equals(deviceType, DeviceConstant.DeviceType.CONTROLLER)) {
             w.in(IotDeviceAuth::getControllerId, deviceIds);

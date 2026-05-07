@@ -30,6 +30,9 @@ spring:
       minimum-idle: 5
       maximum-pool-size: 20
       connection-timeout: 30000
+      idle-timeout: 600000       # 空闲连接超过 5 分钟自动回收
+      max-lifetime: 1800000      # 连接最长存活 30 分钟，到期强制重建
+      keepalive-time: 60000      # 每 60 秒发心跳，防止被 MySQL 单方面断开
   data:
     redis:
       host: realman-redis
@@ -113,7 +116,7 @@ zipkin:
 webrtc:
   # TURN 服务器列表，支持多个
   turn-servers:
-    - url: "39.107.117.20:3479?transport=udp"
+    - url: "turn:39.107.117.20:3479?transport=udp"
       username: "realman"
       password: "TBdWj0HhwTK56AzK"
   # STUN 服务器列表（英文逗号分隔，拆分后作为数组下发）
@@ -124,13 +127,13 @@ webrtc:
   signaling:
     server:
       url: 39.107.117.20
-      port: 2233
+      port: 8091
       auto-push:
-        enabled: false  # 测试环境禁用启动时推送，生产环境设为 true 或删除此行
+        enabled: true  # 测试环境禁用启动时推送，生产环境设为 true 或删除此行
 
 logging:
   level:
-    org.jeecg.modules.device: DEBUG
+    org.jeecg.modules.device: info
     org.eclipse.paho: WARN
     com.baomidou.mybatisplus: WARN
 

@@ -14,6 +14,7 @@ import org.jeecg.modules.device.mapper.IotDeviceMapper;
 import org.jeecg.modules.device.security.CommandEncryptService;
 import org.jeecg.modules.device.service.ForceFeedbackQueryPendingService;
 import org.jeecg.modules.device.service.IDeviceOperationLogService;
+import org.jeecg.modules.device.service.IIotDeviceCommandRecordService;
 import org.jeecg.modules.device.service.SportSpeedQueryPendingService;
 import org.jeecg.modules.device.vo.ForceFeedbackVO;
 import org.jeecg.modules.device.vo.SportSpeedVO;
@@ -32,12 +33,13 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class MasterCommandAckHandler {
 
-    private final CommandEncryptService      encryptService;
-    private final ObjectMapper               objectMapper;
-    private final IDeviceOperationLogService logService;
-    private final IotDeviceConfigMapper        configMapper;
-    private final IotDeviceMapper              deviceMapper;
-    private final SportSpeedQueryPendingService sportSpeedPending;
+    private final CommandEncryptService           encryptService;
+    private final ObjectMapper                    objectMapper;
+    private final IDeviceOperationLogService      logService;
+    private final IIotDeviceCommandRecordService  commandRecordService;
+    private final IotDeviceConfigMapper           configMapper;
+    private final IotDeviceMapper                 deviceMapper;
+    private final SportSpeedQueryPendingService   sportSpeedPending;
     private final ForceFeedbackQueryPendingService forceFeedbackPending;
 
     public void handle(String deviceCode, String cmd, String payload) throws Exception {
@@ -53,14 +55,14 @@ public class MasterCommandAckHandler {
                 deviceCode, cmd, commandId, code);
 
         String deviceId = resolveDeviceId(deviceCode);
-        // 目前仍使用通用 COMMAND_SEND 类型，必要时可扩展专用类型
         logService.recordLog(deviceId, deviceCode,
                 DeviceConstant.OperationType.COMMAND_SEND,
                 "主控设备执行指令[" + cmd + "]" + (code == 0 ? "成功" : "失败"),
-                "{commandId:" + (commandId == null ? "" : commandId) + "}",
+                "{\"commandId\":\"" + (commandId == null ? "" : commandId) + "\"}",
                 DeviceConstant.OperationSource.DEVICE,
                 code == 0 ? "SUCCESS" : "FAIL",
                 message, null, null);
+        commandRecordService.ack(commandId, code == 0, message, decrypted);
 
         switch (cmd) {
             case "sport-speed":

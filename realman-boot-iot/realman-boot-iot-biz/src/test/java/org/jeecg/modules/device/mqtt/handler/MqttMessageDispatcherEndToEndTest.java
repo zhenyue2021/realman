@@ -18,6 +18,7 @@ import org.jeecg.modules.device.security.CommandEncryptService;
 import org.jeecg.modules.device.service.DeviceCameraStreamPendingService;
 import org.jeecg.modules.device.service.ForceFeedbackQueryPendingService;
 import org.jeecg.modules.device.service.IDeviceOperationLogService;
+import org.jeecg.modules.device.service.IIotDeviceCommandRecordService;
 import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -54,6 +55,7 @@ public class MqttMessageDispatcherEndToEndTest {
     private StringRedisTemplate redisTemplate;
     private DeviceWebSocketServer webSocketServer;
     private IDeviceOperationLogService logService;
+    private IIotDeviceCommandRecordService commandRecordService;
     private DeviceOnlineOfflineHandler onlineOfflineHandler;
     private ForceFeedbackQueryPendingService forceFeedbackPending;
 
@@ -101,6 +103,7 @@ public class MqttMessageDispatcherEndToEndTest {
         redisTemplate = Mockito.mock(StringRedisTemplate.class);
         webSocketServer = Mockito.mock(DeviceWebSocketServer.class);
         logService = Mockito.mock(IDeviceOperationLogService.class);
+        commandRecordService = Mockito.mock(IIotDeviceCommandRecordService.class);
         onlineOfflineHandler = Mockito.mock(DeviceOnlineOfflineHandler.class);
         extParamsRequestHandler = Mockito.mock(ExtParamsRequestHandler.class);
         masterCommandHandler = Mockito.mock(MasterCommandHandler.class);
@@ -135,6 +138,7 @@ public class MqttMessageDispatcherEndToEndTest {
                 encryptService,
                 objectMapper,
                 logService,
+                commandRecordService,
                 configMapper,
                 deviceMapper
         );
@@ -316,6 +320,13 @@ public class MqttMessageDispatcherEndToEndTest {
                 Mockito.anyString(),
                 Mockito.isNull(),
                 Mockito.isNull()
+        );
+        // 双向通信闭环：ACK 到达后 command record 应被更新为 SUCCESS
+        Mockito.verify(commandRecordService).ack(
+                Mockito.eq(commandId),
+                Mockito.eq(true),
+                Mockito.anyString(),
+                Mockito.anyString()
         );
     }
 
