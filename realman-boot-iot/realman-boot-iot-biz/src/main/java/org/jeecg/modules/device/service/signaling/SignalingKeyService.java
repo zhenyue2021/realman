@@ -1,6 +1,7 @@
 package org.jeecg.modules.device.service.signaling;
 
 import cn.hutool.core.util.HexUtil;
+import cn.hutool.crypto.digest.DigestUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.constant.DeviceConstant;
 import org.springframework.beans.factory.annotation.Value;
@@ -11,9 +12,10 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
-import java.util.Arrays;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -125,7 +127,9 @@ public class SignalingKeyService {
     private static String generateKey() {
         byte[] bytes = new byte[32];
         SECURE_RANDOM.nextBytes(bytes);
-        return HexUtil.encodeHexStr(bytes);
+        String timestampStr = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssS"));
+        String randomHex = HexUtil.encodeHexStr(bytes);
+        return timestampStr + "_"+ DigestUtil.md5Hex(randomHex).toUpperCase(Locale.ROOT);
     }
 
     /**
@@ -145,6 +149,7 @@ public class SignalingKeyService {
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 Object success = response.getBody().get("success");
                 if (Boolean.TRUE.equals(success)) {
+                    log.info("[Signaling] 推送响应 success=TRUE url={} body={}", url, response.getBody());
                     return true;
                 }
                 log.warn("[Signaling] 推送响应 success=false url={} body={}", url, response.getBody());
