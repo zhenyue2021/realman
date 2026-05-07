@@ -11,6 +11,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.jeecg.common.exception.JeecgBootException;
 import org.jeecg.common.system.util.JwtUtil;
 import org.jeecg.common.util.ContentDispositionUtil;
@@ -51,6 +52,7 @@ public class MasterDeviceController {
     private final MasterDeviceApiService masterDeviceApiService;
 
     /** 新增主控设备 */
+    @RequiresPermissions("mainController:add")
     @PostMapping("/add")
     @Operation(summary = "新增主控设备", extensions = @Extension(properties = {
             @ExtensionProperty(name = "x-order", value = "1")
@@ -69,6 +71,7 @@ public class MasterDeviceController {
     }
 
     /** 编辑主控设备 */
+    @RequiresPermissions("mainController:edit")
     @PutMapping("/{controllerId}")
     @Operation(summary = "编辑主控设备", extensions = @Extension(properties = {
             @ExtensionProperty(name = "x-order", value = "2")
@@ -81,6 +84,7 @@ public class MasterDeviceController {
     }
 
     /** 删除主控设备（逻辑删除） */
+    @RequiresPermissions("mainController:delete")
     @DeleteMapping("/{controllerId}")
     @Operation(summary = "删除主控设备", extensions = @Extension(properties = {
             @ExtensionProperty(name = "x-order", value = "4")

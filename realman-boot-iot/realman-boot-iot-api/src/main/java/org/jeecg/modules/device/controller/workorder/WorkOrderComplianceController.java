@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.extensions.ExtensionProperty;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.jeecg.common.util.ContentDispositionUtil;
 import org.jeecg.modules.device.util.RequestUtil;
 import org.jeecg.modules.device.api.WorkOrderComplianceApiService;
@@ -50,6 +51,7 @@ public class WorkOrderComplianceController {
         return ApiResult.ok(apiService.pageConfigs(page, query));
     }
 
+    @RequiresPermissions("workOrderconfig:add")
     @PostMapping("/add")
     @Operation(summary = "新增工单合规配置", extensions = @Extension(properties = {
             @ExtensionProperty(name = "x-order", value = "2")
@@ -85,6 +87,7 @@ public class WorkOrderComplianceController {
         return ApiResult.ok(apiService.detail(id));
     }
 
+    @RequiresPermissions("workOrderconfig:edit")
     @PutMapping("/{id}")
     @Operation(summary = "修改工单合规配置", extensions = @Extension(properties = {
             @ExtensionProperty(name = "x-order", value = "4")
@@ -97,6 +100,7 @@ public class WorkOrderComplianceController {
         return ApiResult.ok(updated);
     }
 
+    @RequiresPermissions("workOrderconfig:delete")
     @DeleteMapping("/{id}")
     @Operation(summary = "删除工单合规配置", extensions = @Extension(properties = {
             @ExtensionProperty(name = "x-order", value = "5")

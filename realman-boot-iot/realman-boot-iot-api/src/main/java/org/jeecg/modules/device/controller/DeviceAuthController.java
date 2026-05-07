@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.jeecg.modules.device.api.DeviceAuthApiService;
 import org.jeecg.modules.device.dto.DeviceAuthDTO;
 import org.jeecg.modules.device.dto.DeviceAuthDetailDTO;
@@ -35,6 +36,7 @@ public class DeviceAuthController {
         return ApiResult.ok(deviceAuthApiService.page(request, query));
     }
 
+    @RequiresPermissions("deviceAuth:add")
     @PostMapping("/add")
     @Operation(summary = "新增设备授权")
     public ApiResult<DeviceAuthDTO> create(@RequestBody DeviceAuthDTO dto,
@@ -42,6 +44,7 @@ public class DeviceAuthController {
         return ApiResult.ok(deviceAuthApiService.create(request, dto), "授权成功");
     }
 
+    @RequiresPermissions("deviceAuth:edit")
     @PutMapping("/{id}")
     @Operation(summary = "修改设备授权")
     public ApiResult<DeviceAuthDTO> update(@PathVariable String id,
@@ -50,6 +53,7 @@ public class DeviceAuthController {
         return ApiResult.ok(deviceAuthApiService.update(request, id, dto), "修改成功");
     }
 
+    @RequiresPermissions("deviceAuth:delete")
     @DeleteMapping("/{id}")
     @Operation(summary = "删除设备授权（逻辑删除）")
     public ApiResult<Void> delete(@PathVariable String id, HttpServletRequest request) {
