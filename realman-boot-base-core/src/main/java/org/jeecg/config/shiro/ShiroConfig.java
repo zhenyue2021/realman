@@ -21,23 +21,18 @@ import org.jeecg.config.shiro.filters.CustomShiroFilterFactoryBean;
 import org.jeecg.config.shiro.filters.JwtFilter;
 import org.springframework.aop.framework.autoproxy.DefaultAdvisorAutoProxyCreator;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.config.BeanDefinition;
-import org.springframework.boot.web.servlet.FilterRegistrationBean;
+import org.springframework.boot.web.servlet.DelegatingFilterProxyRegistrationBean;
 import org.springframework.context.annotation.*;
-import org.springframework.core.annotation.AnnotationUtils;
+import org.springframework.core.Ordered;
 import org.springframework.core.env.Environment;
-import org.springframework.core.type.filter.AnnotationTypeFilter;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.boot.autoconfigure.data.redis.RedisProperties;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.filter.DelegatingFilterProxy;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 import redis.clients.jedis.HostAndPort;
 import redis.clients.jedis.JedisCluster;
 
-import java.lang.reflect.Method;
 import java.util.*;
 
 /**
@@ -50,6 +45,13 @@ import java.util.*;
 @Configuration
 public class ShiroConfig {
 
+    /**
+     * Shiro FilterFactoryBean 在 Spring 容器中的 Bean 名称。
+     * 同时用于 @Bean 声明和 DelegatingFilterProxyRegistrationBean 引用，
+     * 保证两处始终一致，避免魔法字符串导致的运行时错误。
+     */
+    private static final String SHIRO_FILTER_BEAN_NAME = "shiroFilterFactoryBean";
+
     @Resource
     private LettuceConnectionFactory lettuceConnectionFactory;
     @Autowired
@@ -58,66 +60,65 @@ public class ShiroConfig {
     private JeecgBaseConfig jeecgBaseConfig;
     @Autowired(required = false)
     private RedisProperties redisProperties;
-    
+
     /**
      * Filter Chain定义说明
-     *
+     * <p>
      * 1、一个URL可以配置多个Filter，使用逗号分隔
      * 2、当设置多个过滤器时，全部验证通过，才视为通过
      * 3、部分过滤器可指定参数，如perms，roles
      */
-    @Bean("shiroFilterFactoryBean")
+    @Bean(SHIRO_FILTER_BEAN_NAME)
     public ShiroFilterFactoryBean shiroFilter(SecurityManager securityManager) {
         CustomShiroFilterFactoryBean shiroFilterFactoryBean = new CustomShiroFilterFactoryBean();
         shiroFilterFactoryBean.setSecurityManager(securityManager);
-        // 拦截器
-        Map<String, String> filterChainDefinitionMap = new LinkedHashMap<String, String>();
+        // 拦截器（LinkedHashMap 保证顺序，从上往下依次匹配，/** 兜底放最后）
+        Map<String, String> filterChainDefinitionMap = new LinkedHashMap<>();
 
-        //支持yml方式，配置拦截排除
-        if(jeecgBaseConfig!=null && jeecgBaseConfig.getShiro()!=null){
+        // 支持 yml 方式配置拦截排除
+        if (jeecgBaseConfig != null && jeecgBaseConfig.getShiro() != null) {
             String shiroExcludeUrls = jeecgBaseConfig.getShiro().getExcludeUrls();
-            if(oConvertUtils.isNotEmpty(shiroExcludeUrls)){
-                String[] permissionUrl = shiroExcludeUrls.split(",");
-                for(String url : permissionUrl){
-                    filterChainDefinitionMap.put(url,"anon");
+            if (oConvertUtils.isNotEmpty(shiroExcludeUrls)) {
+                for (String url : shiroExcludeUrls.split(",")) {
+                    filterChainDefinitionMap.put(url, "anon");
                 }
             }
         }
 
-        // 配置不会被拦截的链接 顺序判断
-        filterChainDefinitionMap.put("/sys/cas/client/validateLogin", "anon"); //cas验证登录
-        filterChainDefinitionMap.put("/sys/randomImage/**", "anon"); //登录验证码接口排除
-        filterChainDefinitionMap.put("/sys/checkCaptcha", "anon"); //登录验证码接口排除
-        filterChainDefinitionMap.put("/sys/smsCheckCaptcha", "anon"); //短信次数发送太多验证码排除
-        filterChainDefinitionMap.put("/sys/login", "anon"); //登录接口排除
-        filterChainDefinitionMap.put("/sys/mLogin", "anon"); //登录接口排除
-        filterChainDefinitionMap.put("/sys/logout", "anon"); //登出接口排除
-        filterChainDefinitionMap.put("/sys/thirdLogin/**", "anon"); //第三方登录
-        filterChainDefinitionMap.put("/sys/getEncryptedString", "anon"); //获取加密串
-        filterChainDefinitionMap.put("/sys/sms", "anon");//短信验证码
-        filterChainDefinitionMap.put("/sys/phoneLogin", "anon");//手机登录
-        filterChainDefinitionMap.put("/sys/user/checkOnlyUser", "anon");//校验用户是否存在
-        filterChainDefinitionMap.put("/sys/user/register", "anon");//用户注册
-        filterChainDefinitionMap.put("/sys/user/phoneVerification", "anon");//用户忘记密码验证手机号
-        filterChainDefinitionMap.put("/sys/user/passwordChange", "anon");//用户更改密码
-        filterChainDefinitionMap.put("/auth/2step-code", "anon");//登录验证码
-        filterChainDefinitionMap.put("/sys/common/static/**", "anon");//图片预览 &下载文件不限制token
-        filterChainDefinitionMap.put("/sys/common/pdf/**", "anon");//pdf预览
+        // ---- 认证 / 登录相关 ----
+        filterChainDefinitionMap.put("/sys/cas/client/validateLogin", "anon"); // CAS 验证登录
+        filterChainDefinitionMap.put("/sys/randomImage/**", "anon");           // 登录验证码
+        filterChainDefinitionMap.put("/sys/checkCaptcha", "anon");             // 登录验证码校验
+        filterChainDefinitionMap.put("/sys/smsCheckCaptcha", "anon");          // 短信次数限制验证码
+        filterChainDefinitionMap.put("/sys/login", "anon");                    // 登录接口
+        filterChainDefinitionMap.put("/sys/mLogin", "anon");                   // 移动端登录
+        filterChainDefinitionMap.put("/sys/logout", "anon");                   // 登出接口
+        filterChainDefinitionMap.put("/sys/thirdLogin/**", "anon");            // 第三方登录
+        filterChainDefinitionMap.put("/sys/getEncryptedString", "anon");       // 获取加密串
+        filterChainDefinitionMap.put("/sys/sms", "anon");                      // 短信验证码
+        filterChainDefinitionMap.put("/sys/phoneLogin", "anon");               // 手机号登录
+        filterChainDefinitionMap.put("/sys/user/checkOnlyUser", "anon");       // 校验用户是否存在
+        filterChainDefinitionMap.put("/sys/user/register", "anon");            // 用户注册
+        filterChainDefinitionMap.put("/sys/user/phoneVerification", "anon");   // 忘记密码-手机号验证
+        filterChainDefinitionMap.put("/sys/user/passwordChange", "anon");      // 忘记密码-修改密码
+        filterChainDefinitionMap.put("/auth/2step-code", "anon");              // 两步验证码
+        filterChainDefinitionMap.put("/sys/getLoginQrcode/**", "anon");        // 登录二维码
+        filterChainDefinitionMap.put("/sys/getQrcodeToken/**", "anon");        // 监听扫码
+        filterChainDefinitionMap.put("/sys/checkAuth", "anon");                // 授权接口
+        filterChainDefinitionMap.put("/sys/version/app3version", "anon");      // App vue3 版本查询
 
-        //filterChainDefinitionMap.put("/sys/common/view/**", "anon");//图片预览不限制token
-        //filterChainDefinitionMap.put("/sys/common/download/**", "anon");//文件下载不限制token
-        filterChainDefinitionMap.put("/generic/**", "anon");//pdf预览需要文件
+        // ---- 文件 / 预览 ----
+        filterChainDefinitionMap.put("/sys/common/static/**", "anon"); // 图片预览 & 文件下载
+        filterChainDefinitionMap.put("/sys/common/pdf/**", "anon");    // PDF 预览
+        filterChainDefinitionMap.put("/generic/**", "anon");           // PDF 预览依赖文件
 
-        filterChainDefinitionMap.put("/sys/getLoginQrcode/**", "anon"); //登录二维码
-        filterChainDefinitionMap.put("/sys/getQrcodeToken/**", "anon"); //监听扫码
-        filterChainDefinitionMap.put("/sys/checkAuth", "anon"); //授权接口排除
-        filterChainDefinitionMap.put("/openapi/call/**", "anon"); // 开放平台接口排除
-
-        // 代码逻辑说明: 排除静态资源后缀
+        // ---- 静态资源（前端构建产物）----
         filterChainDefinitionMap.put("/", "anon");
         filterChainDefinitionMap.put("/doc.html", "anon");
         filterChainDefinitionMap.put("/**/*.js", "anon");
+        filterChainDefinitionMap.put("/**/*.js.map", "anon");
         filterChainDefinitionMap.put("/**/*.css", "anon");
+        filterChainDefinitionMap.put("/**/*.css.map", "anon");
         filterChainDefinitionMap.put("/**/*.html", "anon");
         filterChainDefinitionMap.put("/**/*.svg", "anon");
         filterChainDefinitionMap.put("/**/*.pdf", "anon");
@@ -128,138 +129,110 @@ public class ShiroConfig {
         filterChainDefinitionMap.put("/**/*.ttf", "anon");
         filterChainDefinitionMap.put("/**/*.woff", "anon");
         filterChainDefinitionMap.put("/**/*.woff2", "anon");
-
         filterChainDefinitionMap.put("/**/*.glb", "anon");
         filterChainDefinitionMap.put("/**/*.wasm", "anon");
 
+        // ---- 开发 / 文档工具 ----
         filterChainDefinitionMap.put("/druid/**", "anon");
         filterChainDefinitionMap.put("/swagger-ui.html", "anon");
         filterChainDefinitionMap.put("/swagger**/**", "anon");
         filterChainDefinitionMap.put("/webjars/**", "anon");
         filterChainDefinitionMap.put("/v3/**", "anon");
 
+        // ---- 公告 / 大屏 ----
         filterChainDefinitionMap.put("/sys/annountCement/show/**", "anon");
-
-        filterChainDefinitionMap.put("/**/*.js.map", "anon");
-        filterChainDefinitionMap.put("/**/*.css.map", "anon");
-
-        //大屏模板例子
         filterChainDefinitionMap.put("/test/bigScreen/**", "anon");
         filterChainDefinitionMap.put("/bigscreen/template1/**", "anon");
         filterChainDefinitionMap.put("/bigscreen/template2/**", "anon");
-        //filterChainDefinitionMap.put("/test/jeecgDemo/rabbitMqClientTest/**", "anon"); //MQ测试
-        //filterChainDefinitionMap.put("/test/jeecgDemo/html", "anon"); //模板页面
-        //filterChainDefinitionMap.put("/test/jeecgDemo/redis/**", "anon"); //redis测试
 
-        //websocket排除
-        filterChainDefinitionMap.put("/websocket/**", "anon");//系统通知和公告
-        filterChainDefinitionMap.put("/newsWebsocket/**", "anon");//CMS模块
-        filterChainDefinitionMap.put("/vxeSocket/**", "anon");//JVxeTable无痕刷新示例
-        filterChainDefinitionMap.put("/ws/**", "anon");//IoT 设备 WebSocket（DeviceWebSocketServer）
-        // 部分容器 / 代理路径下 Shiro 可能按「含 context-path 的 servletPath」匹配；与 /ws/** 并存，避免误落到 /** → jwt
-        filterChainDefinitionMap.put("/realman-iot/ws/**", "anon");//IoT 设备 WS（与 context-path 对齐的兜底）
-        //App vue3版本查询版本接口
-        filterChainDefinitionMap.put("/sys/version/app3version", "anon");
-        //仪表盘（按钮通信）
-        filterChainDefinitionMap.put("/dragChannelSocket/**","anon");
-        //App vue3版本查询版本接口
-        filterChainDefinitionMap.put("/sys/version/app3version", "anon");
+        // ---- WebSocket / 长连接 ----
+        filterChainDefinitionMap.put("/websocket/**", "anon");          // 系统通知和公告
+        filterChainDefinitionMap.put("/newsWebsocket/**", "anon");      // CMS 模块
+        filterChainDefinitionMap.put("/vxeSocket/**", "anon");          // JVxeTable 无痕刷新
+        filterChainDefinitionMap.put("/ws/**", "anon");                 // IoT 设备 WebSocket
+        // 部分容器/代理路径下 Shiro 可能按「含 context-path 的 servletPath」匹配，与 /ws/** 并存避免误拦截
+        filterChainDefinitionMap.put("/realman-iot/ws/**", "anon");     // IoT WS（context-path 兜底）
+        filterChainDefinitionMap.put("/dragChannelSocket/**", "anon");  // 仪表盘按钮通信
 
-        //性能监控——安全隐患泄露TOEKN（durid连接池也有）
-        //filterChainDefinitionMap.put("/actuator/**", "anon");
-        //测试模块排除
-        filterChainDefinitionMap.put("/test/seata/**", "anon");
-
-        //错误路径排除
-        filterChainDefinitionMap.put("/error", "anon");
-        // 企业微信证书排除
-        filterChainDefinitionMap.put("/WW_verify*", "anon");
-
-        filterChainDefinitionMap.put("/openapi/call/**", "anon");
-
-        // 添加自己的过滤器并且取名为jwt
-        Map<String, Filter> filterMap = new HashMap<String, Filter>(1);
-        //如果cloudServer为空 则说明是单体 需要加载跨域配置【微服务跨域切换】
+        // ---- 其他公开接口 ----
+        filterChainDefinitionMap.put("/openapi/call/**", "anon"); // 开放平台接口
+        filterChainDefinitionMap.put("/test/seata/**", "anon");   // Seata 测试
+        filterChainDefinitionMap.put("/error", "anon");           // 错误路径
+        filterChainDefinitionMap.put("/WW_verify*", "anon");      // 企业微信证书
+        filterChainDefinitionMap.put("/internal/mqtt/**", "anon"); // EMQX HTTP Auth 回调
+        // ---- JWT 自定义 Filter ----
+        Map<String, Filter> filterMap = new HashMap<>(1);
+        // cloudServer 为空说明是单体模式，需要加载跨域配置【微服务跨域切换】
         Object cloudServer = env.getProperty(CommonConstant.CLOUD_SERVER_KEY);
-        filterMap.put("jwt", new JwtFilter(cloudServer==null));
+        filterMap.put("jwt", new JwtFilter(cloudServer == null));
         shiroFilterFactoryBean.setFilters(filterMap);
-        // <!-- 过滤链定义，从上向下顺序执行，一般将/**放在最为下边
+
+        // /** 兜底，必须放最后
         filterChainDefinitionMap.put("/**", "jwt");
 
-        // 未授权界面返回JSON
+        // 未授权统一返回 JSON
         shiroFilterFactoryBean.setUnauthorizedUrl("/sys/common/403");
         shiroFilterFactoryBean.setLoginUrl("/sys/common/403");
         shiroFilterFactoryBean.setFilterChainDefinitionMap(filterChainDefinitionMap);
         return shiroFilterFactoryBean;
     }
 
-
     /**
-     * spring过滤装饰器 <br/>
-     * 因为shiro的filter不支持异步请求,导致所有的异步请求都会报错. <br/>
-     * 所以需要用spring的FilterRegistrationBean再代理一下shiro的filter.为他扩展异步支持. <br/>
-     * 后续所有异步的接口都需要再这里增加registration.addUrlPatterns("/xxx/xxx");
-     * @return
-     * @author chenrui
-     * @date 2024/12/3 19:49
+     * 用 DelegatingFilterProxyRegistrationBean 统一注册 Shiro filter。
+     * <p>
+     * 相比 FilterRegistrationBean + DelegatingFilterProxy 的组合，此方式会将
+     * targetBeanName 写入 Spring Boot 的 seen 集合，从而可靠地防止
+     * shiroFilterFactoryBean 被二次自动注册，确保 /* 为唯一注册点。
+     * <p>
+     * 设置 order = HIGHEST_PRECEDENCE + 1，使 Shiro 在其他自定义 Filter（如跨域）
+     * 之前执行；如需调整与跨域 Filter 的相对顺序，修改此值即可。
      */
     @Bean
-    public FilterRegistrationBean shiroFilterRegistration() {
-        FilterRegistrationBean registration = new FilterRegistrationBean();
-        registration.setFilter(new DelegatingFilterProxy("shiroFilterFactoryBean"));
-        registration.setEnabled(true);
-        // 代码逻辑说明: [issues/7491]运行耗时长，效率慢 
-        registration.addUrlPatterns("/test/ai/chat/send");
-        registration.addUrlPatterns("/airag/flow/run");
-        registration.addUrlPatterns("/airag/flow/debug");
-        registration.addUrlPatterns("/airag/chat/send");
-        registration.addUrlPatterns("/airag/app/debug");
-        registration.addUrlPatterns("/airag/app/prompt/generate");
-        registration.addUrlPatterns("/airag/chat/receive/**");
-        // 添加SSE接口的异步支持
-        registration.addUrlPatterns("/airag/extData/evaluator/debug");
-        registration.addUrlPatterns("/drag/onlDragDatasetHead/generateChartSse");
-        registration.addUrlPatterns("/drag/onlDragDatasetHead/updateChartOptSse");
-        registration.addUrlPatterns("/drag/onlDragDatasetHead/generateSqlSse");
-        //支持异步
+    public DelegatingFilterProxyRegistrationBean shiroFilterRegistration() {
+        DelegatingFilterProxyRegistrationBean registration =
+                new DelegatingFilterProxyRegistrationBean(SHIRO_FILTER_BEAN_NAME);
+        registration.addUrlPatterns("/*");
+        registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 1);
         registration.setAsyncSupported(true);
-        registration.setDispatcherTypes(DispatcherType.REQUEST, DispatcherType.ASYNC);
+        // 包含 ERROR：Spring Boot 异常 forward 到 /error 时 dispatcher 类型为 ERROR，
+        // 确保 Shiro 能处理该路径（/error 已在 anon 白名单，不影响正常流程）
+        registration.setDispatcherTypes(
+                DispatcherType.REQUEST,
+                DispatcherType.ASYNC,
+                DispatcherType.ERROR
+        );
         return registration;
     }
 
     @Bean("securityManager")
-    public DefaultWebSecurityManager securityManager(ShiroRealm myRealm) {
+    public DefaultWebSecurityManager securityManager(ShiroRealm myRealm, RedisCacheManager redisCacheManager) {
         DefaultWebSecurityManager securityManager = new DefaultWebSecurityManager();
         securityManager.setRealm(myRealm);
 
         /*
-         * 关闭shiro自带的session，详情见文档
-         * http://shiro.apache.org/session-management.html#SessionManagement-
-         * StatelessApplications%28Sessionless%29
+         * 关闭 Shiro 自带 session，详情见文档：
+         * http://shiro.apache.org/session-management.html#SessionManagement-StatelessApplications
          */
         DefaultSubjectDAO subjectDAO = new DefaultSubjectDAO();
         DefaultSessionStorageEvaluator defaultSessionStorageEvaluator = new DefaultSessionStorageEvaluator();
         defaultSessionStorageEvaluator.setSessionStorageEnabled(false);
         subjectDAO.setSessionStorageEvaluator(defaultSessionStorageEvaluator);
         securityManager.setSubjectDAO(subjectDAO);
-        //自定义缓存实现,使用redis
-        securityManager.setCacheManager(redisCacheManager());
+
+        // 注入 Spring 管理的单例 RedisCacheManager
+        securityManager.setCacheManager(redisCacheManager);
         return securityManager;
     }
 
     /**
      * 下面的代码是添加注解支持
-     * @return
      */
     @Bean
     @DependsOn("lifecycleBeanPostProcessor")
     public DefaultAdvisorAutoProxyCreator defaultAdvisorAutoProxyCreator() {
         DefaultAdvisorAutoProxyCreator defaultAdvisorAutoProxyCreator = new DefaultAdvisorAutoProxyCreator();
         defaultAdvisorAutoProxyCreator.setProxyTargetClass(true);
-        /**
-         * 解决重复代理问题 github#994
-         * 添加前缀判断 不匹配 任何Advisor
-         */
+        // 解决重复代理问题 github#994：添加前缀判断，不匹配任何 Advisor
         defaultAdvisorAutoProxyCreator.setUsePrefix(true);
         defaultAdvisorAutoProxyCreator.setAdvisorBeanNamePrefix("_no_advisor");
         return defaultAdvisorAutoProxyCreator;
@@ -278,36 +251,31 @@ public class ShiroConfig {
     }
 
     /**
-     * cacheManager 缓存 redis实现
-     * 使用的是shiro-redis开源插件
-     *
-     * @return
+     * cacheManager 缓存 redis 实现（shiro-redis 开源插件）。
+     * 声明为 @Bean，由 Spring 管理单例生命周期，避免多次调用产生多个实例和重复连接。
      */
-    public RedisCacheManager redisCacheManager() {
+    @Bean
+    public RedisCacheManager redisCacheManager(IRedisManager redisManager) {
         log.info("===============(1)创建缓存管理器RedisCacheManager");
         RedisCacheManager redisCacheManager = new RedisCacheManager();
-        redisCacheManager.setRedisManager(redisManager());
-        //redis中针对不同用户缓存(此处的id需要对应user实体中的id字段,用于唯一标识)
+        redisCacheManager.setRedisManager(redisManager);
+        // 此处的 id 需对应 User 实体中的 id 字段，用于唯一标识缓存 key
         redisCacheManager.setPrincipalIdFieldName("id");
-        //用户权限信息缓存时间
+        // 用户权限信息缓存时间（单位：毫秒）
         redisCacheManager.setExpire(200000);
         return redisCacheManager;
     }
 
     /**
-     * RedisConfig在项目starter项目中
-     * jeecg-boot-starter-github\jeecg-boot-common\src\main\java\org\jeecg\common\modules\redis\config\RedisConfig.java
-     * 
-     * 配置shiro redisManager
-     * 使用的是shiro-redis开源插件
-     *
-     * @return
+     * 配置 shiro redisManager（shiro-redis 开源插件）。
+     * RedisConfig 位于：
+     * jeecg-boot-starter-github/jeecg-boot-common/.../redis/config/RedisConfig.java
      */
     @Bean
     public IRedisManager redisManager() {
         log.info("===============(2)创建RedisManager,连接Redis..");
-        IRedisManager manager;
-        // sentinel cluster redis（【issues/5569】shiro集成 redis 不支持 sentinel 方式部署的redis集群 #5569）
+
+        // Sentinel 集群模式（issues/5569）
         if (Objects.nonNull(redisProperties)
                 && Objects.nonNull(redisProperties.getSentinel())
                 && !CollectionUtils.isEmpty(redisProperties.getSentinel().getNodes())) {
@@ -316,44 +284,42 @@ public class ShiroConfig {
             sentinelManager.setHost(String.join(",", redisProperties.getSentinel().getNodes()));
             sentinelManager.setPassword(redisProperties.getPassword());
             sentinelManager.setDatabase(redisProperties.getDatabase());
-
             return sentinelManager;
         }
-        
-        // redis 单机支持，在集群为空，或者集群无机器时候使用 add by jzyadmin@163.com
-        if (lettuceConnectionFactory.getClusterConfiguration() == null || lettuceConnectionFactory.getClusterConfiguration().getClusterNodes().isEmpty()) {
+
+        // 单机模式：集群配置为空或无节点时使用
+        if (lettuceConnectionFactory.getClusterConfiguration() == null
+                || lettuceConnectionFactory.getClusterConfiguration().getClusterNodes().isEmpty()) {
             RedisManager redisManager = new RedisManager();
             redisManager.setHost(lettuceConnectionFactory.getHostName() + ":" + lettuceConnectionFactory.getPort());
-            //(lettuceConnectionFactory.getPort());
             redisManager.setDatabase(lettuceConnectionFactory.getDatabase());
             redisManager.setTimeout(0);
             if (!StringUtils.isEmpty(lettuceConnectionFactory.getPassword())) {
                 redisManager.setPassword(lettuceConnectionFactory.getPassword());
             }
-            manager = redisManager;
-        }else{
-            // redis集群支持，优先使用集群配置
-            RedisClusterManager redisManager = new RedisClusterManager();
-            Set<HostAndPort> portSet = new HashSet<>();
-            lettuceConnectionFactory.getClusterConfiguration().getClusterNodes().forEach(node -> portSet.add(new HostAndPort(node.getHost() , node.getPort())));
-            //update-begin--Author:scott Date:20210531 for：修改集群模式下未设置redis密码的bug issues/I3QNIC
-            if (oConvertUtils.isNotEmpty(lettuceConnectionFactory.getPassword())) {
-                JedisCluster jedisCluster = new JedisCluster(portSet, 2000, 2000, 5,
-                    lettuceConnectionFactory.getPassword(), new GenericObjectPoolConfig());
-                redisManager.setPassword(lettuceConnectionFactory.getPassword());
-                redisManager.setJedisCluster(jedisCluster);
-            } else {
-                JedisCluster jedisCluster = new JedisCluster(portSet);
-                redisManager.setJedisCluster(jedisCluster);
-            }
-            manager = redisManager;
+            return redisManager;
         }
-        return manager;
+
+        // 集群模式：优先使用集群配置（update-begin Author:scott Date:20210531 issues/I3QNIC）
+        RedisClusterManager redisClusterManager = new RedisClusterManager();
+        Set<HostAndPort> portSet = new HashSet<>();
+        lettuceConnectionFactory.getClusterConfiguration().getClusterNodes()
+                .forEach(node -> portSet.add(new HostAndPort(node.getHost(), node.getPort())));
+        if (oConvertUtils.isNotEmpty(lettuceConnectionFactory.getPassword())) {
+            JedisCluster jedisCluster = new JedisCluster(portSet, 2000, 2000, 5,
+                    lettuceConnectionFactory.getPassword(), new GenericObjectPoolConfig());
+            redisClusterManager.setPassword(lettuceConnectionFactory.getPassword());
+            redisClusterManager.setJedisCluster(jedisCluster);
+        } else {
+            redisClusterManager.setJedisCluster(new JedisCluster(portSet));
+        }
+        return redisClusterManager;
     }
 
     /**
-     * 解决 ShiroRequestMappingConfig 获取 requestMappingHandlerMapping Bean 冲突
-     * spring-boot-autoconfigure:3.4.5 和 spring-boot-actuator-autoconfigure:3.4.5
+     * 解决 ShiroRequestMappingConfig 获取 requestMappingHandlerMapping Bean 冲突。
+     * spring-boot-autoconfigure:3.4.5 与 spring-boot-actuator-autoconfigure:3.4.5 均会注册
+     * RequestMappingHandlerMapping，@Primary 确保 Shiro 的 ShiroUrlPathHelper 版本优先。
      */
     @Primary
     @Bean
@@ -361,20 +327,6 @@ public class ShiroConfig {
         RequestMappingHandlerMapping mapping = new RequestMappingHandlerMapping();
         mapping.setUrlPathHelper(new ShiroUrlPathHelper());
         return mapping;
-    }
-    
-    private List<String> rebuildUrl(String[] bases, String[] uris) {
-        List<String> urls = new ArrayList<>();
-        for (String base : bases) {
-            for (String uri : uris) {
-                urls.add(prefix(base)+prefix(uri));
-            }
-        }
-        return urls;
-    }
-
-    private String prefix(String seg) {
-        return seg.startsWith("/") ? seg : "/"+seg;
     }
 
 }

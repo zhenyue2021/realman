@@ -97,7 +97,7 @@ xxl:
 
 jeecg:
   shiro:
-    excludeUrls: /internal/mqtt/**,/api/device/**,/api/ota/**
+    excludeUrls: /internal/mqtt/**,/api/ota/**
 
 device:
   encrypt:
