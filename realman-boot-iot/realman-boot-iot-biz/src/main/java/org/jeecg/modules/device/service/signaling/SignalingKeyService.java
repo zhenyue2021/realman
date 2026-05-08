@@ -64,6 +64,11 @@ public class SignalingKeyService {
      */
     private static final long KEY_TTL_HOURS = 26L;
 
+    /** 密钥缺失时自动恢复的分布式锁 Key，防止多节点并发重复推送 */
+    private static final String RECOVER_LOCK_KEY      = "iot:signaling:recover:lock";
+    /** 恢复锁 TTL（秒）：推送+写入的合理上限；失败时主动释放，成功时让锁自然过期避免重入 */
+    private static final long   RECOVER_LOCK_TTL_SECONDS = 60L;
+
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final StringRedisTemplate redisTemplate;
@@ -89,19 +94,40 @@ public class SignalingKeyService {
         String newKey = generateKey();
         boolean pushed = pushToServer(newKey);
         if (pushed) {
-            storeInRedis(newKey);
-            log.info("[Signaling] 密钥已更新并推送至信令服务器 url={}", serverUrl);
+            try {
+                storeInRedis(newKey);
+                log.info("[Signaling] 密钥已更新并推送至信令服务器 url={}", serverUrl);
+            } catch (Exception e) {
+                log.error("[Signaling] 密钥已推送信令服务器但 Redis 写入失败，信令/缓存不一致 url={}", serverUrl, e);
+            }
         } else {
             log.warn("[Signaling] 密钥推送失败，Redis 保留旧密钥 url={}", serverUrl);
         }
     }
 
     /**
-     * 从 Redis 查询当前有效密钥（供其他模块使用）。
+     * 从 Redis 查询当前有效密钥；若缺失则自动重新生成并推送（幂等，集群内只有一个节点执行）。
      *
-     * @return 当前密钥，未初始化或已过期时返回 null
+     * @return 当前密钥；若信令服务器不可达或未配置则返回 null
      */
     public String getCurrentKey() {
+        String key = redisTemplate.opsForValue().get(redisKey());
+        if (key != null) {
+            return key;
+        }
+        log.warn("[Signaling] Redis 中密钥缺失，尝试自动恢复 url={}", serverUrl);
+        Boolean acquired = redisTemplate.opsForValue()
+                .setIfAbsent(RECOVER_LOCK_KEY, "1", RECOVER_LOCK_TTL_SECONDS, TimeUnit.SECONDS);
+        if (Boolean.TRUE.equals(acquired)) {
+            try {
+                generateAndPush();
+            } catch (Exception e) {
+                log.error("[Signaling] 密钥自动恢复失败，释放锁 url={}", serverUrl, e);
+                redisTemplate.delete(RECOVER_LOCK_KEY);
+            }
+        } else {
+            log.info("[Signaling] 其他节点正在恢复密钥，本次跳过 url={}", serverUrl);
+        }
         return redisTemplate.opsForValue().get(redisKey());
     }
 
