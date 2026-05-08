@@ -159,7 +159,7 @@ public class ShiroConfig {
         filterChainDefinitionMap.put("/test/seata/**", "anon");   // Seata 测试
         filterChainDefinitionMap.put("/error", "anon");           // 错误路径
         filterChainDefinitionMap.put("/WW_verify*", "anon");      // 企业微信证书
-
+        filterChainDefinitionMap.put("/internal/mqtt/**", "anon"); // EMQX HTTP Auth 回调
         // ---- JWT 自定义 Filter ----
         Map<String, Filter> filterMap = new HashMap<>(1);
         // cloudServer 为空说明是单体模式，需要加载跨域配置【微服务跨域切换】
