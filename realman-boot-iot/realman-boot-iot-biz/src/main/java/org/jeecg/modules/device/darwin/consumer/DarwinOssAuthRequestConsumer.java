@@ -24,7 +24,7 @@ import java.time.LocalDateTime;
 @ConditionalOnProperty(prefix = "darwin.integration", name = "enabled", havingValue = "true")
 @RocketMQMessageListener(
         topic = DarwinTopicConstant.OSS_AUTH_REQUEST,
-        consumerGroup = "${rocketmq.consumer.group:REALMAN_IOT_CONSUMER_GROUP}",
+        consumerGroup = "DARWIN_OSS_AUTH_CONSUMER_GROUP",
         selectorExpression = DarwinTopicConstant.TAG_REQUEST
 )
 public class DarwinOssAuthRequestConsumer implements RocketMQListener<String> {

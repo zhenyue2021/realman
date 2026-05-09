@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit;
 @ConditionalOnProperty(prefix = "darwin.integration", name = "enabled", havingValue = "true")
 @RocketMQMessageListener(
         topic = DarwinTopicConstant.FILE_REPORT,
-        consumerGroup = "${rocketmq.consumer.group:REALMAN_IOT_CONSUMER_GROUP}",
+        consumerGroup = "DARWIN_FILE_REPORT_CONSUMER_GROUP",
         selectorExpression = DarwinTopicConstant.TAG_UPLOAD
 )
 public class DarwinFileReportConsumer implements RocketMQListener<String> {
