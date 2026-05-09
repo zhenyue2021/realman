@@ -15,6 +15,8 @@ import org.jeecg.modules.device.mapper.*;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.mqtt.publisher.MqttPublisher;
 import org.jeecg.modules.device.security.CommandEncryptService;
+import org.jeecg.modules.device.datacollect.handler.CollectUrlRequestHandler;
+import org.jeecg.modules.device.datacollect.handler.OssAddressReportHandler;
 import org.jeecg.modules.device.service.DeviceCameraStreamPendingService;
 import org.jeecg.modules.device.service.ForceFeedbackQueryPendingService;
 import org.jeecg.modules.device.service.IDeviceOperationLogService;
@@ -76,6 +78,8 @@ public class MqttMessageDispatcherEndToEndTest {
     private ExtParamRecordIotMapper extParamRecordIotMapper;
     private WebRtcAckHandler webRtcAckHandler;
     private WebRtcRestartHandler webRtcRestartHandler;
+    private CollectUrlRequestHandler collectUrlRequestHandler;
+    private OssAddressReportHandler ossAddressReportHandler;
 
     // 分发器
     private MqttMessageDispatcher dispatcher;
@@ -167,6 +171,8 @@ public class MqttMessageDispatcherEndToEndTest {
         slamStatesHandler = Mockito.mock(SlamStatesHandler.class);
         webRtcAckHandler = Mockito.mock(WebRtcAckHandler.class);
         webRtcRestartHandler = new WebRtcRestartHandler(encryptService, objectMapper, webSocketServer, logService);
+        collectUrlRequestHandler = Mockito.mock(CollectUrlRequestHandler.class);
+        ossAddressReportHandler = Mockito.mock(OssAddressReportHandler.class);
         DeviceCameraStreamPendingService cameraStreamPendingService = Mockito.mock(DeviceCameraStreamPendingService.class);
         DeviceCameraStreamResponseHandler deviceCameraStreamResponseHandler = new DeviceCameraStreamResponseHandler(
                 encryptService,
@@ -196,7 +202,9 @@ public class MqttMessageDispatcherEndToEndTest {
                 extParamsRequestHandler,
                 masterCommandHandler,
                 webRtcAckHandler,
-                webRtcRestartHandler
+                webRtcRestartHandler,
+                collectUrlRequestHandler,
+                ossAddressReportHandler
         );
     }
 

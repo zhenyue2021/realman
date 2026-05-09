@@ -21,7 +21,7 @@ import org.springframework.stereotype.Component;
 @ConditionalOnProperty(prefix = "darwin.integration", name = "enabled", havingValue = "true")
 @RocketMQMessageListener(
         topic = DarwinTopicConstant.WORK_ORDER_IN,
-        consumerGroup = "${rocketmq.consumer.group:REALMAN_IOT_CONSUMER_GROUP}",
+        consumerGroup = "DARWIN_WORKORDER_CONSUMER_GROUP",
         selectorExpression = DarwinTopicConstant.TAG_CREATE
 )
 public class DarwinWorkOrderConsumer implements RocketMQListener<String> {

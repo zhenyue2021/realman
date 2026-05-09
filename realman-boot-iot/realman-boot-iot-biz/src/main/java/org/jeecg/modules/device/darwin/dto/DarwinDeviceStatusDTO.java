@@ -15,7 +15,7 @@ public class DarwinDeviceStatusDTO {
     private String deviceType;
     /** ONLINE / OFFLINE */
     private String eventType;
-    private LocalDateTime eventTime;
+    private Long eventTime;
     /** 下线原因，上线时为空字符串 */
     private String offlineReason;
 }

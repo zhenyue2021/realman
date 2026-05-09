@@ -10,7 +10,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
 
 @Slf4j
 @Component
@@ -36,7 +35,7 @@ public class DarwinDeviceStatusProducer {
                 .deviceCode(deviceCode)
                 .deviceType(deviceType)
                 .eventType(tag)
-                .eventTime(LocalDateTime.now())
+                .eventTime(System.currentTimeMillis())
                 .offlineReason(offlineReason)
                 .build();
         try {

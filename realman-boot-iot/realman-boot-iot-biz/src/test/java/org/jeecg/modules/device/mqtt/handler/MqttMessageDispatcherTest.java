@@ -1,6 +1,8 @@
 package org.jeecg.modules.device.mqtt.handler;
 
 import org.eclipse.paho.mqttv5.common.MqttMessage;
+import org.jeecg.modules.device.datacollect.handler.CollectUrlRequestHandler;
+import org.jeecg.modules.device.datacollect.handler.OssAddressReportHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -35,6 +37,8 @@ public class MqttMessageDispatcherTest {
     private MasterCommandHandler masterCommandHandler;
     private WebRtcAckHandler webRtcAckHandler;
     private WebRtcRestartHandler webRtcRestartHandler;
+    private CollectUrlRequestHandler collectUrlRequestHandler;
+    private OssAddressReportHandler ossAddressReportHandler;
 
     private MqttMessageDispatcher dispatcher;
 
@@ -56,6 +60,8 @@ public class MqttMessageDispatcherTest {
         masterCommandHandler = Mockito.mock(MasterCommandHandler.class);
         webRtcAckHandler = Mockito.mock(WebRtcAckHandler.class);
         webRtcRestartHandler = Mockito.mock(WebRtcRestartHandler.class);
+        collectUrlRequestHandler = Mockito.mock(CollectUrlRequestHandler.class);
+        ossAddressReportHandler = Mockito.mock(OssAddressReportHandler.class);
 
         dispatcher = new MqttMessageDispatcher(
                 statusHandler,
@@ -73,7 +79,9 @@ public class MqttMessageDispatcherTest {
                 extParamsRequestHandler,
                 masterCommandHandler,
                 webRtcAckHandler,
-                webRtcRestartHandler
+                webRtcRestartHandler,
+                collectUrlRequestHandler,
+                ossAddressReportHandler
         );
     }
 
@@ -248,6 +256,24 @@ public class MqttMessageDispatcherTest {
         String payload = "{\"command\":\"restart\",\"commandId\":\"97127fb9b78a4d00b217eeb42c0d5041\",\"timestamp\":1775716304420}";
         dispatcher.dispatch(topic, mqttMsg(payload));
         Mockito.verify(webRtcRestartHandler).handle(deviceCode, payload);
+    }
+
+    @Test
+    void testCollectUrlRequest() throws Exception {
+        String deviceCode = "ROBOT001";
+        String topic = "device/" + deviceCode + "/datacollect/collectUrlRequest";
+        String payload = "{\"requestId\":\"req-001\",\"timestamp\":1710000000000}";
+        dispatcher.dispatch(topic, mqttMsg(payload));
+        Mockito.verify(collectUrlRequestHandler).handle(deviceCode, payload);
+    }
+
+    @Test
+    void testOssAddressReport() throws Exception {
+        String deviceCode = "ROBOT001";
+        String topic = "device/" + deviceCode + "/datacollect/ossAdressReport";
+        String payload = "{\"timestamp\":1710000000000,\"oss\":{\"address\":\"oss://bucket/path\",\"list\":[\"file1.bag\"]}}";
+        dispatcher.dispatch(topic, mqttMsg(payload));
+        Mockito.verify(ossAddressReportHandler).handle(deviceCode, payload);
     }
 
     @Test
