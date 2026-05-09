@@ -1,4 +1,4 @@
-package org.jeecg.modules.device.darwin.service;
+package org.jeecg.modules.device.datacollect.service;
 
 import io.minio.GetPresignedObjectUrlArgs;
 import io.minio.MinioClient;
@@ -6,7 +6,7 @@ import io.minio.PutObjectArgs;
 import io.minio.http.Method;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jeecg.modules.device.darwin.config.DarwinProperties;
+import org.jeecg.modules.device.datacollect.config.DataCollectIntegrationProperties;
 import org.jeecg.modules.device.util.MinioUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -18,11 +18,11 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class DarwinFileStorageService {
+public class FileStorageService {
 
     private final MinioClient minioClient;
     private final MinioUtil minioUtil;
-    private final DarwinProperties darwinProperties;
+    private final DataCollectIntegrationProperties properties;
 
     /**
      * 上传文件到 MinIO，返回预签名下载 URL。
@@ -32,12 +32,12 @@ public class DarwinFileStorageService {
      * @return 预签名下载 URL
      */
     public String store(MultipartFile file, String bizType) {
-        DarwinProperties.FileUpload cfg = darwinProperties.getFileUpload();
+        DataCollectIntegrationProperties.FileUpload cfg = properties.getFileUpload();
         String bucket = cfg.getUploadBucket();
         minioUtil.ensureBucketExists(bucket);
 
         String ext = extractExtension(file.getOriginalFilename());
-        String date = LocalDateTime.now().toString().substring(0, 10); // yyyy-MM-dd
+        String date = LocalDateTime.now().toString().substring(0, 10);
         String objectKey = String.format("darwin/%s/%s/%s%s",
                 bizType.toLowerCase(), date, UUID.randomUUID().toString().replace("-", ""), ext);
 
@@ -49,7 +49,7 @@ public class DarwinFileStorageService {
                     .contentType(file.getContentType())
                     .build());
         } catch (Exception e) {
-            throw new RuntimeException("[Darwin] 上传文件到 MinIO 失败: " + e.getMessage(), e);
+            throw new RuntimeException("[DataCollect] 上传文件到 MinIO 失败: " + e.getMessage(), e);
         }
 
         try {
@@ -60,7 +60,7 @@ public class DarwinFileStorageService {
                     .expiry(cfg.getUrlExpireDays(), TimeUnit.DAYS)
                     .build());
         } catch (Exception e) {
-            throw new RuntimeException("[Darwin] 生成预签名下载 URL 失败: " + e.getMessage(), e);
+            throw new RuntimeException("[DataCollect] 生成预签名下载 URL 失败: " + e.getMessage(), e);
         }
     }
 

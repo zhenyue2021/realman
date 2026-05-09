@@ -1,13 +1,11 @@
-package org.jeecg.modules.device.darwin.dto;
+package org.jeecg.modules.device.datacollect.dto.mq;
 
 import lombok.Builder;
 import lombok.Data;
 
-import java.time.LocalDateTime;
-
 @Data
 @Builder
-public class DarwinDeviceStatusDTO {
+public class DeviceStatusMsg {
 
     private String traceId;
     private String deviceCode;

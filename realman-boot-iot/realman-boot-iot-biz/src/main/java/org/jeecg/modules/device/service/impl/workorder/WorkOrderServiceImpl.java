@@ -9,9 +9,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.constant.DeviceConstant;
 import org.jeecg.modules.device.constant.WorkOrderConstant;
-import org.jeecg.modules.device.darwin.dto.DarwinWorkOrderCreateDTO;
-import org.jeecg.modules.device.darwin.entity.DarwinWorkOrderMapping;
-import org.jeecg.modules.device.darwin.mapper.DarwinWorkOrderMappingMapper;
+import org.jeecg.modules.device.datacollect.dto.mq.WorkOrderCreateMsg;
+import org.jeecg.modules.device.datacollect.entity.WorkOrderMapping;
+import org.jeecg.modules.device.datacollect.mapper.WorkOrderMappingMapper;
 import org.jeecg.modules.device.dto.WorkOrderOperationRecordDTO;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.entity.workorder.WorkOrder;
@@ -41,7 +41,7 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
     private final DeviceWebSocketServer deviceWebSocketServer;
     private final IWorkOrderStateMachineService workOrderStateMachine;
     private final IotDeviceMapper iotDeviceMapper;
-    private final DarwinWorkOrderMappingMapper darwinMappingMapper;
+    private final WorkOrderMappingMapper darwinMappingMapper;
 
     @Override
     public IPage<WorkOrder> pageWorkOrders(Page<WorkOrder> page, String agentId, String status) {
@@ -249,7 +249,7 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public WorkOrder createWorkOrderFromDarwin(DarwinWorkOrderCreateDTO dto) {
+    public WorkOrder createWorkOrderFromDarwin(WorkOrderCreateMsg dto) {
         WorkOrder order = new WorkOrder();
         order.setTaskName(dto.getTaskName());
         order.setPlanStartTime(dto.getPlanStartTime());
@@ -288,7 +288,7 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
         }
 
         // 写入达尔文映射记录
-        DarwinWorkOrderMapping mapping = new DarwinWorkOrderMapping();
+        WorkOrderMapping mapping = new WorkOrderMapping();
         mapping.setWorkOrderId(order.getId());
         mapping.setDarwinOrderId(dto.getDarwinOrderId());
         mapping.setDarwinAgentId(dto.getDarwinAgentId());

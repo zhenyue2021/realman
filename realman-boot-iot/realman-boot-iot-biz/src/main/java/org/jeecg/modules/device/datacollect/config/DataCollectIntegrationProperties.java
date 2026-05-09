@@ -1,4 +1,4 @@
-package org.jeecg.modules.device.darwin.config;
+package org.jeecg.modules.device.datacollect.config;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -9,7 +9,7 @@ import java.util.List;
 @Data
 @Component
 @ConfigurationProperties(prefix = "darwin.integration")
-public class DarwinProperties {
+public class DataCollectIntegrationProperties {
 
     private boolean enabled = false;
 
@@ -24,7 +24,6 @@ public class DarwinProperties {
         private List<String> allowedBizTypes = List.of(
                 "WORKORDER_ATTACHMENT", "DEVICE_FILE");
         private String uploadBucket = "darwin-files";
-        /** 预签名下载 URL 有效期（天） */
         private int urlExpireDays = 7;
     }
 }

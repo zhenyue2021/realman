@@ -3,7 +3,7 @@ package org.jeecg.modules.device.service.workorder;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.jeecg.modules.device.darwin.mapper.DarwinWorkOrderMappingMapper;
+import org.jeecg.modules.device.datacollect.mapper.WorkOrderMappingMapper;
 import org.jeecg.modules.device.entity.workorder.WorkOrder;
 import org.jeecg.modules.device.entity.workorder.WorkOrderDevice;
 import org.jeecg.modules.device.mapper.IotDeviceMapper;
@@ -48,7 +48,7 @@ class WorkOrderServiceImplTest {
     @Mock
     private IotDeviceMapper iotDeviceMapper;
     @Mock
-    private DarwinWorkOrderMappingMapper darwinWorkOrderMappingMapper;
+    private WorkOrderMappingMapper darwinWorkOrderMappingMapper;
 
     @InjectMocks
     private WorkOrderServiceImpl workOrderService;
