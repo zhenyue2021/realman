@@ -34,9 +34,26 @@ public final class DataCollectConstant {
     /** OSS STS 凭证下发，完整 Topic：device/{code}/datacollect/collectUrlResponse */
     public static final String MQTT_DOWN_COLLECT_URL_RESP = "datacollect/collectUrlResponse";
 
+    // ===== 设备状态推送（Teleop → Darwin）=====
+    public static final String MQ_TOPIC_DEVICE_STATUS    = "DARWIN_DEVICE_STATUS";
+    public static final String MQ_TAG_ONLINE             = "ONLINE";
+    public static final String MQ_TAG_OFFLINE            = "OFFLINE";
+
+    // ===== 工单创建（Darwin → Teleop）=====
+    public static final String MQ_TOPIC_WORK_ORDER_IN    = "DARWIN_WORKORDER_IN";
+    public static final String MQ_TAG_CREATE             = "CREATE";
+    public static final String MQ_GROUP_WORK_ORDER_IN    = "DARWIN_WORKORDER_CONSUMER_GROUP";
+
+    // ===== Darwin 文件上报（Darwin → Teleop MinIO）=====
+    public static final String MQ_TOPIC_FILE_REPORT_IN   = "DARWIN_FILE_REPORT";
+    public static final String MQ_TAG_UPLOAD             = "UPLOAD";
+    public static final String MQ_GROUP_FILE_REPORT_IN   = "DARWIN_FILE_REPORT_CONSUMER_GROUP";
+
     // ===== Redis Keys =====
     /** requestId → deviceCode 映射，TTL 2 小时；Key = prefix + requestId */
     public static final String REDIS_OSS_REQUEST_PREFIX  = "datacollect:oss:req:";
     /** OSS 地址上报去重，TTL 24 小时；Key = prefix + deviceCode + ":" + ossAddress */
     public static final String REDIS_REPORT_DEDUP_PREFIX = "datacollect:report:dedup:";
+    /** Darwin 文件上报去重，TTL 24 小时；Key = prefix + darwinFileId */
+    public static final String REDIS_DARWIN_FILE_DEDUP   = "darwin:file:report:";
 }

@@ -1,4 +1,4 @@
-package org.jeecg.modules.device.darwin.entity;
+package org.jeecg.modules.device.datacollect.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 
 @Data
 @TableName("darwin_workorder_mapping")
-public class DarwinWorkOrderMapping implements Serializable {
+public class WorkOrderMapping implements Serializable {
 
     @TableId(type = IdType.ASSIGN_ID)
     private String id;

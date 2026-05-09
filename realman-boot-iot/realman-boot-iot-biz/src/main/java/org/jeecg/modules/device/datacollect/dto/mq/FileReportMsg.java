@@ -1,11 +1,11 @@
-package org.jeecg.modules.device.darwin.dto;
+package org.jeecg.modules.device.datacollect.dto.mq;
 
 import lombok.Data;
 
 import java.time.LocalDateTime;
 
 @Data
-public class DarwinFileReportDTO {
+public class FileReportMsg {
 
     private String traceId;
     /** 达尔文文件 ID（幂等 Key） */

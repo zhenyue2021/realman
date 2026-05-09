@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.constant.DeviceConstant;
-import org.jeecg.modules.device.darwin.producer.DarwinDeviceStatusProducer;
+import org.jeecg.modules.device.datacollect.producer.DeviceStatusProducer;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.mapper.IotDeviceMapper;
 import org.jeecg.modules.device.service.IDeviceOperationLogService;
@@ -66,7 +66,7 @@ public class DeviceOnlineOfflineHandler {
 
     /** Darwin 集成未启用时为 null */
     @Autowired(required = false)
-    private DarwinDeviceStatusProducer darwinProducer;
+    private DeviceStatusProducer darwinProducer;
 
     /**
      * 处理设备上线事件

@@ -1,4 +1,4 @@
-package org.jeecg.modules.device.darwin.dto;
+package org.jeecg.modules.device.datacollect.dto.mq;
 
 import lombok.Data;
 
@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
-public class DarwinWorkOrderCreateDTO {
+public class WorkOrderCreateMsg {
 
     private String traceId;
     /** 达尔文工单 ID（幂等 Key） */
