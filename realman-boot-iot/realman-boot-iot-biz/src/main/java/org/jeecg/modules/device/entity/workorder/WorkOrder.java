@@ -127,5 +127,13 @@ public class WorkOrder implements Serializable {
     /** 来源：1=内部创建 2=达尔文平台 */
     @TableField("source")
     private Integer source;
+
+    /** 动作链描述，格式："1.xxx，2.xxx，3.xxx"，由达尔文 collectionItem.actions 格式化而来 */
+    @TableField("task_desc")
+    private String taskDesc;
+
+    /** 采集总条数，由达尔文 quotaValue 写入 */
+    @TableField("quota_total")
+    private Integer quotaTotal;
 }
 

@@ -26,6 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -247,63 +248,129 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
         return workOrderMapper.pageWorkOrderOperationRecords(page, controllerCode);
     }
 
+    private static final DateTimeFormatter DARWIN_DT_FMT =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public WorkOrder createWorkOrderFromDarwin(WorkOrderCreateMsg dto) {
+    public WorkOrder upsertWorkOrderFromDarwin(String tenant,
+                                               WorkOrderCreateMsg.WorkOrderItem item,
+                                               String traceId) {
+        WorkOrderMapping mapping = darwinMappingMapper.selectOne(
+                new LambdaQueryWrapper<WorkOrderMapping>()
+                        .eq(WorkOrderMapping::getDarwinOrderId, item.getId())
+                        .eq(WorkOrderMapping::getDelFlag, 0));
+
+        if (mapping != null) {
+            // 已存在：更新工单字段
+            return updateFromDarwin(mapping.getWorkOrderId(), tenant, item);
+        } else {
+            // 不存在：新建工单 + 映射
+            return createFromDarwin(tenant, item);
+        }
+    }
+
+    private WorkOrder createFromDarwin(String tenant, WorkOrderCreateMsg.WorkOrderItem item) {
+        WorkOrderCreateMsg.CollectionPlan plan = item.getCollectionPlan();
         WorkOrder order = new WorkOrder();
-        order.setTaskName(dto.getTaskName());
-        order.setPlanStartTime(dto.getPlanStartTime());
-        order.setPlanEndTime(dto.getPlanEndTime());
-        order.setUnitPrice(dto.getUnitPrice());
-        order.setRemark(dto.getRemark());
+        applyDarwinFields(order, tenant, item, plan);
         order.setStatus(WorkOrderConstant.ORDER_STATUS.PENDING);
-        order.setSource(2); // 达尔文来源
+        order.setSource(2);
         order.setCreateBy("darwin");
         order.setUpdateBy("darwin");
         this.save(order);
 
-        // 根据 deviceCode 查询设备并绑定
-        List<WorkOrderDevice> devices = new ArrayList<>();
-        if (dto.getDeviceCodes() != null) {
-            for (String code : dto.getDeviceCodes()) {
-                IotDevice device = iotDeviceMapper.selectOne(
-                        new LambdaQueryWrapper<IotDevice>().eq(IotDevice::getDeviceCode, code));
-                if (device == null) {
-                    log.warn("[Darwin] 设备不存在，跳过绑定 deviceCode={} darwinOrderId={}",
-                            code, dto.getDarwinOrderId());
-                    continue;
-                }
-                WorkOrderDevice wd = new WorkOrderDevice();
-                wd.setWorkOrderId(order.getId());
-                wd.setDeviceCode(device.getDeviceCode());
-                wd.setDeviceId(device.getId());
-                wd.setDeviceName(device.getDeviceName());
-                wd.setDeviceType(String.valueOf(device.getDeviceType()));
-                wd.setCreateTime(LocalDateTime.now());
-                devices.add(wd);
-            }
-        }
-        if (!devices.isEmpty()) {
-            bindDevices(order.getId(), devices);
-        }
-
-        // 写入达尔文映射记录
         WorkOrderMapping mapping = new WorkOrderMapping();
         mapping.setWorkOrderId(order.getId());
-        mapping.setDarwinOrderId(dto.getDarwinOrderId());
-        mapping.setDarwinAgentId(dto.getDarwinAgentId());
-        mapping.setDarwinAgentName(dto.getDarwinAgentName());
-        mapping.setDarwinDeptId(dto.getDarwinDeptId());
-        mapping.setDarwinDeptName(dto.getDarwinDeptName());
+        mapping.setDarwinOrderId(item.getId());
         mapping.setCreateBy("darwin");
         mapping.setUpdateBy("darwin");
         try {
-            mapping.setRawMessage(objectMapper.writeValueAsString(dto));
+            mapping.setRawMessage(objectMapper.writeValueAsString(item));
         } catch (Exception ignored) {}
         darwinMappingMapper.insert(mapping);
 
-        log.info("[Darwin] 工单创建完成 workOrderId={} darwinOrderId={} devices={}",
-                order.getId(), dto.getDarwinOrderId(), devices.size());
+        log.info("[Darwin] 工单创建完成 workOrderId={} darwinOrderId={}", order.getId(), item.getId());
         return order;
+    }
+
+    private WorkOrder updateFromDarwin(String workOrderId, String tenant,
+                                       WorkOrderCreateMsg.WorkOrderItem item) {
+        WorkOrder order = this.getById(workOrderId);
+        if (order == null) {
+            log.warn("[Darwin] 工单不存在，降级为新建 workOrderId={} darwinOrderId={}", workOrderId, item.getId());
+            return createFromDarwin(tenant, item);
+        }
+        WorkOrderCreateMsg.CollectionPlan plan = item.getCollectionPlan();
+        applyDarwinFields(order, tenant, item, plan);
+        order.setUpdateBy("darwin");
+        this.updateById(order);
+
+        log.info("[Darwin] 工单更新完成 workOrderId={} darwinOrderId={}", order.getId(), item.getId());
+        return order;
+    }
+
+    /** 将 Darwin 消息字段写入 WorkOrder 对象（新建/更新共用） */
+    private void applyDarwinFields(WorkOrder order, String tenant,
+                                   WorkOrderCreateMsg.WorkOrderItem item,
+                                   WorkOrderCreateMsg.CollectionPlan plan) {
+        order.setTaskName(plan != null ? plan.getName() : null);
+        order.setPlanStartTime(parseDateTime(plan != null ? plan.getBeginAt() : null));
+        order.setPlanEndTime(parseDateTime(plan != null ? plan.getEndAt() : null));
+        order.setTaskDesc(formatTaskDesc(item.getCollectionItem()));
+        order.setQuotaTotal(parseQuota(item.getQuotaValue()));
+        order.setTenantId(tenant);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteWorkOrderFromDarwin(String darwinOrderId) {
+        WorkOrderMapping mapping = darwinMappingMapper.selectOne(
+                new LambdaQueryWrapper<WorkOrderMapping>()
+                        .eq(WorkOrderMapping::getDarwinOrderId, darwinOrderId)
+                        .eq(WorkOrderMapping::getDelFlag, 0));
+        if (mapping == null) {
+            log.warn("[Darwin] 未找到映射记录，跳过删除 darwinOrderId={}", darwinOrderId);
+            return;
+        }
+        // @TableLogic 软删除工单
+        this.removeById(mapping.getWorkOrderId());
+        // 软删除映射记录
+        darwinMappingMapper.deleteById(mapping.getId());
+        log.info("[Darwin] 工单删除完成 workOrderId={} darwinOrderId={}", mapping.getWorkOrderId(), darwinOrderId);
+    }
+
+    /** actions 格式化为 "1.xxx，2.xxx，3.xxx" */
+    private static String formatTaskDesc(WorkOrderCreateMsg.CollectionItem item) {
+        if (item == null || item.getActions() == null || item.getActions().isEmpty()) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder();
+        List<WorkOrderCreateMsg.Action> actions = item.getActions();
+        for (int i = 0; i < actions.size(); i++) {
+            if (i > 0) sb.append("，");
+            sb.append(i + 1).append(".").append(actions.get(i).getName());
+        }
+        return sb.toString();
+    }
+
+    private LocalDateTime parseDateTime(String value) {
+        if (value == null || value.isBlank()) return null;
+        try {
+            return LocalDateTime.parse(value, DARWIN_DT_FMT);
+        } catch (Exception e) {
+            log.warn("[Darwin] 日期时间解析失败 value={}", value);
+            return null;
+        }
+    }
+
+    private Integer parseQuota(String value) {
+        if (value == null || value.isBlank()) return null;
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            log.warn("[Darwin] quotaValue 解析失败 value={}", value);
+            return null;
+        }
     }
 }

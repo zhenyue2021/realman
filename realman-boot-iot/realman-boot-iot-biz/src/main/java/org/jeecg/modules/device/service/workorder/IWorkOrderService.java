@@ -60,9 +60,14 @@ public interface IWorkOrderService extends IService<WorkOrder> {
             String controllerCode);
 
     /**
-     * 由达尔文平台工单消息创建内部工单，同时写入映射表。
-     * 调用方需确保 darwinOrderId 幂等性已前置校验。
+     * 达尔文平台工单 upsert：mapping 不存在时新建，已存在时更新。
      */
-    WorkOrder createWorkOrderFromDarwin(WorkOrderCreateMsg dto);
+    WorkOrder upsertWorkOrderFromDarwin(String tenant, WorkOrderCreateMsg.WorkOrderItem item, String traceId);
+
+    /**
+     * 达尔文侧删除工单（deleted=true）：通过 darwinOrderId 找到映射，软删除工单和映射记录。
+     * 幂等：找不到映射时静默跳过。
+     */
+    void deleteWorkOrderFromDarwin(String darwinOrderId);
 }
 
