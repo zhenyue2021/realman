@@ -8,6 +8,8 @@ import org.jeecg.modules.device.datacollect.dto.mqtt.CollectUrlResponseCmd;
 import org.jeecg.modules.device.datacollect.dto.mqtt.StartCollectCmd;
 import org.jeecg.modules.device.datacollect.dto.mqtt.StopCollectCmd;
 import org.jeecg.modules.device.mqtt.publisher.MqttPublisher;
+import org.jeecg.modules.device.security.CommandEncryptService;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.stereotype.Service;
 
 /**
@@ -16,10 +18,12 @@ import org.springframework.stereotype.Service;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@ConditionalOnExpression("${mqtt.enabled:false} && ${darwin.integration.enabled:false}")
 public class DataCollectCommandService {
 
     private final MqttPublisher mqttPublisher;
     private final ObjectMapper objectMapper;
+    private final CommandEncryptService encryptService;
 
     public void sendStartCollect(String deviceCode, String taskId, StartCollectCmd.CollectParams params) {
         StartCollectCmd cmd = StartCollectCmd.builder()
@@ -49,7 +53,8 @@ public class DataCollectCommandService {
         String topic = "device/" + deviceCode + "/" + topicPath;
         try {
             String json = objectMapper.writeValueAsString(payload);
-            mqttPublisher.publishToDevice(deviceCode, topic, json, 1);
+            String encrypted = encryptService.encryptForDevice(deviceCode, json);
+            mqttPublisher.publishToDevice(deviceCode, topic, encrypted, 1);
             log.info("[DataCollect] 指令已下发 cmd={} deviceCode={}", cmdName, deviceCode);
         } catch (Exception e) {
             log.error("[DataCollect] 指令下发失败 cmd={} deviceCode={}", cmdName, deviceCode, e);

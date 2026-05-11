@@ -6,9 +6,11 @@ import org.eclipse.paho.mqttv5.common.MqttMessage;
 import org.eclipse.paho.mqttv5.common.packet.MqttProperties;
 import org.eclipse.paho.mqttv5.common.packet.UserProperty;
 import org.jeecg.common.trace.TraceIdConst;
+import org.jeecg.modules.device.datacollect.constant.DataCollectConstant;
 import org.jeecg.modules.device.datacollect.handler.CollectUrlRequestHandler;
 import org.jeecg.modules.device.datacollect.handler.OssAddressReportHandler;
 import org.slf4j.MDC;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -81,8 +83,10 @@ public class MqttMessageDispatcher {
     private final MasterCommandHandler                masterCommandHandler;
     private final WebRtcAckHandler                    webRtcAckHandler;
     private final WebRtcRestartHandler                webRtcRestartHandler;
-    private final CollectUrlRequestHandler            collectUrlRequestHandler;
     private final OssAddressReportHandler             ossAddressReportHandler;
+    /** darwin.integration.enabled=false 时 Bean 不存在，注入 null，dispatch 时做空判断 */
+    @Autowired(required = false)
+    private CollectUrlRequestHandler                  collectUrlRequestHandler;
 
     /**
      * 分发 MQTT 消息到对应 Handler
@@ -199,8 +203,11 @@ public class MqttMessageDispatcher {
             case "ext-params/request"                 -> extParamsRequestHandler.handle(deviceCode, payload);
             case "webrtc/ack"                         -> webRtcAckHandler.handle(deviceCode, payload);
             case "webrtc/restart"                     -> webRtcRestartHandler.handle(deviceCode, payload);
-            case "datacollect/collectUrlRequest"      -> collectUrlRequestHandler.handle(deviceCode, payload);
-            case "datacollect/ossAdressReport"        -> ossAddressReportHandler.handle(deviceCode, payload);
+            case DataCollectConstant.MQTT_UP_COLLECT_URL_REQUEST -> {
+                if (collectUrlRequestHandler != null) collectUrlRequestHandler.handle(deviceCode, payload);
+                else log.warn("[Dispatcher] Darwin 集成未启用，忽略 collectUrlRequest deviceCode={}", deviceCode);
+            }
+            case DataCollectConstant.MQTT_UP_OSS_ADDRESS_REPORT -> ossAddressReportHandler.handle(deviceCode, payload);
             default -> log.warn("[Dispatcher] 未知路径: {}", topic);
         }
     }

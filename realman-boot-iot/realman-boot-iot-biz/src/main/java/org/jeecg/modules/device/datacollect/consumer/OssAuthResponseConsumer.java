@@ -66,6 +66,18 @@ public class OssAuthResponseConsumer implements RocketMQListener<String> {
             if (!resp.isSuccess()) {
                 log.warn("[DataCollect] 数采平台 OSS 授权失败 requestId={} errorCode={} errorMsg={}",
                         resp.getRequestId(), resp.getErrorCode(), resp.getErrorMsg());
+                // 回传失败响应，机器人可感知错误并及时释放等待，而非超时
+                CollectUrlResponseCmd errCmd = CollectUrlResponseCmd.builder()
+                        .requestId(resp.getRequestId())
+                        .timestamp(System.currentTimeMillis())
+                        .deviceSn(deviceCode)
+                        .code(400)
+                        .message(resp.getErrorMsg() != null ? resp.getErrorMsg() : "OSS授权失败")
+                        .params(null)
+                        .build();
+                commandService.sendCollectUrlResponse(deviceCode, errCmd);
+                log.info("[DataCollect] OSS授权失败响应已下发至机器人 requestId={} deviceCode={}",
+                        resp.getRequestId(), deviceCode);
                 return;
             }
 
@@ -73,6 +85,8 @@ public class OssAuthResponseConsumer implements RocketMQListener<String> {
                     .requestId(resp.getRequestId())
                     .timestamp(System.currentTimeMillis())
                     .deviceSn(deviceCode)
+                    .code(0)
+                    .message(null)
                     .params(CollectUrlResponseCmd.StsParams.builder()
                             .endpoint(resp.getEndpoint())
                             .bucket(resp.getBucket())

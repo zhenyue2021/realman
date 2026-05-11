@@ -1,5 +1,6 @@
 package org.jeecg.modules.device.mqtt.handler;
 
+import java.lang.reflect.Field;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
@@ -203,9 +204,12 @@ public class MqttMessageDispatcherEndToEndTest {
                 masterCommandHandler,
                 webRtcAckHandler,
                 webRtcRestartHandler,
-                collectUrlRequestHandler,
                 ossAddressReportHandler
         );
+        // collectUrlRequestHandler 为 @Autowired(required=false) 非 final 字段，不在构造器中，需反射注入
+        Field collectUrlField = MqttMessageDispatcher.class.getDeclaredField("collectUrlRequestHandler");
+        collectUrlField.setAccessible(true);
+        collectUrlField.set(dispatcher, collectUrlRequestHandler);
     }
 
     private static MqttMessage mqtt(String body) {

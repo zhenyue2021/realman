@@ -7,6 +7,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
+import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 
 /**
@@ -43,7 +44,7 @@ public class MqttMessageDispatcherTest {
     private MqttMessageDispatcher dispatcher;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
         statusHandler = Mockito.mock(DeviceStatusHandler.class);
         configAckHandler = Mockito.mock(DeviceConfigAckHandler.class);
         commandAckHandler = Mockito.mock(DeviceCommandAckHandler.class);
@@ -80,9 +81,12 @@ public class MqttMessageDispatcherTest {
                 masterCommandHandler,
                 webRtcAckHandler,
                 webRtcRestartHandler,
-                collectUrlRequestHandler,
                 ossAddressReportHandler
         );
+        // collectUrlRequestHandler 为 @Autowired(required=false) 非 final 字段，不在构造器中，需反射注入
+        Field f = MqttMessageDispatcher.class.getDeclaredField("collectUrlRequestHandler");
+        f.setAccessible(true);
+        f.set(dispatcher, collectUrlRequestHandler);
     }
 
     private static MqttMessage mqttMsg(String payload) {
