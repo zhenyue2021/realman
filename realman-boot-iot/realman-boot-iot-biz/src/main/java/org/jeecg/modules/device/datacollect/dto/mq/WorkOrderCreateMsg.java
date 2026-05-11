@@ -2,25 +2,73 @@ package org.jeecg.modules.device.datacollect.dto.mq;
 
 import lombok.Data;
 
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.List;
 
+/** Darwin → Teleop（RocketMQ）：工单推送消息，data 为工单列表（一条消息可含多个工单） */
 @Data
 public class WorkOrderCreateMsg {
 
     private String traceId;
-    /** 达尔文工单 ID（幂等 Key） */
-    private String darwinOrderId;
-    private String darwinAgentId;
-    private String darwinAgentName;
-    private String darwinDeptId;
-    private String darwinDeptName;
-    private String taskName;
-    private LocalDateTime planStartTime;
-    private LocalDateTime planEndTime;
-    /** 关联设备码列表（平台内 deviceCode） */
-    private List<String> deviceCodes;
-    private BigDecimal unitPrice;
-    private String remark;
+    private String tenant;
+    private List<WorkOrderItem> data;
+
+    @Data
+    public static class WorkOrderItem {
+        /** Darwin 工单 ID，幂等键 */
+        private String id;
+        /** "true" 表示该工单已被达尔文侧删除 */
+        private String deleted;
+        private String completed;
+        private String quotaType;
+        /** 总条数 */
+        private String quotaValue;
+        private CollectionItem collectionItem;
+        private CollectionPlan collectionPlan;
+        private CollectionProject collectionProject;
+        private Scene level1Scene;
+        private Scene level2Scene;
+    }
+
+    @Data
+    public static class CollectionItem {
+        private String id;
+        private String name;
+        private String nameEn;
+        /** 动作列表，格式化后存入 task_desc */
+        private List<Action> actions;
+    }
+
+    @Data
+    public static class Action {
+        private String name;
+        private String nameEn;
+    }
+
+    @Data
+    public static class CollectionPlan {
+        private String id;
+        /** 计划描述，对应 task_name */
+        private String name;
+        private String nameEn;
+        /** 计划开始时间，格式 yyyy-MM-dd HH:mm:ss */
+        private String beginAt;
+        /** 计划结束时间，格式 yyyy-MM-dd HH:mm:ss */
+        private String endAt;
+    }
+
+    @Data
+    public static class CollectionProject {
+        private String id;
+        private String name;
+        private String nameEn;
+        private String customerName;
+    }
+
+    @Data
+    public static class Scene {
+        private String id;
+        private String name;
+        private String nameEn;
+        private String description;
+    }
 }
