@@ -9,13 +9,21 @@ import java.util.List;
 @Data
 @Builder
 public class FileAddressReportMsg {
-    private String traceId;
+
+    private String tenant;
     private String deviceCode;
-    /** 关联工单 ID，工单集成完成前可为 null */
-    private String workOrderId;
-    /** 采集任务 ID，工单集成完成前可为 null */
-    private String taskId;
-    private String ossAddress;
-    private List<String> fileList;
-    private long timestamp;
+    private String traceId;
+    private long eventTime;
+    private MsgData data;
+
+    @Data
+    @Builder
+    public static class MsgData {
+        /** 关联工单 ID，工单集成完成前可为 null */
+        private String workOrderId;
+        /** 采集任务 ID，工单集成完成前可为 null */
+        private String taskId;
+        private String ossAddress;
+        private List<String> fileList;
+    }
 }

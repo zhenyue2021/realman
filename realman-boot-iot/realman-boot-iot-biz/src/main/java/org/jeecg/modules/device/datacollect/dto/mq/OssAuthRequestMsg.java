@@ -7,9 +7,17 @@ import lombok.Data;
 @Data
 @Builder
 public class OssAuthRequestMsg {
-    private String traceId;
-    private String requestId;
+
+    private String tenant;
     private String deviceCode;
-    private String taskId;
-    private long timestamp;
+    private String traceId;
+    private long eventTime;
+    private MsgData data;
+
+    @Data
+    @Builder
+    public static class MsgData {
+        private String requestId;
+        private String taskId;
+    }
 }

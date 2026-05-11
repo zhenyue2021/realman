@@ -105,8 +105,9 @@ public class DeviceSchedulerJob {
                 // 机器人设备异常离线时推送 RocketMQ（兜底场景：心跳超时，EMQX $SYS 事件未触发）
                 if (deviceStatusProducer != null
                         && DeviceConstant.DeviceTypeInteger.ROBOT == d.getDeviceType()) {
+                    String tenant = d.getTenantId() != null ? String.valueOf(d.getTenantId()) : "";
                     deviceStatusProducer.sendOfflineEvent(
-                            d.getDeviceCode(), "SLAVE", "heartbeat_timeout", MDC.get("traceId"));
+                            tenant, d.getDeviceCode(), "SLAVE", "heartbeat_timeout", MDC.get("traceId"));
                 }
                 cnt++;
             }

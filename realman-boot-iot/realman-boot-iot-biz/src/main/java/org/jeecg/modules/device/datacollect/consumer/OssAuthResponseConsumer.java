@@ -43,8 +43,9 @@ public class OssAuthResponseConsumer implements RocketMQListener<String> {
             return;
         }
 
-        if (resp.getRequestId() == null || resp.getRequestId().isBlank()) {
-            log.error("[DataCollect] OSS授权响应缺少 requestId");
+        OssAuthResponseMsg.MsgData data = resp.getData();
+        if (data == null || data.getRequestId() == null || data.getRequestId().isBlank()) {
+            log.error("[DataCollect] OSS授权响应缺少 data 或 requestId");
             return;
         }
 
@@ -53,58 +54,56 @@ public class OssAuthResponseConsumer implements RocketMQListener<String> {
         }
 
         try {
-            String redisKey = DataCollectConstant.REDIS_OSS_REQUEST_PREFIX + resp.getRequestId();
+            String redisKey = DataCollectConstant.REDIS_OSS_REQUEST_PREFIX + data.getRequestId();
             String deviceCode = redisTemplate.opsForValue().get(redisKey);
             if (deviceCode == null) {
                 log.warn("[DataCollect] 未找到 requestId 对应设备，可能已超时或重复处理 requestId={}",
-                        resp.getRequestId());
+                        data.getRequestId());
                 return;
             }
             // 原子消费，防止多节点重复下发
             redisTemplate.delete(redisKey);
 
-            if (!resp.isSuccess()) {
+            if (!data.isSuccess()) {
                 log.warn("[DataCollect] 数采平台 OSS 授权失败 requestId={} errorCode={} errorMsg={}",
-                        resp.getRequestId(), resp.getErrorCode(), resp.getErrorMsg());
-                // 回传失败响应，机器人可感知错误并及时释放等待，而非超时
+                        data.getRequestId(), data.getErrorCode(), data.getErrorMsg());
                 CollectUrlResponseCmd errCmd = CollectUrlResponseCmd.builder()
-                        .requestId(resp.getRequestId())
+                        .requestId(data.getRequestId())
                         .timestamp(System.currentTimeMillis())
                         .deviceSn(deviceCode)
                         .code(400)
-                        .message(resp.getErrorMsg() != null ? resp.getErrorMsg() : "OSS授权失败")
+                        .message(data.getErrorMsg() != null ? data.getErrorMsg() : "OSS授权失败")
                         .params(null)
                         .build();
                 commandService.sendCollectUrlResponse(deviceCode, errCmd);
                 log.info("[DataCollect] OSS授权失败响应已下发至机器人 requestId={} deviceCode={}",
-                        resp.getRequestId(), deviceCode);
+                        data.getRequestId(), deviceCode);
                 return;
             }
 
             CollectUrlResponseCmd cmd = CollectUrlResponseCmd.builder()
-                    .requestId(resp.getRequestId())
+                    .requestId(data.getRequestId())
                     .timestamp(System.currentTimeMillis())
                     .deviceSn(deviceCode)
                     .code(0)
                     .message(null)
                     .params(CollectUrlResponseCmd.StsParams.builder()
-                            .endpoint(resp.getEndpoint())
-                            .bucket(resp.getBucket())
-                            .bjExpiration(resp.getBjExpiration())
-                            .utcExpiration(resp.getUtcExpiration())
-                            .accessKeyId(resp.getAccessKeyId())
-                            .accessKeySecret(resp.getAccessKeySecret())
-                            .securityToken(resp.getSecurityToken())
+                            .endpoint(data.getEndpoint())
+                            .bucket(data.getBucket())
+                            .bjExpiration(data.getBjExpiration())
+                            .utcExpiration(data.getUtcExpiration())
+                            .accessKeyId(data.getAccessKeyId())
+                            .accessKeySecret(data.getAccessKeySecret())
+                            .securityToken(data.getSecurityToken())
                             .build())
                     .build();
 
             commandService.sendCollectUrlResponse(deviceCode, cmd);
-            // accessKeySecret / securityToken 敏感，只打 requestId 和 deviceCode
             log.info("[DataCollect] STS凭证已下发至机器人 requestId={} deviceCode={}",
-                    resp.getRequestId(), deviceCode);
+                    data.getRequestId(), deviceCode);
 
         } catch (Exception e) {
-            log.error("[DataCollect] 处理 OSS 授权响应失败 requestId={}", resp.getRequestId(), e);
+            log.error("[DataCollect] 处理 OSS 授权响应失败 requestId={}", data.getRequestId(), e);
             throw new RuntimeException(e);
         } finally {
             MDC.remove("traceId");

@@ -7,13 +7,20 @@ import lombok.Data;
 @Builder
 public class DeviceStatusMsg {
 
-    private String traceId;
+    private String tenant;
     private String deviceCode;
-    /** MASTER / SLAVE */
-    private String deviceType;
-    /** ONLINE / OFFLINE */
-    private String eventType;
+    private String traceId;
     private Long eventTime;
-    /** 下线原因，上线时为空字符串 */
-    private String offlineReason;
+    private MsgData data;
+
+    @Data
+    @Builder
+    public static class MsgData {
+        /** MASTER / SLAVE */
+        private String deviceType;
+        /** ONLINE / OFFLINE */
+        private String eventType;
+        /** 下线原因，上线时为空字符串 */
+        private String offlineReason;
+    }
 }
