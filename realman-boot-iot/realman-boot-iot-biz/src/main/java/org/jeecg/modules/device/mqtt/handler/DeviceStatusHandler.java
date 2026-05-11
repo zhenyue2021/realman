@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.constant.DeviceConstant;
+import org.jeecg.modules.device.datacollect.producer.DeviceStatusProducer;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.entity.IotDeviceStatus;
 import org.jeecg.modules.device.mapper.IotDeviceMapper;
@@ -12,6 +13,8 @@ import org.jeecg.modules.device.mapper.IotDeviceStatusMapper;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.security.CommandEncryptService;
 import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
+import org.slf4j.MDC;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
@@ -48,6 +51,9 @@ public class DeviceStatusHandler {
     private final ObjectMapper          objectMapper;
     private final StringRedisTemplate   redisTemplate;
     private final DeviceWebSocketServer webSocketServer;
+    /** darwin.integration.enabled=false 时 Bean 不存在，注入 null，调用前做空判断 */
+    @Autowired(required = false)
+    private DeviceStatusProducer deviceStatusProducer;
 
     /**
      * 处理设备状态上报消息
@@ -80,6 +86,8 @@ public class DeviceStatusHandler {
         redisTemplate.opsForSet().add(DeviceConstant.RedisKey.DEVICE_ONLINE_SET, deviceCode);
 
         // 5. 同步更新 DB 中的在线状态和位置（经纬度有值才覆盖，避免用空值覆盖历史有效位置）
+        // 记录状态变更前的旧状态，用于判断是否为首次上线（避免每次心跳都触发 MQ）
+        boolean wasOffline = !Integer.valueOf(DeviceConstant.DeviceStatus.ONLINE).equals(device.getStatus());
         device.setStatus(DeviceConstant.DeviceStatus.ONLINE);
         device.setLastOnlineTime(LocalDateTime.now());
         if (r.getLongitude() != null) device.setLongitude(r.getLongitude());
@@ -89,7 +97,13 @@ public class DeviceStatusHandler {
         // 6. WebSocket 实时推送给前端监控页面
         webSocketServer.pushDeviceStatus(deviceCode, decrypted);
 
-        // 7. 异步写入历史状态 DB（使用独立线程池，不占用 MQTT 消费线程）
+        // 7. 机器人设备状态由非 ONLINE 恢复上线时，推送 RocketMQ 上线事件（仅状态转换时触发，非每次心跳）
+        if (wasOffline && deviceStatusProducer != null
+                && DeviceConstant.DeviceTypeInteger.ROBOT == device.getDeviceType()) {
+            deviceStatusProducer.sendOnlineEvent(deviceCode, "SLAVE", MDC.get("traceId"));
+        }
+
+        // 8. 异步写入历史状态 DB（使用独立线程池，不占用 MQTT 消费线程）
         persistAsync(device, r, decrypted);
     }
 

@@ -24,6 +24,7 @@ public class DeviceStatusProducer {
     }
 
     public void sendOfflineEvent(String deviceCode, String deviceType, String offlineReason, String traceId) {
+        log.info("[Offline] - 检测到设备离线 deviceCode={} offlineReason={}", deviceCode, offlineReason);
         send(deviceCode, deviceType, DataCollectConstant.MQ_TAG_OFFLINE,
                 offlineReason == null ? "" : offlineReason, traceId);
     }
