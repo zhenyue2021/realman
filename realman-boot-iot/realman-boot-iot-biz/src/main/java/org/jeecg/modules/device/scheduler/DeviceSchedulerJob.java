@@ -7,8 +7,10 @@ import com.xxl.job.core.context.XxlJobHelper;
 import com.xxl.job.core.handler.annotation.XxlJob;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.jeecg.modules.device.constant.DeviceConstant;
+import org.jeecg.modules.device.datacollect.producer.DeviceStatusProducer;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.entity.IotDeviceStatus;
 import org.jeecg.modules.device.entity.IotOtaUpgradeRecord;
@@ -65,6 +67,9 @@ public class DeviceSchedulerJob {
     /** mqtt.enabled=false 时 Bean 不存在，注入 null，任务方法内做空判断 */
     @Autowired(required = false)
     private RobotSlaveStatusHandler robotSlaveStatusHandler;
+    /** darwin.integration.enabled=false 时 Bean 不存在，注入 null，调用前做空判断 */
+    @Autowired(required = false)
+    private DeviceStatusProducer deviceStatusProducer;
 
     /**
      * 设备离线检测任务
@@ -99,6 +104,12 @@ public class DeviceSchedulerJob {
                 d.setLastOfflineTime(LocalDateTime.now());
                 deviceMapper.updateById(d);
                 redisTemplate.opsForSet().remove(DeviceConstant.RedisKey.DEVICE_ONLINE_SET, d.getDeviceCode());
+                // 机器人设备异常离线时推送 RocketMQ（兜底场景：心跳超时，EMQX $SYS 事件未触发）
+                if (deviceStatusProducer != null
+                        && DeviceConstant.DeviceTypeInteger.ROBOT == d.getDeviceType()) {
+                    deviceStatusProducer.sendOfflineEvent(
+                            d.getDeviceCode(), "SLAVE", "heartbeat_timeout", MDC.get("traceId"));
+                }
                 cnt++;
             }
         }

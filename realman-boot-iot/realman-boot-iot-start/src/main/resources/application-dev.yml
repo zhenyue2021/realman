@@ -78,7 +78,7 @@ rocketmq:
 # 设为 true 时加载 Darwin RocketMQ Bean；未部署 RocketMQ 时请保持 false 或使用环境变量覆盖
 darwin:
   integration:
-    enabled: ${DARWIN_INTEGRATION_ENABLED:false}
+    enabled: true
     file-upload:
       upload-url-prefix: ${DARWIN_UPLOAD_URL_PREFIX:http://172.16.44.66:8085/realman-iot}
       upload-bucket: darwin-files

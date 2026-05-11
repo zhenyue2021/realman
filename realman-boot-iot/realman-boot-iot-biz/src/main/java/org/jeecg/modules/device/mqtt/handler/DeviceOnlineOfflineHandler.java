@@ -106,10 +106,10 @@ public class DeviceOnlineOfflineHandler {
             // 设备上线后补推离线期间待同步的配置/OTA 指令
             pendingSyncService.flushPendingMessages(deviceCode);
 
-            // 向达尔文数采平台推送上线事件（Darwin 集成未启用时 darwinProducer 为 null）
-            if (darwinProducer != null) {
-                String deviceType = resolveDeviceType(device.getDeviceType());
-                darwinProducer.sendOnlineEvent(deviceCode, deviceType, MDC.get("traceId"));
+            // 向达尔文数采平台推送机器人上线事件（Darwin 集成未启用或非机器人设备时跳过）
+            if (darwinProducer != null
+                    && DeviceConstant.DeviceTypeInteger.ROBOT == device.getDeviceType()) {
+                darwinProducer.sendOnlineEvent(deviceCode, "SLAVE", MDC.get("traceId"));
             }
         } catch (Exception e) {
             log.error("[Online] 处理异常", e);
@@ -163,10 +163,10 @@ public class DeviceOnlineOfflineHandler {
                 log.warn("[Offline] 房间销毁失败 deviceCode={}", deviceCode, roomEx);
             }
 
-            // 向达尔文数采平台推送下线事件
-            if (darwinProducer != null) {
-                String deviceType = resolveDeviceType(device.getDeviceType());
-                darwinProducer.sendOfflineEvent(deviceCode, deviceType, reason, MDC.get("traceId"));
+            // 向达尔文数采平台推送机器人下线事件（Darwin 集成未启用或非机器人设备时跳过）
+            if (darwinProducer != null
+                    && DeviceConstant.DeviceTypeInteger.ROBOT == device.getDeviceType()) {
+                darwinProducer.sendOfflineEvent(deviceCode, "SLAVE", reason, MDC.get("traceId"));
             }
         } catch (Exception e) {
             log.error("[Offline] 处理异常", e);
@@ -220,8 +220,4 @@ public class DeviceOnlineOfflineHandler {
         return device;
     }
 
-    private String resolveDeviceType(Integer deviceType) {
-        if (deviceType == null) return "UNKNOWN";
-        return DeviceConstant.DeviceTypeInteger.CONTROLLER == deviceType ? "MASTER" : "SLAVE";
-    }
 }
