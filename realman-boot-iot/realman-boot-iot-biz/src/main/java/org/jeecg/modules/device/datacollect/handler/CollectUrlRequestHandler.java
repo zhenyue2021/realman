@@ -6,7 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.datacollect.dto.mqtt.CollectUrlRequestMsg;
 import org.jeecg.modules.device.datacollect.producer.OssAuthRequestProducer;
 import org.slf4j.MDC;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.stereotype.Component;
 
 /**
@@ -21,7 +21,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-@ConditionalOnProperty(prefix = "mqtt", name = "enabled", havingValue = "true", matchIfMissing = false)
+@ConditionalOnExpression("${mqtt.enabled:false} && ${darwin.integration.enabled:false}")
 public class CollectUrlRequestHandler {
 
     private final OssAuthRequestProducer ossAuthRequestProducer;

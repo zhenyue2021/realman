@@ -7,7 +7,7 @@ import org.jeecg.modules.device.datacollect.constant.DataCollectConstant;
 import org.jeecg.modules.device.datacollect.dto.mqtt.OssAddressReportMsg;
 import org.jeecg.modules.device.datacollect.producer.FileAddressReportProducer;
 import org.slf4j.MDC;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
@@ -28,7 +28,7 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-@ConditionalOnProperty(prefix = "mqtt", name = "enabled", havingValue = "true", matchIfMissing = false)
+@ConditionalOnExpression("${mqtt.enabled:false} && ${darwin.integration.enabled:false}")
 public class OssAddressReportHandler {
 
     private final FileAddressReportProducer fileAddressReportProducer;
@@ -46,8 +46,8 @@ public class OssAddressReportHandler {
         }
 
         OssAddressReportMsg.OssInfo oss = msg.getOss();
-        if (oss == null || oss.getList() == null || oss.getList().isEmpty()) {
-            log.warn("[DataCollect] ossAdressReport 文件列表为空 deviceCode={}", deviceCode);
+        if (oss == null || oss.getAddress() == null || oss.getList() == null || oss.getList().isEmpty()) {
+            log.warn("[DataCollect] ossAdressReport 消息不合法（oss/address/list 为空） deviceCode={}", deviceCode);
             return;
         }
 
