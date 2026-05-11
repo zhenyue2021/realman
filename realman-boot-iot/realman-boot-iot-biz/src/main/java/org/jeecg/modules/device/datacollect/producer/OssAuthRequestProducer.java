@@ -30,17 +30,21 @@ public class OssAuthRequestProducer {
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
 
-    public void sendAndStore(String requestId, String deviceCode, String taskId, String traceId) {
+    public void sendAndStore(String requestId, String tenant, String deviceCode,
+                             String taskId, String traceId) {
         // 先写 Redis，再发 MQ，确保响应到来时一定能查到映射
         String redisKey = DataCollectConstant.REDIS_OSS_REQUEST_PREFIX + requestId;
         redisTemplate.opsForValue().set(redisKey, deviceCode, REQUEST_TTL_HOURS, TimeUnit.HOURS);
 
         OssAuthRequestMsg msg = OssAuthRequestMsg.builder()
-                .traceId(traceId)
-                .requestId(requestId)
+                .tenant(tenant)
                 .deviceCode(deviceCode)
-                .taskId(taskId != null ? taskId : "")
-                .timestamp(System.currentTimeMillis())
+                .traceId(traceId)
+                .eventTime(System.currentTimeMillis())
+                .data(OssAuthRequestMsg.MsgData.builder()
+                        .requestId(requestId)
+                        .taskId(taskId != null ? taskId : "")
+                        .build())
                 .build();
 
         String destination = DataCollectConstant.MQ_TOPIC_OSS_AUTH_REQUEST

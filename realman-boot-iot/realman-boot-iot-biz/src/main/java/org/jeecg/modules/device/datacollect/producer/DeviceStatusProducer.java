@@ -19,24 +19,29 @@ public class DeviceStatusProducer {
     private final RocketMQTemplate rocketMQTemplate;
     private final ObjectMapper objectMapper;
 
-    public void sendOnlineEvent(String deviceCode, String deviceType, String traceId) {
-        send(deviceCode, deviceType, DataCollectConstant.MQ_TAG_ONLINE, "", traceId);
+    public void sendOnlineEvent(String tenant, String deviceCode, String deviceType, String traceId) {
+        send(tenant, deviceCode, deviceType, DataCollectConstant.MQ_TAG_ONLINE, "", traceId);
     }
 
-    public void sendOfflineEvent(String deviceCode, String deviceType, String offlineReason, String traceId) {
+    public void sendOfflineEvent(String tenant, String deviceCode, String deviceType,
+                                 String offlineReason, String traceId) {
         log.info("[Offline] - 检测到设备离线 deviceCode={} offlineReason={}", deviceCode, offlineReason);
-        send(deviceCode, deviceType, DataCollectConstant.MQ_TAG_OFFLINE,
+        send(tenant, deviceCode, deviceType, DataCollectConstant.MQ_TAG_OFFLINE,
                 offlineReason == null ? "" : offlineReason, traceId);
     }
 
-    private void send(String deviceCode, String deviceType, String tag, String offlineReason, String traceId) {
+    private void send(String tenant, String deviceCode, String deviceType,
+                      String tag, String offlineReason, String traceId) {
         DeviceStatusMsg msg = DeviceStatusMsg.builder()
-                .traceId(traceId)
+                .tenant(tenant)
                 .deviceCode(deviceCode)
-                .deviceType(deviceType)
-                .eventType(tag)
+                .traceId(traceId)
                 .eventTime(System.currentTimeMillis())
-                .offlineReason(offlineReason)
+                .data(DeviceStatusMsg.MsgData.builder()
+                        .deviceType(deviceType)
+                        .eventType(tag)
+                        .offlineReason(offlineReason)
+                        .build())
                 .build();
         try {
             String destination = DataCollectConstant.MQ_TOPIC_DEVICE_STATUS + ":" + tag;

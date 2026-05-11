@@ -100,7 +100,8 @@ public class DeviceStatusHandler {
         // 7. 机器人设备状态由非 ONLINE 恢复上线时，推送 RocketMQ 上线事件（仅状态转换时触发，非每次心跳）
         if (wasOffline && deviceStatusProducer != null
                 && DeviceConstant.DeviceTypeInteger.ROBOT == device.getDeviceType()) {
-            deviceStatusProducer.sendOnlineEvent(deviceCode, "SLAVE", MDC.get("traceId"));
+            String tenant = device.getTenantId() != null ? String.valueOf(device.getTenantId()) : "";
+            deviceStatusProducer.sendOnlineEvent(tenant, deviceCode, "SLAVE", MDC.get("traceId"));
         }
 
         // 8. 异步写入历史状态 DB（使用独立线程池，不占用 MQTT 消费线程）

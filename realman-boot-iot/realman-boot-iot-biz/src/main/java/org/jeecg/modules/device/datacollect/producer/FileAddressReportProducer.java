@@ -23,16 +23,19 @@ public class FileAddressReportProducer {
     private final RocketMQTemplate rocketMQTemplate;
     private final ObjectMapper objectMapper;
 
-    public void send(String deviceCode, String workOrderId, String taskId,
+    public void send(String tenant, String deviceCode, String workOrderId, String taskId,
                      String ossAddress, List<String> fileList, String traceId) {
         FileAddressReportMsg msg = FileAddressReportMsg.builder()
-                .traceId(traceId)
+                .tenant(tenant)
                 .deviceCode(deviceCode)
-                .workOrderId(workOrderId)
-                .taskId(taskId)
-                .ossAddress(ossAddress)
-                .fileList(fileList)
-                .timestamp(System.currentTimeMillis())
+                .traceId(traceId)
+                .eventTime(System.currentTimeMillis())
+                .data(FileAddressReportMsg.MsgData.builder()
+                        .workOrderId(workOrderId)
+                        .taskId(taskId)
+                        .ossAddress(ossAddress)
+                        .fileList(fileList)
+                        .build())
                 .build();
 
         String destination = DataCollectConstant.MQ_TOPIC_FILE_REPORT
