@@ -3,8 +3,10 @@ package org.jeecg.modules.device.datacollect.consumer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.rocketmq.spring.annotation.RocketMQMessageListener;
-import org.apache.rocketmq.spring.core.RocketMQListener;
+import org.apache.rocketmq.client.annotation.RocketMQMessageListener;
+import org.apache.rocketmq.client.apis.consumer.ConsumeResult;
+import org.apache.rocketmq.client.apis.message.MessageView;
+import org.apache.rocketmq.client.core.RocketMQListener;
 import org.jeecg.modules.device.datacollect.constant.DataCollectConstant;
 import org.jeecg.modules.device.datacollect.dto.mq.WorkOrderCreateMsg;
 import org.jeecg.modules.device.service.workorder.IWorkOrderService;
@@ -12,6 +14,7 @@ import org.slf4j.MDC;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 @Slf4j
@@ -21,26 +24,29 @@ import java.util.List;
 @RocketMQMessageListener(
         topic = DataCollectConstant.MQ_TOPIC_WORK_ORDER_IN,
         consumerGroup = DataCollectConstant.MQ_GROUP_WORK_ORDER_IN,
-        selectorExpression = DataCollectConstant.MQ_TAG_CREATE
+        tag = DataCollectConstant.MQ_TAG_CREATE,
+        namespace = "${rocketmq.push-consumer.namespace:}"
 )
-public class WorkOrderCreateConsumer implements RocketMQListener<String> {
+public class WorkOrderCreateConsumer implements RocketMQListener {
 
     private final IWorkOrderService workOrderService;
     private final ObjectMapper objectMapper;
 
     @Override
-    public void onMessage(String message) {
+    public ConsumeResult consume(MessageView messageView) {
+        String message = StandardCharsets.UTF_8.decode(messageView.getBody()).toString();
+
         WorkOrderCreateMsg dto;
         try {
             dto = objectMapper.readValue(message, WorkOrderCreateMsg.class);
         } catch (Exception e) {
             log.error("[DataCollect] 工单消息反序列化失败 payload={}", message, e);
-            return;
+            return ConsumeResult.SUCCESS;
         }
 
         if (dto.getData() == null || dto.getData().isEmpty()) {
             log.warn("[DataCollect] 工单消息 data 为空，跳过");
-            return;
+            return ConsumeResult.SUCCESS;
         }
 
         if (dto.getTraceId() != null) {
@@ -56,17 +62,16 @@ public class WorkOrderCreateConsumer implements RocketMQListener<String> {
                 }
                 try {
                     if ("true".equalsIgnoreCase(item.getDeleted())) {
-                        // deleted=true：按 item.id 软删除对应工单
                         workOrderService.deleteWorkOrderFromDarwin(item.getId());
                     } else {
-                        // item.id 直接作为 work_order 主键，查到则更新，查不到则新建
                         workOrderService.upsertWorkOrderFromDarwin(item.getId(), tenant, item, dto.getTraceId());
                     }
                 } catch (Exception e) {
                     log.error("[DataCollect] 工单处理失败 workOrderId={}", item.getId(), e);
-                    throw e;
+                    return ConsumeResult.FAILURE;
                 }
             }
+            return ConsumeResult.SUCCESS;
         } finally {
             MDC.remove("traceId");
         }

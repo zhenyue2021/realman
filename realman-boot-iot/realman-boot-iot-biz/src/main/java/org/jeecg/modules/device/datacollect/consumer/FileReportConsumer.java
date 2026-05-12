@@ -3,8 +3,10 @@ package org.jeecg.modules.device.datacollect.consumer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.rocketmq.spring.annotation.RocketMQMessageListener;
-import org.apache.rocketmq.spring.core.RocketMQListener;
+import org.apache.rocketmq.client.annotation.RocketMQMessageListener;
+import org.apache.rocketmq.client.apis.consumer.ConsumeResult;
+import org.apache.rocketmq.client.apis.message.MessageView;
+import org.apache.rocketmq.client.core.RocketMQListener;
 import org.jeecg.modules.device.datacollect.constant.DataCollectConstant;
 import org.jeecg.modules.device.datacollect.dto.mq.FileReportMsg;
 import org.jeecg.modules.device.entity.workorder.WorkOrderAttachment;
@@ -14,6 +16,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -25,27 +28,30 @@ import java.util.concurrent.TimeUnit;
 @RocketMQMessageListener(
         topic = DataCollectConstant.MQ_TOPIC_FILE_REPORT_IN,
         consumerGroup = DataCollectConstant.MQ_GROUP_FILE_REPORT_IN,
-        selectorExpression = DataCollectConstant.MQ_TAG_UPLOAD
+        tag = DataCollectConstant.MQ_TAG_UPLOAD,
+        namespace = "${rocketmq.push-consumer.namespace:}"
 )
-public class FileReportConsumer implements RocketMQListener<String> {
+public class FileReportConsumer implements RocketMQListener {
 
     private final IWorkOrderAttachmentService attachmentService;
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
 
     @Override
-    public void onMessage(String message) {
+    public ConsumeResult consume(MessageView messageView) {
+        String message = StandardCharsets.UTF_8.decode(messageView.getBody()).toString();
+
         FileReportMsg dto;
         try {
             dto = objectMapper.readValue(message, FileReportMsg.class);
         } catch (Exception e) {
             log.error("[DataCollect] 文件上报消息反序列化失败 payload={}", message, e);
-            return;
+            return ConsumeResult.SUCCESS;
         }
 
         if (dto.getDarwinFileId() == null || dto.getDarwinFileId().isBlank()) {
             log.error("[DataCollect] 文件上报消息缺少 darwinFileId payload={}", message);
-            return;
+            return ConsumeResult.SUCCESS;
         }
 
         if (dto.getTraceId() != null) {
@@ -57,7 +63,7 @@ public class FileReportConsumer implements RocketMQListener<String> {
             Boolean isNew = redisTemplate.opsForValue().setIfAbsent(dedupKey, "1", 24, TimeUnit.HOURS);
             if (Boolean.FALSE.equals(isNew)) {
                 log.info("[DataCollect] 文件上报已处理，跳过 darwinFileId={}", dto.getDarwinFileId());
-                return;
+                return ConsumeResult.SUCCESS;
             }
 
             if (dto.getWorkOrderId() != null && !dto.getWorkOrderId().isBlank()) {
@@ -68,9 +74,10 @@ public class FileReportConsumer implements RocketMQListener<String> {
 
             log.info("[DataCollect] 文件上报处理成功 darwinFileId={} workOrderId={}",
                     dto.getDarwinFileId(), dto.getWorkOrderId());
+            return ConsumeResult.SUCCESS;
         } catch (Exception e) {
             log.error("[DataCollect] 文件上报处理失败 darwinFileId={}", dto.getDarwinFileId(), e);
-            throw new RuntimeException(e);
+            return ConsumeResult.FAILURE;
         } finally {
             MDC.remove("traceId");
         }
