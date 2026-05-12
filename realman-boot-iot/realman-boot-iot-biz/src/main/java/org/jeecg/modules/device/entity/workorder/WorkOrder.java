@@ -123,5 +123,8 @@ public class WorkOrder implements Serializable {
 
     @TableField("tenant_id")
     private String tenantId;
+
+    @TableField("darwin_data_source")
+    private String darwinDataSource;
 }
 
