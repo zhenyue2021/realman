@@ -18,6 +18,8 @@ public class DeviceStatusMsg {
     public static class MsgData {
         /** MASTER / SLAVE */
         private String deviceType;
+        /** 设备型号，对应 iot_device.device_model */
+        private String deviceModel;
         /** ONLINE / OFFLINE */
         private String eventType;
         /** 下线原因，上线时为空字符串 */
