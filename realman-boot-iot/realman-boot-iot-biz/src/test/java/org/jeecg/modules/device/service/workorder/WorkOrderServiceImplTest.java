@@ -3,7 +3,6 @@ package org.jeecg.modules.device.service.workorder;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.jeecg.modules.device.datacollect.mapper.WorkOrderMappingMapper;
 import org.jeecg.modules.device.entity.workorder.WorkOrder;
 import org.jeecg.modules.device.entity.workorder.WorkOrderDevice;
 import org.jeecg.modules.device.mapper.IotDeviceMapper;
@@ -47,8 +46,6 @@ class WorkOrderServiceImplTest {
     private ObjectMapper objectMapper;
     @Mock
     private IotDeviceMapper iotDeviceMapper;
-    @Mock
-    private WorkOrderMappingMapper darwinWorkOrderMappingMapper;
 
     @InjectMocks
     private WorkOrderServiceImpl workOrderService;
@@ -121,14 +118,15 @@ class WorkOrderServiceImplTest {
     @Test
     @DisplayName("startWorkOrder：调用状态机后推送 WebSocket")
     void startWorkOrder_invokesStateMachineAndWebSocket() throws Exception {
-        order.setStatus("STARTED");
+        order.setStatus("PENDING");
+        // 第一次 getById 返回 order（触发状态机），第二次返回重新加载的 order（推送 WS）
         when(workOrderMapper.selectById("wo-001")).thenReturn(order);
         WorkOrderDevice master = new WorkOrderDevice();
         master.setDeviceCode("CTRL-001");
         when(workOrderDeviceMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(master);
         when(objectMapper.writeValueAsString(order)).thenReturn("{}");
 
-        workOrderService.startWorkOrder("wo-001", "op1", "张三", "13800138000");
+        workOrderService.startWorkOrder("wo-001", "op1", "张三", "13800138000", null, null);
 
         verify(workOrderStateMachine).startWorkOrder("wo-001", "op1", "张三", "13800138000");
         verify(deviceWebSocketServer).pushStartedWorkOrder(eq("CTRL-001"), eq("{}"));
@@ -138,9 +136,10 @@ class WorkOrderServiceImplTest {
     @DisplayName("startWorkOrder：状态机执行后工单不存在则不再推送")
     void startWorkOrder_skipsWebSocketWhenOrderMissingAfterMachine() {
         doNothing().when(workOrderStateMachine).startWorkOrder(any(), any(), any(), any());
-        when(workOrderMapper.selectById("wo-001")).thenReturn(null);
+        // 第一次 getById 返回 order（进入状态机），第二次返回 null（跳过 WebSocket）
+        when(workOrderMapper.selectById("wo-001")).thenReturn(order, (WorkOrder) null);
 
-        workOrderService.startWorkOrder("wo-001", "op1", "张三", "138");
+        workOrderService.startWorkOrder("wo-001", "op1", "张三", "138", null, null);
 
         verify(workOrderStateMachine).startWorkOrder("wo-001", "op1", "张三", "138");
         verifyNoInteractions(deviceWebSocketServer);

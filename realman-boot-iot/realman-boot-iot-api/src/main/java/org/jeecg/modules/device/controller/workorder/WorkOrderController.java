@@ -107,7 +107,8 @@ public class WorkOrderController {
     @PostMapping("/{id}/start")
     @Operation(summary = "开始工单")
     public ApiResult<Void> start(HttpServletRequest request, @PathVariable String id, @RequestBody WorkOrderStartDTO dto) {
-        workOrderService.startWorkOrder(id, dto.getOperatorId(), dto.getOperatorName(), dto.getOperatorPhone());
+        workOrderService.startWorkOrder(id, dto.getOperatorId(), dto.getOperatorName(), dto.getOperatorPhone(),
+                dto.getControllerCode(), dto.getRobotCode());
         return ApiResult.ok(null);
     }
 

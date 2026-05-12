@@ -135,5 +135,21 @@ public class WorkOrder implements Serializable {
     /** 采集总条数，由达尔文 quotaValue 写入 */
     @TableField("quota_total")
     private Integer quotaTotal;
+
+    /** 一级场景英文名，对应达尔文 level1Scene.nameEn，用于 startCollect MQTT 指令 */
+    @TableField("level1_scene_name_en")
+    private String level1SceneNameEn;
+
+    /** 二级场景英文名，对应达尔文 level2Scene.nameEn，用于 startCollect MQTT 指令 */
+    @TableField("level2_scene_name_en")
+    private String level2SceneNameEn;
+
+    /** 采集项英文名，对应达尔文 collectionItem.nameEn，用于 startCollect MQTT 指令 */
+    @TableField("collection_item_name_en")
+    private String collectionItemNameEn;
+
+    /** 达尔文平台推送的原始 JSON（WorkOrderItem），完整保存一份备查 */
+    @TableField("darwin_data_source")
+    private String darwinDataSource;
 }
 

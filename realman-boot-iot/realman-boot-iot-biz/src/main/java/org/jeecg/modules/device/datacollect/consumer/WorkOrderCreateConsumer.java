@@ -49,34 +49,26 @@ public class WorkOrderCreateConsumer implements RocketMQListener<String> {
 
         try {
             String tenant = dto.getTenant() != null ? dto.getTenant() : "";
-            List<WorkOrderCreateMsg.WorkOrderItem> items = dto.getData();
-            for (WorkOrderCreateMsg.WorkOrderItem item : items) {
+            for (WorkOrderCreateMsg.WorkOrderItem item : dto.getData()) {
                 if (item.getId() == null || item.getId().isBlank()) {
-                    log.warn("[DataCollect] 工单项缺少 id，跳过 index={}", items.indexOf(item));
+                    log.warn("[DataCollect] 工单项缺少 id，跳过");
                     continue;
                 }
                 try {
-                    processItem(tenant, item, dto.getTraceId());
+                    if ("true".equalsIgnoreCase(item.getDeleted())) {
+                        // deleted=true：按 item.id 软删除对应工单
+                        workOrderService.deleteWorkOrderFromDarwin(item.getId());
+                    } else {
+                        // item.id 直接作为 work_order 主键，查到则更新，查不到则新建
+                        workOrderService.upsertWorkOrderFromDarwin(item.getId(), tenant, item, dto.getTraceId());
+                    }
                 } catch (Exception e) {
-                    log.error("[DataCollect] 工单处理失败 darwinOrderId={}", item.getId(), e);
+                    log.error("[DataCollect] 工单处理失败 workOrderId={}", item.getId(), e);
                     throw e;
                 }
             }
         } finally {
             MDC.remove("traceId");
         }
-    }
-
-    private void processItem(String tenant, WorkOrderCreateMsg.WorkOrderItem item, String traceId) {
-        String darwinOrderId = item.getId();
-
-        // deleted=true：软删除已存在的工单（映射不存在时静默跳过）
-        if ("true".equalsIgnoreCase(item.getDeleted())) {
-            workOrderService.deleteWorkOrderFromDarwin(darwinOrderId);
-            return;
-        }
-
-        // upsert：mapping 存在则更新，不存在则新建
-        workOrderService.upsertWorkOrderFromDarwin(tenant, item, traceId);
     }
 }
