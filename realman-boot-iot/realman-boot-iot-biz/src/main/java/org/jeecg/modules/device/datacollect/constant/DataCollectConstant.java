@@ -27,16 +27,16 @@ public final class DataCollectConstant {
 
     // ===== 链路一 RocketMQ Topics =====
     /** ② 遥操平台 → 数采平台：转发机器人 OSS 授权请求 */
-    public static final String MQ_TOPIC_OSS_AUTH_REQUEST  = "TELEP_ROBOT_OSS_AUTH_REQUEST";
+    public static final String MQ_TOPIC_OSS_AUTH_REQUEST  = "daily_GLN_PLATFORM";
     /** ③ 数采平台 → 遥操平台：返回 STS 临时凭证 */
-    public static final String MQ_TOPIC_OSS_AUTH_RESPONSE = "DARWIN_OSS_AUTH_RESPONSE";
+    public static final String MQ_TOPIC_OSS_AUTH_RESPONSE = "daily_GLN_PLATFORM";
 
     // ===== 链路一 RocketMQ Consumer Groups =====
-    public static final String MQ_GROUP_OSS_AUTH_RESPONSE = "DARWIN_OSS_AUTH_RESPONSE_GROUP";
+    public static final String MQ_GROUP_OSS_AUTH_RESPONSE = "CID_GLN_PLATFORM_AUTH_RESULT";
 
     // ===== 链路一 RocketMQ Tags =====
-    public static final String MQ_TAG_REQUEST  = "REQUEST";
-    public static final String MQ_TAG_RESPONSE = "RESPONSE";
+    public static final String MQ_TAG_REQUEST  = "OSS_AUTH_REQUEST";
+    public static final String MQ_TAG_RESPONSE = "OSS_AUTH_RESPONSE";
 
     // ===== 链路一 Redis Keys =====
     /** requestId → deviceCode 映射，TTL 2 小时；Key = prefix + requestId */
@@ -58,10 +58,10 @@ public final class DataCollectConstant {
 
     // ===== 链路二 RocketMQ Topics =====
     /** ② 遥操平台 → 数采平台：转发机器人 OSS 文件地址上报 */
-    public static final String MQ_TOPIC_FILE_REPORT        = "TELEP_ROBOT_FILE_REPORT";
+    public static final String MQ_TOPIC_FILE_REPORT        = "daily_GLN_PLATFORM";
 
     // ===== 链路二 RocketMQ Tags =====
-    public static final String MQ_TAG_REPORT   = "REPORT";
+    public static final String MQ_TAG_REPORT   = "UPLOAD_COLLECTION_RESULT";
 
     // ===== 链路二 Redis Keys =====
     /** OSS 地址上报去重，TTL 24 小时；Key = prefix + deviceCode + ":" + ossAddress */
@@ -72,19 +72,19 @@ public final class DataCollectConstant {
     // =========================================================================
 
     // ===== 设备状态推送（Teleop → Darwin）=====
-    public static final String MQ_TOPIC_DEVICE_STATUS    = "DARWIN_DEVICE_STATUS";
-    public static final String MQ_TAG_ONLINE             = "ONLINE";
-    public static final String MQ_TAG_OFFLINE            = "OFFLINE";
+    public static final String MQ_TOPIC_DEVICE_STATUS    = "daily_GLN_PLATFORM";
+    public static final String MQ_TAG_ONLINE             = "DEVICE_STATUS";
+    public static final String MQ_TAG_OFFLINE            = "DEVICE_STATUS";
 
     // ===== 工单创建（Darwin → Teleop）=====
-    public static final String MQ_TOPIC_WORK_ORDER_IN    = "DARWIN_WORKORDER_IN";
-    public static final String MQ_TAG_CREATE             = "CREATE";
-    public static final String MQ_GROUP_WORK_ORDER_IN    = "DARWIN_WORKORDER_CONSUMER_GROUP";
+    public static final String MQ_TOPIC_WORK_ORDER_IN    = "daily_GLN_PLATFORM";
+    public static final String MQ_TAG_CREATE             = "GET_WORK_ORDER_RESPONSE";
+    public static final String MQ_GROUP_WORK_ORDER_IN    = "CID_GLN_PLATFORM_CREATE_ORDER";
 
     // ===== Darwin 文件上报（Darwin → Teleop MinIO）=====
-    public static final String MQ_TOPIC_FILE_REPORT_IN   = "DARWIN_FILE_REPORT";
+    public static final String MQ_TOPIC_FILE_REPORT_IN   = "daily_GLN_PLATFORM";
     public static final String MQ_TAG_UPLOAD             = "UPLOAD";
-    public static final String MQ_GROUP_FILE_REPORT_IN   = "DARWIN_FILE_REPORT_CONSUMER_GROUP";
+    public static final String MQ_GROUP_FILE_REPORT_IN   = "CID_GLN_UPLOAD_COLLECTION_RESULT";
 
     // ===== Darwin 文件上报去重 Redis Key =====
     /** Darwin 文件上报去重，TTL 24 小时；Key = prefix + darwinFileId */
