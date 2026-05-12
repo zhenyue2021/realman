@@ -101,7 +101,7 @@ public class DeviceStatusHandler {
         if (wasOffline && deviceStatusProducer != null
                 && DeviceConstant.DeviceTypeInteger.ROBOT == device.getDeviceType()) {
             String tenant = device.getTenantId() != null ? String.valueOf(device.getTenantId()) : "";
-            deviceStatusProducer.sendOnlineEvent(tenant, deviceCode, "SLAVE", MDC.get("traceId"));
+            deviceStatusProducer.sendOnlineEvent(tenant, deviceCode, "SLAVE", device.getDeviceModel(), MDC.get("traceId"));
         }
 
         // 8. 异步写入历史状态 DB（使用独立线程池，不占用 MQTT 消费线程）

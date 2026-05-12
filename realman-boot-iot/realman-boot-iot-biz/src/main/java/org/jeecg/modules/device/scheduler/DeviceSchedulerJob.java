@@ -109,7 +109,7 @@ public class DeviceSchedulerJob {
                         && DeviceConstant.DeviceTypeInteger.ROBOT == d.getDeviceType()) {
                     String tenant = d.getTenantId() != null ? String.valueOf(d.getTenantId()) : "";
                     deviceStatusProducer.sendOfflineEvent(
-                            tenant, d.getDeviceCode(), "SLAVE", "heartbeat_timeout", MDC.get("traceId"));
+                            tenant, d.getDeviceCode(), "SLAVE", d.getDeviceModel(), "heartbeat_timeout", MDC.get("traceId"));
                 }
                 cnt++;
             }
