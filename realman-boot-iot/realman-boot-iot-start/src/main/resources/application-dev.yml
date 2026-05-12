@@ -59,18 +59,20 @@ mybatis-plus:
       logic-delete-value: 1
       logic-not-delete-value: 0
 
-# RocketMQ（阿里云消息队列 RocketMQ 版，实例 rmq-cn-jjw4iubgh07，北京区域）
+# RocketMQ（阿里云消息队列 RocketMQ 版 5.x，实例 rmq-cn-jjw4iubgh07，北京区域）
+# 使用 rocketmq-v5-client-spring-boot-starter，通过 gRPC 端点（:8080）连接
 rocketmq:
-  name-server: rmq-cn-jjw4iubgh07.cn-beijing.rmq.aliyuncs.com:8080
   producer:
-    group: daily_GLN_PLATFORM
-    send-message-timeout: 3000
-    retry-times-when-send-failed: 3
+    endpoints: rmq-cn-jjw4iubgh07.cn-beijing.rmq.aliyuncs.com:8080
     namespace: rmq-cn-jjw4iubgh07
     access-key: MnZdSW6d1U3r1spP
     secret-key: 8scK0fvHum30JA44
-  consumer:
-    group: CID_GLN_PLATFORM
+    topic: daily_GLN_PLATFORM
+    ssl-enabled: true
+    max-attempts: 3
+    request-timeout: 3
+  push-consumer:
+    endpoints: rmq-cn-jjw4iubgh07.cn-beijing.rmq.aliyuncs.com:8080
     namespace: rmq-cn-jjw4iubgh07
     access-key: MnZdSW6d1U3r1spP
     secret-key: 8scK0fvHum30JA44

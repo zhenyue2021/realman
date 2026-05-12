@@ -3,10 +3,9 @@ package org.jeecg.modules.device.datacollect.producer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.rocketmq.spring.core.RocketMQTemplate;
+import org.apache.rocketmq.client.core.RocketMQClientTemplate;
 import org.jeecg.modules.device.datacollect.constant.DataCollectConstant;
 import org.jeecg.modules.device.datacollect.dto.mq.FileAddressReportMsg;
-import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -20,7 +19,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class FileAddressReportProducer {
 
-    private final RocketMQTemplate rocketMQTemplate;
+    private final RocketMQClientTemplate rocketMQClientTemplate;
     private final ObjectMapper objectMapper;
 
     public void send(String tenant, String deviceCode, String workOrderId, String taskId,
@@ -41,8 +40,7 @@ public class FileAddressReportProducer {
         String destination = DataCollectConstant.MQ_TOPIC_FILE_REPORT
                 + ":" + DataCollectConstant.MQ_TAG_REPORT;
         try {
-            rocketMQTemplate.send(destination,
-                    MessageBuilder.withPayload(objectMapper.writeValueAsString(msg)).build());
+            rocketMQClientTemplate.syncSendNormalMessage(destination, objectMapper.writeValueAsString(msg));
             log.info("[DataCollect] OSS地址已上报至数采平台 deviceCode={} fileCount={}",
                     deviceCode, fileList != null ? fileList.size() : 0);
         } catch (Exception e) {

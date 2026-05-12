@@ -3,11 +3,10 @@ package org.jeecg.modules.device.datacollect.producer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.rocketmq.spring.core.RocketMQTemplate;
+import org.apache.rocketmq.client.core.RocketMQClientTemplate;
 import org.jeecg.modules.device.datacollect.constant.DataCollectConstant;
 import org.jeecg.modules.device.datacollect.dto.mq.OssAuthRequestMsg;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.stereotype.Component;
 
 import java.util.concurrent.TimeUnit;
@@ -26,7 +25,7 @@ public class OssAuthRequestProducer {
 
     private static final long REQUEST_TTL_HOURS = 2;
 
-    private final RocketMQTemplate rocketMQTemplate;
+    private final RocketMQClientTemplate rocketMQClientTemplate;
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
 
@@ -50,8 +49,7 @@ public class OssAuthRequestProducer {
         String destination = DataCollectConstant.MQ_TOPIC_OSS_AUTH_REQUEST
                 + ":" + DataCollectConstant.MQ_TAG_REQUEST;
         try {
-            rocketMQTemplate.send(destination,
-                    MessageBuilder.withPayload(objectMapper.writeValueAsString(msg)).build());
+            rocketMQClientTemplate.syncSendNormalMessage(destination, objectMapper.writeValueAsString(msg));
             log.info("[DataCollect] OSS授权请求已转发 requestId={} deviceCode={}", requestId, deviceCode);
         } catch (Exception e) {
             // 发送失败清理 Redis，避免悬挂 key
