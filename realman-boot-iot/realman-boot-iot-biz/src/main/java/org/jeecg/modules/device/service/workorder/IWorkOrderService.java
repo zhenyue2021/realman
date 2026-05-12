@@ -26,7 +26,8 @@ public interface IWorkOrderService extends IService<WorkOrder> {
     void bindDevices(String workOrderId, List<WorkOrderDevice> devices);
     List<WorkOrderDevice> findDevices(String workOrderId);
     WorkOrderDevice findMasterDevice(String workOrderId);
-    void startWorkOrder(String workOrderId, String operatorId, String operatorName, String operatorPhone);
+    void startWorkOrder(String workOrderId, String operatorId, String operatorName, String operatorPhone,
+                        String controllerCode, String robotCode);
 
     void submitWorkOrder(String workOrderId, String operator);
 
@@ -60,14 +61,16 @@ public interface IWorkOrderService extends IService<WorkOrder> {
             String controllerCode);
 
     /**
-     * 达尔文平台工单 upsert：mapping 不存在时新建，已存在时更新。
+     * 达尔文平台工单 upsert：workOrderId（外层 id）不存在时新建，已存在时更新。
+     * workOrderId 即达尔文工单 ID，直接用作 work_order 表主键。
      */
-    WorkOrder upsertWorkOrderFromDarwin(String tenant, WorkOrderCreateMsg.WorkOrderItem item, String traceId);
+    WorkOrder upsertWorkOrderFromDarwin(String workOrderId, String tenant,
+                                        WorkOrderCreateMsg.WorkOrderItem item, String traceId);
 
     /**
-     * 达尔文侧删除工单（deleted=true）：通过 darwinOrderId 找到映射，软删除工单和映射记录。
-     * 幂等：找不到映射时静默跳过。
+     * 达尔文侧删除工单（deleted=true）：按 workOrderId（= work_order.id）软删除。
+     * 幂等：不存在时静默跳过。
      */
-    void deleteWorkOrderFromDarwin(String darwinOrderId);
+    void deleteWorkOrderFromDarwin(String workOrderId);
 }
 

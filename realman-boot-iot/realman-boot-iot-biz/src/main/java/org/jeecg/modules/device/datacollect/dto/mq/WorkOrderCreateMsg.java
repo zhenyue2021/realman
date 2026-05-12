@@ -4,7 +4,7 @@ import lombok.Data;
 
 import java.util.List;
 
-/** Darwin → Teleop（RocketMQ）：工单推送消息，data 为工单列表（一条消息可含多个工单） */
+/** Darwin → Teleop（RocketMQ）：工单推送消息，data 中每条 item.id 即对应 work_order 主键 */
 @Data
 public class WorkOrderCreateMsg {
 

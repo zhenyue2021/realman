@@ -59,21 +59,21 @@ mybatis-plus:
       logic-delete-value: 1
       logic-not-delete-value: 0
 
-# RocketMQ（达尔文对接；开发机直连 172.16.44.66 上 NameServer）
-# Broker：容器镜像版本与父 pom 中 rocketmq-broker-docker.version 对齐（当前 apache/rocketmq:5.3.2）
-# 监听 10911；Docker 部署须在 broker.conf 设置 brokerIP1 为本机 IP，否则客户端会拿到容器内网地址而连不上
+# RocketMQ（阿里云消息队列 RocketMQ 版，实例 rmq-cn-jjw4iubgh07，北京区域）
 rocketmq:
-  name-server: ${ROCKETMQ_NAME_SERVER:172.16.44.66:9876}
+  name-server: rmq-cn-jjw4iubgh07.cn-beijing.rmq.aliyuncs.com:8080
   producer:
-    group: REALMAN_IOT_PRODUCER_GROUP
+    group: daily_GLN_PLATFORM
     send-message-timeout: 3000
     retry-times-when-send-failed: 3
-    access-key: ${ROCKETMQ_ACCESS_KEY:}
-    secret-key: ${ROCKETMQ_SECRET_KEY:}
+    namespace: rmq-cn-jjw4iubgh07
+    access-key: MnZdSW6d1U3r1spP
+    secret-key: 8scK0fvHum30JA44
   consumer:
-    group: REALMAN_IOT_CONSUMER_GROUP
-    access-key: ${ROCKETMQ_ACCESS_KEY:}
-    secret-key: ${ROCKETMQ_SECRET_KEY:}
+    group: CID_GLN_PLATFORM
+    namespace: rmq-cn-jjw4iubgh07
+    access-key: MnZdSW6d1U3r1spP
+    secret-key: 8scK0fvHum30JA44
 
 # 设为 true 时加载 Darwin RocketMQ Bean；未部署 RocketMQ 时请保持 false 或使用环境变量覆盖
 darwin:
