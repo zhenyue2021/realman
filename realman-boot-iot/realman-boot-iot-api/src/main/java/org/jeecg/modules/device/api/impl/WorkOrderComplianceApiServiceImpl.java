@@ -4,8 +4,12 @@ import cn.hutool.core.bean.BeanUtil;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import cn.hutool.core.util.StrUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import jakarta.servlet.http.HttpServletRequest;
 import org.jeecg.common.system.vo.DictModel;
+import org.jeecg.common.util.TokenUtils;
 import org.jeecg.modules.device.api.WorkOrderComplianceApiService;
 import org.jeecg.modules.device.component.DeviceServiceComponent;
 import org.jeecg.modules.device.dto.EnterpriseNodeRowDTO;
@@ -17,15 +21,18 @@ import org.jeecg.modules.device.dto.workorder.WorkOrderComplianceCreateDTO;
 import org.jeecg.modules.device.dto.workorder.WorkOrderComplianceQueryDTO;
 import org.jeecg.modules.device.entity.workorder.WorkOrderComplianceConfig;
 import org.jeecg.modules.device.feign.SysAuthFeignClient;
+import org.jeecg.modules.device.util.RequestUtil;
 import org.jeecg.modules.device.service.workorder.IWorkOrderComplianceConfigService;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class WorkOrderComplianceApiServiceImpl implements WorkOrderComplianceApiService {
 
     private final IWorkOrderComplianceConfigService configService;
@@ -101,26 +108,37 @@ public class WorkOrderComplianceApiServiceImpl implements WorkOrderComplianceApi
     }
 
     @Override
-    public List<OptionTreeDTO> enterpriseOptionsTree() {
-        return deviceComponent.buildEnterpriseTree(toEnterpriseRows(sysAuthFeignClient.listEnterpriseTreeRows()));
+    public List<OptionTreeDTO> enterpriseOptionsTree(HttpServletRequest request) {
+        String username = RequestUtil.safeUsername(request);
+        if (StrUtil.isBlank(username)) {
+            return List.of();
+        }
+        List<String> anchorIds = sysAuthFeignClient.listValidEnterpriseIdsByUsername(username);
+        if (anchorIds == null || anchorIds.isEmpty()) {
+            return List.of();
+        }
+        List<EnterpriseNodeRowDTO> rows = toEnterpriseRows(sysAuthFeignClient.listEnterpriseTreeRows());
+        return deviceComponent.buildEnterpriseTreeForAnchors(rows, new HashSet<>(anchorIds));
     }
 
     @Override
-    public List<OptionDTO> tenantOptions() {
-        return toOptionList(sysAuthFeignClient.listActiveTenants());
-    }
-
-    // ── 转换工具 ─────────────────────────────────────────────────────────
-
-    /** DictModel(value=id, text=name) → OptionDTO(id, name) */
-    private static List<OptionDTO> toOptionList(List<DictModel> models) {
-        if (models == null || models.isEmpty()) {
+    public List<OptionDTO> tenantOptions(HttpServletRequest request) {
+        String tenantId = TokenUtils.getTenantIdByRequest(request);
+        if (StrUtil.isBlank(tenantId)) {
+            log.debug("租户下拉缺少请求租户标识（租户ID / X-Tenant-Id）");
             return List.of();
         }
-        return models.stream()
+        List<DictModel> all = sysAuthFeignClient.listActiveTenants();
+        if (all == null || all.isEmpty()) {
+            return List.of();
+        }
+        return all.stream()
+                .filter(m -> m != null && tenantId.equals(m.getValue()))
                 .map(m -> new OptionDTO(m.getValue(), m.getText()))
                 .collect(Collectors.toList());
     }
+
+    // ── 转换工具 ─────────────────────────────────────────────────────────
 
     /** JSONObject{id,parentId,name,orgCategory} → EnterpriseNodeRowDTO */
     private static List<EnterpriseNodeRowDTO> toEnterpriseRows(List<JSONObject> items) {

@@ -172,6 +172,31 @@ CREATE TABLE IF NOT EXISTS `iot_device_operation_log` (
   KEY `idx_operation_time` (`operation_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='设备操作日志';
 
+-- 4.1 设备指令下发/ACK记录表（跟踪双向通信生命周期）
+-- 平台下发时插入 PENDING，收到设备 ACK 后更新为 SUCCESS/FAIL
+-- 超时未 ACK 由定时任务扫 status=PENDING AND send_time < now()-timeout 后标记 TIMEOUT
+CREATE TABLE IF NOT EXISTS `iot_device_command_record` (
+  `id`           VARCHAR(32)   NOT NULL                    COMMENT '主键（雪花ID）',
+  `command_id`   VARCHAR(32)   NOT NULL                    COMMENT '指令唯一ID，与 MQTT payload 中 commandId 一致',
+  `device_id`    VARCHAR(32)   DEFAULT NULL                COMMENT '设备ID',
+  `device_code`  VARCHAR(64)   NOT NULL                    COMMENT '设备编号',
+  `command_type` VARCHAR(32)   NOT NULL                    COMMENT '指令类型：restart/emergency-stop/poweroff/reset/force-feedback/sport-speed 等',
+  `device_type`  VARCHAR(16)   NOT NULL DEFAULT 'device'   COMMENT '设备角色：device（机器人）/ master（主控）',
+  `status`       VARCHAR(16)   NOT NULL DEFAULT 'PENDING'  COMMENT '指令状态：PENDING/SUCCESS/FAIL/TIMEOUT',
+  `fail_reason`  VARCHAR(256)  DEFAULT NULL                COMMENT '失败原因（设备返回的 message）',
+  `operator`     VARCHAR(64)   DEFAULT NULL                COMMENT '操作人（设备主动查询时为 null）',
+  `params_json`  TEXT          DEFAULT NULL                COMMENT '下发指令的明文 JSON（不存 AES 密文）',
+  `ack_data_json` TEXT         DEFAULT NULL                COMMENT '设备回复的完整明文 JSON',
+  `send_time`    DATETIME      NOT NULL                    COMMENT '指令下发时间',
+  `ack_time`     DATETIME      DEFAULT NULL                COMMENT '收到设备 ACK 的时间（可与 send_time 差值算 RTT）',
+  `create_time`  DATETIME      NOT NULL                    COMMENT '记录创建时间',
+  `update_time`  DATETIME      DEFAULT NULL                COMMENT '记录最后更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_command_id` (`command_id`),
+  KEY `idx_device_code`      (`device_code`),
+  KEY `idx_status_send_time` (`status`, `send_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='设备指令下发/ACK记录（双向通信生命周期追踪）';
+
 -- 5. OTA固件包
 CREATE TABLE IF NOT EXISTS `iot_ota_firmware` (
   `id`            VARCHAR(32)   NOT NULL,

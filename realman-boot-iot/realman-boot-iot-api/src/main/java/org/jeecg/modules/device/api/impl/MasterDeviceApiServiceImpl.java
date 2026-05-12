@@ -94,6 +94,7 @@ public class MasterDeviceApiServiceImpl implements MasterDeviceApiService {
             if (auth != null) {
                 item.setAuthEffectiveTime(auth.getEffectiveTime());
                 item.setAuthExpireTime(auth.getExpireTime());
+                item.setAuthEnterpriseName(auth.getEnterpriseName());
             }
 
 //            String addr = reverseGeocodeCached(d.getLatitude(), d.getLongitude(), addressCache);

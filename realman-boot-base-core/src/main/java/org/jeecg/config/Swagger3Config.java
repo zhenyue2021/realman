@@ -3,6 +3,7 @@ package org.jeecg.config;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.Paths;
 import io.swagger.v3.oas.models.info.Contact;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.info.License;
@@ -10,6 +11,7 @@ import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.common.constant.CommonConstant;
+import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springdoc.core.customizers.OperationCustomizer;
 import org.springdoc.core.filters.GlobalOpenApiMethodFilter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -21,10 +23,7 @@ import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -92,6 +91,65 @@ public class Swagger3Config implements WebMvcConfigurer {
                 log.info("忽略加入 X_ACCESS_TOKEN 的 PATH:" + path);
             }
             return operation;
+        };
+    }
+
+
+    /**
+     * 按各接口上声明的 x-order 值对 Swagger 文档中的 Path 进行排序。
+     *
+     * 使用方式：在 Controller 方法的 @Operation 上添加扩展：
+     * <pre>
+     * {@code
+     * @Operation(
+     *     summary = "创建用户",
+     *     extensions = @Extension(properties = {
+     *         @ExtensionProperty(name = "x-order", value = "1")
+     *     })
+     * )
+     * }
+     * </pre>
+     * 未标注 x-order 的接口统一排到末尾。
+     */
+    @Bean
+    public OpenApiCustomizer operationOrderCustomizer() {
+        return openApi -> {
+            Paths paths = openApi.getPaths();
+            if (paths == null || paths.isEmpty()) {
+                return;
+            }
+
+            // 收集每个 path 对应的最小 x-order 值（一个 path 下可能有多个 HTTP method）
+            Map<String, Integer> pathOrderMap = new LinkedHashMap<>();
+            paths.forEach((path, pathItem) -> {
+                int minOrder = pathItem.readOperations().stream()
+                        .mapToInt(op -> {
+                            if (op.getExtensions() == null) {
+                                return Integer.MAX_VALUE;
+                            }
+                            Object xOrder = op.getExtensions().get("x-order");
+                            if (xOrder == null) {
+                                return Integer.MAX_VALUE;
+                            }
+                            try {
+                                return Integer.parseInt(xOrder.toString());
+                            } catch (NumberFormatException e) {
+                                log.warn("x-order 值非整数，path={}，value={}", path, xOrder);
+                                return Integer.MAX_VALUE;
+                            }
+                        })
+                        .min()
+                        .orElse(Integer.MAX_VALUE);
+                pathOrderMap.put(path, minOrder);
+            });
+
+            // 按 x-order 升序重建 Paths（未标注的排在最后，保留原始相对顺序）
+            Paths sortedPaths = new Paths();
+            pathOrderMap.entrySet().stream()
+                    .sorted(Map.Entry.comparingByValue())
+                    .forEach(entry -> sortedPaths.addPathItem(entry.getKey(), paths.get(entry.getKey())));
+
+            openApi.setPaths(sortedPaths);
         };
     }
 

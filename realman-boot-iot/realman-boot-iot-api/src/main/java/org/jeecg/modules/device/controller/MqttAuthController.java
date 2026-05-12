@@ -3,6 +3,7 @@ package org.jeecg.modules.device.controller;
 import io.swagger.v3.oas.annotations.Hidden;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jeecg.config.shiro.IgnoreAuth;
 import org.jeecg.modules.device.security.DeviceSecretService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -46,6 +47,7 @@ public class MqttAuthController {
      * EMQX HTTP Auth 认证回调
      * 返回 {"result":"allow"} 或 {"result":"deny"}
      */
+    @IgnoreAuth
     @PostMapping("/auth")
     public ResponseEntity<Map<String, String>> auth(@RequestBody Map<String, String> body) {
         log.info("[MqttAuth] requestBody={}", body);
@@ -69,6 +71,7 @@ public class MqttAuthController {
      * EMQX HTTP ACL 授权回调
      * 设备只能访问自身 device/{deviceCode}/... 命名空间下的Topic
      */
+    @IgnoreAuth
     @PostMapping("/acl")
     public ResponseEntity<Map<String, String>> acl(@RequestBody Map<String, String> body) {
         log.info("[MqttAcl] requestBody={}", body);

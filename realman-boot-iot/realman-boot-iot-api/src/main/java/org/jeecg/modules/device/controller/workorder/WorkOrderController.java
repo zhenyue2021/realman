@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.jeecg.common.util.ContentDispositionUtil;
 import org.jeecg.modules.device.util.RequestUtil;
 import org.jeecg.modules.device.api.WorkOrderApiService;
@@ -71,6 +72,7 @@ public class WorkOrderController {
                 .body(bytes);
     }
 
+    @RequiresPermissions("workOrder:add")
     @PostMapping("/add")
     @Operation(summary = "创建工单")
     public ApiResult<WorkOrder> create(@RequestBody @Validated WorkOrderCreateDTO dto, HttpServletRequest request) {
@@ -84,6 +86,7 @@ public class WorkOrderController {
         return ApiResult.ok(created);
     }
 
+    @RequiresPermissions("workOrder:edit")
     @PostMapping("/{id}/edit")
     @Operation(summary = "编辑工单（基础信息与绑定设备）")
     public ApiResult<WorkOrder> edit(@PathVariable String id,
@@ -124,6 +127,7 @@ public class WorkOrderController {
         return ApiResult.ok(null);
     }
 
+    @RequiresPermissions("workOrder:audit")
     @PostMapping("/{id}/audit")
     @Operation(summary = "审核工单")
     public ApiResult<Void> audit(@PathVariable String id, @RequestBody WorkOrderAuditDTO dto,
@@ -132,6 +136,7 @@ public class WorkOrderController {
         return ApiResult.ok(null);
     }
 
+    @RequiresPermissions("workOrder:delete")
     @DeleteMapping("/{id}")
     @Operation(summary = "删除工单")
     public ApiResult<Void> delete(@PathVariable String id) {

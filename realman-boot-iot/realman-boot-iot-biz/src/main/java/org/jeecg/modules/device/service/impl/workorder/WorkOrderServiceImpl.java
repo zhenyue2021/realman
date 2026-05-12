@@ -13,8 +13,10 @@ import org.jeecg.modules.device.datacollect.dto.mq.WorkOrderCreateMsg;
 import org.jeecg.modules.device.dto.WorkOrderOperationRecordDTO;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.entity.workorder.WorkOrder;
+import org.jeecg.modules.device.entity.workorder.WorkOrderComplianceConfig;
 import org.jeecg.modules.device.entity.workorder.WorkOrderDevice;
 import org.jeecg.modules.device.mapper.IotDeviceMapper;
+import org.jeecg.modules.device.mapper.workorder.WorkOrderComplianceConfigMapper;
 import org.jeecg.modules.device.mapper.workorder.WorkOrderDeviceMapper;
 import org.jeecg.modules.device.datacollect.dto.mqtt.StartCollectCmd;
 import org.jeecg.modules.device.datacollect.dto.mqtt.StopCollectCmd;
@@ -41,6 +43,7 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
     private final ObjectMapper objectMapper;
     private final WorkOrderMapper workOrderMapper;
     private final WorkOrderDeviceMapper workOrderDeviceMapper;
+    private final WorkOrderComplianceConfigMapper complianceConfigMapper;
     private final DeviceWebSocketServer deviceWebSocketServer;
     private final IWorkOrderStateMachineService workOrderStateMachine;
     private final IotDeviceMapper iotDeviceMapper;
@@ -299,6 +302,7 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
         if (!"PENDING".equals(existing.getStatus())) {
             throw new IllegalStateException("仅允许编辑未开始的工单");
         }
+        String complianceId = existing.getComplianceId();
         existing.setAgentId(updated.getAgentId());
         existing.setAgentName(updated.getAgentName());
         existing.setTaskName(updated.getTaskName());
@@ -314,6 +318,8 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
         existing.setUpdateBy(updated.getUpdateBy());
         this.updateById(existing);
         bindDevices(existing.getId(), devices);
+        // 根据complianceId判断当前工单合规配置是否有其他工单绑定，若无，则更新工单合规配置的使用状态
+        updateComplianceApplyStatus(complianceId, updated.getComplianceId());
         return existing;
     }
 
@@ -348,6 +354,45 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
             Page<WorkOrder> page,
             String controllerCode) {
         return workOrderMapper.pageWorkOrderOperationRecords(page, controllerCode);
+    }
+
+    /**
+     * 更新合规配置的应用状态
+     * <p>
+     * 逻辑：
+     * 1. 检查旧的合规配置（complianceId）是否还有其他工单在使用，如果没有则设置为未应用（0）
+     * 2. 新的合规配置（newComplianceId）被当前工单使用，设置为已应用（1）
+     *
+     * @param oldComplianceId 旧的合规配置ID
+     * @param newComplianceId 新的合规配置ID
+     */
+    private void updateComplianceApplyStatus(String oldComplianceId, String newComplianceId) {
+        // 1. 检查旧合规配置是否还被其他工单使用
+        if (oldComplianceId != null && !oldComplianceId.isEmpty()) {
+            long count = this.count(new LambdaQueryWrapper<WorkOrder>()
+                    .eq(WorkOrder::getComplianceId, oldComplianceId)
+                    .eq(WorkOrder::getDelFlag, 0));
+
+            // 如果没有其他工单使用该合规配置，则更新为未应用状态
+            if (count == 0) {
+                WorkOrderComplianceConfig oldConfig = complianceConfigMapper.selectById(oldComplianceId);
+                if (oldConfig != null && oldConfig.getApplyStatus() != null && oldConfig.getApplyStatus() == 1) {
+                    oldConfig.setApplyStatus(0);
+                    complianceConfigMapper.updateById(oldConfig);
+                    log.info("[updateComplianceApplyStatus] 合规配置 {} 无工单绑定，更新为未应用状态", oldComplianceId);
+                }
+            }
+        }
+
+        // 2. 将新合规配置标记为已应用
+        if (newComplianceId != null && !newComplianceId.isEmpty()) {
+            WorkOrderComplianceConfig newConfig = complianceConfigMapper.selectById(newComplianceId);
+            if (newConfig != null && (newConfig.getApplyStatus() == null || newConfig.getApplyStatus() == 0)) {
+                newConfig.setApplyStatus(1);
+                complianceConfigMapper.updateById(newConfig);
+                log.info("[updateComplianceApplyStatus] 合规配置 {} 被工单绑定，更新为已应用状态", newComplianceId);
+            }
+        }
     }
 
     private static final DateTimeFormatter DARWIN_DT_FMT =

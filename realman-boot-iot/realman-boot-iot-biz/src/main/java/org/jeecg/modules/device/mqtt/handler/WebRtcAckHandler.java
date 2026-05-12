@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.security.CommandEncryptService;
+import org.jeecg.modules.device.service.IIotDeviceCommandRecordService;
 import org.jeecg.modules.device.service.WebRtcAckPendingService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -20,13 +21,14 @@ import org.springframework.stereotype.Component;
  */
 @Slf4j
 @Component
-@ConditionalOnProperty(prefix = "mqtt", name = "enabled", havingValue = "true", matchIfMissing = false)
+@ConditionalOnProperty(prefix = "mqtt", name = "enabled", havingValue = "true")
 @RequiredArgsConstructor
 public class WebRtcAckHandler {
 
     private final CommandEncryptService encryptService;
     private final ObjectMapper objectMapper;
     private final WebRtcAckPendingService pendingService;
+    private final IIotDeviceCommandRecordService commandRecordService;
 
     /**
      * 处理 WebRTC ACK
@@ -43,6 +45,7 @@ public class WebRtcAckHandler {
 
             if (ack.getCommandId() != null) {
                 pendingService.complete(ack.getCommandId(), ack);
+                commandRecordService.ack(ack.getCommandId(), ack.isSuccess(), ack.getMessage(), decrypted);
             }
         } catch (Exception e) {
             log.error("[WebRtcAck] 处理异常 deviceCode={}", deviceCode, e);

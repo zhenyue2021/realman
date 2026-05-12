@@ -248,7 +248,7 @@ public class IotSlamCommandServiceImpl extends ServiceImpl<IotSlamCommandRecordM
             String masterCode = stringRedisTemplate.opsForValue()
                     .get(DeviceConstant.RedisKey.TELEOP_ROBOT_TO_MASTER + deviceCode);
             if (masterCode == null) {
-                log.warn("[MasterCommandHandler] 未找到机器人 {} 对应的主控缓存，忽略消息", deviceCode);
+//                log.warn("[MasterCommandHandler] 未找到机器人 {} 对应的主控缓存，忽略消息", deviceCode);
                 return;
             }
             webSocketServer.pushSlamStates(masterCode, objectMapper.writeValueAsString(states));
