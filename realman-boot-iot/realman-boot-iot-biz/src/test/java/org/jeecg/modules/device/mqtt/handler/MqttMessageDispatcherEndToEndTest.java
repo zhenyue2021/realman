@@ -81,6 +81,7 @@ public class MqttMessageDispatcherEndToEndTest {
     private WebRtcRestartHandler webRtcRestartHandler;
     private CollectUrlRequestHandler collectUrlRequestHandler;
     private OssAddressReportHandler ossAddressReportHandler;
+    private DeviceOnlineReportHandler deviceOnlineReportHandler;
 
     // 分发器
     private MqttMessageDispatcher dispatcher;
@@ -174,6 +175,7 @@ public class MqttMessageDispatcherEndToEndTest {
         webRtcRestartHandler = new WebRtcRestartHandler(encryptService, objectMapper, webSocketServer, logService);
         collectUrlRequestHandler = Mockito.mock(CollectUrlRequestHandler.class);
         ossAddressReportHandler = Mockito.mock(OssAddressReportHandler.class);
+        deviceOnlineReportHandler = Mockito.mock(DeviceOnlineReportHandler.class);
         DeviceCameraStreamPendingService cameraStreamPendingService = Mockito.mock(DeviceCameraStreamPendingService.class);
         DeviceCameraStreamResponseHandler deviceCameraStreamResponseHandler = new DeviceCameraStreamResponseHandler(
                 encryptService,
@@ -204,7 +206,8 @@ public class MqttMessageDispatcherEndToEndTest {
                 masterCommandHandler,
                 webRtcAckHandler,
                 webRtcRestartHandler,
-                ossAddressReportHandler
+                ossAddressReportHandler,
+                deviceOnlineReportHandler
         );
         // collectUrlRequestHandler 为 @Autowired(required=false) 非 final 字段，不在构造器中，需反射注入
         Field collectUrlField = MqttMessageDispatcher.class.getDeclaredField("collectUrlRequestHandler");

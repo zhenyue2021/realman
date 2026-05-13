@@ -22,6 +22,8 @@ public final class DataCollectConstant {
     // ===== 链路一 MQTT Topics =====
     /** ① 机器人 → 遥操平台：请求 OSS 上传授权，完整 Topic：device/{code}/datacollect/collectUrlRequest */
     public static final String MQTT_UP_COLLECT_URL_REQUEST = "datacollect/collectUrlRequest";
+    /** 机器人 → 遥操平台：设备上线信息上报，完整 Topic：device/{code}/datacollect/deviceOnline */
+    public static final String MQTT_UP_DEVICE_ONLINE       = "datacollect/deviceOnline";
     /** ④ 遥操平台 → 机器人：下发 OSS STS 凭证，完整 Topic：device/{code}/datacollect/collectUrlResponse */
     public static final String MQTT_DOWN_COLLECT_URL_RESP  = "datacollect/collectUrlResponse";
 

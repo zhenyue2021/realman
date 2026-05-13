@@ -40,6 +40,7 @@ public class MqttMessageDispatcherTest {
     private WebRtcRestartHandler webRtcRestartHandler;
     private CollectUrlRequestHandler collectUrlRequestHandler;
     private OssAddressReportHandler ossAddressReportHandler;
+    private DeviceOnlineReportHandler deviceOnlineReportHandler;
 
     private MqttMessageDispatcher dispatcher;
 
@@ -63,6 +64,7 @@ public class MqttMessageDispatcherTest {
         webRtcRestartHandler = Mockito.mock(WebRtcRestartHandler.class);
         collectUrlRequestHandler = Mockito.mock(CollectUrlRequestHandler.class);
         ossAddressReportHandler = Mockito.mock(OssAddressReportHandler.class);
+        deviceOnlineReportHandler = Mockito.mock(DeviceOnlineReportHandler.class);
 
         dispatcher = new MqttMessageDispatcher(
                 statusHandler,
@@ -81,7 +83,8 @@ public class MqttMessageDispatcherTest {
                 masterCommandHandler,
                 webRtcAckHandler,
                 webRtcRestartHandler,
-                ossAddressReportHandler
+                ossAddressReportHandler,
+                deviceOnlineReportHandler
         );
         // collectUrlRequestHandler 为 @Autowired(required=false) 非 final 字段，不在构造器中，需反射注入
         Field f = MqttMessageDispatcher.class.getDeclaredField("collectUrlRequestHandler");
@@ -278,6 +281,17 @@ public class MqttMessageDispatcherTest {
         String payload = "{\"timestamp\":1710000000000,\"oss\":{\"address\":\"oss://bucket/path\",\"list\":[\"file1.bag\"]}}";
         dispatcher.dispatch(topic, mqttMsg(payload));
         Mockito.verify(ossAddressReportHandler).handle(deviceCode, payload);
+    }
+
+    @Test
+    void testDeviceOnlineReport() throws Exception {
+        String deviceCode = "ROBOT001";
+        String topic = "device/" + deviceCode + "/datacollect/deviceOnline";
+        String payload = "{\"timestamp\":1745393452000,\"deviceSn\":\"ROBOT001\"," +
+                "\"payload\":{\"deviceType\":\"Realbot1.2\",\"version\":\"v1.0.1\"," +
+                "\"location\":{\"latitude\":30.0,\"longitude\":120.0}}}";
+        dispatcher.dispatch(topic, mqttMsg(payload));
+        Mockito.verify(deviceOnlineReportHandler).handle(deviceCode, payload);
     }
 
     @Test
