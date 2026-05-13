@@ -31,8 +31,17 @@ CREATE TABLE IF NOT EXISTS `darwin_workorder_mapping`
   DEFAULT CHARSET = utf8mb4
   COMMENT = '达尔文平台工单映射表';
 
+-- ③ work_order 表 agent_id / compliance_id 改为允许 NULL
+--    达尔文创单时无代理商/合规配置信息，需允许为空
+ALTER TABLE work_order
+    MODIFY COLUMN `agent_id`     VARCHAR(36) NULL COMMENT '代理商ID（达尔文来源时为空）',
+    MODIFY COLUMN `compliance_id` VARCHAR(36) NULL COMMENT '绑定合规配置ID（达尔文来源时为空）';
+
 -- ============================================================
 -- 回滚脚本
 -- ============================================================
 -- ALTER TABLE work_order DROP INDEX idx_source, DROP COLUMN source;
 -- DROP TABLE IF EXISTS darwin_workorder_mapping;
+-- ALTER TABLE work_order
+--     MODIFY COLUMN `agent_id`      VARCHAR(36) NOT NULL COMMENT '代理商ID',
+--     MODIFY COLUMN `compliance_id` VARCHAR(36) NOT NULL COMMENT '绑定合规配置ID';

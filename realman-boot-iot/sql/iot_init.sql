@@ -296,11 +296,11 @@ CREATE TABLE IF NOT EXISTS `work_order_compliance_config` (
 CREATE TABLE IF NOT EXISTS `work_order` (
   `id`                    VARCHAR(36)  NOT NULL PRIMARY KEY COMMENT '工单ID',
   `task_name`             VARCHAR(200) NOT NULL COMMENT '工单任务名称',
-  `agent_id`              VARCHAR(36)  NOT NULL COMMENT '代理商ID',
+  `agent_id`              VARCHAR(36)           COMMENT '代理商ID（达尔文来源时为空）',
   `agent_name`            VARCHAR(100)          COMMENT '代理商名称',
   `department_id`         VARCHAR(36)           COMMENT '所属部门ID',
   `department_name`       VARCHAR(100)          COMMENT '所属部门名称',
-  `compliance_id`         VARCHAR(36)  NOT NULL COMMENT '绑定合规配置ID',
+  `compliance_id`         VARCHAR(36)           COMMENT '绑定合规配置ID（达尔文来源时为空）',
   `currency`              VARCHAR(10)           COMMENT '币种（如CNY/USD）',
   `unit_price`            DECIMAL(10,2)         COMMENT '单价',
   `total_price`           DECIMAL(10,2)         COMMENT '总价',

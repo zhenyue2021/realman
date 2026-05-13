@@ -791,4 +791,50 @@ public class MqttMessageModel {
         /** 上报时间戳（毫秒 epoch） */
         private long timestamp;
     }
+
+    /**
+     * 上行：机器人设备上线信息上报（Topic: device/{deviceCode}/datacollect/deviceOnline）
+     *
+     * <p>设备 MQTT 连接建立后主动上报，平台收到后：
+     * <ol>
+     *   <li>更新 DB：device_model / firmware_version / latitude / longitude / last_online_time</li>
+     *   <li>推送 RocketMQ 上线事件（Darwin 集成启用时）</li>
+     * </ol>
+     */
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class DeviceOnlineReport {
+        /** 设备上线时间戳（毫秒 epoch，对应 iot_device.last_online_time） */
+        private long timestamp;
+        /** 设备编码（对应 iot_device.device_code，与 Topic 中的 deviceCode 一致） */
+        private String deviceSn;
+        /** 上线附加信息 */
+        private OnlinePayload payload;
+
+        @Data
+        @NoArgsConstructor
+        @AllArgsConstructor
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        public static class OnlinePayload {
+            /** 设备型号（对应 iot_device.device_model，如 "Realbot1.2"） */
+            private String deviceType;
+            /** 固件版本（对应 iot_device.firmware_version，如 "v1.0.1"） */
+            private String version;
+            /** 设备位置 */
+            private Location location;
+        }
+
+        @Data
+        @NoArgsConstructor
+        @AllArgsConstructor
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        public static class Location {
+            /** 纬度（WGS84，对应 iot_device.latitude） */
+            private Double latitude;
+            /** 经度（WGS84，对应 iot_device.longitude） */
+            private Double longitude;
+        }
+    }
 }

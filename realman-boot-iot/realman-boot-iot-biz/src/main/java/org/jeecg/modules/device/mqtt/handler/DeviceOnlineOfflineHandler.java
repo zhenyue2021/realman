@@ -107,11 +107,11 @@ public class DeviceOnlineOfflineHandler {
             pendingSyncService.flushPendingMessages(deviceCode);
 
             // 向达尔文数采平台推送机器人上线事件（Darwin 集成未启用或非机器人设备时跳过）
-            if (darwinProducer != null
+            /*if (darwinProducer != null
                     && DeviceConstant.DeviceTypeInteger.ROBOT == device.getDeviceType()) {
                 String tenant = device.getTenantId() != null ? String.valueOf(device.getTenantId()) : "";
-                darwinProducer.sendOnlineEvent(tenant, deviceCode, "SLAVE", MDC.get("traceId"));
-            }
+                darwinProducer.sendOnlineEvent(tenant, deviceCode, "SLAVE", device.getDeviceModel(), MDC.get("traceId"));
+            }*/
         } catch (Exception e) {
             log.error("[Online] 处理异常", e);
         }
@@ -168,7 +168,7 @@ public class DeviceOnlineOfflineHandler {
             if (darwinProducer != null
                     && DeviceConstant.DeviceTypeInteger.ROBOT == device.getDeviceType()) {
                 String tenant = device.getTenantId() != null ? String.valueOf(device.getTenantId()) : "";
-                darwinProducer.sendOfflineEvent(tenant, deviceCode, "SLAVE", reason, MDC.get("traceId"));
+                darwinProducer.sendOfflineEvent(tenant, deviceCode, "SLAVE", device.getDeviceModel(), reason, MDC.get("traceId"));
             }
         } catch (Exception e) {
             log.error("[Offline] 处理异常", e);

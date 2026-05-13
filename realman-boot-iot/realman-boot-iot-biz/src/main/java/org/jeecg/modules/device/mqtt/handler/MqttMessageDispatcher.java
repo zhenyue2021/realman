@@ -42,6 +42,7 @@ import java.util.regex.Pattern;
  *   device/{code}/camera/stream/ack → DeviceCameraStreamResponseHandler.handle()
  *   master/{code}/teleop/associated-device/ack → MasterAssociatedDeviceResponseHandler.handle()
  *   device/{code}/teleop/associated-device/ack → MasterAssociatedDeviceResponseHandler.handle()（同上业务，备用 Topic）
+ *   device/{code}/datacollect/deviceOnline    → DeviceOnlineReportHandler.handle()（设备主动上线上报，更新 DB 并推 MQ）
  *
  *   {code}/master/{action}               → 主控设备原始上报（cmd/states/rtsp/ctrl 等）
  *   {code}/slave/{action}                → 机器人设备原始上报（cmd/states 等）
@@ -87,6 +88,7 @@ public class MqttMessageDispatcher {
     /** darwin.integration.enabled=false 时 Bean 不存在，注入 null，dispatch 时做空判断 */
     @Autowired(required = false)
     private CollectUrlRequestHandler                  collectUrlRequestHandler;
+    private final DeviceOnlineReportHandler           deviceOnlineReportHandler;
 
     /**
      * 分发 MQTT 消息到对应 Handler
@@ -208,6 +210,7 @@ public class MqttMessageDispatcher {
                 else log.warn("[Dispatcher] Darwin 集成未启用，忽略 collectUrlRequest deviceCode={}", deviceCode);
             }
             case DataCollectConstant.MQTT_UP_OSS_ADDRESS_REPORT -> ossAddressReportHandler.handle(deviceCode, payload);
+            case DataCollectConstant.MQTT_UP_DEVICE_ONLINE      -> deviceOnlineReportHandler.handle(deviceCode, payload);
             default -> log.warn("[Dispatcher] 未知路径: {}", topic);
         }
     }
