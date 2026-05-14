@@ -180,11 +180,21 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
     public void submitWorkOrder(String workOrderId, String operator) {
         workOrderStateMachine.submitWorkOrder(workOrderId, operator);
 
-        // Darwin 工单：向机器人下发停止采集指令
         WorkOrder order = this.getById(workOrderId);
-        if (order != null && Integer.valueOf(2).equals(order.getSource())
-                && dataCollectCommandService != null) {
-            sendStopCollect(workOrderId, order);
+        if (order != null && Integer.valueOf(2).equals(order.getSource())) {
+            // 向机器人下发停止采集指令
+            if (dataCollectCommandService != null) {
+                sendStopCollect(workOrderId, order);
+            }
+            // 推送最新工单列表（已提交的工单不在 PENDING/STARTED 中，前端自动感知）
+            WorkOrderDevice robotDevice = workOrderDeviceMapper.selectOne(
+                    new LambdaQueryWrapper<WorkOrderDevice>()
+                            .eq(WorkOrderDevice::getWorkOrderId, workOrderId)
+                            .eq(WorkOrderDevice::getDeviceType, DeviceConstant.DeviceType.ROBOT)
+                            .last("LIMIT 1"));
+            if (robotDevice != null && robotDevice.getDeviceCode() != null) {
+                pushDarwinWorkOrdersForDevice(robotDevice.getDeviceCode());
+            }
         }
     }
 
