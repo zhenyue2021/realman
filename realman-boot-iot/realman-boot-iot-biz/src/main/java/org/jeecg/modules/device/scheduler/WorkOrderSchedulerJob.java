@@ -75,4 +75,14 @@ public class WorkOrderSchedulerJob {
     public void pushStartedWorkOrderJob() {
         workOrderSchedulerService.pushStartedWorkOrders();
     }
+
+    /**
+     * Darwin 活跃工单推送任务：将 PENDING/STARTED 的 Darwin 工单推送给对应机器人设备。
+     *
+     * <p>XXL-Job Handler Name：{@code pushDarwinActiveWorkOrderJob}，建议 Cron：{@code 0 * * * * ?}
+     */
+    @XxlJob("pushDarwinActiveWorkOrderJob")
+    public void pushDarwinActiveWorkOrderJob() {
+        workOrderSchedulerService.pushDarwinActiveWorkOrders();
+    }
 }

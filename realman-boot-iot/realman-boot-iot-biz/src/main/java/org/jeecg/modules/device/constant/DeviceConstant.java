@@ -441,6 +441,8 @@ public interface DeviceConstant {
         String WORK_ORDER_PENDING    = "WORK_ORDER_PENDING";
         /** 工单已开始提醒 */
         String WORK_ORDER_STARTED    = "WORK_ORDER_STARTED";
+        /** Darwin 活跃工单列表（PENDING+STARTED 批量推送给机器人） */
+        String WORK_ORDER_LIST       = "WORK_ORDER_LIST";
         /** 主控当前关联设备信息 */
         String ASSOCIATED_DEVICE_INFO = "ASSOCIATED_DEVICE_INFO";
         /** WebRTC 信令服务已重新启动 */

@@ -48,4 +48,10 @@ public interface IWorkOrderSchedulerService {
      *
      */
     void pushStartedWorkOrders();
+
+    /**
+     * Darwin 活跃工单定时推送：查询所有 Darwin PENDING/STARTED 工单，
+     * 按机器人设备编码通过 WebSocket 推送，设备不在线则跳过。
+     */
+    void pushDarwinActiveWorkOrders();
 }

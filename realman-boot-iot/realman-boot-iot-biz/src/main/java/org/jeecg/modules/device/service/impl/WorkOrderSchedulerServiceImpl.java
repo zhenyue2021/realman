@@ -342,6 +342,55 @@ public class WorkOrderSchedulerServiceImpl implements IWorkOrderSchedulerService
         log.debug("[pushStartedWorkOrders] 推送进行中工单 {} 条", startedOrders.size());
     }
 
+    @Override
+    public void pushDarwinActiveWorkOrders() {
+        List<WorkOrder> orders = workOrderService.list(new LambdaQueryWrapper<WorkOrder>()
+                .in(WorkOrder::getStatus, WorkOrderConstant.ORDER_STATUS.PENDING, WorkOrderConstant.ORDER_STATUS.STARTED)
+                .eq(WorkOrder::getDelFlag, 0));
+        if (orders.isEmpty()) return;
+
+        List<String> orderIds = orders.stream().map(WorkOrder::getId).distinct().toList();
+        List<WorkOrderDevice> robotDevices = workOrderDeviceMapper.selectList(
+                new LambdaQueryWrapper<WorkOrderDevice>()
+                        .in(WorkOrderDevice::getWorkOrderId, orderIds)
+                        .eq(WorkOrderDevice::getDeviceType, DeviceConstant.DeviceType.ROBOT));
+        if (robotDevices.isEmpty()) return;
+
+        // workOrderId -> robotCode（同一工单多条取第一条）
+        Map<String, String> robotCodeByOrderId = robotDevices.stream()
+                .filter(d -> d.getWorkOrderId() != null && d.getDeviceCode() != null)
+                .collect(Collectors.toMap(
+                        WorkOrderDevice::getWorkOrderId,
+                        WorkOrderDevice::getDeviceCode,
+                        (a, b) -> a));
+
+        // robotCode -> 该机器人的工单列表
+        Map<String, List<WorkOrder>> ordersByRobot = orders.stream()
+                .filter(o -> robotCodeByOrderId.containsKey(o.getId()))
+                .collect(Collectors.groupingBy(o -> robotCodeByOrderId.get(o.getId())));
+
+        int pushed = 0, skippedOffline = 0;
+        for (Map.Entry<String, List<WorkOrder>> entry : ordersByRobot.entrySet()) {
+            String robotCode = entry.getKey();
+            boolean online = Boolean.TRUE.equals(
+                    redisTemplate.opsForSet().isMember(DeviceConstant.RedisKey.DEVICE_ONLINE_SET, robotCode));
+            if (!online) {
+                skippedOffline++;
+                continue;
+            }
+            try {
+                String listJson = objectMapper.writeValueAsString(entry.getValue());
+                webSocketServer.pushDarwinWorkOrderList(robotCode, listJson);
+                pushed++;
+            } catch (Exception e) {
+                log.warn("[Darwin-WorkOrderPush] 推送失败 robotCode={}", robotCode, e);
+            }
+        }
+        if (pushed > 0 || skippedOffline > 0) {
+            log.info("[Darwin-WorkOrderPush] 已推送 {} 台机器人，离线跳过 {} 台", pushed, skippedOffline);
+        }
+    }
+
     /**
      * 将 "HH:mm:ss" 格式字符串解析为总秒数。
      * <p>格式不合法或为空时返回 defaultSeconds。
