@@ -49,7 +49,8 @@ public class OssAddressReportHandler {
                     deviceCode, payload, e);
             return;
         }
-
+        log.info("[DataCollect] 收到 ossAdressReport deviceCode={} payload={}",
+                deviceCode, payload);
         OssAddressReportMsg.OssInfo oss = msg.getOss();
         if (oss == null || oss.getAddress() == null || oss.getList() == null || oss.getList().isEmpty()) {
             log.warn("[DataCollect] ossAdressReport 消息不合法（oss/address/list 为空） deviceCode={}", deviceCode);
