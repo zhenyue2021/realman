@@ -267,7 +267,14 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
             return;
         }
         try {
-            dataCollectCommandService.sendStopCollect(robotDevice.getDeviceCode(), workOrderId, null);
+            StopCollectCmd.CollectParams params = StopCollectCmd.CollectParams.builder()
+                    .primarySceneEn(order.getLevel1SceneNameEn())
+                    .secondarySceneEn(order.getLevel2SceneNameEn())
+                    .collectionItemNameEn(order.getCollectionItemNameEn())
+                    .operatorName(order.getOperatorName())
+                    .tenantId(order.getTenantId())
+                    .build();
+            dataCollectCommandService.sendStopCollect(robotDevice.getDeviceCode(), workOrderId, params);
             log.info("[Darwin] 停止采集指令已下发 workOrderId={} robotCode={}", workOrderId, robotDevice.getDeviceCode());
         } catch (Exception e) {
             log.warn("[Darwin] 停止采集指令下发失败 workOrderId={}", workOrderId, e);
