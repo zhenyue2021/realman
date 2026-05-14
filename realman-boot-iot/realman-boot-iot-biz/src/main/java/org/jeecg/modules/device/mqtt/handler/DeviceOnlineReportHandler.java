@@ -69,8 +69,8 @@ public class DeviceOnlineReportHandler {
         // 同步设备信息到 DB
         updateDeviceFields(device, report);
         deviceMapper.updateById(device);
-        log.info("[DeviceOnlineReport] 设备信息已同步 deviceCode={} model={} version={}",
-                deviceCode, device.getDeviceModel(), device.getFirmwareVersion());
+        log.info("[DeviceOnlineReport] 设备信息已同步 deviceCode={} payload={}",
+                deviceCode, payload);
 
         // 仅机器人设备推送上线 MQ 事件
         if (deviceStatusProducer != null

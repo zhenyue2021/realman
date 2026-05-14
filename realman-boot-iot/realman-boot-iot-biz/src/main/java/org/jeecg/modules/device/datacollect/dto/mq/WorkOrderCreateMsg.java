@@ -10,6 +10,8 @@ public class WorkOrderCreateMsg {
 
     private String traceId;
     private String tenant;
+    /** 执行该工单的机器人设备编码（对应 iot_device.device_code），用于写入 work_order_device */
+    private String deviceCode;
     private List<WorkOrderItem> data;
 
     @Data

@@ -402,13 +402,22 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
     @Transactional(rollbackFor = Exception.class)
     public WorkOrder upsertWorkOrderFromDarwin(String workOrderId, String tenant,
                                                WorkOrderCreateMsg.WorkOrderItem item,
-                                               String traceId) {
+                                               String traceId, String deviceCode) {
         WorkOrder existing = this.getById(workOrderId);
+        WorkOrder result;
         if (existing != null) {
-            return updateFromDarwin(existing, tenant, item);
+            result = updateFromDarwin(existing, tenant, item);
+            // 仅在实际执行了更新（非 STARTED/SUBMITTED/COMPLETED 跳过）时重新绑定设备
+            if (!WorkOrderConstant.ORDER_STATUS.STARTED.equals(existing.getStatus())
+                    && !WorkOrderConstant.ORDER_STATUS.SUBMITTED.equals(existing.getStatus())
+                    && !WorkOrderConstant.ORDER_STATUS.COMPLETED.equals(existing.getStatus())) {
+                bindRobotDevice(workOrderId, deviceCode);
+            }
         } else {
-            return createFromDarwin(workOrderId, tenant, item);
+            result = createFromDarwin(workOrderId, tenant, item);
+            bindRobotDevice(workOrderId, deviceCode);
         }
+        return result;
     }
 
     private WorkOrder createFromDarwin(String workOrderId, String tenant,
@@ -447,6 +456,36 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
         this.updateById(order);
         log.info("[Darwin] 工单更新完成 workOrderId={} status={} → {}", order.getId(), status, order.getStatus());
         return order;
+    }
+
+    /**
+     * 将机器人设备绑定到工单（ROBOT 类型）。
+     * 先删除该工单已有的 ROBOT 绑定再插入，保证幂等；CONTROLLER 绑定不受影响。
+     */
+    private void bindRobotDevice(String workOrderId, String deviceCode) {
+        if (deviceCode == null || deviceCode.isBlank()) {
+            log.warn("[Darwin] deviceCode 为空，跳过设备绑定 workOrderId={}", workOrderId);
+            return;
+        }
+        IotDevice robot = iotDeviceMapper.selectOne(
+                new LambdaQueryWrapper<IotDevice>().eq(IotDevice::getDeviceCode, deviceCode));
+        if (robot == null) {
+            log.warn("[Darwin] 机器人设备不存在，跳过绑定 deviceCode={} workOrderId={}", deviceCode, workOrderId);
+            return;
+        }
+        // 删除旧的 ROBOT 绑定（CONTROLLER 绑定保留）
+        workOrderDeviceMapper.delete(new LambdaQueryWrapper<WorkOrderDevice>()
+                .eq(WorkOrderDevice::getWorkOrderId, workOrderId)
+                .eq(WorkOrderDevice::getDeviceType, DeviceConstant.DeviceType.ROBOT));
+        WorkOrderDevice wd = new WorkOrderDevice();
+        wd.setWorkOrderId(workOrderId);
+        wd.setDeviceCode(robot.getDeviceCode());
+        wd.setDeviceId(robot.getId());
+        wd.setDeviceName(robot.getDeviceName());
+        wd.setDeviceType(DeviceConstant.DeviceType.ROBOT);
+        wd.setCreateTime(LocalDateTime.now());
+        workOrderDeviceMapper.insert(wd);
+        log.info("[Darwin] 机器人设备绑定成功 workOrderId={} deviceCode={}", workOrderId, deviceCode);
     }
 
     /** 将 Darwin 消息字段写入 WorkOrder 对象（新建/更新共用） */
@@ -507,7 +546,7 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
         StringBuilder sb = new StringBuilder();
         List<WorkOrderCreateMsg.Action> actions = item.getActions();
         for (int i = 0; i < actions.size(); i++) {
-            if (i > 0) sb.append("，");
+            if (i > 0) sb.append("teleop");
             sb.append(i + 1).append(".").append(actions.get(i).getName());
         }
         return sb.toString();
