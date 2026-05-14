@@ -63,9 +63,11 @@ public interface IWorkOrderService extends IService<WorkOrder> {
     /**
      * 达尔文平台工单 upsert：workOrderId（外层 id）不存在时新建，已存在时更新。
      * workOrderId 即达尔文工单 ID，直接用作 work_order 表主键。
+     * deviceCode 为执行该工单的机器人设备编码，写入 work_order_device（ROBOT 类型）。
      */
     WorkOrder upsertWorkOrderFromDarwin(String workOrderId, String tenant,
-                                        WorkOrderCreateMsg.WorkOrderItem item, String traceId);
+                                        WorkOrderCreateMsg.WorkOrderItem item, String traceId,
+                                        String deviceCode);
 
     /**
      * 达尔文侧删除工单（deleted=true）：按 workOrderId（= work_order.id）软删除。

@@ -64,7 +64,8 @@ public class WorkOrderCreateConsumer implements RocketMQListener {
                     if ("true".equalsIgnoreCase(item.getDeleted())) {
                         workOrderService.deleteWorkOrderFromDarwin(item.getId());
                     } else {
-                        workOrderService.upsertWorkOrderFromDarwin(item.getId(), tenant, item, dto.getTraceId());
+                        workOrderService.upsertWorkOrderFromDarwin(
+                                item.getId(), tenant, item, dto.getTraceId(), dto.getDeviceCode());
                     }
                 } catch (Exception e) {
                     log.error("[DataCollect] 工单处理失败 workOrderId={}", item.getId(), e);
