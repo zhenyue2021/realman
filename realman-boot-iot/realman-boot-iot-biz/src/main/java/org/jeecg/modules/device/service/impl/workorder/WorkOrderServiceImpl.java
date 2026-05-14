@@ -538,6 +538,42 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
         log.info("[Darwin] 工单删除完成 workOrderId={}", workOrderId);
     }
 
+    @Override
+    public void pushDarwinWorkOrdersForDevice(String deviceCode) {
+        if (deviceCode == null || deviceCode.isBlank()) return;
+
+        // 仅对机器人设备推送，非 ROBOT 类型直接跳过
+        IotDevice device = iotDeviceMapper.selectOne(
+                new LambdaQueryWrapper<IotDevice>().eq(IotDevice::getDeviceCode, deviceCode));
+        if (device == null || DeviceConstant.DeviceTypeInteger.ROBOT != device.getDeviceType()) return;
+
+        List<WorkOrderDevice> robotBindings = workOrderDeviceMapper.selectList(
+                new LambdaQueryWrapper<WorkOrderDevice>()
+                        .eq(WorkOrderDevice::getDeviceCode, deviceCode)
+                        .eq(WorkOrderDevice::getDeviceType, DeviceConstant.DeviceType.ROBOT));
+        if (robotBindings.isEmpty()) return;
+
+        List<String> orderIds = robotBindings.stream()
+                .map(WorkOrderDevice::getWorkOrderId).distinct().toList();
+
+        List<WorkOrder> orders = this.list(new LambdaQueryWrapper<WorkOrder>()
+                .in(WorkOrder::getId, orderIds)
+                .in(WorkOrder::getStatus, WorkOrderConstant.ORDER_STATUS.PENDING, WorkOrderConstant.ORDER_STATUS.STARTED)
+//                .eq(WorkOrder::getSource, 2)
+                .eq(WorkOrder::getDelFlag, 0)
+                .orderByAsc(WorkOrder::getPlanStartTime));
+        if (orders.isEmpty()) return;
+
+        try {
+            String listJson = objectMapper.writeValueAsString(orders);
+            deviceWebSocketServer.pushDarwinWorkOrderList(deviceCode, listJson);
+        } catch (Exception e) {
+            log.warn("[Darwin] 推送工单列表失败 deviceCode={}", deviceCode, e);
+            return;
+        }
+        log.info("[Darwin] 已批量推送工单 {} 条至 deviceCode={}", orders.size(), deviceCode);
+    }
+
     /** actions 格式化为 "1.xxx，2.xxx，3.xxx" */
     private static String formatTaskDesc(WorkOrderCreateMsg.CollectionItem item) {
         if (item == null || item.getActions() == null || item.getActions().isEmpty()) {

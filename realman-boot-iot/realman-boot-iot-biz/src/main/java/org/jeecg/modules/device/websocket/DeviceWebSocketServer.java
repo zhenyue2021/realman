@@ -227,6 +227,18 @@ public class DeviceWebSocketServer implements MessageListener {
     }
 
     /**
+     * 批量推送 Darwin 活跃工单列表给机器人设备（连接时触发 / 定时任务轮询）。
+     *
+     * <p>data 为工单对象数组，前端用 type=WORK_ORDER_LIST 统一处理，无需区分单条状态。
+     *
+     * @param robotCode      机器人 deviceCode
+     * @param workOrdersJson 工单数组 JSON（已序列化的 JSON array 字符串）
+     */
+    public void pushDarwinWorkOrderList(String robotCode, String workOrdersJson) {
+        redisPublish(robotCode, buildMsg(DeviceConstant.WebSocketType.WORK_ORDER_LIST, robotCode, workOrdersJson));
+    }
+
+    /**
      * 推送主控"当前关联设备信息"（登录后触发查询）
      *
      * <p>只推送给该主控设备（device_type=2）的订阅者。

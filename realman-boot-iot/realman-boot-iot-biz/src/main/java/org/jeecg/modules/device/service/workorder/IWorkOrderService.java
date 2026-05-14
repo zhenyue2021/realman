@@ -74,5 +74,11 @@ public interface IWorkOrderService extends IService<WorkOrder> {
      * 幂等：不存在时静默跳过。
      */
     void deleteWorkOrderFromDarwin(String workOrderId);
+
+    /**
+     * 将 Darwin 的 PENDING 和 STARTED 工单通过 WebSocket 推送给指定机器人设备。
+     * 设备无 Darwin 工单时静默返回。
+     */
+    void pushDarwinWorkOrdersForDevice(String deviceCode);
 }
 
