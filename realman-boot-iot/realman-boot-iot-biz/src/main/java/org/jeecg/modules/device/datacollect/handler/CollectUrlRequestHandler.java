@@ -41,7 +41,8 @@ public class CollectUrlRequestHandler {
                     deviceCode, payload, e);
             return;
         }
-
+        log.info("[DataCollect] 收到 collectUrlRequest deviceCode={} payload={}",
+                deviceCode, payload);
         if (msg.getRequestId() == null || msg.getRequestId().isBlank()) {
             log.warn("[DataCollect] collectUrlRequest 缺少 requestId deviceCode={}", deviceCode);
             return;

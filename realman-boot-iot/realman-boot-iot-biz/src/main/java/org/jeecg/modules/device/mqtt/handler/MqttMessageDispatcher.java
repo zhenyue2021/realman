@@ -1,5 +1,6 @@
 package org.jeecg.modules.device.mqtt.handler;
 
+import cn.hutool.core.util.IdUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.paho.mqttv5.common.MqttMessage;
@@ -106,7 +107,7 @@ public class MqttMessageDispatcher {
         // P2 链路追踪：从 MQTT 5 User Properties 提取 traceId，或生成新的
         String traceId = extractTraceId(message);
         if (!StringUtils.hasText(traceId)) {
-            traceId = "mqtt-" + UUID.randomUUID().toString().replace("-", "");
+            traceId = "mqtt-" + IdUtil.fastSimpleUUID();
         }
         MDC.put(TraceIdConst.MDC_TRACE_ID, traceId);
         MDC.put(TraceIdConst.MDC_SPAN_ID,  generateSpanId());
