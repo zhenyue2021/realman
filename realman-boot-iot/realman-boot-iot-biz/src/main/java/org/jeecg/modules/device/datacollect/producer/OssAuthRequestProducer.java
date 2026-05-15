@@ -39,6 +39,7 @@ public class OssAuthRequestProducer {
                 .tenant(tenant)
                 .deviceCode(deviceCode)
                 .traceId(traceId)
+                .requestId(requestId)
                 .eventTime(System.currentTimeMillis())
                 .data(OssAuthRequestMsg.MsgData.builder()
                         .requestId(requestId)
