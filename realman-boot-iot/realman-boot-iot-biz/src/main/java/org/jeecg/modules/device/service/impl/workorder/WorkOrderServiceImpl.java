@@ -19,6 +19,7 @@ import org.jeecg.modules.device.mapper.IotDeviceMapper;
 import org.jeecg.modules.device.mapper.workorder.WorkOrderComplianceConfigMapper;
 import org.jeecg.modules.device.mapper.workorder.WorkOrderDeviceMapper;
 import org.jeecg.modules.device.datacollect.dto.mqtt.StartCollectCmd;
+import org.jeecg.modules.device.feign.SysAuthFeignClient;
 import org.jeecg.modules.device.datacollect.dto.mqtt.StopCollectCmd;
 import org.jeecg.modules.device.datacollect.service.DataCollectCommandService;
 import org.jeecg.modules.device.mapper.workorder.WorkOrderMapper;
@@ -50,6 +51,8 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
     /** darwin.integration.enabled=false 时 Bean 不存在，启动时注入 null，调用前做空判断 */
     @Autowired(required = false)
     private DataCollectCommandService dataCollectCommandService;
+    @Autowired(required = false)
+    private SysAuthFeignClient sysAuthFeignClient;
 
     @Override
     public IPage<WorkOrder> pageWorkOrders(Page<WorkOrder> page, String agentId, String status) {
@@ -515,6 +518,8 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
         order.setTaskDesc(formatTaskDesc(item.getCollectionItem()));
         order.setQuotaTotal(parseQuota(item.getQuotaValue()));
         order.setTenantId(tenant);
+        order.setAgentId(tenant);
+        order.setAgentName(resolveTenantName(tenant));
         WorkOrderCreateMsg.CollectionItem ci = item.getCollectionItem();
         if (ci != null) {
             order.setCollectionItemNameEn(ci.getNameEn());
@@ -612,6 +617,19 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
         } catch (Exception e) {
             log.warn("[Darwin] 日期时间解析失败 value={}", value);
             return null;
+        }
+    }
+
+    private String resolveTenantName(String tenantId) {
+        if (tenantId == null || tenantId.isBlank() || sysAuthFeignClient == null) {
+            return tenantId;
+        }
+        try {
+            String name = sysAuthFeignClient.getTenantNameById(tenantId);
+            return (name != null && !name.isBlank()) ? name : tenantId;
+        } catch (Exception e) {
+            log.warn("[Darwin] 查询租户名称失败 tenantId={}", tenantId, e);
+            return tenantId;
         }
     }
 
