@@ -21,6 +21,7 @@ import org.jeecg.modules.device.mapper.workorder.WorkOrderDeviceMapper;
 import org.jeecg.modules.device.datacollect.dto.mqtt.StartCollectCmd;
 import org.jeecg.modules.device.feign.SysAuthFeignClient;
 import org.jeecg.modules.device.datacollect.dto.mqtt.StopCollectCmd;
+import org.jeecg.modules.device.datacollect.config.DataCollectIntegrationProperties;
 import org.jeecg.modules.device.datacollect.service.DataCollectCommandService;
 import org.jeecg.modules.device.mapper.workorder.WorkOrderMapper;
 import org.jeecg.modules.device.service.workorder.IWorkOrderService;
@@ -48,6 +49,7 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
     private final DeviceWebSocketServer deviceWebSocketServer;
     private final IWorkOrderStateMachineService workOrderStateMachine;
     private final IotDeviceMapper iotDeviceMapper;
+    private final DataCollectIntegrationProperties darwinProps;
     /** darwin.integration.enabled=false 时 Bean 不存在，启动时注入 null，调用前做空判断 */
     @Autowired(required = false)
     private DataCollectCommandService dataCollectCommandService;
@@ -520,6 +522,8 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
         order.setTenantId(tenant);
         order.setAgentId(tenant);
         order.setAgentName(resolveTenantName(tenant));
+        order.setDepartmentId(darwinProps.getDefaultDepartmentId());
+        order.setDepartmentName(darwinProps.getDefaultDepartmentName());
         WorkOrderCreateMsg.CollectionItem ci = item.getCollectionItem();
         if (ci != null) {
             order.setCollectionItemNameEn(ci.getNameEn());

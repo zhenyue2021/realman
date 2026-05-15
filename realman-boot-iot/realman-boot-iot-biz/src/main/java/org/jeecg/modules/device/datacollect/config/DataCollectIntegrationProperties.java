@@ -13,6 +13,11 @@ public class DataCollectIntegrationProperties {
 
     private boolean enabled = false;
 
+    /** Darwin 工单默认部门 ID，写入 work_order.department_id */
+    private String defaultDepartmentId = "";
+    /** Darwin 工单默认代理商名称，写入 work_order.department_name */
+    private String defaultDepartmentName = "";
+
     private FileUpload fileUpload = new FileUpload();
 
     @Data
