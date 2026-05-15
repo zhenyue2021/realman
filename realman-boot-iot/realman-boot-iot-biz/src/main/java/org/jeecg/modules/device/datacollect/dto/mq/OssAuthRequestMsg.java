@@ -13,6 +13,7 @@ public class OssAuthRequestMsg {
     private String traceId;
     private long eventTime;
     private MsgData data;
+    private String requestId;
 
     @Data
     @Builder

@@ -52,9 +52,9 @@ public class OssAuthResponseConsumer implements RocketMQListener {
             log.error("[DataCollect] OSS授权响应反序列化失败 payload={}", message, e);
             return ConsumeResult.SUCCESS;
         }
-
+        String requestId = resp.getRequestId();
         OssAuthResponseMsg.MsgData data = resp.getData();
-        if (data == null || data.getRequestId() == null || data.getRequestId().isBlank()) {
+        if (data == null || requestId == null || requestId.isBlank()) {
             log.error("[DataCollect] OSS授权响应缺少 data 或 requestId");
             return ConsumeResult.SUCCESS;
         }
@@ -64,39 +64,29 @@ public class OssAuthResponseConsumer implements RocketMQListener {
         }
 
         try {
-            String redisKey = DataCollectConstant.REDIS_OSS_REQUEST_PREFIX + data.getRequestId();
-            String deviceCode = redisTemplate.opsForValue().get(redisKey);
-            if (deviceCode == null) {
-                log.warn("[DataCollect] 未找到 requestId 对应设备，可能已超时或重复处理 requestId={}",
-                        data.getRequestId());
-                return ConsumeResult.SUCCESS;
+            // 优先使用消息体中的 deviceCode，Redis 反查作为兜底（requestId 与 MQTT 请求对应）
+            String deviceCode = resp.getDeviceCode();
+            String redisKey = DataCollectConstant.REDIS_OSS_REQUEST_PREFIX + requestId;
+            if (deviceCode == null || deviceCode.isBlank()) {
+                deviceCode = redisTemplate.opsForValue().get(redisKey);
             }
-            // 原子消费，防止多节点重复下发
             redisTemplate.delete(redisKey);
 
+            if (deviceCode == null || deviceCode.isBlank()) {
+                log.warn("[DataCollect] 未找到 requestId 对应设备，可能已超时或重复处理 requestId={}",
+                        requestId);
+                return ConsumeResult.SUCCESS;
+            }
+
+            // 授权失败：设备会自动重试，无需下发通知
             if (!data.isSuccess()) {
-                log.warn("[DataCollect] 数采平台 OSS 授权失败 requestId={} errorCode={} errorMsg={}",
-                        data.getRequestId(), data.getErrorCode(), data.getErrorMsg());
-                if (commandService != null) {
-                    CollectUrlResponseCmd errCmd = CollectUrlResponseCmd.builder()
-                            .requestId(data.getRequestId())
-                            .timestamp(System.currentTimeMillis())
-                            .deviceSn(deviceCode)
-                            .code(400)
-                            .message(data.getErrorMsg() != null ? data.getErrorMsg() : "OSS授权失败")
-                            .params(null)
-                            .build();
-                    commandService.sendCollectUrlResponse(deviceCode, errCmd);
-                    log.info("[DataCollect] OSS授权失败响应已下发至机器人 requestId={} deviceCode={}",
-                            data.getRequestId(), deviceCode);
-                } else {
-                    log.warn("[DataCollect] MQTT未启用，跳过OSS授权失败响应下发 requestId={}", data.getRequestId());
-                }
+                log.warn("[DataCollect] 数采平台 OSS 授权失败，设备将自动重试 requestId={} deviceCode={} errorCode={} errorMsg={}",
+                        requestId, deviceCode, data.getErrorCode(), data.getErrorMsg());
                 return ConsumeResult.SUCCESS;
             }
 
             CollectUrlResponseCmd cmd = CollectUrlResponseCmd.builder()
-                    .requestId(data.getRequestId())
+                    .requestId(requestId)
                     .timestamp(System.currentTimeMillis())
                     .deviceSn(deviceCode)
                     .code(0)
@@ -115,14 +105,14 @@ public class OssAuthResponseConsumer implements RocketMQListener {
             if (commandService != null) {
                 commandService.sendCollectUrlResponse(deviceCode, cmd);
                 log.info("[DataCollect] STS凭证已下发至机器人 requestId={} deviceCode={}",
-                        data.getRequestId(), deviceCode);
+                        requestId, deviceCode);
             } else {
-                log.warn("[DataCollect] MQTT未启用，跳过STS凭证MQTT下发 requestId={}", data.getRequestId());
+                log.warn("[DataCollect] MQTT未启用，跳过STS凭证MQTT下发 requestId={}", requestId);
             }
             return ConsumeResult.SUCCESS;
 
         } catch (Exception e) {
-            log.error("[DataCollect] 处理 OSS 授权响应失败 requestId={}", data.getRequestId(), e);
+            log.error("[DataCollect] 处理 OSS 授权响应失败 requestId={}", requestId, e);
             return ConsumeResult.FAILURE;
         } finally {
             MDC.remove("traceId");
