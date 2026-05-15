@@ -52,18 +52,17 @@ public class OssAddressReportHandler {
         log.info("[DataCollect] 收到 ossAdressReport deviceCode={} payload={}",
                 deviceCode, payload);
         OssAddressReportMsg.OssInfo oss = msg.getOss();
-        if (oss == null || oss.getAddress() == null || oss.getList() == null || oss.getList().isEmpty()) {
-            log.warn("[DataCollect] ossAdressReport 消息不合法（oss/address/list 为空） deviceCode={}", deviceCode);
+        if (oss == null || oss.getAddress() == null || oss.getBusinessKey() == null || oss.getList() == null || oss.getList().isEmpty()) {
+            log.warn("[DataCollect] ossAdressReport 消息不合法（oss/address/businessKey/list 为空） deviceCode={}", deviceCode);
             return;
         }
-
-        // 去重：deviceCode + ossAddress 组合，防机器人因网络重发导致重复上报
+        String businessKey = oss.getBusinessKey();
+        // 去重：deviceCode + businessKey 组合，防机器人因网络重发导致重复上报
         String dedupKey = DataCollectConstant.REDIS_REPORT_DEDUP_PREFIX
-                + deviceCode + ":" + oss.getAddress();
+                + deviceCode + ":" + businessKey;
         Boolean isNew = redisTemplate.opsForValue().setIfAbsent(dedupKey, "1", 24, TimeUnit.HOURS);
         if (Boolean.FALSE.equals(isNew)) {
-            log.info("[DataCollect] ossAdressReport 重复上报，跳过 deviceCode={} address={}",
-                    deviceCode, oss.getAddress());
+            log.info("[DataCollect] ossAdressReport 重复上报，跳过 deviceCode={} businessKey={}", deviceCode, businessKey);
             return;
         }
 
