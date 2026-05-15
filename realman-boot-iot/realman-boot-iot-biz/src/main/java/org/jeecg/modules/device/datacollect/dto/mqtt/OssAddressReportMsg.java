@@ -14,6 +14,7 @@ public class OssAddressReportMsg {
     @Data
     public static class OssInfo {
         private String address;
+        private String businessKey;
         private List<String> list;
     }
 }
