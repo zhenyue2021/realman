@@ -4,8 +4,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.rocketmq.client.core.RocketMQClientTemplate;
+import org.apache.rocketmq.client.support.RocketMQHeaders;
 import org.jeecg.modules.device.datacollect.constant.DataCollectConstant;
 import org.jeecg.modules.device.datacollect.dto.mq.FileAddressReportMsg;
+import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -40,7 +42,10 @@ public class FileAddressReportProducer {
         String destination = DataCollectConstant.MQ_TOPIC_FILE_REPORT
                 + ":" + DataCollectConstant.MQ_TAG_REPORT;
         try {
-            rocketMQClientTemplate.syncSendNormalMessage(destination, objectMapper.writeValueAsString(msg));
+            var springMessage = MessageBuilder.withPayload(objectMapper.writeValueAsString(msg))
+                    .setHeader(RocketMQHeaders.KEYS, deviceCode)
+                    .build();
+            rocketMQClientTemplate.syncSendNormalMessage(destination, springMessage);
             log.info("[DataCollect] OSS地址已上报至数采平台 deviceCode={} fileCount={}",
                     deviceCode, fileList != null ? fileList.size() : 0);
         } catch (Exception e) {

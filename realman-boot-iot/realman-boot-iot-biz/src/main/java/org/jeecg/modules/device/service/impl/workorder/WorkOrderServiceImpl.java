@@ -425,6 +425,18 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
     public WorkOrder upsertWorkOrderFromDarwin(String workOrderId, String tenant,
                                                WorkOrderCreateMsg.WorkOrderItem item,
                                                String traceId, String deviceCode) {
+        // 设备不存在时忽略该工单，避免写入无法绑定的孤立工单
+        if (deviceCode == null || deviceCode.isBlank()) {
+            log.warn("[Darwin] deviceCode 为空，忽略工单 workOrderId={}", workOrderId);
+            return null;
+        }
+        IotDevice robot = iotDeviceMapper.selectOne(
+                new LambdaQueryWrapper<IotDevice>().eq(IotDevice::getDeviceCode, deviceCode));
+        if (robot == null) {
+            log.warn("[Darwin] 设备不存在，忽略工单 workOrderId={} deviceCode={}", workOrderId, deviceCode);
+            return null;
+        }
+
         WorkOrder existing = this.getById(workOrderId);
         WorkOrder result;
         if (existing != null) {

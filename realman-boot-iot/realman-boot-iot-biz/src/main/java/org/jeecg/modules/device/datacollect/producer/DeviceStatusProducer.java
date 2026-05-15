@@ -4,9 +4,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.rocketmq.client.core.RocketMQClientTemplate;
+import org.apache.rocketmq.client.support.RocketMQHeaders;
 import org.jeecg.modules.device.datacollect.constant.DataCollectConstant;
 import org.jeecg.modules.device.datacollect.dto.mq.DeviceStatusMsg;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.stereotype.Component;
 
 @Slf4j
@@ -47,7 +49,10 @@ public class DeviceStatusProducer {
         try {
             String destination = DataCollectConstant.MQ_TOPIC_DEVICE_STATUS
                     + ":" + DataCollectConstant.MQ_TAG_DEVICE_STATUS;
-            rocketMQClientTemplate.syncSendNormalMessage(destination, objectMapper.writeValueAsString(msg));
+            var springMessage = MessageBuilder.withPayload(objectMapper.writeValueAsString(msg))
+                    .setHeader(RocketMQHeaders.KEYS, deviceCode)
+                    .build();
+            rocketMQClientTemplate.syncSendNormalMessage(destination, springMessage);
             log.info("[DataCollect] 设备状态推送成功 deviceCode={} event={}", deviceCode, eventType);
         } catch (Exception e) {
             log.warn("[DataCollect] 设备状态推送失败 deviceCode={} event={}", deviceCode, eventType, e);
