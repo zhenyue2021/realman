@@ -177,7 +177,13 @@ public class DeviceOnlineOfflineHandler {
 
     /**
      * 从 Topic 路径中提取 clientId
+     * 从 Payload 或 Topic 中提取 deviceCode。
      *
+     *
+     * <p>优先使用 Payload 中的 {@code username} 字段，因为设备 clientId 可能带有
+     * "iot-platform-" 前缀（与平台服务账号过滤规则冲突），而 username 就是设备编码本身。
+     * 平台服务账号的 username 为 "iot-platform"，仍可被上层过滤拦截。
+     * <p>
      * <p>EMQX $SYS Topic 格式：$SYS/brokers/{node}/clients/{clientId}/connected
      * 优先从 Topic 的 "clients" 后一段提取，若失败则降级解析 Payload 的 "clientid" 字段。
      *
@@ -186,6 +192,12 @@ public class DeviceOnlineOfflineHandler {
      * @return clientId（即 deviceCode），提取失败返回 null
      */
     private String extractClientId(String topic, String payload) {
+        // 优先从 Payload 取 username（= deviceCode），避免 clientId 前缀干扰
+        String username = extractField(payload, "username");
+        if (username != null && !username.isBlank() && !"unknown".equals(username)) {
+            return username;
+        }
+        // 降级：从 Topic 路径 $SYS/.../clients/{clientId}/... 中提取
         String[] parts = topic.split("/");
         for (int i = 0; i < parts.length; i++) {
             if ("clients".equals(parts[i]) && i + 1 < parts.length) return parts[i + 1];
