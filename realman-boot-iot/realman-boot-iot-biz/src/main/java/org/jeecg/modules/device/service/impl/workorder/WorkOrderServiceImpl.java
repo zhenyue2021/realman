@@ -186,9 +186,9 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
         workOrderStateMachine.submitWorkOrder(workOrderId, operator);
 
         WorkOrder order = this.getById(workOrderId);
-        if (order != null && Integer.valueOf(2).equals(order.getSource())) {
+        if (order != null) {
             // 向机器人下发停止采集指令
-            if (dataCollectCommandService != null) {
+            if (dataCollectCommandService != null && Integer.valueOf(2).equals(order.getSource())) {
                 sendStopCollect(workOrderId, order);
             }
             // 推送最新工单列表（已提交的工单不在 PENDING/STARTED 中，前端自动感知）

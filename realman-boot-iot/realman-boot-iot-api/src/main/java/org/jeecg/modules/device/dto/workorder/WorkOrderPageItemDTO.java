@@ -74,6 +74,7 @@ public class WorkOrderPageItemDTO {
     private LocalDateTime closeTime;
 
     private String closeReason;
+    private String source;
 
     private String createBy;
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
