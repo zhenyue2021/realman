@@ -80,7 +80,7 @@ public class YouBianCodeUtil {
 	 * @return
 	 */
 	public static synchronized String getSubYouBianCode(String parentCode,String localCode) {
-		if(localCode!=null && localCode!=""){
+		if (oConvertUtils.isNotEmpty(localCode)) {
 
 //			return parentCode + getNextYouBianCode(localCode);
 			return getNextYouBianCode(localCode);

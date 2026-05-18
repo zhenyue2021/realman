@@ -233,4 +233,5 @@ public class DeviceOnlineOfflineHandler {
         }
         return device;
     }
+
 }
