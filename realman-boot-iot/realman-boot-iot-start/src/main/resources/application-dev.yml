@@ -59,6 +59,36 @@ mybatis-plus:
       logic-delete-value: 1
       logic-not-delete-value: 0
 
+# RocketMQ（阿里云消息队列 RocketMQ 版 5.x，实例 rmq-cn-jjw4iubgh07，北京区域）
+# 使用 rocketmq-v5-client-spring-boot-starter，通过 gRPC 端点（:8080）连接
+rocketmq:
+  producer:
+    endpoints: rmq-cn-jjw4iubgh07.cn-beijing.rmq.aliyuncs.com:8080
+    namespace: rmq-cn-jjw4iubgh07
+    access-key: MnZdSW6d1U3r1spP
+    secret-key: 8scK0fvHum30JA44
+    topic: daily_GLN_PLATFORM
+    ssl-enabled: true
+    max-attempts: 3
+    request-timeout: 3
+  push-consumer:
+    endpoints: rmq-cn-jjw4iubgh07.cn-beijing.rmq.aliyuncs.com:8080
+    namespace: rmq-cn-jjw4iubgh07
+    access-key: MnZdSW6d1U3r1spP
+    secret-key: 8scK0fvHum30JA44
+
+# 设为 true 时加载 Darwin RocketMQ Bean；未部署 RocketMQ 时请保持 false 或使用环境变量覆盖
+darwin:
+  integration:
+    enabled: true
+    default-department-id: "1958496759810363394"
+    default-agent-name: "城市运营管理集团有限公司"
+    file-upload:
+      upload-url-prefix: ${DARWIN_UPLOAD_URL_PREFIX:http://172.16.44.66:8085/realman-iot}
+      upload-bucket: darwin-files
+      max-file-size-mb: 50
+      url-expire-days: 7
+
 # mqtt
 mqtt:
   enabled: false  # 临时禁用，避免启动失败
@@ -93,7 +123,7 @@ xxl:
 
 jeecg:
   shiro:
-    excludeUrls: /internal/mqtt/**,/api/device/**,/api/ota/**
+    excludeUrls: /internal/mqtt/**,/api/ota/**
 
 device:
   encrypt:

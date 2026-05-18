@@ -58,6 +58,9 @@ public class RobotDeviceController {
     @PostMapping("/add")
     @Operation(summary = "新增机器人设备")
     public ApiResult<RobotDevicePageItemDTO> addDevice(@Valid @RequestBody DeviceAddDTO dto) {
+        if (dto.getDeviceModel() == null || dto.getDeviceModel().isBlank()) {
+            return ApiResult.fail("设备型号不能为空");
+        }
         IotDevice d = new IotDevice();
         d.setDeviceCode(dto.getDeviceCode());
         d.setDeviceName(dto.getDeviceName());

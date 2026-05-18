@@ -82,14 +82,15 @@ public class DeviceStatusHandler {
         // 5. 同步更新 DB 中的在线状态和位置（经纬度有值才覆盖，避免用空值覆盖历史有效位置）
         device.setStatus(DeviceConstant.DeviceStatus.ONLINE);
         device.setLastOnlineTime(LocalDateTime.now());
-        if (r.getLongitude() != null) device.setLongitude(r.getLongitude());
-        if (r.getLatitude()  != null) device.setLatitude(r.getLatitude());
+        if (r.getLongitude() != null) { device.setLongitude(r.getLongitude()); }
+        if (r.getLatitude()  != null) { device.setLatitude(r.getLatitude()); }
         deviceMapper.updateById(device);
 
         // 6. WebSocket 实时推送给前端监控页面
         webSocketServer.pushDeviceStatus(deviceCode, decrypted);
 
         // 7. 异步写入历史状态 DB（使用独立线程池，不占用 MQTT 消费线程）
+        // 注：上线 MQ 事件统一由 DeviceOnlineReportHandler 在收到 datacollect/deviceOnline 消息时推送
         persistAsync(device, r, decrypted);
     }
 

@@ -5,12 +5,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.constant.DeviceConstant;
+import org.jeecg.modules.device.datacollect.producer.DeviceStatusProducer;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.mapper.IotDeviceMapper;
 import org.jeecg.modules.device.service.IDeviceOperationLogService;
 import org.jeecg.modules.device.service.IIotDeviceRoomService;
 import org.jeecg.modules.device.service.PendingSyncService;
 import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
+import org.slf4j.MDC;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
@@ -61,6 +64,10 @@ public class DeviceOnlineOfflineHandler {
     private final PendingSyncService pendingSyncService;
     private final IIotDeviceRoomService roomService;
 
+    /** Darwin 集成未启用时为 null */
+    @Autowired(required = false)
+    private DeviceStatusProducer darwinProducer;
+
     /**
      * 处理设备上线事件
      *
@@ -98,6 +105,13 @@ public class DeviceOnlineOfflineHandler {
 
             // 设备上线后补推离线期间待同步的配置/OTA 指令
             pendingSyncService.flushPendingMessages(deviceCode);
+
+            // 向达尔文数采平台推送机器人上线事件（Darwin 集成未启用或非机器人设备时跳过）
+            /*if (darwinProducer != null
+                    && DeviceConstant.DeviceTypeInteger.ROBOT == device.getDeviceType()) {
+                String tenant = device.getTenantId() != null ? String.valueOf(device.getTenantId()) : "";
+                darwinProducer.sendOnlineEvent(tenant, deviceCode, "SLAVE", device.getDeviceModel(), MDC.get("traceId"));
+            }*/
         } catch (Exception e) {
             log.error("[Online] 处理异常", e);
         }
@@ -149,6 +163,13 @@ public class DeviceOnlineOfflineHandler {
             } catch (Exception roomEx) {
                 log.warn("[Offline] 房间销毁失败 deviceCode={}", deviceCode, roomEx);
             }
+
+            // 向达尔文数采平台推送机器人下线事件（Darwin 集成未启用或非机器人设备时跳过）
+            if (darwinProducer != null
+                    && DeviceConstant.DeviceTypeInteger.ROBOT == device.getDeviceType()) {
+                String tenant = device.getTenantId() != null ? String.valueOf(device.getTenantId()) : "";
+                darwinProducer.sendOfflineEvent(tenant, deviceCode, "SLAVE", device.getDeviceModel(), reason, MDC.get("traceId"));
+            }
         } catch (Exception e) {
             log.error("[Offline] 处理异常", e);
         }
@@ -156,7 +177,13 @@ public class DeviceOnlineOfflineHandler {
 
     /**
      * 从 Topic 路径中提取 clientId
+     * 从 Payload 或 Topic 中提取 deviceCode。
      *
+     *
+     * <p>优先使用 Payload 中的 {@code username} 字段，因为设备 clientId 可能带有
+     * "iot-platform-" 前缀（与平台服务账号过滤规则冲突），而 username 就是设备编码本身。
+     * 平台服务账号的 username 为 "iot-platform"，仍可被上层过滤拦截。
+     * <p>
      * <p>EMQX $SYS Topic 格式：$SYS/brokers/{node}/clients/{clientId}/connected
      * 优先从 Topic 的 "clients" 后一段提取，若失败则降级解析 Payload 的 "clientid" 字段。
      *
@@ -165,6 +192,12 @@ public class DeviceOnlineOfflineHandler {
      * @return clientId（即 deviceCode），提取失败返回 null
      */
     private String extractClientId(String topic, String payload) {
+        // 优先从 Payload 取 username（= deviceCode），避免 clientId 前缀干扰
+        String username = extractField(payload, "username");
+        if (username != null && !username.isBlank() && !"unknown".equals(username)) {
+            return username;
+        }
+        // 降级：从 Topic 路径 $SYS/.../clients/{clientId}/... 中提取
         String[] parts = topic.split("/");
         for (int i = 0; i < parts.length; i++) {
             if ("clients".equals(parts[i]) && i + 1 < parts.length) return parts[i + 1];
@@ -200,4 +233,5 @@ public class DeviceOnlineOfflineHandler {
         }
         return device;
     }
+
 }

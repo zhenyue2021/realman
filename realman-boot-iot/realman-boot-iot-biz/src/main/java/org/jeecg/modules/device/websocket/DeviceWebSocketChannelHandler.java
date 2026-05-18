@@ -2,6 +2,8 @@ package org.jeecg.modules.device.websocket;
 
 import jakarta.websocket.Session;
 import lombok.extern.slf4j.Slf4j;
+import org.jeecg.modules.device.service.workorder.IWorkOrderService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
@@ -25,6 +27,9 @@ import java.util.Objects;
 @Component
 public class DeviceWebSocketChannelHandler extends TextWebSocketHandler {
 
+    @Autowired
+    private IWorkOrderService workOrderService;
+
     @Override
     public void afterConnectionEstablished(@NonNull WebSocketSession session) {
         String deviceCode = resolveDeviceCode(session);
@@ -46,6 +51,12 @@ public class DeviceWebSocketChannelHandler extends TextWebSocketHandler {
             return;
         }
         DeviceWebSocketServer.registerManagedSession(deviceCode, nativeSession);
+
+        try {
+            workOrderService.pushDarwinWorkOrdersForDevice(deviceCode);
+        } catch (Exception e) {
+            log.warn("[WS] Darwin 工单推送失败 deviceCode={}", deviceCode, e);
+        }
     }
 
     @Override

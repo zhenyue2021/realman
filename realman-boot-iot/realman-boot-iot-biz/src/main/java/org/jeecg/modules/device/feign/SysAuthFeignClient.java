@@ -56,4 +56,8 @@ public interface SysAuthFeignClient {
     /** 查询指定租户下用户列表（value=userId, text=username） */
     @GetMapping("/sys/api/listUserOptionsByTenantId")
     List<DictModel> listUserOptionsByTenantId(@RequestParam("tenantId") Integer tenantId);
+
+    /** 根据租户ID查询租户名称，不存在时返回空字符串 */
+    @GetMapping("/sys/api/getTenantNameById")
+    String getTenantNameById(@RequestParam("tenantId") String tenantId);
 }

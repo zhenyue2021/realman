@@ -943,6 +943,21 @@ public class SystemApiController {
         return sysBaseApi.selectUserIdByTenantId(tenantId);
     }
 
+    @IgnoreAuth
+    @GetMapping("/getTenantNameById")
+    public String getTenantNameById(@RequestParam("tenantId") String tenantId) {
+        if (tenantId == null || tenantId.isBlank()) {
+            return "";
+        }
+        try {
+            SysTenant tenant = sysTenantService.getById(tenantId);
+            return tenant != null ? tenant.getName() : "";
+        } catch (Exception e) {
+            log.warn("[SystemApi] 查询租户名称失败 tenantId={}", tenantId, e);
+            return "";
+        }
+    }
+
 
     /**
      * 根据部门ID查询用户ID

@@ -1,12 +1,17 @@
 package org.jeecg.modules.device.mqtt.handler;
 
+import cn.hutool.core.util.IdUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.paho.mqttv5.common.MqttMessage;
 import org.eclipse.paho.mqttv5.common.packet.MqttProperties;
 import org.eclipse.paho.mqttv5.common.packet.UserProperty;
 import org.jeecg.common.trace.TraceIdConst;
+import org.jeecg.modules.device.datacollect.constant.DataCollectConstant;
+import org.jeecg.modules.device.datacollect.handler.CollectUrlRequestHandler;
+import org.jeecg.modules.device.datacollect.handler.OssAddressReportHandler;
 import org.slf4j.MDC;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -38,6 +43,7 @@ import java.util.regex.Pattern;
  *   device/{code}/camera/stream/ack → DeviceCameraStreamResponseHandler.handle()
  *   master/{code}/teleop/associated-device/ack → MasterAssociatedDeviceResponseHandler.handle()
  *   device/{code}/teleop/associated-device/ack → MasterAssociatedDeviceResponseHandler.handle()（同上业务，备用 Topic）
+ *   device/{code}/datacollect/deviceOnline    → DeviceOnlineReportHandler.handle()（设备主动上线上报，更新 DB 并推 MQ）
  *
  *   {code}/master/{action}               → 主控设备原始上报（cmd/states/rtsp/ctrl 等）
  *   {code}/slave/{action}                → 机器人设备原始上报（cmd/states 等）
@@ -79,6 +85,11 @@ public class MqttMessageDispatcher {
     private final MasterCommandHandler                masterCommandHandler;
     private final WebRtcAckHandler                    webRtcAckHandler;
     private final WebRtcRestartHandler                webRtcRestartHandler;
+    private final OssAddressReportHandler             ossAddressReportHandler;
+    /** darwin.integration.enabled=false 时 Bean 不存在，注入 null，dispatch 时做空判断 */
+    @Autowired(required = false)
+    private CollectUrlRequestHandler                  collectUrlRequestHandler;
+    private final DeviceOnlineReportHandler           deviceOnlineReportHandler;
 
     /**
      * 分发 MQTT 消息到对应 Handler
@@ -96,7 +107,7 @@ public class MqttMessageDispatcher {
         // P2 链路追踪：从 MQTT 5 User Properties 提取 traceId，或生成新的
         String traceId = extractTraceId(message);
         if (!StringUtils.hasText(traceId)) {
-            traceId = "mqtt-" + UUID.randomUUID().toString().replace("-", "");
+            traceId = "mqtt-" + IdUtil.fastSimpleUUID();
         }
         MDC.put(TraceIdConst.MDC_TRACE_ID, traceId);
         MDC.put(TraceIdConst.MDC_SPAN_ID,  generateSpanId());
@@ -195,6 +206,12 @@ public class MqttMessageDispatcher {
             case "ext-params/request"                 -> extParamsRequestHandler.handle(deviceCode, payload);
             case "webrtc/ack"                         -> webRtcAckHandler.handle(deviceCode, payload);
             case "webrtc/restart"                     -> webRtcRestartHandler.handle(deviceCode, payload);
+            case DataCollectConstant.MQTT_UP_COLLECT_URL_REQUEST -> {
+                if (collectUrlRequestHandler != null) collectUrlRequestHandler.handle(deviceCode, payload);
+                else log.warn("[Dispatcher] Darwin 集成未启用，忽略 collectUrlRequest deviceCode={}", deviceCode);
+            }
+            case DataCollectConstant.MQTT_UP_OSS_ADDRESS_REPORT -> ossAddressReportHandler.handle(deviceCode, payload);
+            case DataCollectConstant.MQTT_UP_DEVICE_ONLINE      -> deviceOnlineReportHandler.handle(deviceCode, payload);
             default -> log.warn("[Dispatcher] 未知路径: {}", topic);
         }
     }

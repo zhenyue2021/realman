@@ -5,6 +5,8 @@
 - **作者**：lorete
 - **状态**：已确认，待实现
 
+**RocketMQ 版本约定**（与父 `pom.xml` 一致）：`rocketmq-spring-boot-starter` 见 **`rocketmq-spring.version`**（**2.3.1**）；独立 Broker / NameServer 容器镜像 **`apache/rocketmq:${rocketmq-broker-docker.version}`**（**5.3.2**）。
+
 ---
 
 ## 一、背景与目标
@@ -373,6 +375,7 @@ darwin:
 ```xml
 <!-- 版本属性（父 pom properties） -->
 <rocketmq-spring.version>2.3.1</rocketmq-spring.version>
+<rocketmq-broker-docker.version>5.3.2</rocketmq-broker-docker.version>
 
 <!-- realman-boot-iot-biz/pom.xml -->
 <dependency>
@@ -382,7 +385,8 @@ darwin:
 </dependency>
 ```
 
-> Spring Boot 3.x 对应 rocketmq-spring-boot-starter 2.3.x。
+> Spring Boot 3.x 对应 rocketmq-spring-boot-starter 2.3.x。  
+> 独立部署 NameServer / Broker 时，Docker 镜像 `apache/rocketmq` 的 tag 必须与父 pom 中 **`rocketmq-broker-docker.version`**（当前 **5.3.2**）一致。
 
 ---
 

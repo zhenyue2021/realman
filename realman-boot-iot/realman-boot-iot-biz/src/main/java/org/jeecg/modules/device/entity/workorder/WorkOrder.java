@@ -123,5 +123,33 @@ public class WorkOrder implements Serializable {
 
     @TableField("tenant_id")
     private String tenantId;
+
+    /** 来源：1=内部创建 2=达尔文平台 */
+    @TableField("source")
+    private Integer source;
+
+    /** 动作链描述，格式："1.xxx，2.xxx，3.xxx"，由达尔文 collectionItem.actions 格式化而来 */
+    @TableField("task_desc")
+    private String taskDesc;
+
+    /** 采集总条数，由达尔文 quotaValue 写入 */
+    @TableField("quota_total")
+    private Integer quotaTotal;
+
+    /** 一级场景英文名，对应达尔文 level1Scene.nameEn，用于 startCollect MQTT 指令 */
+    @TableField("level1_scene_name_en")
+    private String level1SceneNameEn;
+
+    /** 二级场景英文名，对应达尔文 level2Scene.nameEn，用于 startCollect MQTT 指令 */
+    @TableField("level2_scene_name_en")
+    private String level2SceneNameEn;
+
+    /** 采集项英文名，对应达尔文 collectionItem.nameEn，用于 startCollect MQTT 指令 */
+    @TableField("collection_item_name_en")
+    private String collectionItemNameEn;
+
+    /** 达尔文平台推送的原始 JSON（WorkOrderItem），完整保存一份备查 */
+    @TableField("darwin_data_source")
+    private String darwinDataSource;
 }
 

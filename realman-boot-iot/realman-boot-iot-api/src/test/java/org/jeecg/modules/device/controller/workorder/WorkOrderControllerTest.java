@@ -99,7 +99,7 @@ class WorkOrderControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200));
 
-        verify(workOrderService).startWorkOrder(eq("wo-1"), eq("op1"), eq("张三"), eq("138"));
+        verify(workOrderService).startWorkOrder(eq("wo-1"), eq("op1"), eq("张三"), eq("138"), isNull(), isNull());
     }
 
     @Test

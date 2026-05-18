@@ -81,6 +81,9 @@
 		<qiniu-java-sdk.version>7.4.0</qiniu-java-sdk.version>
 		<jedis.version>3.8.0</jedis.version>
 		<baidu-java-sdk.version>4.16.19</baidu-java-sdk.version>
+		<!-- RocketMQ Java：rocketmq-spring-boot-starter；Broker 镜像 tag 运维须与此对齐（见 rocketmq-usage-guide.md） -->
+		<rocketmq-spring.version>2.3.1</rocketmq-spring.version>
+		<rocketmq-broker-docker.version>5.3.2</rocketmq-broker-docker.version>
 		<!-- 默认跳过单元测试；显式执行测试时使用: mvn test -DskipTests=false -->
 		<skipTests>true</skipTests>
 		<!-- Surefire/JaCoCo：子模块可拼接 ${argLine}；无 JaCoCo 时为空 -->
