@@ -3,14 +3,15 @@ package org.jeecg.modules.device.datacollect.producer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.rocketmq.client.apis.producer.SendReceipt;
 import org.apache.rocketmq.client.core.RocketMQClientTemplate;
-import org.apache.rocketmq.client.support.RocketMQHeaders;
 import org.jeecg.modules.device.datacollect.constant.DataCollectConstant;
 import org.jeecg.modules.device.datacollect.dto.mq.FileAddressReportMsg;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * 将机器人上报的 OSS 文件地址转发给数采平台（Teleop → Darwin）。
@@ -43,13 +44,20 @@ public class FileAddressReportProducer {
                 + ":" + DataCollectConstant.MQ_TAG_REPORT;
         try {
             var springMessage = MessageBuilder.withPayload(objectMapper.writeValueAsString(msg))
-                    .setHeader(RocketMQHeaders.KEYS, deviceCode)
+                    .setHeader("deviceCode", deviceCode)
                     .build();
-            rocketMQClientTemplate.syncSendNormalMessage(destination, springMessage);
-            log.info("[DataCollect] OSS地址已上报至数采平台 deviceCode={} fileCount={}",
-                    deviceCode, fileList != null ? fileList.size() : 0);
+            CompletableFuture<SendReceipt> future = new CompletableFuture<>();
+            rocketMQClientTemplate.asyncSendNormalMessage(destination, springMessage, future);
+            future.whenComplete((receipt, ex) -> {
+                if (ex != null) {
+                    log.warn("[DataCollect] OSS地址上报失败，不阻塞主流程 deviceCode={}", deviceCode, ex);
+                } else {
+                    log.info("[DataCollect] OSS地址已上报至数采平台 deviceCode={} fileCount={} msgId={}",
+                            deviceCode, fileList != null ? fileList.size() : 0, receipt.getMessageId());
+                }
+            });
         } catch (Exception e) {
-            log.warn("[DataCollect] OSS地址上报失败，不阻塞主流程 deviceCode={}", deviceCode, e);
+            log.warn("[DataCollect] OSS地址上报序列化失败，不阻塞主流程 deviceCode={}", deviceCode, e);
         }
     }
 }

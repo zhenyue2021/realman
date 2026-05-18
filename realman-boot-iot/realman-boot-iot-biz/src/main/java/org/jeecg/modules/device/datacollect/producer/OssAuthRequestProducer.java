@@ -3,14 +3,15 @@ package org.jeecg.modules.device.datacollect.producer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.rocketmq.client.apis.producer.SendReceipt;
 import org.apache.rocketmq.client.core.RocketMQClientTemplate;
-import org.apache.rocketmq.client.support.RocketMQHeaders;
 import org.jeecg.modules.device.datacollect.constant.DataCollectConstant;
 import org.jeecg.modules.device.datacollect.dto.mq.OssAuthRequestMsg;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.stereotype.Component;
 
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -53,10 +54,14 @@ public class OssAuthRequestProducer {
                 + ":" + DataCollectConstant.MQ_TAG_REQUEST;
         try {
             var springMessage = MessageBuilder.withPayload(objectMapper.writeValueAsString(msg))
-                    .setHeader(RocketMQHeaders.KEYS, deviceCode)
+                    .setHeader("deviceCode", deviceCode)
                     .build();
-            rocketMQClientTemplate.syncSendNormalMessage(destination, springMessage);
-            log.info("[DataCollect] OSS授权请求已转发 requestId={} deviceCode={}", requestId, deviceCode);
+            CompletableFuture<SendReceipt> future = new CompletableFuture<>();
+            rocketMQClientTemplate.asyncSendNormalMessage(destination, springMessage, future);
+            // join() 会正确抛出发送异常，绕过 syncSendNormalMessage 内部吞异常的问题
+            SendReceipt receipt = future.join();
+            log.info("[DataCollect] OSS授权请求已转发 requestId={} deviceCode={} msgId={}",
+                    requestId, deviceCode, receipt.getMessageId());
         } catch (Exception e) {
             // 发送失败清理 Redis，避免悬挂 key
             redisTemplate.delete(redisKey);
