@@ -86,7 +86,7 @@ darwin:
   integration:
     enabled: true
     default-department-id: "1958496759810363394"
-    default-agent-name: "城市运营管理集团有限公司"
+    default-department-name: "城市运营管理集团有限公司"
 
 
 # mqtt（enabled 勿在此写 false，否则会覆盖 Nacos 的 realman-iot.yaml；仅作无 Nacos 时的 broker 兜底）
