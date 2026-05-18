@@ -80,14 +80,9 @@ rocketmq:
 # 设为 true 时加载 Darwin RocketMQ Bean；未部署 RocketMQ 时请保持 false 或使用环境变量覆盖
 darwin:
   integration:
-    enabled: true
+    enabled: false
     default-department-id: "1958496759810363394"
     default-agent-name: "城市运营管理集团有限公司"
-    file-upload:
-      upload-url-prefix: ${DARWIN_UPLOAD_URL_PREFIX:http://172.16.44.66:8085/realman-iot}
-      upload-bucket: darwin-files
-      max-file-size-mb: 50
-      url-expire-days: 7
 
 # mqtt
 mqtt:
