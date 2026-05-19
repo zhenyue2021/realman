@@ -57,9 +57,16 @@ public class RobotDeviceController {
     @RequiresPermissions("robot:add")
     @PostMapping("/add")
     @Operation(summary = "新增机器人设备")
-    public ApiResult<RobotDevicePageItemDTO> addDevice(@Valid @RequestBody DeviceAddDTO dto) {
+    public ApiResult<RobotDevicePageItemDTO> addDevice(HttpServletRequest request, @Valid @RequestBody DeviceAddDTO dto) {
         if (dto.getDeviceModel() == null || dto.getDeviceModel().isBlank()) {
             return ApiResult.fail("设备型号不能为空");
+        }
+        String tenantIdStr = request.getHeader("X-TENANT-ID");
+        if (tenantIdStr == null || tenantIdStr.isBlank()) {
+            throw new IllegalArgumentException("缺少请求头：X-TENANT-ID");
+        }
+        if (!tenantIdStr.matches("\\d+")) {
+            throw new IllegalArgumentException("X-TENANT-ID 格式不合法，必须为正整数：" + tenantIdStr);
         }
         IotDevice d = new IotDevice();
         d.setDeviceCode(dto.getDeviceCode());
@@ -70,6 +77,7 @@ public class RobotDeviceController {
         d.setSerialNumber(dto.getSerialNumber());
         d.setMacAddress(dto.getMacAddress());
         d.setDescription(dto.getDescription());
+        d.setTenantId(Integer.parseInt(tenantIdStr));
         IotDevice saved = deviceService.addDevice(d);
         return ApiResult.ok(robotDeviceApiService.toPageItem(saved), "设备添加成功");
     }

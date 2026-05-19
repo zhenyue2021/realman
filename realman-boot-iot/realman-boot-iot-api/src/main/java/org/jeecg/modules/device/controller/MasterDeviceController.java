@@ -57,7 +57,16 @@ public class MasterDeviceController {
     @Operation(summary = "新增主控设备", extensions = @Extension(properties = {
             @ExtensionProperty(name = "x-order", value = "1")
     }))
-    public ApiResult<IotDevice> add(@Valid @RequestBody DeviceAddDTO dto) {
+    public ApiResult<IotDevice> add(HttpServletRequest request, @Valid @RequestBody DeviceAddDTO dto) {
+        String tenantIdStr = request.getHeader("X-TENANT-ID");
+
+        if (tenantIdStr == null || tenantIdStr.isBlank()) {
+            throw new IllegalArgumentException("缺少请求头：X-TENANT-ID");
+        }
+
+        if (!tenantIdStr.matches("\\d+")) {
+            throw new IllegalArgumentException("X-TENANT-ID 格式不合法，必须为正整数：" + tenantIdStr);
+        }
         IotDevice d = new IotDevice();
         d.setDeviceCode(dto.getDeviceCode());
         d.setDeviceName(dto.getDeviceName());
@@ -67,6 +76,7 @@ public class MasterDeviceController {
         d.setSerialNumber(dto.getSerialNumber());
         d.setMacAddress(dto.getMacAddress());
         d.setDescription(dto.getDescription());
+        d.setTenantId(Integer.parseInt(tenantIdStr));
         return ApiResult.ok(deviceService.addDevice(d), "设备添加成功");
     }
 
