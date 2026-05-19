@@ -15,6 +15,7 @@ import org.jeecg.modules.device.entity.workorder.WorkOrderDevice;
 import org.jeecg.modules.device.mapper.workorder.WorkOrderComplianceConfigMapper;
 import org.jeecg.modules.device.mapper.workorder.WorkOrderDeviceMapper;
 import org.jeecg.modules.device.mapper.workorder.WorkOrderMapper;
+import org.jeecg.modules.device.datacollect.config.DataCollectIntegrationProperties;
 import org.jeecg.modules.device.service.IMasterOperationRecordService;
 import org.jeecg.modules.device.service.IWorkOrderSchedulerService;
 import org.jeecg.modules.device.service.workorder.IWorkOrderComplianceConfigService;
@@ -46,6 +47,7 @@ public class WorkOrderSchedulerServiceImpl implements IWorkOrderSchedulerService
     private final StringRedisTemplate redisTemplate;
     private final DeviceWebSocketServer webSocketServer;
     private final ObjectMapper objectMapper;
+    private final DataCollectIntegrationProperties darwinProps;
 
     @Override
     public void timeoutAlert() {
@@ -388,6 +390,48 @@ public class WorkOrderSchedulerServiceImpl implements IWorkOrderSchedulerService
         }
         if (pushed > 0 || skippedOffline > 0) {
             log.info("[Darwin-WorkOrderPush] 已推送 {} 台机器人，离线跳过 {} 台", pushed, skippedOffline);
+        }
+    }
+
+    @Override
+    public void darwinAutoSubmit() {
+        int autoSubmitMinutes = darwinProps.getAutoSubmitMinutes();
+        if (autoSubmitMinutes <= 0) {
+            log.debug("[Darwin-AutoSubmit] 自动提交已禁用（autoSubmitMinutes={}），跳过", autoSubmitMinutes);
+            return;
+        }
+        LocalDateTime threshold = LocalDateTime.now().minusMinutes(autoSubmitMinutes);
+
+        List<WorkOrder> candidates = workOrderMapper.selectList(
+                new LambdaQueryWrapper<WorkOrder>()
+                        .eq(WorkOrder::getStatus, WorkOrderConstant.ORDER_STATUS.STARTED)
+                        .eq(WorkOrder::getSource, 2)
+                        .isNotNull(WorkOrder::getActualStartTime)
+                        .le(WorkOrder::getActualStartTime, threshold)
+                        .eq(WorkOrder::getDelFlag, 0));
+        if (candidates.isEmpty()) return;
+
+        int submitted = 0, skipped = 0;
+        for (WorkOrder order : candidates) {
+            String operator = order.getOperatorName();
+            if (operator == null || operator.isBlank()) {
+                log.warn("[Darwin-AutoSubmit] 工单操作员为空，跳过自动提交 workOrderId={}", order.getId());
+                skipped++;
+                continue;
+            }
+            try {
+                workOrderService.submitWorkOrder(order.getId(), operator);
+                submitted++;
+                log.info("[Darwin-AutoSubmit] 工单自动提交成功 workOrderId={} operator={} actualStartTime={}",
+                        order.getId(), operator, order.getActualStartTime());
+            } catch (Exception e) {
+                skipped++;
+                log.warn("[Darwin-AutoSubmit] 工单自动提交失败 workOrderId={} operator={}",
+                        order.getId(), operator, e);
+            }
+        }
+        if (submitted > 0 || skipped > 0) {
+            log.info("[Darwin-AutoSubmit] 本次自动提交 {} 条，跳过/失败 {} 条", submitted, skipped);
         }
     }
 

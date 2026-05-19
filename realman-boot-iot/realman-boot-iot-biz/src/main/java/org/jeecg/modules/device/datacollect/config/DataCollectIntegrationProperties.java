@@ -15,6 +15,12 @@ public class DataCollectIntegrationProperties {
 
     private boolean enabled = false;
 
+    /**
+     * Darwin 工单开启后多少分钟无操作则系统自动提交（含 MQTT 停采 + 机器人通知）。
+     * 0 表示禁用自动提交。支持 Nacos 动态刷新。
+     */
+    private int autoSubmitMinutes = 10;
+
     /** Darwin 工单默认部门 ID，写入 work_order.department_id */
     private String defaultDepartmentId = "";
     /** Darwin 工单默认代理商名称，写入 work_order.department_name */

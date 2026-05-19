@@ -11,6 +11,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.stereotype.Component;
 
+import org.slf4j.MDC;
+
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 @Slf4j
@@ -54,14 +57,22 @@ public class DeviceStatusProducer {
             var springMessage = MessageBuilder.withPayload(objectMapper.writeValueAsString(msg))
                     .setHeader("deviceCode", deviceCode)
                     .build();
+            Map<String, String> mdcContext = MDC.getCopyOfContextMap();
             CompletableFuture<SendReceipt> future = new CompletableFuture<>();
             rocketMQClientTemplate.asyncSendNormalMessage(destination, springMessage, future);
             future.whenComplete((receipt, ex) -> {
-                if (ex != null) {
-                    log.warn("[DataCollect] 设备状态推送失败 deviceCode={} event={}", deviceCode, eventType, ex);
-                } else {
-                    log.info("[DataCollect] 设备状态推送成功 deviceCode={} event={} msgId={}",
-                            deviceCode, eventType, receipt.getMessageId());
+                if (mdcContext != null) {
+                    MDC.setContextMap(mdcContext);
+                }
+                try {
+                    if (ex != null) {
+                        log.warn("[DataCollect] 设备状态推送失败 deviceCode={} event={}", deviceCode, eventType, ex);
+                    } else {
+                        log.info("[DataCollect] 设备状态推送成功 deviceCode={} event={} msgId={}",
+                                deviceCode, eventType, receipt.getMessageId());
+                    }
+                } finally {
+                    MDC.clear();
                 }
             });
         } catch (Exception e) {

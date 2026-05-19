@@ -54,4 +54,12 @@ public interface IWorkOrderSchedulerService {
      * 按机器人设备编码通过 WebSocket 推送，设备不在线则跳过。
      */
     void pushDarwinActiveWorkOrders();
+
+    /**
+     * Darwin 工单开启后超时自动提交
+     * <p>
+     * 扫描 source=2（Darwin）、status=STARTED、且 actualStartTime 距今超过10分钟的工单，
+     * 代操作员完成提交（含 MQTT 停采指令 + WebSocket 通知机器人）。
+     */
+    void darwinAutoSubmit();
 }

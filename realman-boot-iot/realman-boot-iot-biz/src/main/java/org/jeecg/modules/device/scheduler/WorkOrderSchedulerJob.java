@@ -85,4 +85,15 @@ public class WorkOrderSchedulerJob {
     public void pushDarwinActiveWorkOrderJob() {
         workOrderSchedulerService.pushDarwinActiveWorkOrders();
     }
+
+    /**
+     * Darwin 工单开启后超时自动提交任务
+     * <p>扫描 Darwin 工单中已开启超过10分钟仍未手动提交的工单，系统代为提交并通知机器人。
+     *
+     * <p>XXL-Job Handler Name：{@code darwinWorkOrderAutoSubmitJob}，建议 Cron：{@code 0 * * * * ?}
+     */
+    @XxlJob("darwinWorkOrderAutoSubmitJob")
+    public void darwinWorkOrderAutoSubmitJob() {
+        workOrderSchedulerService.darwinAutoSubmit();
+    }
 }

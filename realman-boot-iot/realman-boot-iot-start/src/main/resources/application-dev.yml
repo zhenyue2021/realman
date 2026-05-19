@@ -81,8 +81,9 @@ rocketmq:
 darwin:
   integration:
     enabled: false
+    auto-submit-minutes: 10   # Darwin 工单开启后超时自动提交阈值（分钟），0=禁用
     default-department-id: "1958496759810363394"
-    default-agent-name: "城市运营管理集团有限公司"
+    default-department-name: "城市运营管理集团有限公司"
 
 # mqtt
 mqtt:

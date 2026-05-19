@@ -150,6 +150,8 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
     @Transactional(rollbackFor = Exception.class)
     public void startWorkOrder(String workOrderId, String operatorId, String operatorName,
                                String operatorPhone, String controllerCode, String robotCode) {
+        log.info("[startWorkOrder] workOrderId={} operatorId={} operatorName={} operatorPhone={} controllerCode={} robotCode={}",
+                workOrderId, operatorId, operatorName, operatorPhone, controllerCode, robotCode);
         WorkOrder order = this.getById(workOrderId);
         if (order == null) return;
 
@@ -167,6 +169,7 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
         WorkOrderDevice master = findMasterDevice(workOrderId);
         if (master != null && master.getDeviceCode() != null) {
             try {
+                log.info("[startWorkOrder] 向设备推送工单 workOrderId={} deviceCode={}", workOrderId, master.getDeviceCode());
                 deviceWebSocketServer.pushStartedWorkOrder(master.getDeviceCode(),
                         objectMapper.writeValueAsString(order));
             } catch (Exception e) {
@@ -177,18 +180,21 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
         // Darwin 工单：向机器人下发开始采集指令
         if (Integer.valueOf(2).equals(order.getSource()) && dataCollectCommandService != null
                 && robotCode != null) {
+            log.info("[startWorkOrder] 向机器人推送开始采集指令 workOrderId={} robotCode={}", workOrderId, robotCode);
             sendStartCollect(workOrderId, order, robotCode, operatorName);
         }
     }
 
     @Override
     public void submitWorkOrder(String workOrderId, String operator) {
+        log.info("[submitWorkOrder] workOrderId={} operator={}", workOrderId, operator);
         workOrderStateMachine.submitWorkOrder(workOrderId, operator);
 
         WorkOrder order = this.getById(workOrderId);
         if (order != null) {
             // 向机器人下发停止采集指令
             if (dataCollectCommandService != null && Integer.valueOf(2).equals(order.getSource())) {
+                log.info("[submitWorkOrder] 向机器人推送停止采集指令 workOrderId={} order={}", workOrderId, order);
                 sendStopCollect(workOrderId, order);
             }
             // 推送最新工单列表（已提交的工单不在 PENDING/STARTED 中，前端自动感知）
@@ -198,6 +204,7 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
                             .eq(WorkOrderDevice::getDeviceType, DeviceConstant.DeviceType.ROBOT)
                             .last("LIMIT 1"));
             if (robotDevice != null && robotDevice.getDeviceCode() != null) {
+                log.info("[submitWorkOrder] 向设备推送工单 workOrderId={} deviceCode={}", workOrderId, robotDevice.getDeviceCode());
                 pushDarwinWorkOrdersForDevice(robotDevice.getDeviceCode());
             }
         }
