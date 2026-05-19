@@ -241,8 +241,9 @@ public class IotSlamCommandServiceImpl extends ServiceImpl<IotSlamCommandRecordM
     public void handleStates(String deviceCode, MqttMessageModel.SlamStates states) {
         try {
             String key = DeviceConstant.SlamRedisKey.SLAM_STATES_PREFIX + deviceCode;
-            redisUtil.set(key, objectMapper.writeValueAsString(states));
-            redisUtil.expire(key, SLAM_STATES_TTL);
+            // set + expire 合并为一次原子操作，减少 1 次 Redis 往返
+            stringRedisTemplate.opsForValue().set(key, objectMapper.writeValueAsString(states),
+                    java.time.Duration.ofSeconds(SLAM_STATES_TTL));
             log.debug("[SlamStates] 状态已缓存: deviceCode={}, mode={}", deviceCode, states.getSlamNavMode());
             // TELEOP_ROBOT_TO_MASTER 由 StringRedisTemplate 写入纯字符串，不可用 RedisUtil(Jackson) 反序列化
             String masterCode = stringRedisTemplate.opsForValue()

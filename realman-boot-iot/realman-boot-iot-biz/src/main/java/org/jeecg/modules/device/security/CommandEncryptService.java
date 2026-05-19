@@ -16,6 +16,7 @@ import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.Base64;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -49,6 +50,13 @@ public class CommandEncryptService {
 
     private final StringRedisTemplate redisTemplate;
     private static final String AES_CACHE = "iot:device:aeskey:";
+
+    /**
+     * JVM 本地 AES 密钥缓存：key = SHA256(deviceCode)，永远不变，无需过期。
+     * 最多 N 台设备（当前预期 200 台），内存占用 200 × 32B = 6KB，可忽略。
+     * 避免每条 MQTT 消息都走一次 Redis GET（~1ms/次 × 1200条/秒 = 节省 1.2s Redis 时间/秒）。
+     */
+    private final ConcurrentHashMap<String, byte[]> localKeyCache = new ConcurrentHashMap<>();
 
     /**
      * 加密（平台 → 设备方向）
@@ -92,17 +100,6 @@ public class CommandEncryptService {
     }
 
     /**
-     * 清除设备 AES Key 缓存（禁用设备或 deviceCode 变更时调用）
-     *
-     * <p>缓存失效后，下次加解密操作将重新派生密钥并写入缓存。
-     *
-     * @param deviceCode 设备编号
-     */
-    public void evictCache(String deviceCode) {
-        redisTemplate.delete(AES_CACHE + deviceCode);
-    }
-
-    /**
      * 派生设备 AES Key：SHA256(deviceCode) 取前 32 字节（256 bit）
      *
      * <p>密钥由 deviceCode 确定性派生，设备端用相同算法离线计算，无需网络传输密钥。
@@ -112,17 +109,32 @@ public class CommandEncryptService {
      * @return 32 字节 AES 密钥
      */
     private byte[] getAesKey(String deviceCode) {
+        // 优先读 JVM 本地缓存（0 网络开销）：密钥由 deviceCode 确定性派生，永不变化
+        byte[] local = localKeyCache.get(deviceCode);
+        if (local != null) return local;
+
+        // 本地未命中（首次）：先查 Redis，兼容多节点部署时其他实例已写入的场景
         String cached = redisTemplate.opsForValue().get(AES_CACHE + deviceCode);
-        if (cached != null) return HexUtil.decodeHex(cached);
-
-        // SHA256(deviceCode) 取前32字节作为256bit AES密钥
-        byte[] hash = DigestUtil.sha256(deviceCode.getBytes(StandardCharsets.UTF_8));
-        byte[] key  = new byte[32];
-        System.arraycopy(hash, 0, key, 0, 32);
-
-        redisTemplate.opsForValue().set(AES_CACHE + deviceCode,
-                HexUtil.encodeHexStr(key), 24L, TimeUnit.HOURS);
+        byte[] key;
+        if (cached != null) {
+            key = HexUtil.decodeHex(cached);
+        } else {
+            byte[] hash = DigestUtil.sha256(deviceCode.getBytes(StandardCharsets.UTF_8));
+            key = new byte[32];
+            System.arraycopy(hash, 0, key, 0, 32);
+            redisTemplate.opsForValue().set(AES_CACHE + deviceCode,
+                    HexUtil.encodeHexStr(key), 24L, TimeUnit.HOURS);
+        }
+        localKeyCache.put(deviceCode, key);
         return key;
+    }
+
+    /**
+     * 清除设备密钥缓存（本地 + Redis），设备 deviceCode 变更时调用。
+     */
+    public void evictCache(String deviceCode) {
+        localKeyCache.remove(deviceCode);
+        redisTemplate.delete(AES_CACHE + deviceCode);
     }
 
     /**

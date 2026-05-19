@@ -12,6 +12,7 @@ import org.jeecg.modules.device.datacollect.handler.CollectUrlRequestHandler;
 import org.jeecg.modules.device.datacollect.handler.OssAddressReportHandler;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -19,7 +20,8 @@ import org.springframework.util.StringUtils;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -91,21 +93,81 @@ public class MqttMessageDispatcher {
     private CollectUrlRequestHandler                  collectUrlRequestHandler;
     private final DeviceOnlineReportHandler           deviceOnlineReportHandler;
 
+    /** IoT 设备任务线程池，由 AppConfig 定义，已内置 MDC 跨线程传播。
+     *  非 final：@Qualifier 不随 Lombok @RequiredArgsConstructor 传播到构造器参数，
+     *  改用 @Autowired setter 注入以确保 Spring 选到正确的 Bean。 */
+    @Autowired
+    @Qualifier("deviceTaskExecutor")
+    private Executor taskExecutor;
+
     /**
-     * 分发 MQTT 消息到对应 Handler
+     * 高频上报 Topic 的节流间隔（毫秒）。
+     * 500ms = 2次/秒，1000ms = 1次/秒。
+     * 对 slam/states、slave/states、master/states 生效；其他 Topic 不受影响。
+     */
+    @Value("${mqtt.high-freq-throttle-ms:500}")
+    private long highFreqThrottleMs;
+
+    /**
+     * 节流时间戳表：key=topic（含设备编码，每台设备独立节流），value=上次投递时间戳(ms)。
+     * 最多 N 台设备×高频 Topic 数条目，内存可忽略；设备掉线后条目保留但无害。
+     */
+    private final ConcurrentHashMap<String, Long> throttleTimestamps = new ConcurrentHashMap<>();
+
+    /** 需要节流的高频 Topic 后缀集合 */
+    private static final List<String> HIGH_FREQ_SUFFIXES =
+            List.of("/slam/states", "/slave/states", "/master/states");
+
+    /**
+     * 异步分发入口：Paho messageArrived 回调调用此方法，立即将消息投递到线程池后返回，
+     * 保证 Paho 唯一接收线程不被任何 Handler 的 I/O 操作阻塞。
      *
-     * @param topic   MQTT Topic 字符串
-     * @param message MQTT 消息对象（Payload 为 AES 加密密文或原始 JSON）
+     * <p>高频上报 Topic（slam/states 等）在投递前先做节流检查，超出阈值的帧直接丢弃，
+     * 不进入线程池队列，彻底避免 EMQX mqueue 打满。
      */
     public void dispatch(String topic, MqttMessage message) {
-        // 标准化：去除前导 /，兼容部分设备固件将 topic 写为 /code/slave/states 的情况
-        if (topic != null && topic.startsWith("/")) {
-            topic = topic.substring(1);
-        }
-        String payload = new String(message.getPayload(), StandardCharsets.UTF_8);
+        String topicNorm = (topic != null && topic.startsWith("/")) ? topic.substring(1) : topic;
 
-        // P2 链路追踪：从 MQTT 5 User Properties 提取 traceId，或生成新的
+        // 节流：高频上报 Topic 每 highFreqThrottleMs 只处理一次，直接在 Paho 线程判断后丢弃
+        if (isThrottled(topicNorm)) {
+            return;
+        }
+
+        // 在 Paho 接收线程立即拷贝数据，避免 Paho 内部回收 byte[]
+        String payload = new String(message.getPayload(), StandardCharsets.UTF_8);
         String traceId = extractTraceId(message);
+
+        taskExecutor.execute(() -> doDispatch(topicNorm, payload, traceId));
+    }
+
+    /**
+     * 节流检查：仅对高频 Topic 生效。
+     * 同一 topic 上次投递距今不足 highFreqThrottleMs 则返回 true（丢弃）。
+     * 使用 topic 全路径作为 key，每台设备独立计时。
+     */
+    private boolean isThrottled(String topic) {
+        if (topic == null) return false;
+        boolean isHighFreq = false;
+        for (String suffix : HIGH_FREQ_SUFFIXES) {
+            if (topic.endsWith(suffix)) {
+                isHighFreq = true;
+                break;
+            }
+        }
+        if (!isHighFreq) return false;
+
+        long now = System.currentTimeMillis();
+        Long last = throttleTimestamps.get(topic);
+        if (last != null && now - last < highFreqThrottleMs) {
+            return true;
+        }
+        throttleTimestamps.put(topic, now);
+        return false;
+    }
+
+    private void doDispatch(String topic, String payload, String traceId) {
+
+        // 链路追踪：traceId 由 dispatch() 在 Paho 线程提取并传入，此处直接使用
         if (!StringUtils.hasText(traceId)) {
             traceId = "mqtt-" + IdUtil.fastSimpleUUID();
         }

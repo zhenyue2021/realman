@@ -88,13 +88,14 @@ darwin:
 # mqtt
 mqtt:
   enabled: false  # 临时禁用，避免启动失败
+  high-freq-throttle-ms: 500  # slam/states 等高频 Topic 节流间隔(ms)：500=2次/秒，1000=1次/秒，0=不限
   broker:
     url: tcp://172.16.44.66:1883
     username: iot-platform
     password: realman123
     client-id: iot-platform-server
     qos: 1
-    keep-alive: 60
+    keep-alive: 30
 
 # 文件存储
 minio:

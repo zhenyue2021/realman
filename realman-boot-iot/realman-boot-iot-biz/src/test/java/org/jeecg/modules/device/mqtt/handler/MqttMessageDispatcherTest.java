@@ -86,10 +86,14 @@ public class MqttMessageDispatcherTest {
                 ossAddressReportHandler,
                 deviceOnlineReportHandler
         );
-        // collectUrlRequestHandler 为 @Autowired(required=false) 非 final 字段，不在构造器中，需反射注入
+        // collectUrlRequestHandler / taskExecutor 均为非 final 字段（@Autowired 注入），需反射设值
         Field f = MqttMessageDispatcher.class.getDeclaredField("collectUrlRequestHandler");
         f.setAccessible(true);
         f.set(dispatcher, collectUrlRequestHandler);
+        // 测试用同步 Executor：在调用线程立即执行，Mockito.verify() 无需等待
+        Field fe = MqttMessageDispatcher.class.getDeclaredField("taskExecutor");
+        fe.setAccessible(true);
+        fe.set(dispatcher, (java.util.concurrent.Executor) Runnable::run);
     }
 
     private static MqttMessage mqttMsg(String payload) {

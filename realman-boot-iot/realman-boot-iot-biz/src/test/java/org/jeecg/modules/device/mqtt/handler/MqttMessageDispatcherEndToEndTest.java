@@ -209,6 +209,10 @@ public class MqttMessageDispatcherEndToEndTest {
                 ossAddressReportHandler,
                 deviceOnlineReportHandler
         );
+        // taskExecutor 为非 final 字段（@Autowired 注入），反射注入同步 Executor 保证断言可立即执行
+        java.lang.reflect.Field fe = MqttMessageDispatcher.class.getDeclaredField("taskExecutor");
+        fe.setAccessible(true);
+        fe.set(dispatcher, (java.util.concurrent.Executor) Runnable::run);
         // collectUrlRequestHandler 为 @Autowired(required=false) 非 final 字段，不在构造器中，需反射注入
         Field collectUrlField = MqttMessageDispatcher.class.getDeclaredField("collectUrlRequestHandler");
         collectUrlField.setAccessible(true);

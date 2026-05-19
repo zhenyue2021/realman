@@ -93,13 +93,14 @@ darwin:
 # mqtt（enabled 勿在此写 false，否则会覆盖 Nacos 的 realman-iot.yaml；仅作无 Nacos 时的 broker 兜底）
 mqtt:
   enabled: true
+  high-freq-throttle-ms: 500  # slam/states 等高频 Topic 节流间隔(ms)：500=2次/秒，1000=1次/秒，0=不限
   broker:
     url: tcp://realman-emqx:1883
     username: iot-platform
     password: realman123
     client-id: iot-platform-server
     qos: 1
-    keep-alive: 60
+    keep-alive: 30
 
 # 文件存储
 minio:

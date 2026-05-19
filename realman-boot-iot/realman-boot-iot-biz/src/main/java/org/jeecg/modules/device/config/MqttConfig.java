@@ -12,6 +12,10 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import javax.net.SocketFactory;
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
@@ -107,6 +111,9 @@ public class MqttConfig {
         opts.setKeepAliveInterval(keepAlive);  // 心跳间隔（秒）
         opts.setAutomaticReconnect(true);      // 自动重连（断线后指数退避重试）
         opts.setMaxReconnectDelay(5000);       // 最大重连间隔 5s
+        // TCP Socket 层 keepalive：由 OS 负责探测，早于 MQTT 心跳发现半打开连接。
+        // 在 NAT/防火墙静默丢弃 TCP 连接状态时，OS 的 TCP keepalive 能更早探知连接已死。
+        opts.setSocketFactory(tcpKeepaliveSocketFactory());
 
         client.setCallback(new MqttCallback() {
             /**
@@ -161,9 +168,6 @@ public class MqttConfig {
             }
         });
 
-        client.connect(opts);
-        log.info("[MQTT] 平台已连接 EMQX: {}", brokerUrl);
-
         // 订阅全部业务 Topic（鉴权相关 Topic 由 EMQX HTTP Auth 在连接层处理，无需平台订阅）
         //
         // 说明：
@@ -176,7 +180,7 @@ public class MqttConfig {
         //     Handler 内部通过幂等设计（Redis SET NX）保证只有一个节点实际处理。
         //   - 带前导 / 的原始 Topic：兼容旧固件，无需共享订阅（流量极低）。
         String share = "$share/iot-cluster/";
-        String[] topics = {
+        final String[] topics = {
                 share + "device/+/status/report",           // 设备状态上报
                 share + "device/+/config/ack",              // 参数配置同步确认
                 share + "device/+/command/+/ack",           // 指令集执行确认（restart/emergency-stop 等）
@@ -210,8 +214,59 @@ public class MqttConfig {
                 share + "+/slave/states",
                 share + "/+/slave/states",
         };
-        int[] qosArr = new int[topics.length];
+        final int[] qosArr = new int[topics.length];
         Arrays.fill(qosArr, qos);
+
+        // 重连后重订阅兜底：Paho 自动重连时会尝试重发内部订阅列表，
+        // 但在 cleanStart=true + 某些 Paho 版本下订阅列表可能丢失，此处主动重订阅保证万无一失。
+        client.setCallback(new MqttCallback() {
+            @Override
+            public void disconnected(MqttDisconnectResponse response) {
+                MqttException cause = response.getException();
+                if (cause != null) {
+                    log.error("[MQTT] 连接丢失，等待重连", cause);
+                } else {
+                    log.warn("[MQTT] 连接断开 (reasonCode={})", response.getReturnCode());
+                }
+            }
+
+            @Override
+            public void mqttErrorOccurred(MqttException exception) {
+                log.error("[MQTT] 客户端内部错误", exception);
+            }
+
+            @Override
+            public void messageArrived(String topic, MqttMessage msg) {
+                MqttMessageDispatcher dispatcher = getDispatcher();
+                if (dispatcher != null) {
+                    dispatcher.dispatch(topic, msg);
+                }
+            }
+
+            @Override
+            public void deliveryComplete(IMqttToken token) {
+            }
+
+            @Override
+            public void connectComplete(boolean reconnect, String serverURI) {
+                if (reconnect) {
+                    log.info("[MQTT] 重连成功: {}，重新订阅{}个Topic", serverURI, topics.length);
+                    try {
+                        client.subscribe(topics, qosArr);
+                    } catch (MqttException e) {
+                        log.error("[MQTT] 重连后重订阅失败", e);
+                    }
+                }
+            }
+
+            @Override
+            public void authPacketArrived(int reasonCode, MqttProperties properties) {
+            }
+        });
+
+        client.connect(opts);
+        log.info("[MQTT] 平台已连接 EMQX: {}", brokerUrl);
+
         client.subscribe(topics, qosArr);
         log.info("[MQTT] 已订阅{}个业务Topic", topics.length);
         return client;
@@ -225,5 +280,49 @@ public class MqttConfig {
      */
     private MqttMessageDispatcher getDispatcher() {
         return MqttConfigContext.getDispatcher();
+    }
+
+    /**
+     * 创建启用 TCP SO_KEEPALIVE 的 SocketFactory。
+     * OS 层面的 TCP keepalive 早于 MQTT 心跳探测到半打开连接（NAT/防火墙静默丢弃 TCP 状态时尤为有效）。
+     * 具体探测间隔由 OS 内核参数控制：tcp_keepalive_time（默认2h，建议调低至300s）。
+     */
+    private static SocketFactory tcpKeepaliveSocketFactory() {
+        return new SocketFactory() {
+            @Override
+            public Socket createSocket() throws IOException {
+                Socket s = SocketFactory.getDefault().createSocket();
+                s.setKeepAlive(true);
+                return s;
+            }
+
+            @Override
+            public Socket createSocket(String host, int port) throws IOException {
+                Socket s = SocketFactory.getDefault().createSocket(host, port);
+                s.setKeepAlive(true);
+                return s;
+            }
+
+            @Override
+            public Socket createSocket(String host, int port, InetAddress localHost, int localPort) throws IOException {
+                Socket s = SocketFactory.getDefault().createSocket(host, port, localHost, localPort);
+                s.setKeepAlive(true);
+                return s;
+            }
+
+            @Override
+            public Socket createSocket(InetAddress host, int port) throws IOException {
+                Socket s = SocketFactory.getDefault().createSocket(host, port);
+                s.setKeepAlive(true);
+                return s;
+            }
+
+            @Override
+            public Socket createSocket(InetAddress address, int port, InetAddress localAddress, int localPort) throws IOException {
+                Socket s = SocketFactory.getDefault().createSocket(address, port, localAddress, localPort);
+                s.setKeepAlive(true);
+                return s;
+            }
+        };
     }
 }

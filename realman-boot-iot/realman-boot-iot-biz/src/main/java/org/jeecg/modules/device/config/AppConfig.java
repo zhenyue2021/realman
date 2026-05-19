@@ -60,11 +60,15 @@ public class AppConfig {
     @Bean("deviceTaskExecutor")
     public Executor deviceTaskExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(5);
-        executor.setMaxPoolSize(20);
-        executor.setQueueCapacity(200);
+        // 200台设备稳态 ~1200 msg/s，每条 ~5ms → 需要 6 线程，核心设为 20 避免冷启动扩容延迟
+        executor.setCorePoolSize(20);
+        executor.setMaxPoolSize(50);
+        // 队列 2000：为 Redis 短暂抖动（<1.5s）提供缓冲；超出后丢弃（见下方拒绝策略）
+        executor.setQueueCapacity(2000);
         executor.setThreadNamePrefix("device-task-");
-        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        // 丢弃最旧任务（非阻塞）：队列满时绝不让 Paho 接收线程执行任务，
+        // 否则 Paho 阻塞 → TCP 窗口耗尽 → EMQX mqueue 堆积 → 复现断连
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.DiscardOldestPolicy());
         // MDC 跨线程传播：提交任务时快照父线程 MDC，子线程执行前恢复，finally 清理防止污染
         executor.setTaskDecorator(runnable -> {
             Map<String, String> mdc = MDC.getCopyOfContextMap();
