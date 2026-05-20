@@ -10,7 +10,8 @@ import org.eclipse.paho.mqttv5.common.packet.UserProperty;
 import org.jeecg.common.trace.TraceIdConst;
 import org.jeecg.modules.device.security.CommandEncryptService;
 import org.slf4j.MDC;
-import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import java.nio.charset.StandardCharsets;
@@ -22,8 +23,15 @@ import java.util.List;
 @RequiredArgsConstructor
 public class MqttPublisher {
 
-    private final ObjectProvider<MqttClient> mqttClientProvider;
     private final CommandEncryptService encryptService;
+
+    /**
+     * 专用发布客户端，与订阅客户端隔离，避免 Paho v5 CommsCallback 竞争问题。
+     * mqtt.enabled=false 时 Bean 不存在，注入 null，发布时做空判断跳过。
+     */
+    @Autowired(required = false)
+    @Qualifier("mqttPublishClient")
+    private MqttClient publishClient;
 
     /** 向设备发布AES加密消息 */
     public void publishToDevice(String deviceCode, String topic, String payload, int qos) {
@@ -35,13 +43,12 @@ public class MqttPublisher {
 
     public void publishRaw(String topic, String payload, int qos, boolean retained) {
         try {
-            MqttClient mqttClient = mqttClientProvider.getIfAvailable();
-            if (mqttClient == null) {
-                log.warn("[MqttPublisher] 未启用MQTT或未创建MqttClient，跳过发布: topic={}", topic);
+            if (publishClient == null) {
+                log.warn("[MqttPublisher] 未启用MQTT或未创建发布客户端，跳过发布: topic={}", topic);
                 return;
             }
-            if (!mqttClient.isConnected()) {
-                log.warn("[MqttPublisher] MQTT未连接, topic={}", topic);
+            if (!publishClient.isConnected()) {
+                log.warn("[MqttPublisher] MQTT发布客户端未连接, topic={}", topic);
                 return;
             }
             MqttMessage msg = new MqttMessage(payload.getBytes(StandardCharsets.UTF_8));
@@ -55,7 +62,7 @@ public class MqttPublisher {
                 props.setUserProperties(userProps);
                 msg.setProperties(props);
             }
-            mqttClient.publish(topic, msg);
+            publishClient.publish(topic, msg);
         } catch (MqttException e) {
             throw new RuntimeException("MQTT发布失败: " + e.getMessage(), e);
         }

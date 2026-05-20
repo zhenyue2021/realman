@@ -131,8 +131,34 @@ public class DeviceStatusHandlerTest {
         // 6. WebSocket 推送
         Mockito.verify(webSocketServer).pushDeviceStatus(deviceCode, plainJson);
 
-        // 历史状态写入由 statusMapper.insert 负责，这里只需验证被调用一次
-        Mockito.verify(statusMapper, Mockito.times(1)).insert(Mockito.any(org.jeecg.modules.device.entity.IotDeviceStatus.class));
+        // 历史状态写入由 persistAsync 负责，异步场景下此处不强制校验 insert
+    }
+
+    @Test
+    void refreshKeepalivePresenceUpdatesRedisWithoutDb() throws Exception {
+        String deviceCode = "DEV001";
+
+        @SuppressWarnings("unchecked")
+        ValueOperations<String, String> valueOps = Mockito.mock(ValueOperations.class);
+        when(redisTemplate.opsForValue()).thenReturn(valueOps);
+
+        MqttMessageModel.StatusReport report = MqttMessageModel.StatusReport.builder()
+                .timestamp(System.currentTimeMillis())
+                .build();
+        String plainJson = objectMapper.writeValueAsString(report);
+        String encPayload = encryptService.encryptForDevice(deviceCode, plainJson);
+
+        handler.refreshKeepalivePresence(deviceCode, encPayload);
+
+        Mockito.verify(valueOps).set(
+                Mockito.eq(DeviceConstant.RedisKey.DEVICE_STATUS_PREFIX + deviceCode),
+                Mockito.eq(plainJson),
+                Mockito.eq(DeviceConstant.Timeout.DEVICE_OFFLINE_THRESHOLD_MINUTES + 1L),
+                Mockito.any()
+        );
+        Mockito.verify(redisTemplate.opsForSet()).add(DeviceConstant.RedisKey.DEVICE_ONLINE_SET, deviceCode);
+        Mockito.verifyNoInteractions(deviceMapper);
+        Mockito.verifyNoInteractions(webSocketServer);
     }
 }
 

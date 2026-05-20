@@ -57,10 +57,11 @@ public class MqttAuthController {
         String peerHost = body.get("peerhost");
         String peername = body.get("peername");
 
-        // 平台服务账号直接放行
-//        if (clientId != null && clientId.startsWith("iot-platform")) {
-//            return allow();
-//        }
+        // 平台服务账号直接放行（与 ACL 端点对称）
+        if (clientId != null && clientId.startsWith("iot-platform")) {
+            log.info("[MqttAuth] 平台账号放行: clientId={}", clientId);
+            return allow();
+        }
 
         boolean ok = secretService.validateSecret(username, password, peerHost);
         log.info("[MqttAuth] clientId={} peerhost={} peername={} allow={}", clientId, peerHost, peername, ok);

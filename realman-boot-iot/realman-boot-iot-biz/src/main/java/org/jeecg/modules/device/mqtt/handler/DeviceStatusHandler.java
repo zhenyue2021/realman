@@ -25,7 +25,7 @@ import java.util.concurrent.TimeUnit;
  * <ol>
  *   <li>解密 AES 密文 → 解析为 {@link MqttMessageModel.StatusReport}</li>
  *   <li>查询设备基础信息（验证 deviceCode 是否合法）</li>
- *   <li>更新 Redis 实时状态缓存（TTL = 离线阈值 + 1min 缓冲）</li>
+ *   <li>更新 Redis 实时状态缓存（TTL = 离线阈值 + 1min 缓冲）；{@link #refreshKeepalivePresence} 由 {@link MqttMessageDispatcher} 的 keepaliveExecutor 优先续期，避免业务队列丢弃导致误判离线</li>
  *   <li>将设备加入在线集合（iot:device:online）</li>
  *   <li>同步更新 DB 设备在线状态及位置信息</li>
  *   <li>通过 WebSocket 推送实时状态到前端</li>
@@ -49,6 +49,37 @@ public class DeviceStatusHandler {
     private final StringRedisTemplate   redisTemplate;
     private final DeviceWebSocketServer webSocketServer;
 
+    private static final long PRESENCE_TTL_MINUTES =
+            DeviceConstant.Timeout.DEVICE_OFFLINE_THRESHOLD_MINUTES + 1;
+
+    /**
+     * 刷新 keepalive 存活性（Redis Key + 在线集合），供离线判定使用。
+     *
+     * <p>由 {@link MqttMessageDispatcher} 提交到专用 {@code keepaliveExecutor} 执行，
+     * 与 {@link #handle} 使用的 {@code deviceTaskExecutor} 隔离，避免业务队列满丢弃任务导致 Redis TTL 未续期。
+     *
+     * @param deviceCode 设备编号（从 Topic 提取）
+     * @param payload    AES 加密的消息体密文
+     */
+    public void refreshKeepalivePresence(String deviceCode, String payload) {
+        try {
+            String decrypted = encryptService.decryptFromDevice(deviceCode, payload);
+            touchPresence(deviceCode, decrypted);
+        } catch (Exception e) {
+            log.warn("[StatusHandler] keepalive 续期解密失败，仅写入占位 Key: deviceCode={}", deviceCode, e);
+            touchPresence(deviceCode, "{\"keepalive\":true}");
+        }
+    }
+
+    private void touchPresence(String deviceCode, String redisValue) {
+        redisTemplate.opsForValue().set(
+                DeviceConstant.RedisKey.DEVICE_STATUS_PREFIX + deviceCode,
+                redisValue,
+                PRESENCE_TTL_MINUTES,
+                TimeUnit.MINUTES);
+        redisTemplate.opsForSet().add(DeviceConstant.RedisKey.DEVICE_ONLINE_SET, deviceCode);
+    }
+
     /**
      * 处理设备状态上报消息
      *
@@ -70,26 +101,20 @@ public class DeviceStatusHandler {
             return;
         }
 
-        // 3. 更新 Redis 实时状态缓存，TTL = 离线判定阈值 + 1min 缓冲
-        //    Key 过期即视为设备失联，定时任务据此将设备标记为 OFFLINE
-        redisTemplate.opsForValue().set(
-                DeviceConstant.RedisKey.DEVICE_STATUS_PREFIX + deviceCode, decrypted,
-                DeviceConstant.Timeout.DEVICE_OFFLINE_THRESHOLD_MINUTES + 1, TimeUnit.MINUTES);
+        // 3. 刷新 Redis 存活性（keepaliveExecutor 已续期 TTL，此处再写一次以保证内容与 DB/WS 一致）
+        touchPresence(deviceCode, decrypted);
 
-        // 4. 维护在线设备集合（用于批量查询在线状态）
-        redisTemplate.opsForSet().add(DeviceConstant.RedisKey.DEVICE_ONLINE_SET, deviceCode);
-
-        // 5. 同步更新 DB 中的在线状态和位置（经纬度有值才覆盖，避免用空值覆盖历史有效位置）
+        // 4. 同步更新 DB 中的在线状态和位置（经纬度有值才覆盖，避免用空值覆盖历史有效位置）
         device.setStatus(DeviceConstant.DeviceStatus.ONLINE);
         device.setLastOnlineTime(LocalDateTime.now());
         if (r.getLongitude() != null) { device.setLongitude(r.getLongitude()); }
         if (r.getLatitude()  != null) { device.setLatitude(r.getLatitude()); }
         deviceMapper.updateById(device);
 
-        // 6. WebSocket 实时推送给前端监控页面
+        // 5. WebSocket 实时推送给前端监控页面
         webSocketServer.pushDeviceStatus(deviceCode, decrypted);
 
-        // 7. 异步写入历史状态 DB（使用独立线程池，不占用 MQTT 消费线程）
+        // 6. 异步写入历史状态 DB（使用独立线程池，不占用 MQTT 消费线程）
         // 注：上线 MQ 事件统一由 DeviceOnlineReportHandler 在收到 datacollect/deviceOnline 消息时推送
         persistAsync(device, r, decrypted);
     }

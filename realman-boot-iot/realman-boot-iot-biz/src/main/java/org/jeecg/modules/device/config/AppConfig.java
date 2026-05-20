@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.inner.OptimisticLockerInnerInt
 import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
 import com.baomidou.mybatisplus.extension.toolkit.JdbcUtils;
 import io.minio.MinioClient;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,8 +19,9 @@ import javax.sql.DataSource;
 import java.sql.SQLException;
 import java.util.Map;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.atomic.AtomicLong;
 
+@Slf4j
 @Configuration
 @EnableAsync
 public class AppConfig {
@@ -27,6 +29,9 @@ public class AppConfig {
     @Value("${minio.endpoint:http://localhost:9000}")   private String endpoint;
     @Value("${minio.access-key:minioadmin}")            private String accessKey;
     @Value("${minio.secret-key:minioadmin}")            private String secretKey;
+
+    /** 拒绝处理器日志节流：5s 内最多打一条 WARN，避免队列满时日志风暴 */
+    private final AtomicLong lastRejectWarnTs = new AtomicLong(0);
 
     @Autowired
     private DataSource dataSource;
@@ -67,8 +72,26 @@ public class AppConfig {
         executor.setQueueCapacity(2000);
         executor.setThreadNamePrefix("device-task-");
         // 丢弃最旧任务（非阻塞）：队列满时绝不让 Paho 接收线程执行任务，
-        // 否则 Paho 阻塞 → TCP 窗口耗尽 → EMQX mqueue 堆积 → 复现断连
-        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.DiscardOldestPolicy());
+        // 否则 Paho 阻塞 → TCP 窗口耗尽 → EMQX mqueue 堆积 → 复现断连。
+        // keepalive 由 MqttMessageDispatcher.keepaliveExecutor 续期 Redis，此处丢弃不影响离线判定。
+        executor.setRejectedExecutionHandler((runnable, pool) -> {
+            if (pool.isShutdown()) {
+                return;
+            }
+            var queue = pool.getQueue();
+            var dropped = queue.poll();
+            long now = System.currentTimeMillis();
+            if (now - lastRejectWarnTs.getAndSet(now) > 5_000) {
+                log.warn(
+                        "[deviceTaskExecutor] 队列已满，丢弃最旧任务后重试提交 (active={}, poolSize={}, queue={}, completed={}, dropped={})",
+                        pool.getActiveCount(),
+                        pool.getPoolSize(),
+                        queue.size(),
+                        pool.getCompletedTaskCount(),
+                        dropped != null);
+            }
+            pool.execute(runnable);
+        });
         // MDC 跨线程传播：提交任务时快照父线程 MDC，子线程执行前恢复，finally 清理防止污染
         executor.setTaskDecorator(runnable -> {
             Map<String, String> mdc = MDC.getCopyOfContextMap();

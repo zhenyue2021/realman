@@ -18,10 +18,14 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+import jakarta.annotation.PreDestroy;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
@@ -69,6 +73,8 @@ public class MqttMessageDispatcher {
 
     /** 匹配 device/{deviceCode}/{path}，group(1)=deviceCode，group(2)=path */
     private static final Pattern DEVICE_TOPIC     = Pattern.compile("^device/([^/]+)/(.+)$");
+    /** keepalive：device/{deviceCode}/status/report */
+    private static final Pattern STATUS_REPORT_TOPIC = Pattern.compile("^device/([^/]+)/status/report$");
     /** 匹配 {deviceCode}/master/{path} 或 {deviceCode}/slave/{path}，group(1)=deviceCode，group(2)=role，group(3)=path */
     private static final Pattern RAW_DEVICE_TOPIC = Pattern.compile("^([^/]+)/(master|slave)/(.+)$");
 
@@ -123,11 +129,41 @@ public class MqttMessageDispatcher {
     public static final AtomicLong lastReceivedTs = new AtomicLong(System.currentTimeMillis());
 
     /**
+     * keepalive 专用单线程池：仅用于 status/report 的 Redis TTL 刷新。
+     * 不借用 deviceTaskExecutor，保证即使业务队列满载也不影响续期；
+     * 单线程足够（keepalive 写入轻量，无并发瓶颈），不阻塞 Paho CommsCallback 线程。
+     * Spring 容器销毁时由 {@link #shutdownKeepaliveExecutor()} 优雅关闭。
+     */
+    private final ExecutorService keepaliveExecutor = Executors.newSingleThreadExecutor(
+            r -> new Thread(r, "device-keepalive"));
+
+    @PreDestroy
+    void shutdownKeepaliveExecutor() {
+        keepaliveExecutor.shutdown();
+        try {
+            if (!keepaliveExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
+                keepaliveExecutor.shutdownNow();
+                if (!keepaliveExecutor.awaitTermination(2, TimeUnit.SECONDS)) {
+                    log.warn("[Dispatcher] keepaliveExecutor 未在时限内结束，可能仍有任务未完成");
+                }
+            }
+        } catch (InterruptedException e) {
+            keepaliveExecutor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+        log.info("[Dispatcher] keepaliveExecutor 已关闭");
+    }
+
+    /**
      * 异步分发入口：Paho messageArrived 回调调用此方法，立即将消息投递到线程池后返回，
      * 保证 Paho 唯一接收线程不被任何 Handler 的 I/O 操作阻塞。
      *
      * <p>高频上报 Topic（slam/states 等）在投递前先做节流检查，超出阈值的帧直接丢弃，
      * 不进入线程池队列，彻底避免 EMQX mqueue 打满。
+     *
+     * <p>{@code status/report} keepalive 在入队前提交到 {@code keepaliveExecutor}（专用单线程池）
+     * 异步刷新 Redis TTL，既不阻塞 Paho CommsCallback 线程，也不受 {@code deviceTaskExecutor}
+     * 队列满丢弃影响，保证离线判定不误判。
      */
     public void dispatch(String topic, MqttMessage message) {
         String topicNorm = (topic != null && topic.startsWith("/")) ? topic.substring(1) : topic;
@@ -143,6 +179,14 @@ public class MqttMessageDispatcher {
         // 在 Paho 接收线程立即拷贝数据，避免 Paho 内部回收 byte[]
         String payload = new String(message.getPayload(), StandardCharsets.UTF_8);
         String traceId = extractTraceId(message);
+
+        Matcher keepalive = STATUS_REPORT_TOPIC.matcher(topicNorm);
+        if (keepalive.matches()) {
+            String keepaliveDeviceCode = keepalive.group(1);
+            // 提交到专用单线程池，Paho CommsCallback 线程立即返回，不因 Redis I/O 阻塞
+            keepaliveExecutor.execute(() ->
+                    statusHandler.refreshKeepalivePresence(keepaliveDeviceCode, payload));
+        }
 
         taskExecutor.execute(() -> doDispatch(topicNorm, payload, traceId));
     }

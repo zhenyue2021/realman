@@ -262,6 +262,58 @@ public class MqttConfig {
     }
 
     /**
+     * 专用发布客户端（仅用于平台 → 设备的指令下发）。
+     *
+     * <p>与订阅客户端（{@link #mqttClient()}）完全隔离：
+     * <ul>
+     *   <li>订阅客户端的 CommsCallback 只处理入站 PUBLISH → messageArrived</li>
+     *   <li>发布客户端的 CommsCallback 只处理出站 PUBACK 完成回调</li>
+     * </ul>
+     * 两者互不干扰，彻底消除 Paho v5 中 publish() PUBACK 与 messageArrived 竞争导致
+     * CommsCallback 僵死的根本原因。
+     *
+     * <p>clientId 追加 {@code -pub} 后缀，EMQX 侧需同样放行（与 iot-platform-server 同 username）。
+     * 自动重连由 Paho 内置机制负责，无需 Watchdog 监控。
+     */
+    @Bean("mqttPublishClient")
+    @ConditionalOnProperty(prefix = "mqtt", name = "enabled", havingValue = "true", matchIfMissing = false)
+    public MqttClient mqttPublishClient() throws MqttException {
+        MqttClient pubClient = new MqttClient(brokerUrl, clientId + "-pub", new MemoryPersistence());
+
+        MqttConnectionOptions pubOpts = new MqttConnectionOptions();
+        pubOpts.setCleanStart(true);
+        pubOpts.setUserName(username);
+        pubOpts.setPassword(password.getBytes(StandardCharsets.UTF_8));
+        pubOpts.setKeepAliveInterval(keepAlive);
+        pubOpts.setAutomaticReconnect(true);
+        pubOpts.setMaxReconnectDelay(5000);
+        pubOpts.setConnectionTimeout(10);
+        pubOpts.setSocketFactory(tcpKeepaliveSocketFactory());
+
+        pubClient.setCallback(new MqttCallback() {
+            @Override
+            public void disconnected(MqttDisconnectResponse response) {
+                MqttException cause = response.getException();
+                if (cause != null) log.error("[MQTT-PUB] 连接丢失，等待重连", cause);
+                else log.warn("[MQTT-PUB] 连接断开 (reasonCode={})", response.getReturnCode());
+            }
+            @Override public void mqttErrorOccurred(MqttException exception) {
+                log.error("[MQTT-PUB] 客户端内部错误", exception);
+            }
+            @Override public void messageArrived(String topic, MqttMessage msg) { }
+            @Override public void deliveryComplete(IMqttToken token) { }
+            @Override public void connectComplete(boolean reconnect, String serverURI) {
+                if (reconnect) log.info("[MQTT-PUB] 重连成功: {}", serverURI);
+            }
+            @Override public void authPacketArrived(int reasonCode, MqttProperties properties) { }
+        });
+
+        pubClient.connect(pubOpts);
+        log.info("[MQTT-PUB] 发布客户端已连接 EMQX: {} (clientId={})", brokerUrl, clientId + "-pub");
+        return pubClient;
+    }
+
+    /**
      * 强制重建 MQTT 连接，彻底消除 Paho 僵死状态。
      *
      * <p>与 {@code reconnect()} 的本质区别：{@code reconnect()} 尝试复用现有的
