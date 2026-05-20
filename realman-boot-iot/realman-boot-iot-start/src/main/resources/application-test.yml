@@ -95,7 +95,7 @@ mqtt:
   enabled: true
   high-freq-throttle-ms: 500  # slam/states 等高频 Topic 节流间隔(ms)：500=2次/秒，1000=1次/秒，0=不限
   watchdog:
-    idle-timeout-seconds: 180  # Watchdog 空闲超时阈值(秒)；必须 < DEVICE_OFFLINE_THRESHOLD_MINUTES*60(300s)，留足重连时间
+    idle-timeout-seconds: 90  # 空闲超时(秒)=心跳间隔45s×2；须 < 设备离线判定阈值 300s
   broker:
     url: tcp://realman-emqx:1883
     username: iot-platform

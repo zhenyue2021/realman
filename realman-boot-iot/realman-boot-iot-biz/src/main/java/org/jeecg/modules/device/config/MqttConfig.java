@@ -8,6 +8,7 @@ import org.eclipse.paho.mqttv5.common.MqttMessage;
 import org.eclipse.paho.mqttv5.common.packet.MqttProperties;
 import org.jeecg.modules.device.mqtt.handler.MqttMessageDispatcher;
 import org.springframework.beans.factory.annotation.Value;
+import java.util.concurrent.atomic.AtomicLong;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -55,6 +56,11 @@ public class MqttConfig {
     private MqttConnectionOptions savedOpts;
     private String[] savedTopics;
     private int[] savedQosArr;
+
+    /** 断线后触发重建连接的去抖窗口（毫秒），避免短时抖动多次 restart */
+    private static final long DISCONNECT_RESTART_DEBOUNCE_MS = 30_000L;
+
+    private final AtomicLong lastDisconnectRestartScheduledMs = new AtomicLong(0);
 
     @Value("${mqtt.broker.url:tcp://localhost:1883}")
     private String brokerUrl;
@@ -121,7 +127,9 @@ public class MqttConfig {
         opts.setUserName(username);
         opts.setPassword(password.getBytes(StandardCharsets.UTF_8));
         opts.setKeepAliveInterval(keepAlive);  // 心跳间隔（秒）
-        opts.setAutomaticReconnect(true);      // 自动重连（断线后指数退避重试）
+        // 禁用 Paho 内置自动重连：由 MqttClientWatchdog 统一负责，避免自动重连与手动重连并发竞争，
+        // 防止出现"已连接但 subscribe() 被跳过"的隐式订阅丢失问题。
+        opts.setAutomaticReconnect(false);
         opts.setMaxReconnectDelay(5000);       // 最大重连间隔 5s
         opts.setConnectionTimeout(10);         // TCP 连接超时 10s（默认 30s 太长，快速失败快速重试）
         // TCP Socket 层 keepalive：由 OS 负责探测，早于 MQTT 心跳发现半打开连接。
@@ -174,6 +182,8 @@ public class MqttConfig {
 //                share + "/+/slave/cmd",
                 share + "+/slave/states",
                 share + "/+/slave/states",
+                // 平台自检心跳：不使用共享订阅，每个节点都需要收到自己发布的心跳来刷新 Watchdog 计时器
+                "iot-platform/heartbeat",
         };
         savedTopics = topics;
         final int[] qosArr = new int[topics.length];
@@ -187,10 +197,12 @@ public class MqttConfig {
             public void disconnected(MqttDisconnectResponse response) {
                 MqttException cause = response.getException();
                 if (cause != null) {
-                    log.error("[MQTT] 连接丢失，等待重连", cause);
+                    log.error("[MQTT] 连接丢失，3s 后尝试重建连接", cause);
                 } else {
-                    log.warn("[MQTT] 连接断开 (reasonCode={})", response.getReturnCode());
+                    log.warn("[MQTT] 连接断开 (reasonCode={})，3s 后尝试重建连接",
+                            response.getReturnCode());
                 }
+                scheduleRestartAfterDisconnect();
             }
 
             @Override
@@ -216,22 +228,22 @@ public class MqttConfig {
                 // 重置 Watchdog 计时器：无论是初次连接还是重连，都重新开始计时，
                 // 避免 Watchdog 在重订阅完成前因"空闲超时"再次触发强制断连。
                 MqttMessageDispatcher.lastReceivedTs.set(System.currentTimeMillis());
-                if (!reconnect) return;
-
-                log.info("[MQTT] 重连成功: {}，重新订阅{}个Topic", serverURI, topics.length);
-                // 必须在独立线程中调用 subscribe()，不能阻塞当前 Paho CommsCallback 线程。
-                // 原因：subscribe() 内部同步等待 SUBACK，而 SUBACK 由 CommsReceiver 接收后
-                // 需经 CommsCallback 队列处理。若在 CommsCallback 线程里直接调用，
-                // 会造成"CommsCallback 等 SUBACK，SUBACK 等 CommsCallback"的死锁，
-                // 超时后 Paho 进入不一致状态（已连接但 messageArrived 永不触发）。
+                if (!reconnect) {
+                    log.info("[MQTT] 连接完成: {}", serverURI);
+                    return;
+                }
+                // automaticReconnect=false，正常情况此分支不触发。
+                // 保留为安全网：若将来意外触发自动重连，确保重订阅仍然执行。
+                log.warn("[MQTT] 检测到意外的自动重连（automaticReconnect=false 时不应发生）: {}", serverURI);
+                // subscribe() 不能在 CommsCallback 线程直接调用（会死锁），必须用独立线程
                 Thread resubThread = new Thread(() -> {
                     for (int attempt = 1; attempt <= 3; attempt++) {
                         try {
                             client.subscribe(topics, qosArr);
-                            log.info("[MQTT] 重订阅完成，共{}个Topic", topics.length);
+                            log.info("[MQTT] 安全网重订阅完成，共{}个Topic", topics.length);
                             return;
                         } catch (MqttException e) {
-                            log.warn("[MQTT] 重订阅第{}次失败", attempt, e);
+                            log.warn("[MQTT] 安全网重订阅第{}次失败", attempt, e);
                             if (attempt < 3) {
                                 try {
                                     Thread.sleep(2000L * attempt);
@@ -242,7 +254,7 @@ public class MqttConfig {
                             }
                         }
                     }
-                    log.error("[MQTT] 重订阅3次均失败，等待 Watchdog 触发强制重连");
+                    log.error("[MQTT] 安全网重订阅3次均失败，等待 Watchdog 触发强制重连");
                 }, "mqtt-resubscribe");
                 resubThread.setDaemon(true);
                 resubThread.start();
@@ -356,6 +368,65 @@ public class MqttConfig {
 
     public boolean isClientConnected() {
         return client != null && client.isConnected();
+    }
+
+    /**
+     * HTTP 服务就绪后补一次订阅（解决冷启动/重启时 EMQX HTTP ACL 不可用导致首次 subscribe 失败）。
+     * MQTT SUBSCRIBE 幂等，重复调用安全。
+     */
+    public synchronized void ensureSubscribed() {
+        if (client == null || !client.isConnected()) {
+            log.warn("[MQTT] ensureSubscribed 跳过：订阅客户端未连接");
+            return;
+        }
+        if (savedTopics == null || savedQosArr == null) {
+            log.warn("[MQTT] ensureSubscribed 跳过：订阅列表未初始化");
+            return;
+        }
+        for (int attempt = 1; attempt <= 3; attempt++) {
+            try {
+                client.subscribe(savedTopics, savedQosArr);
+                MqttMessageDispatcher.lastReceivedTs.set(System.currentTimeMillis());
+                log.info("[MQTT] ensureSubscribed 完成，共 {} 个 Topic", savedTopics.length);
+                return;
+            } catch (MqttException e) {
+                log.warn("[MQTT] ensureSubscribed 第 {} 次失败", attempt, e);
+                if (attempt < 3) {
+                    try {
+                        Thread.sleep(2000L * attempt);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                }
+            }
+        }
+        log.error("[MQTT] ensureSubscribed 3 次均失败，等待 Watchdog 重建连接");
+    }
+
+    /**
+     * 断线后延迟触发 {@link #restartConnection()}（automaticReconnect=false 时替代 Paho 自动重连）。
+     */
+    private void scheduleRestartAfterDisconnect() {
+        long now = System.currentTimeMillis();
+        long last = lastDisconnectRestartScheduledMs.get();
+        if (now - last < DISCONNECT_RESTART_DEBOUNCE_MS) {
+            return;
+        }
+        if (!lastDisconnectRestartScheduledMs.compareAndSet(last, now)) {
+            return;
+        }
+        Thread t = new Thread(() -> {
+            try {
+                Thread.sleep(3000L);
+                log.warn("[MQTT] 断线后触发重建连接...");
+                restartConnection();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }, "mqtt-disconnect-restart");
+        t.setDaemon(true);
+        t.start();
     }
 
     /**

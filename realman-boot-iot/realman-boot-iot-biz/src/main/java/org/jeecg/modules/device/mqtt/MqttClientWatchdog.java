@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.config.MqttConfig;
 import org.jeecg.modules.device.mqtt.handler.MqttMessageDispatcher;
+import org.jeecg.modules.device.mqtt.publisher.MqttPublisher;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -35,14 +36,18 @@ import java.util.concurrent.TimeUnit;
 @ConditionalOnProperty(prefix = "mqtt", name = "enabled", havingValue = "true", matchIfMissing = false)
 public class MqttClientWatchdog {
 
+    /** 平台自检心跳 Topic，与 MqttConfig 订阅列表和 MqttMessageDispatcher 过滤保持一致 */
+    static final String HEARTBEAT_TOPIC = "iot-platform/heartbeat";
+
     private final MqttConfig mqttConfig;
+    private final MqttPublisher mqttPublisher;
 
     /**
      * 消息空闲超时阈值（秒）。
-     * 若平台超过此阈值没有收到任何消息，说明 Paho 可能已僵死，触发强制重连。
-     * 默认 300s（5分钟），可通过配置覆盖：mqtt.watchdog.idle-timeout-seconds
+     * 若平台超过此阈值没有收到任何消息（含自检心跳），触发强制重连。
+     * 默认 90s = 心跳间隔 45s × 2，可通过配置覆盖：mqtt.watchdog.idle-timeout-seconds
      */
-    @Value("${mqtt.watchdog.idle-timeout-seconds:300}")
+    @Value("${mqtt.watchdog.idle-timeout-seconds:90}")
     private long idleTimeoutSeconds;
 
     @PostConstruct
@@ -52,9 +57,21 @@ public class MqttClientWatchdog {
             t.setDaemon(true);
             return t;
         });
-        // fixedDelay：上次执行完成后 60s 再次执行，避免检测本身耗时导致间隔漂移
-        scheduler.scheduleWithFixedDelay(this::check, 60, 60, TimeUnit.SECONDS);
-        log.info("[MqttWatchdog] 已启动，检测间隔 60s，空闲超时 {}s", idleTimeoutSeconds);
+        // 心跳发布：每 45s 发一次，订阅客户端收到后刷新 lastReceivedTs；
+        // 即使 0 台设备在线，watchdog 也不会误判为僵死。首次延迟 15s，等待 MQTT 客户端完全就绪。
+        scheduler.scheduleWithFixedDelay(this::publishHeartbeat, 15, 45, TimeUnit.SECONDS);
+        // 僵死检测：首次 15s 后开始，之后每 30s 检查（与心跳首次延迟对齐）
+        scheduler.scheduleWithFixedDelay(this::check, 15, 30, TimeUnit.SECONDS);
+        log.info("[MqttWatchdog] 已启动，心跳间隔 45s，检测间隔 30s，空闲超时 {}s", idleTimeoutSeconds);
+    }
+
+    private void publishHeartbeat() {
+        try {
+            mqttPublisher.publishRaw(HEARTBEAT_TOPIC,
+                    "{\"ts\":" + System.currentTimeMillis() + "}", 0, false);
+        } catch (Exception e) {
+            log.warn("[MqttWatchdog] 心跳发布失败", e);
+        }
     }
 
     private void check() {
@@ -74,7 +91,15 @@ public class MqttClientWatchdog {
                 // 调用 connect() 创建全新的 CommsSender/CommsReceiver/CommsCallback 线程
                 log.warn("[MqttWatchdog] {}s 无消息但客户端仍显示已连接，疑似僵死，重建连接", idleMs / 1000);
             }
-            mqttConfig.restartConnection();
+            Thread restartThread = new Thread(() -> {
+                try {
+                    mqttConfig.restartConnection();
+                } catch (Exception e) {
+                    log.error("[MqttWatchdog] 重建连接异常", e);
+                }
+            }, "mqtt-watchdog-restart");
+            restartThread.setDaemon(true);
+            restartThread.start();
         } catch (Exception e) {
             // 捕获所有异常，防止单次检测失败导致 Executor 停止调度
             log.error("[MqttWatchdog] 检测异常", e);

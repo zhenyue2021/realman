@@ -75,6 +75,8 @@ public class MqttMessageDispatcher {
     private static final Pattern DEVICE_TOPIC     = Pattern.compile("^device/([^/]+)/(.+)$");
     /** keepalive：device/{deviceCode}/status/report */
     private static final Pattern STATUS_REPORT_TOPIC = Pattern.compile("^device/([^/]+)/status/report$");
+    /** 平台自检心跳 Topic（必须与 MqttClientWatchdog.HEARTBEAT_TOPIC 和 MqttConfig 订阅列表保持一致） */
+    private static final String HEARTBEAT_TOPIC = "iot-platform/heartbeat";
     /** 匹配 {deviceCode}/master/{path} 或 {deviceCode}/slave/{path}，group(1)=deviceCode，group(2)=role，group(3)=path */
     private static final Pattern RAW_DEVICE_TOPIC = Pattern.compile("^([^/]+)/(master|slave)/(.+)$");
 
@@ -175,6 +177,11 @@ public class MqttMessageDispatcher {
 
         // 更新存活时间戳，供 MqttClientWatchdog 检测 Paho 僵死状态
         lastReceivedTs.set(System.currentTimeMillis());
+
+        // 心跳自检 topic：lastReceivedTs 已更新，无需业务处理，直接返回
+        if (HEARTBEAT_TOPIC.equals(topicNorm)) {
+            return;
+        }
 
         // 在 Paho 接收线程立即拷贝数据，避免 Paho 内部回收 byte[]
         String payload = new String(message.getPayload(), StandardCharsets.UTF_8);
