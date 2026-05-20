@@ -2,6 +2,7 @@ package org.jeecg.config.shiro.filters;
 
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang.StringUtils;
+import org.apache.shiro.authc.AuthenticationException;
 import org.apache.shiro.web.filter.authc.BasicHttpAuthenticationFilter;
 import org.jeecg.common.config.TenantContext;
 import org.jeecg.common.constant.CommonConstant;
@@ -76,6 +77,9 @@ public class JwtFilter extends BasicHttpAuthenticationFilter {
         // 代码逻辑说明: JT-355 OA聊天添加token验证，获取token参数
         if (oConvertUtils.isEmpty(token)) {
             token = httpServletRequest.getParameter("token");
+        }
+        if (oConvertUtils.isEmpty(token)) {
+            throw new AuthenticationException("token为空!");
         }
 
         JwtToken jwtToken = new JwtToken(token);

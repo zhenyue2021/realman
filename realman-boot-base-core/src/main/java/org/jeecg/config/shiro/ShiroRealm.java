@@ -9,6 +9,9 @@ import org.apache.shiro.authz.AuthorizationInfo;
 import org.apache.shiro.authz.SimpleAuthorizationInfo;
 import org.apache.shiro.realm.AuthorizingRealm;
 import org.apache.shiro.subject.PrincipalCollection;
+import org.apache.shiro.SecurityUtils;
+import org.apache.shiro.subject.Subject;
+import org.apache.shiro.web.subject.WebSubject;
 import org.jeecg.common.api.CommonAPI;
 import org.jeecg.common.config.TenantContext;
 import org.jeecg.common.constant.CacheConstant;
@@ -100,8 +103,14 @@ public class ShiroRealm extends AuthorizingRealm {
         log.debug("===============Shiro身份认证开始============doGetAuthenticationInfo==========");
         String token = (String) auth.getCredentials();
         if (token == null) {
-            HttpServletRequest req = SpringContextUtils.getHttpServletRequest();
-            log.info("————————身份认证失败——————————IP地址:  "+ oConvertUtils.getIpAddrByRequest(req) +"，URL:"+req.getRequestURI());
+            String ip = "N/A";
+            String url = "N/A";
+            HttpServletRequest req = resolveCurrentRequest();
+            if (req != null) {
+                ip = oConvertUtils.getIpAddrByRequest(req);
+                url = req.getRequestURI();
+            }
+            log.info("————————身份认证失败——————————IP地址:  "+ ip +"，URL:"+ url);
             throw new AuthenticationException("token为空!");
         }
         // 校验token有效性
@@ -182,6 +191,25 @@ public class ShiroRealm extends AuthorizingRealm {
             }
         }
         return loginUser;
+    }
+
+    /**
+     * 优先从 Shiro WebSubject 取当前请求；Feign/异步线程无 RequestContext 时避免 NPE。
+     */
+    private HttpServletRequest resolveCurrentRequest() {
+        try {
+            Subject subject = SecurityUtils.getSubject();
+            if (subject instanceof WebSubject webSubject) {
+                return (HttpServletRequest) webSubject.getServletRequest();
+            }
+        } catch (Exception ignored) {
+            // ignore
+        }
+        try {
+            return SpringContextUtils.getHttpServletRequest();
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     /**

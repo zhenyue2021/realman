@@ -44,13 +44,21 @@ public class SpringContextUtils implements ApplicationContextAware {
 	  * 获取HttpServletRequest
 	 */
 	public static HttpServletRequest getHttpServletRequest() {
-		return ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes()).getRequest();
+		ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+		if (attributes == null) {
+			return null;
+		}
+		return attributes.getRequest();
 	}
 	/**
 	 * 获取HttpServletResponse
 	 */
 	public static HttpServletResponse getHttpServletResponse() {
-		return ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes()).getResponse();
+		ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+		if (attributes == null) {
+			return null;
+		}
+		return attributes.getResponse();
 	}
 
 	/**
@@ -58,6 +66,9 @@ public class SpringContextUtils implements ApplicationContextAware {
 	*/
 	public static String getDomain(){
 		HttpServletRequest request = getHttpServletRequest();
+		if (request == null) {
+			return "";
+		}
 		StringBuffer url = request.getRequestURL();
 		//1.微服务情况下，获取gateway的basePath
 		String basePath = request.getHeader(ServiceNameConstants.X_GATEWAY_BASE_PATH);
@@ -77,7 +88,7 @@ public class SpringContextUtils implements ApplicationContextAware {
 
 	public static String getOrigin(){
 		HttpServletRequest request = getHttpServletRequest();
-		return request.getHeader("Origin");
+		return request != null ? request.getHeader("Origin") : null;
 	}
 	
 	/**
