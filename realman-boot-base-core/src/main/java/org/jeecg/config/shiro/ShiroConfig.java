@@ -154,6 +154,11 @@ public class ShiroConfig {
         filterChainDefinitionMap.put("/realman-iot/ws/**", "anon");     // IoT WS（context-path 兜底）
         filterChainDefinitionMap.put("/dragChannelSocket/**", "anon");  // 仪表盘按钮通信
 
+        // ---- 微服务内部 API（Feign 互调，免 JWT） ----
+        filterChainDefinitionMap.put("/sys/api/**", "anon");
+        // context-path 兜底（部分容器/代理下 servletPath 可能含前缀）
+        filterChainDefinitionMap.put("/realman-boot/sys/api/**", "anon");
+
         // ---- 其他公开接口 ----
         filterChainDefinitionMap.put("/openapi/call/**", "anon"); // 开放平台接口
         filterChainDefinitionMap.put("/test/seata/**", "anon");   // Seata 测试

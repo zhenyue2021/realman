@@ -208,7 +208,7 @@ jeecg:
     #webapp文件路径
     webapp: /opt/jeecg-boot/webapp
   shiro:
-    excludeUrls: /test/jeecgDemo/demo3,/test/jeecgDemo/redisDemo/**,/bigscreen/category/**,/bigscreen/visual/**,/bigscreen/map/**,/api/getUserInfo
+    excludeUrls: /sys/api/**,/test/jeecgDemo/demo3,/test/jeecgDemo/redisDemo/**,/bigscreen/category/**,/bigscreen/visual/**,/bigscreen/map/**,/api/getUserInfo
   # 短信发送方式 aliyun阿里云短信 tencent腾讯云短信
   smsSendType: aliyun
   #阿里云oss存储和大鱼短信秘钥配置
