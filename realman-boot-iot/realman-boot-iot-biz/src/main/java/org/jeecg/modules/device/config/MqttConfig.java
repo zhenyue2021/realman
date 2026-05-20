@@ -37,12 +37,24 @@ import java.util.Arrays;
  *
  * <p>此 Bean 仅在配置 {@code mqtt.enabled=true} 时生效，可通过关闭此配置在无 EMQX 环境下启动。
  *
+ * <p>僵死恢复说明：
+ *   {@link #restartConnection()} 通过 {@code disconnectForcibly + connect} 重建连接，
+ *   与 {@code reconnect()} 的区别在于 {@code connect()} 会创建全新的 CommsSender /
+ *   CommsReceiver / CommsCallback 线程，彻底消除 Paho 僵死状态。
+ *   由 {@link org.jeecg.modules.device.mqtt.MqttClientWatchdog} 检测到僵死后调用。
+ *
  * @see MqttConfigContext 延迟获取 MqttMessageDispatcher 的上下文工具类
  */
 @Slf4j
 @Configuration
 @ConditionalOnProperty(prefix = "mqtt", name = "enabled", havingValue = "true", matchIfMissing = false)
 public class MqttConfig {
+
+    /** 复用同一 MqttClient 对象，通过 connect() 重置内部线程而非创建新对象（避免刷新 Spring bean 引用） */
+    private MqttClient client;
+    private MqttConnectionOptions savedOpts;
+    private String[] savedTopics;
+    private int[] savedQosArr;
 
     @Value("${mqtt.broker.url:tcp://localhost:1883}")
     private String brokerUrl;
@@ -98,7 +110,7 @@ public class MqttConfig {
      */
     @Bean
     public MqttClient mqttClient() throws MqttException {
-        MqttClient client = new MqttClient(brokerUrl, clientId, new MemoryPersistence());
+        client = new MqttClient(brokerUrl, clientId, new MemoryPersistence());
 
         MqttConnectionOptions opts = new MqttConnectionOptions();
         // cleanStart=true：MQTT 5.0 对应 cleanSession，配合 $share 共享订阅使用。
@@ -128,6 +140,7 @@ public class MqttConfig {
         //     Handler 内部通过幂等设计（Redis SET NX）保证只有一个节点实际处理。
         //   - 带前导 / 的原始 Topic：兼容旧固件，无需共享订阅（流量极低）。
         String share = "$share/iot-cluster/";
+        savedOpts = opts;
         final String[] topics = {
                 share + "device/+/status/report",           // 设备状态上报
                 share + "device/+/config/ack",              // 参数配置同步确认
@@ -162,8 +175,10 @@ public class MqttConfig {
                 share + "+/slave/states",
                 share + "/+/slave/states",
         };
+        savedTopics = topics;
         final int[] qosArr = new int[topics.length];
         Arrays.fill(qosArr, qos);
+        savedQosArr = qosArr;
 
         // 重连后重订阅兜底：Paho 自动重连时会尝试重发内部订阅列表，
         // 但在 cleanStart=true + 某些 Paho 版本下订阅列表可能丢失，此处主动重订阅保证万无一失。
@@ -244,6 +259,51 @@ public class MqttConfig {
         client.subscribe(topics, qosArr);
         log.info("[MQTT] 已订阅{}个业务Topic", topics.length);
         return client;
+    }
+
+    /**
+     * 强制重建 MQTT 连接，彻底消除 Paho 僵死状态。
+     *
+     * <p>与 {@code reconnect()} 的本质区别：{@code reconnect()} 尝试复用现有的
+     * CommsSender/CommsReceiver/CommsCallback 线程，在僵死场景下这些线程已损坏；
+     * 本方法调用 {@code connect(opts)} ，Paho 内部会创建全新的通信线程，彻底恢复。
+     *
+     * <p>使用同一 {@link MqttClient} 对象（而非创建新对象），避免刷新已注入其他组件的 Bean 引用。
+     * {@link org.jeecg.modules.device.mqtt.publisher.MqttPublisher} 通过
+     * {@code ObjectProvider.getIfAvailable()} 每次获取，重建后自动使用恢复的连接。
+     *
+     * <p>本方法已加锁，Watchdog 多次触发时串行执行不会并发冲突。
+     */
+    public synchronized void restartConnection() {
+        log.warn("[MQTT] 开始重建连接（disconnectForcibly → connect，创建全新 Paho 通信线程）...");
+        // 重置计时器，避免重建期间 Watchdog 再次触发
+        MqttMessageDispatcher.lastReceivedTs.set(System.currentTimeMillis());
+        try {
+            client.disconnectForcibly(0L, 3000L);
+        } catch (Exception e) {
+            log.warn("[MQTT] 强制断开异常（忽略，继续重连）", e);
+        }
+        for (int attempt = 1; attempt <= 3; attempt++) {
+            try {
+                client.connect(savedOpts);
+                client.subscribe(savedTopics, savedQosArr);
+                log.info("[MQTT] 连接重建完成，已重新订阅 {} 个 Topic", savedTopics.length);
+                return;
+            } catch (MqttException e) {
+                log.warn("[MQTT] 重建连接第 {} 次失败: {}", attempt, e.getMessage());
+                if (attempt < 3) {
+                    try { Thread.sleep(2000L * attempt); } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                }
+            }
+        }
+        log.error("[MQTT] 重建连接 3 次均失败，等待下次 Watchdog 触发");
+    }
+
+    public boolean isClientConnected() {
+        return client != null && client.isConnected();
     }
 
     /**
