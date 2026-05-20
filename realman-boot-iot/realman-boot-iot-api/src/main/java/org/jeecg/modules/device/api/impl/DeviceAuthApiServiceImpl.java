@@ -13,12 +13,7 @@ import org.jeecg.common.util.ContentDispositionUtil;
 import org.jeecg.common.system.util.JwtUtil;
 import org.jeecg.modules.device.api.DeviceAuthApiService;
 import org.jeecg.modules.device.component.DeviceServiceComponent;
-import org.jeecg.modules.device.dto.DeviceAuthDTO;
-import org.jeecg.modules.device.dto.DeviceAuthDetailDTO;
-import org.jeecg.modules.device.dto.DeviceAuthQueryDTO;
-import org.jeecg.modules.device.dto.EnterpriseNodeRowDTO;
-import org.jeecg.modules.device.dto.OptionDTO;
-import org.jeecg.modules.device.dto.OptionTreeDTO;
+import org.jeecg.modules.device.dto.*;
 import org.jeecg.modules.device.entity.IotDeviceAuth;
 import org.jeecg.modules.device.feign.SysAuthFeignClient;
 import org.jeecg.modules.device.mapper.IotDeviceMapper;
@@ -126,7 +121,7 @@ public class DeviceAuthApiServiceImpl implements DeviceAuthApiService {
     }
 
     @Override
-    public List<OptionDTO> availableDevices(HttpServletRequest request, Integer deviceType) {
+    public List<DeviceOptionDTO> availableDevices(HttpServletRequest request, Integer deviceType) {
         assertAdminOrOps(request);
         return iotDeviceMapper.listAvailableDevices(deviceType);
     }

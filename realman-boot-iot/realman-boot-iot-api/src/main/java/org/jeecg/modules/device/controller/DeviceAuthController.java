@@ -7,11 +7,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.jeecg.modules.device.api.DeviceAuthApiService;
-import org.jeecg.modules.device.dto.DeviceAuthDTO;
-import org.jeecg.modules.device.dto.DeviceAuthDetailDTO;
-import org.jeecg.modules.device.dto.DeviceAuthQueryDTO;
-import org.jeecg.modules.device.dto.OptionDTO;
-import org.jeecg.modules.device.dto.OptionTreeDTO;
+import org.jeecg.modules.device.dto.*;
 import org.jeecg.modules.device.vo.ApiResult;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -94,13 +90,13 @@ public class DeviceAuthController {
 
     @GetMapping("/options/controllers/available")
     @Operation(summary = "可授权主控下拉列表")
-    public ApiResult<List<OptionDTO>> availableControllers(HttpServletRequest request) {
+    public ApiResult<List<DeviceOptionDTO>> availableControllers(HttpServletRequest request) {
         return ApiResult.ok(deviceAuthApiService.availableDevices(request, 2));
     }
 
     @GetMapping("/options/robots/available")
     @Operation(summary = "可授权机器人下拉列表")
-    public ApiResult<List<OptionDTO>> availableRobots(HttpServletRequest request) {
+    public ApiResult<List<DeviceOptionDTO>> availableRobots(HttpServletRequest request) {
         return ApiResult.ok(deviceAuthApiService.availableDevices(request, 1));
     }
 

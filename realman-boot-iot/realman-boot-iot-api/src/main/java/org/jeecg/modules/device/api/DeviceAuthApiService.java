@@ -1,11 +1,7 @@
 package org.jeecg.modules.device.api;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import org.jeecg.modules.device.dto.DeviceAuthDTO;
-import org.jeecg.modules.device.dto.DeviceAuthDetailDTO;
-import org.jeecg.modules.device.dto.DeviceAuthQueryDTO;
-import org.jeecg.modules.device.dto.OptionDTO;
-import org.jeecg.modules.device.dto.OptionTreeDTO;
+import org.jeecg.modules.device.dto.*;
 import org.springframework.http.ResponseEntity;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -31,7 +27,7 @@ public interface DeviceAuthApiService {
 
     List<OptionTreeDTO> enterpriseOptionsTree(HttpServletRequest request);
 
-    List<OptionDTO> availableDevices(HttpServletRequest request, Integer deviceType);
+    List<DeviceOptionDTO> availableDevices(HttpServletRequest request, Integer deviceType);
 
     /** 授权记录查询：机器人设备下拉（全部未删除机器人，非「仅可授权」） */
     List<OptionDTO> authQueryRobotOptions(HttpServletRequest request);

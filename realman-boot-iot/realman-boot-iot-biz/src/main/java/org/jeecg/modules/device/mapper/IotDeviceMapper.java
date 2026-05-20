@@ -7,6 +7,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.jeecg.modules.device.dto.AuthorizedDeviceOptionDTO;
+import org.jeecg.modules.device.dto.DeviceOptionDTO;
 import org.jeecg.modules.device.dto.OptionDTO;
 import org.jeecg.modules.device.entity.IotDevice;
 
@@ -36,7 +37,8 @@ public interface IotDeviceMapper extends BaseMapper<IotDevice> {
     @Select("""
             <script>
             SELECT d.id AS id,
-                   d.device_code AS name
+                   d.device_code AS code,
+                   d.device_name AS name
             FROM iot_device d
             WHERE d.del_flag = 0
               AND d.device_type = #{deviceType}
@@ -55,7 +57,7 @@ public interface IotDeviceMapper extends BaseMapper<IotDevice> {
             ORDER BY d.device_code ASC
             </script>
             """)
-    List<OptionDTO> listAvailableDevices(@Param("deviceType") Integer deviceType);
+    List<DeviceOptionDTO> listAvailableDevices(@Param("deviceType") Integer deviceType);
 
     /**
      * 授权记录查询条件下拉：返回指定类型的全部未删除设备（含已有授权记录的设备）。
