@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -118,6 +119,9 @@ public class MqttMessageDispatcher {
     private static final List<String> HIGH_FREQ_SUFFIXES =
             List.of("/slam/states", "/slave/states", "/master/states");
 
+    /** 最后一次收到 MQTT 消息的时间戳（毫秒）；由 Watchdog 读取，用于检测 Paho 僵死状态 */
+    public static final AtomicLong lastReceivedTs = new AtomicLong(System.currentTimeMillis());
+
     /**
      * 异步分发入口：Paho messageArrived 回调调用此方法，立即将消息投递到线程池后返回，
      * 保证 Paho 唯一接收线程不被任何 Handler 的 I/O 操作阻塞。
@@ -132,6 +136,9 @@ public class MqttMessageDispatcher {
         if (isThrottled(topicNorm)) {
             return;
         }
+
+        // 更新存活时间戳，供 MqttClientWatchdog 检测 Paho 僵死状态
+        lastReceivedTs.set(System.currentTimeMillis());
 
         // 在 Paho 接收线程立即拷贝数据，避免 Paho 内部回收 byte[]
         String payload = new String(message.getPayload(), StandardCharsets.UTF_8);

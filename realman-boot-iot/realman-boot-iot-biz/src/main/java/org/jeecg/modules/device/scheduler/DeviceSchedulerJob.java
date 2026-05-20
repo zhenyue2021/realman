@@ -99,7 +99,7 @@ public class DeviceSchedulerJob {
         for (IotDevice d : onlineDevices) {
             String key = DeviceConstant.RedisKey.DEVICE_STATUS_PREFIX + d.getDeviceCode();
             // Redis Key 不存在说明设备超过 DEVICE_OFFLINE_THRESHOLD_MINUTES 分钟未上报状态
-            if (!Boolean.TRUE.equals(redisTemplate.hasKey(key))) {
+            if (!redisTemplate.hasKey(key)) {
                 d.setStatus(DeviceConstant.DeviceStatus.OFFLINE);
                 d.setLastOfflineTime(LocalDateTime.now());
                 deviceMapper.updateById(d);
