@@ -11,12 +11,14 @@ import org.jeecg.modules.device.mapper.ExtParamRecordIotMapper;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.mqtt.publisher.MqttPublisher;
 import org.jeecg.modules.device.security.CommandEncryptService;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.concurrent.Executor;
 
 /**
  * 处理设备请求外部系统服务参数（上行）
@@ -31,26 +33,25 @@ import java.util.Map;
  *   <li>库中亦无数据则响应 code=400</li>
  * </ol>
  *
- * <p>注意：设备请求中 targetSystem 是外部系统的编码（如 GLN_MANAGE_PLATFORM），
- * 对应外部系统推送时的 sourceSystem，因此缓存 key 需做翻转查找。
+ * <p>MQTT 回包在 {@code mqttPublishExecutor} 中异步执行，不占用路由线程。
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class ExtParamsRequestHandler {
 
-    /** 与 ExternalParamRecordServiceImpl.REDIS_KEY_PREFIX 保持一致 */
     private static final String REDIS_KEY_PREFIX = "realman:ext:param:";
-
-    /** utcExpiration 解析失败时的兜底 TTL（1 小时） */
     private static final long DEFAULT_TTL_SECONDS = 3600L;
-
 
     private final CommandEncryptService encryptService;
     private final ObjectMapper objectMapper;
     private final MqttPublisher mqttPublisher;
     private final RedisUtil redisUtil;
     private final ExtParamRecordIotMapper extParamRecordIotMapper;
+
+    @Autowired
+    @Qualifier("mqttPublishExecutor")
+    private Executor mqttPublishExecutor;
 
     public void handle(String deviceCode, String payload) throws Exception {
         String decrypted = encryptService.decryptFromDevice(deviceCode, payload);
@@ -64,18 +65,24 @@ public class ExtParamsRequestHandler {
                 deviceCode, req.getRequestId(), sourceSystem, targetSystem, req.getBizType());
 
         MqttMessageModel.ExtParamsResponse resp = buildResponse(req.getRequestId(), sourceSystem, targetSystem);
-
         String respTopic = String.format(DeviceConstant.MqttTopic.EXT_PARAMS_RESPONSE, deviceCode);
-        mqttPublisher.publishToDevice(deviceCode, respTopic, objectMapper.writeValueAsString(resp), MqttConstant.MQTT_QOS.QOS_1);
+        String respJson = objectMapper.writeValueAsString(resp);
+
+        mqttPublishExecutor.execute(() -> {
+            try {
+                mqttPublisher.publishToDevice(deviceCode, respTopic, respJson, MqttConstant.MQTT_QOS.QOS_1);
+                log.debug("[ExtParams] 已异步下发 ack deviceCode={} requestId={}", deviceCode, req.getRequestId());
+            } catch (Exception e) {
+                log.error("[ExtParams] 异步下发 ack 失败 deviceCode={} requestId={}",
+                        deviceCode, req.getRequestId(), e);
+            }
+        });
     }
 
     @SuppressWarnings("unchecked")
     private MqttMessageModel.ExtParamsResponse buildResponse(String requestId, String sourceSystem, String targetSystem) {
-        // 缓存 key：外部系统推送时以自身为 sourceSystem，设备请求中的 targetSystem 即外部系统编码
-        // 因此 key = realman:ext:param:{req.targetSystem}:{req.sourceSystem}
         String cacheKey = REDIS_KEY_PREFIX + targetSystem + ":" + sourceSystem;
 
-        // 1. 优先读 Redis 缓存
         Object cached = redisUtil.get(cacheKey);
         if (cached != null) {
             Map<String, Object> data = JSON.parseObject(cached.toString(), Map.class);
@@ -84,7 +91,6 @@ public class ExtParamsRequestHandler {
             return toResponse(requestId, sourceSystem, targetSystem, data);
         }
 
-        // 2. 缓存未命中，降级查库（外部系统是 source，请求方是 target）
         log.warn("[ExtParams] Redis 缓存未命中，降级查库: sourceSystem={}, targetSystem={}", sourceSystem, targetSystem);
         Map<String, Object> dbData = extParamRecordIotMapper.findLatestData(targetSystem, sourceSystem);
         if (dbData == null || dbData.isEmpty()) {
@@ -100,7 +106,6 @@ public class ExtParamsRequestHandler {
                     .build();
         }
 
-        // 3. 查库成功，回写 Redis 缓存（TTL 跟随凭证过期时间）
         long ttl = computeTtlSeconds(str(dbData, "utcExpiration"));
         redisUtil.set(cacheKey, JSON.toJSONString(dbData));
         redisUtil.expire(cacheKey, ttl);

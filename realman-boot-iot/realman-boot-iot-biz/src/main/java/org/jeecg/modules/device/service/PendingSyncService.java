@@ -14,6 +14,7 @@ import org.jeecg.modules.device.mapper.IotDeviceConfigMapper;
 import org.jeecg.modules.device.mapper.IotOtaUpgradeRecordMapper;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.mqtt.publisher.MqttPublisher;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
@@ -29,7 +30,7 @@ import java.util.stream.Collectors;
  * 设备重新上线后，需将所有积压的待同步消息一次性推送过去，确保数据最终一致性。
  *
  * <p>触发时机：设备上线事件（{@link org.jeecg.modules.device.mqtt.handler.DeviceOnlineOfflineHandler#handleOnline}）
- * 触发后调用 {@link #flushPendingMessages}（当前已预留 TODO，待稳定后启用）。
+ * 触发后调用 {@link #flushPendingMessagesAsync}。
  *
  * <p>补推内容：
  * <ul>
@@ -66,6 +67,14 @@ public class PendingSyncService {
      * OTA 补推逻辑建议复用 IotOtaServiceImpl.executeUpgradeTask 的实现（含断点续传字节数注入）。
      *
      * @param deviceCode 刚上线的设备编号
+     */
+    @Async("devicePersistExecutor")
+    public void flushPendingMessagesAsync(String deviceCode) {
+        flushPendingMessages(deviceCode);
+    }
+
+    /**
+     * 设备上线时补推所有待同步的离线消息（同步实现，由 {@link #flushPendingMessagesAsync} 在独立池中调用）
      */
     public void flushPendingMessages(String deviceCode) {
         // ── 1. 补推待同步的参数配置 ──────────────────────────────────────────

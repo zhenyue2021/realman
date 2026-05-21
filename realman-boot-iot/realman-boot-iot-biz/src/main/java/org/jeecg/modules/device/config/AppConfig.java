@@ -92,4 +92,49 @@ public class AppConfig {
     }
 
     /** WebSocket：使用平台 WebSocketConfig 中的 serverEndpointExporter，不在此重复定义 */
+
+    /**
+     * MQTT 下行发布池：ExtParams 等需在路由线程外完成 publish，避免 Paho 同步发布占满 deviceTaskExecutor。
+     */
+    @Bean("mqttPublishExecutor")
+    public Executor mqttPublishExecutor() {
+        return buildAuxExecutor("mqtt-publish-", 4, 8, 500);
+    }
+
+    /**
+     * 轻量通知池：slave/master 状态 WebSocket 推送等，与路由池隔离。
+     */
+    @Bean("deviceNotifyExecutor")
+    public Executor deviceNotifyExecutor() {
+        return buildAuxExecutor("device-notify-", 4, 8, 1000);
+    }
+
+    private static Executor buildAuxExecutor(String threadPrefix, int core, int max, int queueCapacity) {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(core);
+        executor.setMaxPoolSize(max);
+        executor.setQueueCapacity(queueCapacity);
+        executor.setThreadNamePrefix(threadPrefix);
+        executor.setRejectedExecutionHandler((runnable, pool) -> {
+            if (!pool.isShutdown()) {
+                log.warn("[{}] 队列已满，丢弃任务 (active={}, queue={})",
+                        threadPrefix, pool.getActiveCount(), pool.getQueue().size());
+            }
+        });
+        executor.setTaskDecorator(runnable -> {
+            Map<String, String> mdc = MDC.getCopyOfContextMap();
+            return () -> {
+                try {
+                    if (mdc != null) {
+                        MDC.setContextMap(mdc);
+                    }
+                    runnable.run();
+                } finally {
+                    MDC.clear();
+                }
+            };
+        });
+        executor.initialize();
+        return executor;
+    }
 }

@@ -48,7 +48,7 @@ import java.util.Map;
  *   <li>记录操作日志（含断线原因）</li>
  * </ol>
  *
- * @see PendingSyncService 设备上线后补推待同步消息（TODO：已预留，暂未在上线事件中调用）
+ * @see PendingSyncService 设备上线后异步补推待同步消息
  */
 @Slf4j
 @Component
@@ -103,8 +103,8 @@ public class DeviceOnlineOfflineHandler {
                     "设备MQTT连接建立，上线", null, DeviceConstant.OperationSource.DEVICE,
                     "SUCCESS", null, null, null);
 
-            // 设备上线后补推离线期间待同步的配置/OTA 指令
-            pendingSyncService.flushPendingMessages(deviceCode);
+            // 设备上线后补推离线期间待同步的配置/OTA 指令（异步，不阻塞 $SYS 路由线程）
+            pendingSyncService.flushPendingMessagesAsync(deviceCode);
 
             // 向达尔文数采平台推送机器人上线事件（Darwin 集成未启用或非机器人设备时跳过）
             /*if (darwinProducer != null
