@@ -42,7 +42,7 @@ import java.util.regex.Pattern;
  *   $SYS/.../clients/.../connected       → DeviceOnlineOfflineHandler.handleOnline()
  *   $SYS/.../clients/.../disconnected    → DeviceOnlineOfflineHandler.handleOffline()
  *
- *   device/{code}/status/report          → DeviceStatusHandler.handle()
+ *   device/{code}/status/report          → DeviceStatusHandler.refreshPresence()（keepaliveExecutor）
  *   device/{code}/config/ack             → DeviceConfigAckHandler.handle()
  *   device/{code}/command/{cmd}/ack      → DeviceCommandAckHandler.handle()
  *   device/{code}/ota/progress           → OtaProgressHandler.handle()
@@ -163,9 +163,8 @@ public class MqttMessageDispatcher {
      * <p>高频上报 Topic（slam/states 等）在投递前先做节流检查，超出阈值的帧直接丢弃，
      * 不进入线程池队列，彻底避免 EMQX mqueue 打满。
      *
-     * <p>{@code status/report} keepalive 在入队前提交到 {@code keepaliveExecutor}（专用单线程池）
-     * 异步刷新 Redis TTL，既不阻塞 Paho CommsCallback 线程，也不受 {@code deviceTaskExecutor}
-     * 队列满丢弃影响，保证离线判定不误判。
+     * <p>{@code status/report} 仅提交到 {@code keepaliveExecutor} 刷新 Redis 在线态，
+     * 不进入 {@code deviceTaskExecutor}，避免 keepalive 占满路由池。
      */
     public void dispatch(String topic, MqttMessage message) {
         String topicNorm = (topic != null && topic.startsWith("/")) ? topic.substring(1) : topic;
@@ -187,12 +186,11 @@ public class MqttMessageDispatcher {
         String payload = new String(message.getPayload(), StandardCharsets.UTF_8);
         String traceId = extractTraceId(message);
 
-        Matcher keepalive = STATUS_REPORT_TOPIC.matcher(topicNorm);
-        if (keepalive.matches()) {
-            String keepaliveDeviceCode = keepalive.group(1);
-            // 提交到专用单线程池，Paho CommsCallback 线程立即返回，不因 Redis I/O 阻塞
-            keepaliveExecutor.execute(() ->
-                    statusHandler.refreshKeepalivePresence(keepaliveDeviceCode, payload));
+        Matcher statusReport = STATUS_REPORT_TOPIC.matcher(topicNorm);
+        if (statusReport.matches()) {
+            String deviceCode = statusReport.group(1);
+            keepaliveExecutor.execute(() -> statusHandler.refreshPresence(deviceCode, payload));
+            return;
         }
 
         taskExecutor.execute(() -> doDispatch(topicNorm, payload, traceId));
@@ -315,7 +313,7 @@ public class MqttMessageDispatcher {
         }
 
         switch (path) {
-            case "status/report"                      -> statusHandler.handle(deviceCode, payload);
+            case "status/report"                      -> statusHandler.refreshPresence(deviceCode, payload);
             case "config/ack"                         -> configAckHandler.handle(deviceCode, payload);
             case "ota/progress"                       -> otaProgressHandler.handle(deviceCode, payload);
             case "log/operation"                      -> operationLogHandler.handle(deviceCode, payload);

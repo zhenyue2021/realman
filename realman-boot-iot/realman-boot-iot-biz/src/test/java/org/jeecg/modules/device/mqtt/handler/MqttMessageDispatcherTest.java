@@ -142,7 +142,7 @@ public class MqttMessageDispatcherTest {
 
         dispatcher.dispatch(topic, mqttMsg(payload));
 
-        Mockito.verify(statusHandler).handle(deviceCode, payload);
+        Mockito.verify(statusHandler, Mockito.timeout(1000)).refreshPresence(deviceCode, payload);
         Mockito.verifyNoMoreInteractions(
                 configAckHandler,
                 commandAckHandler,

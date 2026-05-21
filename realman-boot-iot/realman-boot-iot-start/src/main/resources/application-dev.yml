@@ -35,11 +35,14 @@ spring:
       port: 6379
       password:
       database: 0
+      timeout: 3000              # 命令超时 3s，防止 pipeline 连接 zombie 时线程永久阻塞
       lettuce:
         pool:
           min-idle: 2
           max-active: 20
           max-idle: 10
+          max-wait: 2000         # 等待空闲连接超时 2s（连接池耗尽时快速失败）
+        shutdown-timeout: 200ms  # 关闭时等待 200ms 让进行中的命令完成
   servlet:
     multipart:
       max-file-size: 500MB
@@ -89,6 +92,7 @@ darwin:
 mqtt:
   enabled: false  # 临时禁用，避免启动失败
   high-freq-throttle-ms: 500  # slam/states 等高频 Topic 节流间隔(ms)：500=2次/秒，1000=1次/秒，0=不限
+  collect-url-request-dedup-ms: 60000
   watchdog:
     idle-timeout-seconds: 90  # 空闲超时(秒)=心跳间隔45s×2；须 < 设备离线判定阈值 300s
   broker:

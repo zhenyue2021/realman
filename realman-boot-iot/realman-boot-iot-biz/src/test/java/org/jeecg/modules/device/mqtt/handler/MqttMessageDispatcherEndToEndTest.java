@@ -120,17 +120,8 @@ public class MqttMessageDispatcherEndToEndTest {
                 .thenReturn(java.util.Collections.emptyList());
 
         // 构造各 Handler 实例
-        // DeviceStatusPersistenceService 非 Spring Bean，@Async 不生效，DB 调用同步执行，便于断言
-        DeviceStatusPersistenceService persistenceService =
-                new DeviceStatusPersistenceService(deviceMapper, statusMapper);
-        DeviceStatusHandler statusHandler = new DeviceStatusHandler(
-                deviceMapper,
-                encryptService,
-                objectMapper,
-                redisTemplate,
-                webSocketServer,
-                persistenceService
-        );
+        // DeviceStatusHandler 仅维护 Redis 在线态
+        DeviceStatusHandler statusHandler = new DeviceStatusHandler(redisTemplate);
 
         configAckHandler = new DeviceConfigAckHandler(
                 configMapper,
@@ -224,16 +215,11 @@ public class MqttMessageDispatcherEndToEndTest {
     }
 
     /**
-     * 整链路：设备状态上报 → 分发器 → DeviceStatusHandler → DB/Redis/WebSocket
+     * 整链路：设备 status/report → 分发器 → DeviceStatusHandler → Redis 在线态
      */
     @Test
     void endToEnd_statusReport() throws Exception {
         String deviceCode = "DEV001";
-
-        IotDevice device = new IotDevice();
-        device.setId("dev-id-1");
-        device.setDeviceCode(deviceCode);
-        when(deviceMapper.selectOne(Mockito.any())).thenReturn(device);
 
         long now = System.currentTimeMillis();
         MqttMessageModel.StatusReport report = MqttMessageModel.StatusReport.builder()
@@ -253,20 +239,12 @@ public class MqttMessageDispatcherEndToEndTest {
         String topic = "device/" + deviceCode + "/status/report";
         dispatcher.dispatch(topic, mqtt(enc));
 
-        // 设备状态更新
-        ArgumentCaptor<IotDevice> devCap = ArgumentCaptor.forClass(IotDevice.class);
-        // updateById 有单对象/Collection 两个重载，显式指定类型消除歧义
-        Mockito.verify(deviceMapper).updateById(devCap.capture());
-        IotDevice updated = devCap.getValue();
-        assertThat(updated.getStatus()).isEqualTo(DeviceConstant.DeviceStatus.ONLINE);
-        assertThat(updated.getLongitude()).isEqualByComparingTo(new BigDecimal("120.000001"));
-        assertThat(updated.getLatitude()).isEqualByComparingTo(new BigDecimal("30.000001"));
-
-        // 历史状态写入
-        Mockito.verify(statusMapper).insert(Mockito.any(IotDeviceStatus.class));
-
-        // WebSocket 推送
-        Mockito.verify(webSocketServer).pushDeviceStatus(deviceCode, plain);
+        Thread.sleep(200);
+        Mockito.verify(redisTemplate).executePipelined(
+                Mockito.<org.springframework.data.redis.core.RedisCallback<Object>>any());
+        Mockito.verify(deviceMapper, Mockito.never()).updateById(Mockito.any(IotDevice.class));
+        Mockito.verify(statusMapper, Mockito.never()).insert(Mockito.any(IotDeviceStatus.class));
+        Mockito.verify(webSocketServer, Mockito.never()).pushDeviceStatus(Mockito.anyString(), Mockito.anyString());
     }
 
     /**

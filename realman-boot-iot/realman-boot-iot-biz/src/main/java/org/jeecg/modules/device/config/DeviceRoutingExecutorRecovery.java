@@ -1,11 +1,8 @@
 package org.jeecg.modules.device.config;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 
-import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadPoolExecutor;
 
 /**
@@ -18,21 +15,18 @@ import java.util.concurrent.ThreadPoolExecutor;
 @Component
 public class DeviceRoutingExecutorRecovery {
 
-    private final ThreadPoolTaskExecutor routingExecutor;
+    private final DeviceRoutingExecutor routingExecutor;
 
-    public DeviceRoutingExecutorRecovery(@Qualifier("deviceTaskExecutor") Executor routingExecutorBean) {
-        if (!(routingExecutorBean instanceof ThreadPoolTaskExecutor taskExecutor)) {
-            throw new IllegalStateException("deviceTaskExecutor must be ThreadPoolTaskExecutor");
-        }
-        this.routingExecutor = taskExecutor;
+    public DeviceRoutingExecutorRecovery(DeviceRoutingExecutor routingExecutor) {
+        this.routingExecutor = routingExecutor;
     }
 
     public RoutingPoolSnapshot snapshot() {
-        ThreadPoolExecutor pool = routingExecutor.getThreadPoolExecutor();
+        ThreadPoolExecutor pool = routingExecutor.getDelegate().getThreadPoolExecutor();
         return new RoutingPoolSnapshot(
                 pool.getQueue().size(),
-                routingExecutor.getActiveCount(),
-                routingExecutor.getMaxPoolSize(),
+                routingExecutor.getDelegate().getActiveCount(),
+                routingExecutor.getDelegate().getMaxPoolSize(),
                 pool.getCompletedTaskCount());
     }
 
@@ -42,7 +36,7 @@ public class DeviceRoutingExecutorRecovery {
      * @return 被丢弃的排队任务数
      */
     public int purgeBacklog() {
-        ThreadPoolExecutor pool = routingExecutor.getThreadPoolExecutor();
+        ThreadPoolExecutor pool = routingExecutor.getDelegate().getThreadPoolExecutor();
         int cleared = pool.getQueue().size();
         if (cleared > 0) {
             pool.getQueue().clear();
@@ -50,6 +44,37 @@ public class DeviceRoutingExecutorRecovery {
                     cleared, pool.getActiveCount(), pool.getCompletedTaskCount());
         }
         return cleared;
+    }
+
+    /**
+     * 中断所有名为 "device-task-*" 的存活线程。
+     *
+     * <p>配合 Redis timeout，阻塞在 Lettuce socket read 的线程会收到中断/超时异常，
+     * 再由 handler try-catch 吸收后重新拾取队列任务。
+     *
+     * @return 被中断的线程数
+     */
+    public int interruptZombieWorkers() {
+        int count = 0;
+        for (Thread t : Thread.getAllStackTraces().keySet()) {
+            if (t.getName().startsWith("device-task-") && t.isAlive()) {
+                t.interrupt();
+                count++;
+            }
+        }
+        if (count > 0) {
+            log.warn("[RoutingPool] 已中断僵死 worker 线程 count={}", count);
+        }
+        return count;
+    }
+
+    /**
+     * shutdownNow 当前池并创建全新 ThreadPoolTaskExecutor。
+     *
+     * @return shutdownNow 丢弃的未执行任务数
+     */
+    public int recreatePool() {
+        return routingExecutor.recreatePool();
     }
 
     public record RoutingPoolSnapshot(int queueSize, int activeCount, int maxPoolSize, long completedCount) {

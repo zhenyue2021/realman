@@ -3,6 +3,7 @@ package org.jeecg.modules.device.mqtt;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.config.DeviceRoutingExecutorRecovery;
 import org.jeecg.modules.device.config.MqttConfig;
+import org.jeecg.modules.device.config.RoutingPoolDiagnostics;
 import org.jeecg.modules.device.config.DeviceRoutingExecutorRecovery.RoutingPoolSnapshot;
 import org.jeecg.modules.device.mqtt.handler.MqttMessageDispatcher;
 import org.jeecg.modules.device.mqtt.publisher.MqttPublisher;
@@ -21,7 +22,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * MQTT 客户端存活监控（Watchdog）
  *
  * <p>检测 1 — 消息空闲超时：{@link MqttMessageDispatcher#lastReceivedTs} 超时 → 重建 MQTT（Paho 僵死）。
- * <p>检测 2 — 路由池饱和：清空 deviceTaskExecutor 积压；若仍饱和且任务完成数停滞 → 才重建 MQTT。
+ * <p>检测 2 — 路由池饱和：清空 deviceTaskExecutor 积压；若 completed 停滞 → thread-dump、interrupt、重建池，最后才重建 MQTT。
  */
 @Slf4j
 @Component
@@ -129,8 +130,15 @@ public class MqttClientWatchdog {
         lastCompletedSnapshot = snap.completedCount();
 
         if (completedStallChecks >= STALL_RESTART_THRESHOLD) {
-            log.warn("[MqttWatchdog] 路由池饱和且 completed 停滞 {} 次，重建 MQTT 连接", completedStallChecks);
+            log.warn("[MqttWatchdog] 路由池饱和且 completed 停滞 {} 次，执行恢复：thread-dump → interrupt → purge → 重建池 → MQTT",
+                    completedStallChecks);
             completedStallChecks = 0;
+            lastCompletedSnapshot = -1L;
+
+            RoutingPoolDiagnostics.dumpStuckWorkers("routing-pool-stall");
+            routingPoolRecovery.interruptZombieWorkers();
+            routingPoolRecovery.purgeBacklog();
+            routingPoolRecovery.recreatePool();
             triggerRestart("routing-pool-stall");
         }
     }

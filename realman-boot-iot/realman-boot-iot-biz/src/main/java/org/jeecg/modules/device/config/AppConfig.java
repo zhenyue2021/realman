@@ -19,7 +19,6 @@ import javax.sql.DataSource;
 import java.sql.SQLException;
 import java.util.Map;
 import java.util.concurrent.Executor;
-import java.util.concurrent.atomic.AtomicLong;
 
 @Slf4j
 @Configuration
@@ -29,9 +28,6 @@ public class AppConfig {
     @Value("${minio.endpoint:http://localhost:9000}")   private String endpoint;
     @Value("${minio.access-key:minioadmin}")            private String accessKey;
     @Value("${minio.secret-key:minioadmin}")            private String secretKey;
-
-    /** 拒绝处理器日志节流：5s 内最多打一条 WARN，避免队列满时日志风暴 */
-    private final AtomicLong lastRejectWarnTs = new AtomicLong(0);
 
     @Autowired
     private DataSource dataSource;
@@ -61,55 +57,7 @@ public class AppConfig {
     }
 
     /** 使用平台 WebMvcConfiguration 中的 @Primary ObjectMapper，无需在此重复定义 */
-
-    @Bean("deviceTaskExecutor")
-    public Executor deviceTaskExecutor() {
-        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        // 200台设备稳态 ~1200 msg/s，每条 ~5ms → 需要 6 线程，核心设为 20 避免冷启动扩容延迟
-        executor.setCorePoolSize(20);
-        executor.setMaxPoolSize(50);
-        // 队列 2000：为 Redis 短暂抖动（<1.5s）提供缓冲；超出后丢弃（见下方拒绝策略）
-        executor.setQueueCapacity(2000);
-        executor.setThreadNamePrefix("device-task-");
-        // 丢弃最旧任务（非阻塞）：队列满时绝不让 Paho 接收线程执行任务，
-        // 否则 Paho 阻塞 → TCP 窗口耗尽 → EMQX mqueue 堆积 → 复现断连。
-        // keepalive 由 MqttMessageDispatcher.keepaliveExecutor 续期 Redis，此处丢弃不影响离线判定。
-        executor.setRejectedExecutionHandler((runnable, pool) -> {
-            if (pool.isShutdown()) {
-                return;
-            }
-            var queue = pool.getQueue();
-            // 腾出最旧任务，再直接 offer——绝不递归调用 pool.execute()，
-            // 防止在 Paho CommsCallback 线程里自旋阻塞整个消息接收链路。
-            var dropped = queue.poll();
-            boolean offered = queue.offer(runnable);
-            long now = System.currentTimeMillis();
-            if (now - lastRejectWarnTs.getAndSet(now) > 5_000) {
-                log.warn(
-                        "[deviceTaskExecutor] 队列已满，丢弃最旧任务 (active={}, poolSize={}, queue={}, completed={}, dropped={}, offered={})",
-                        pool.getActiveCount(),
-                        pool.getPoolSize(),
-                        queue.size(),
-                        pool.getCompletedTaskCount(),
-                        dropped != null,
-                        offered);
-            }
-        });
-        // MDC 跨线程传播：提交任务时快照父线程 MDC，子线程执行前恢复，finally 清理防止污染
-        executor.setTaskDecorator(runnable -> {
-            Map<String, String> mdc = MDC.getCopyOfContextMap();
-            return () -> {
-                try {
-                    if (mdc != null) MDC.setContextMap(mdc);
-                    runnable.run();
-                } finally {
-                    MDC.clear();
-                }
-            };
-        });
-        executor.initialize();
-        return executor;
-    }
+    /** MQTT 路由池见 {@link DeviceRoutingExecutor}（deviceTaskExecutor） */
 
     /**
      * DB/IO 异步写池：专用于 persistAsync、recordLog、recordSend 等持久化操作，
