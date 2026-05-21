@@ -240,14 +240,18 @@ public class WorkOrderApiServiceImpl implements WorkOrderApiService {
             dto.setUnitPrice(o.getUnitPrice() != null ? o.getUnitPrice().toPlainString() : null);
             dto.setTotalPrice(o.getTotalPrice() != null ? o.getTotalPrice().toPlainString() : null);
 
-            WorkOrderComplianceConfig cfg = cfgMap.get(o.getComplianceId());
+            WorkOrderComplianceConfig cfg = StrUtil.isNotBlank(o.getComplianceId())
+                    ? cfgMap.get(o.getComplianceId())
+                    : null;
             if (cfg != null) {
                 WorkOrderComplianceConfigDetailDTO configDetailDTO = new WorkOrderComplianceConfigDetailDTO();
                 BeanUtil.copyProperties(cfg, configDetailDTO);
                 dto.setCompliance(configDetailDTO);
             }
 
-            List<WorkOrderDevice> binds = devicesByOrderId.getOrDefault(o.getId(), List.of());
+            List<WorkOrderDevice> binds = StrUtil.isNotBlank(o.getId())
+                    ? devicesByOrderId.getOrDefault(o.getId(), List.of())
+                    : List.of();
             WorkOrderDevice controllerBind = pickController(binds);
             if (controllerBind != null) {
                 dto.setController(toDeviceDTO(controllerBind, iotDeviceMap));
