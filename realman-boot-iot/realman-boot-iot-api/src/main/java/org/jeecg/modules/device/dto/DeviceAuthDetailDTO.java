@@ -24,10 +24,12 @@ public class DeviceAuthDetailDTO {
     /** 主控设备 */
     private String controllerId;
     private String controllerCode;
+    private String controllerName;
 
     /** 机器人设备 */
     private String deviceId;
     private String deviceCode;
+    private String deviceName;
 
     /** 管理后台账号信息 */
     private String adminUserId;

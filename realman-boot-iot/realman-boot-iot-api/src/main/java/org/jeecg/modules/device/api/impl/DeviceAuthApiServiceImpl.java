@@ -14,6 +14,7 @@ import org.jeecg.common.system.util.JwtUtil;
 import org.jeecg.modules.device.api.DeviceAuthApiService;
 import org.jeecg.modules.device.component.DeviceServiceComponent;
 import org.jeecg.modules.device.dto.*;
+import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.entity.IotDeviceAuth;
 import org.jeecg.modules.device.feign.SysAuthFeignClient;
 import org.jeecg.modules.device.mapper.IotDeviceMapper;
@@ -92,6 +93,15 @@ public class DeviceAuthApiServiceImpl implements DeviceAuthApiService {
         }
         DeviceAuthDetailDTO dto = new DeviceAuthDetailDTO();
         BeanUtil.copyProperties(auth, dto);
+
+        IotDevice device = iotDeviceMapper.selectById(auth.getDeviceId());
+        if (device != null) {
+            dto.setDeviceName(device.getDeviceName());
+        }
+        IotDevice controller = iotDeviceMapper.selectById(auth.getControllerId());
+        if (controller != null) {
+            dto.setControllerName(controller.getDeviceName());
+        }
         return dto;
     }
 
