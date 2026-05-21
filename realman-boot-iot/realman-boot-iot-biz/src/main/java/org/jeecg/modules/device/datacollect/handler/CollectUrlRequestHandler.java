@@ -1,13 +1,11 @@
 package org.jeecg.modules.device.datacollect.handler;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.datacollect.dto.mqtt.CollectUrlRequestMsg;
 import org.jeecg.modules.device.datacollect.producer.OssAuthRequestProducer;
-import org.jeecg.modules.device.entity.IotDevice;
-import org.jeecg.modules.device.mapper.IotDeviceMapper;
+import org.jeecg.modules.device.datacollect.service.DeviceTenantResolver;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
@@ -21,8 +19,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>处理流程：
  * <ol>
  *   <li>解析消息体，校验 requestId 非空</li>
+ *   <li>requestId / deviceCode 去重，抑制设备重试风暴</li>
  *   <li>查询设备获取 tenantId（本地缓存，减少 DB 压力）</li>
- *   <li>调用 {@link OssAuthRequestProducer#sendAndStore} 存 Redis 映射并转发给数采平台</li>
+ *   <li>调用 {@link OssAuthRequestProducer#sendAndStore} 存 Redis 映射并异步转发给数采平台</li>
  * </ol>
  */
 @Slf4j
@@ -31,18 +30,20 @@ import java.util.concurrent.ConcurrentHashMap;
 @ConditionalOnExpression("${mqtt.enabled:false} && ${darwin.integration.enabled:false}")
 public class CollectUrlRequestHandler {
 
-    private static final long TENANT_CACHE_TTL_MS = 5 * 60 * 1000L;
-
     private final OssAuthRequestProducer ossAuthRequestProducer;
-    private final IotDeviceMapper deviceMapper;
+    private final DeviceTenantResolver tenantResolver;
     private final ObjectMapper objectMapper;
 
-    /** 同 requestId 去重窗口（毫秒），防止设备 40s 重试风暴重复查库/发 MQ */
+    /** 同 requestId 去重窗口（毫秒），防止设备重复上报同一 requestId */
     @Value("${mqtt.collect-url-request-dedup-ms:60000}")
     private long requestDedupMs;
 
-    private final ConcurrentHashMap<String, TenantCacheEntry> tenantByDevice = new ConcurrentHashMap<>();
+    /** 同 deviceCode 转发节流（毫秒），设备每次重试会换新 requestId，需按设备限流 */
+    @Value("${mqtt.collect-url-device-throttle-ms:45000}")
+    private long deviceThrottleMs;
+
     private final ConcurrentHashMap<String, Long> recentRequestIds = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Long> lastForwardByDevice = new ConcurrentHashMap<>();
 
     public void handle(String deviceCode, String payload) {
         CollectUrlRequestMsg msg;
@@ -64,16 +65,15 @@ public class CollectUrlRequestHandler {
                     msg.getRequestId(), deviceCode);
             return;
         }
-
-        String tenant = resolveTenantId(deviceCode);
-
-        try {
-            ossAuthRequestProducer.sendAndStore(
-                    msg.getRequestId(), tenant, deviceCode, null, MDC.get("traceId"));
-        } catch (Exception e) {
-            log.error("[DataCollect] OSS授权请求转发失败 requestId={} deviceCode={}",
-                    msg.getRequestId(), deviceCode, e);
+        if (isDeviceThrottled(deviceCode)) {
+            log.debug("[DataCollect] 跳过节流窗口内 collectUrlRequest deviceCode={} requestId={}",
+                    deviceCode, msg.getRequestId());
+            return;
         }
+
+        String tenant = tenantResolver.resolveTenantId(deviceCode);
+        ossAuthRequestProducer.sendAndStore(
+                msg.getRequestId(), tenant, deviceCode, null, MDC.get("traceId"));
     }
 
     private boolean isDuplicateRequest(String requestId) {
@@ -90,6 +90,20 @@ public class CollectUrlRequestHandler {
         return false;
     }
 
+    private boolean isDeviceThrottled(String deviceCode) {
+        long now = System.currentTimeMillis();
+        purgeExpiredDeviceForwards(now);
+        Long last = lastForwardByDevice.putIfAbsent(deviceCode, now);
+        if (last == null) {
+            return false;
+        }
+        if (now - last < deviceThrottleMs) {
+            return true;
+        }
+        lastForwardByDevice.put(deviceCode, now);
+        return false;
+    }
+
     private void purgeExpiredRequestIds(long now) {
         if (recentRequestIds.size() < 512) {
             return;
@@ -97,20 +111,10 @@ public class CollectUrlRequestHandler {
         recentRequestIds.entrySet().removeIf(e -> now - e.getValue() > requestDedupMs);
     }
 
-    private String resolveTenantId(String deviceCode) {
-        long now = System.currentTimeMillis();
-        TenantCacheEntry cached = tenantByDevice.get(deviceCode);
-        if (cached != null && now - cached.cachedAtMs < TENANT_CACHE_TTL_MS) {
-            return cached.tenantId;
+    private void purgeExpiredDeviceForwards(long now) {
+        if (lastForwardByDevice.size() < 256) {
+            return;
         }
-        IotDevice device = deviceMapper.selectOne(
-                new LambdaQueryWrapper<IotDevice>().eq(IotDevice::getDeviceCode, deviceCode));
-        String tenant = device != null && device.getTenantId() != null
-                ? String.valueOf(device.getTenantId()) : "";
-        tenantByDevice.put(deviceCode, new TenantCacheEntry(tenant, now));
-        return tenant;
-    }
-
-    private record TenantCacheEntry(String tenantId, long cachedAtMs) {
+        lastForwardByDevice.entrySet().removeIf(e -> now - e.getValue() > deviceThrottleMs);
     }
 }

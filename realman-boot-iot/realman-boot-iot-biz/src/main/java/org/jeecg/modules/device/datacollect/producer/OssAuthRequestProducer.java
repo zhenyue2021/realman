@@ -7,10 +7,12 @@ import org.apache.rocketmq.client.apis.producer.SendReceipt;
 import org.apache.rocketmq.client.core.RocketMQClientTemplate;
 import org.jeecg.modules.device.datacollect.constant.DataCollectConstant;
 import org.jeecg.modules.device.datacollect.dto.mq.OssAuthRequestMsg;
+import org.slf4j.MDC;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.stereotype.Component;
 
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -20,6 +22,8 @@ import java.util.concurrent.TimeUnit;
  * <p>同时在 Redis 中存入 requestId → deviceCode 映射（TTL 2h），
  * 供 {@link org.jeecg.modules.device.datacollect.consumer.OssAuthResponseConsumer}
  * 收到数采平台 STS 凭证后反查目标设备并通过 MQTT 下推。
+ *
+ * <p>MQ 发送为异步，不阻塞 MQTT 路由线程；发送失败时清理 Redis 映射。
  */
 @Slf4j
 @Component
@@ -34,7 +38,6 @@ public class OssAuthRequestProducer {
 
     public void sendAndStore(String requestId, String tenant, String deviceCode,
                              String taskId, String traceId) {
-        // 先写 Redis，再发 MQ，确保响应到来时一定能查到映射
         String redisKey = DataCollectConstant.REDIS_OSS_REQUEST_PREFIX + requestId;
         redisTemplate.opsForValue().set(redisKey, deviceCode, REQUEST_TTL_HOURS, TimeUnit.HOURS);
 
@@ -56,17 +59,30 @@ public class OssAuthRequestProducer {
             var springMessage = MessageBuilder.withPayload(objectMapper.writeValueAsString(msg))
                     .setHeader("deviceCode", deviceCode)
                     .build();
+            Map<String, String> mdcContext = MDC.getCopyOfContextMap();
             CompletableFuture<SendReceipt> future = new CompletableFuture<>();
             rocketMQClientTemplate.asyncSendNormalMessage(destination, springMessage, future);
-            // join() 会正确抛出发送异常，绕过 syncSendNormalMessage 内部吞异常的问题
-            SendReceipt receipt = future.join();
-            log.info("[DataCollect] OSS授权请求已转发 requestId={} deviceCode={} msgId={}",
-                    requestId, deviceCode, receipt.getMessageId());
+            future.whenComplete((receipt, ex) -> {
+                if (mdcContext != null) {
+                    MDC.setContextMap(mdcContext);
+                }
+                try {
+                    if (ex != null) {
+                        redisTemplate.delete(redisKey);
+                        log.error("[DataCollect] OSS授权请求转发失败 requestId={} deviceCode={}",
+                                requestId, deviceCode, ex);
+                    } else {
+                        log.info("[DataCollect] OSS授权请求已转发 requestId={} deviceCode={} msgId={}",
+                                requestId, deviceCode, receipt.getMessageId());
+                    }
+                } finally {
+                    MDC.clear();
+                }
+            });
         } catch (Exception e) {
-            // 发送失败清理 Redis，避免悬挂 key
             redisTemplate.delete(redisKey);
-            log.error("[DataCollect] OSS授权请求转发失败 requestId={} deviceCode={}", requestId, deviceCode, e);
-            throw new RuntimeException("OSS授权请求转发失败", e);
+            log.error("[DataCollect] OSS授权请求序列化失败 requestId={} deviceCode={}",
+                    requestId, deviceCode, e);
         }
     }
 }

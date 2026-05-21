@@ -98,6 +98,7 @@ mqtt:
   enabled: true
   high-freq-throttle-ms: 500  # slam/states 等高频 Topic 节流间隔(ms)：500=2次/秒，1000=1次/秒，0=不限
   collect-url-request-dedup-ms: 60000    # collectUrlRequest 同 requestId 去重窗口(ms)
+  collect-url-device-throttle-ms: 45000  # collectUrlRequest 同 deviceCode 转发节流(ms)，抑制重试风暴
   watchdog:
     idle-timeout-seconds: 90  # 空闲超时(秒)=心跳间隔45s×2；须 < 设备离线判定阈值 300s
   broker:

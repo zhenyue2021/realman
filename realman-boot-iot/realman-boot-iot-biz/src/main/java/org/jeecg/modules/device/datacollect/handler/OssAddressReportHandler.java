@@ -1,14 +1,12 @@
 package org.jeecg.modules.device.datacollect.handler;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.datacollect.constant.DataCollectConstant;
 import org.jeecg.modules.device.datacollect.dto.mqtt.OssAddressReportMsg;
 import org.jeecg.modules.device.datacollect.producer.FileAddressReportProducer;
-import org.jeecg.modules.device.entity.IotDevice;
-import org.jeecg.modules.device.mapper.IotDeviceMapper;
+import org.jeecg.modules.device.datacollect.service.DeviceTenantResolver;
 import org.slf4j.MDC;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -23,7 +21,7 @@ import java.util.concurrent.TimeUnit;
  * <ol>
  *   <li>解析消息体，校验 oss.address 与 oss.list 非空</li>
  *   <li>Redis 去重（deviceCode + ossAddress，TTL 24h），防机器人重复上报</li>
- *   <li>查询设备获取 tenantId</li>
+ *   <li>查询设备获取 tenantId（本地缓存）</li>
  *   <li>调用 {@link FileAddressReportProducer#send} 将地址转发给数采平台</li>
  * </ol>
  *
@@ -36,7 +34,7 @@ import java.util.concurrent.TimeUnit;
 public class OssAddressReportHandler {
 
     private final FileAddressReportProducer fileAddressReportProducer;
-    private final IotDeviceMapper deviceMapper;
+    private final DeviceTenantResolver tenantResolver;
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
 
@@ -57,7 +55,6 @@ public class OssAddressReportHandler {
             return;
         }
         String businessKey = oss.getBusinessKey();
-        // 去重：deviceCode + businessKey 组合，防机器人因网络重发导致重复上报
         String dedupKey = DataCollectConstant.REDIS_REPORT_DEDUP_PREFIX
                 + deviceCode + ":" + businessKey;
         Boolean isNew = redisTemplate.opsForValue().setIfAbsent(dedupKey, "1", 24, TimeUnit.HOURS);
@@ -66,16 +63,12 @@ public class OssAddressReportHandler {
             return;
         }
 
-        IotDevice device = deviceMapper.selectOne(
-                new LambdaQueryWrapper<IotDevice>().eq(IotDevice::getDeviceCode, deviceCode));
-        String tenant = device != null && device.getTenantId() != null
-                ? String.valueOf(device.getTenantId()) : "";
-
+        String tenant = tenantResolver.resolveTenantId(deviceCode);
         fileAddressReportProducer.send(
                 tenant,
                 deviceCode,
-                null,              // workOrderId：工单集成后补充
-                null,              // taskId：工单集成后补充
+                null,
+                null,
                 oss.getAddress(),
                 oss.getList(),
                 MDC.get("traceId")
