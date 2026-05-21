@@ -19,7 +19,7 @@ public class IotDeviceCommandRecordServiceImpl
         implements IIotDeviceCommandRecordService {
 
     @Override
-    @Async("deviceTaskExecutor")
+    @Async("devicePersistExecutor")
     public void recordSend(String commandId, String deviceId, String deviceCode,
                            String commandType, String deviceType, String operator,
                            String paramsJson) {
@@ -42,7 +42,7 @@ public class IotDeviceCommandRecordServiceImpl
     }
 
     @Override
-    @Async("deviceTaskExecutor")
+    @Async("devicePersistExecutor")
     public void ack(String commandId, boolean success, String failReason, String ackDataJson) {
         if (commandId == null || commandId.isEmpty()) {
             return;

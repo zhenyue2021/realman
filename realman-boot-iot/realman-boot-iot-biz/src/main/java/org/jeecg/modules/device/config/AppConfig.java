@@ -79,20 +79,55 @@ public class AppConfig {
                 return;
             }
             var queue = pool.getQueue();
+            // 腾出最旧任务，再直接 offer——绝不递归调用 pool.execute()，
+            // 防止在 Paho CommsCallback 线程里自旋阻塞整个消息接收链路。
             var dropped = queue.poll();
+            boolean offered = queue.offer(runnable);
             long now = System.currentTimeMillis();
             if (now - lastRejectWarnTs.getAndSet(now) > 5_000) {
                 log.warn(
-                        "[deviceTaskExecutor] 队列已满，丢弃最旧任务后重试提交 (active={}, poolSize={}, queue={}, completed={}, dropped={})",
+                        "[deviceTaskExecutor] 队列已满，丢弃最旧任务 (active={}, poolSize={}, queue={}, completed={}, dropped={}, offered={})",
                         pool.getActiveCount(),
                         pool.getPoolSize(),
                         queue.size(),
                         pool.getCompletedTaskCount(),
-                        dropped != null);
+                        dropped != null,
+                        offered);
             }
-            pool.execute(runnable);
         });
         // MDC 跨线程传播：提交任务时快照父线程 MDC，子线程执行前恢复，finally 清理防止污染
+        executor.setTaskDecorator(runnable -> {
+            Map<String, String> mdc = MDC.getCopyOfContextMap();
+            return () -> {
+                try {
+                    if (mdc != null) MDC.setContextMap(mdc);
+                    runnable.run();
+                } finally {
+                    MDC.clear();
+                }
+            };
+        });
+        executor.initialize();
+        return executor;
+    }
+
+    /**
+     * DB/IO 异步写池：专用于 persistAsync、recordLog、recordSend 等持久化操作，
+     * 与 MQTT 路由池（deviceTaskExecutor）隔离，防止 DB 慢查询阻塞消息吞吐。
+     */
+    @Bean("devicePersistExecutor")
+    public Executor devicePersistExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(10);
+        executor.setMaxPoolSize(20);
+        executor.setQueueCapacity(500);
+        executor.setThreadNamePrefix("device-persist-");
+        executor.setRejectedExecutionHandler((runnable, pool) -> {
+            if (!pool.isShutdown()) {
+                log.warn("[devicePersistExecutor] 队列已满，丢弃持久化任务 (active={}, queue={})",
+                        pool.getActiveCount(), pool.getQueue().size());
+            }
+        });
         executor.setTaskDecorator(runnable -> {
             Map<String, String> mdc = MDC.getCopyOfContextMap();
             return () -> {

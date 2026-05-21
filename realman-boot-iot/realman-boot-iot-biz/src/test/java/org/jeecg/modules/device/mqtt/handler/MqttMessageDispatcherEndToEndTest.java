@@ -114,22 +114,22 @@ public class MqttMessageDispatcherEndToEndTest {
         extParamsRequestHandler = Mockito.mock(ExtParamsRequestHandler.class);
         masterCommandHandler = Mockito.mock(MasterCommandHandler.class);
 
-        // Redis ops for handlers
-        @SuppressWarnings("unchecked")
-        ValueOperations<String, String> valueOps = Mockito.mock(ValueOperations.class);
-        @SuppressWarnings("unchecked")
-        SetOperations<String, String> setOps = Mockito.mock(SetOperations.class);
-        when(redisTemplate.opsForValue()).thenReturn(valueOps);
-        when(redisTemplate.opsForSet()).thenReturn(setOps);
+        // pipeline stub（touchPresence 走 executePipelined，不再用 opsForValue/opsForSet）
+        when(redisTemplate.executePipelined(
+                Mockito.<org.springframework.data.redis.core.RedisCallback<Object>>any()))
+                .thenReturn(java.util.Collections.emptyList());
 
         // 构造各 Handler 实例
+        // DeviceStatusPersistenceService 非 Spring Bean，@Async 不生效，DB 调用同步执行，便于断言
+        DeviceStatusPersistenceService persistenceService =
+                new DeviceStatusPersistenceService(deviceMapper, statusMapper);
         DeviceStatusHandler statusHandler = new DeviceStatusHandler(
                 deviceMapper,
-                statusMapper,
                 encryptService,
                 objectMapper,
                 redisTemplate,
-                webSocketServer
+                webSocketServer,
+                persistenceService
         );
 
         configAckHandler = new DeviceConfigAckHandler(
@@ -255,6 +255,7 @@ public class MqttMessageDispatcherEndToEndTest {
 
         // 设备状态更新
         ArgumentCaptor<IotDevice> devCap = ArgumentCaptor.forClass(IotDevice.class);
+        // updateById 有单对象/Collection 两个重载，显式指定类型消除歧义
         Mockito.verify(deviceMapper).updateById(devCap.capture());
         IotDevice updated = devCap.getValue();
         assertThat(updated.getStatus()).isEqualTo(DeviceConstant.DeviceStatus.ONLINE);

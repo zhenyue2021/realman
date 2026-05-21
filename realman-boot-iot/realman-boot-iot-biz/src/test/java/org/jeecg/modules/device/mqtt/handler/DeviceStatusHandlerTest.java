@@ -1,13 +1,9 @@
 package org.jeecg.modules.device.mqtt.handler;
 
-import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.ibatis.builder.MapperBuilderAssistant;
-import org.apache.ibatis.session.Configuration;
 import org.jeecg.modules.device.constant.DeviceConstant;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.mapper.IotDeviceMapper;
-import org.jeecg.modules.device.mapper.IotDeviceStatusMapper;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.security.CommandEncryptService;
 import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
@@ -15,82 +11,74 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
-import org.springframework.data.redis.core.SetOperations;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
 import java.math.BigDecimal;
+import java.util.Collections;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 /**
- * 使用真实 AES 加解密逻辑的设备状态上报处理单元测试。
- *
- * 流程：
- *  1. 构造 StatusReport 对象并序列化为 JSON；
- *  2. 使用 CommandEncryptService.encryptForDevice() 按正式逻辑加密；
- *  3. 调用 DeviceStatusHandler.handle(deviceCode, encPayload)；
- *  4. 验证已经按预期调用 DB / Redis / WebSocket 等接口。
+ * DeviceStatusHandler 单元测试（双投递：refreshKeepalivePresence + handle）。
  */
 public class DeviceStatusHandlerTest {
 
-    private IotDeviceMapper deviceMapper;
-    private IotDeviceStatusMapper statusMapper;
-    private StringRedisTemplate redisTemplate;
-    private DeviceWebSocketServer webSocketServer;
-    private CommandEncryptService encryptService;
-    private ObjectMapper objectMapper;
+    private IotDeviceMapper                  deviceMapper;
+    private StringRedisTemplate              redisTemplate;
+    private DeviceWebSocketServer            webSocketServer;
+    private CommandEncryptService            encryptService;
+    private ObjectMapper                     objectMapper;
+    private DeviceStatusPersistenceService   persistenceService;
 
     private DeviceStatusHandler handler;
 
     @BeforeEach
-    void setUp() throws Exception {
-        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new Configuration(), ""), IotDevice.class);
-        deviceMapper = Mockito.mock(IotDeviceMapper.class);
-        statusMapper = Mockito.mock(IotDeviceStatusMapper.class);
-        redisTemplate = Mockito.mock(StringRedisTemplate.class);
-        @SuppressWarnings("unchecked")
-        SetOperations<String, String> setOps = Mockito.mock(SetOperations.class);
-        when(redisTemplate.opsForSet()).thenReturn(setOps);
-        webSocketServer = Mockito.mock(DeviceWebSocketServer.class);
-        objectMapper = new ObjectMapper();
+    void setUp() {
+        org.apache.ibatis.builder.MapperBuilderAssistant assistant =
+                new org.apache.ibatis.builder.MapperBuilderAssistant(
+                        new org.apache.ibatis.session.Configuration(), "");
+        com.baomidou.mybatisplus.core.metadata.TableInfoHelper.initTableInfo(
+                assistant, IotDevice.class);
 
-        // 为 CommandEncryptService 准备一个可用的 StringRedisTemplate mock（只用于缓存 AES Key）
+        deviceMapper       = Mockito.mock(IotDeviceMapper.class);
+        redisTemplate      = Mockito.mock(StringRedisTemplate.class);
+        webSocketServer    = Mockito.mock(DeviceWebSocketServer.class);
+        persistenceService = Mockito.mock(DeviceStatusPersistenceService.class);
+        objectMapper       = new ObjectMapper();
+
         StringRedisTemplate aesRedis = Mockito.mock(StringRedisTemplate.class);
         @SuppressWarnings("unchecked")
         ValueOperations<String, String> aesOps = Mockito.mock(ValueOperations.class);
         when(aesRedis.opsForValue()).thenReturn(aesOps);
-
         encryptService = new CommandEncryptService(aesRedis);
 
         handler = new DeviceStatusHandler(
                 deviceMapper,
-                statusMapper,
                 encryptService,
                 objectMapper,
                 redisTemplate,
-                webSocketServer
+                webSocketServer,
+                persistenceService
         );
+
+        // executePipelined 有两个重载(RedisCallback/SessionCallback)，需明确类型避免歧义
+        when(redisTemplate.executePipelined(Mockito.<RedisCallback<Object>>any()))
+                .thenReturn(Collections.emptyList());
     }
 
     @Test
     void testHandleStatusReportWithRealEncryption() throws Exception {
         String deviceCode = "DEV001";
 
-        // 准备设备基础信息
         IotDevice device = new IotDevice();
         device.setId("dev-id-1");
         device.setDeviceCode(deviceCode);
         device.setStatus(DeviceConstant.DeviceStatus.OFFLINE);
         when(deviceMapper.selectOne(Mockito.any())).thenReturn(device);
 
-        // Redis value ops mock
-        @SuppressWarnings("unchecked")
-        ValueOperations<String, String> valueOps = Mockito.mock(ValueOperations.class);
-        when(redisTemplate.opsForValue()).thenReturn(valueOps);
-
-        // 1. 构造明文 StatusReport
         long now = System.currentTimeMillis();
         MqttMessageModel.StatusReport report = MqttMessageModel.StatusReport.builder()
                 .temperature(new BigDecimal("25.5"))
@@ -104,61 +92,51 @@ public class DeviceStatusHandlerTest {
                 .build();
 
         String plainJson = objectMapper.writeValueAsString(report);
-
-        // 2. 使用正式逻辑加密
         String encPayload = encryptService.encryptForDevice(deviceCode, plainJson);
 
-        // 3. 调用处理方法
         handler.handle(deviceCode, encPayload);
 
-        // 4. 断言：设备状态被更新为 ONLINE，且经纬度被覆盖
-        ArgumentCaptor<IotDevice> deviceCaptor = ArgumentCaptor.forClass(IotDevice.class);
-        Mockito.verify(deviceMapper).updateById(deviceCaptor.capture());
-        IotDevice updated = deviceCaptor.getValue();
+        ArgumentCaptor<IotDevice> updateCaptor = ArgumentCaptor.forClass(IotDevice.class);
+        Mockito.verify(persistenceService).updateDeviceOnline(updateCaptor.capture());
+        IotDevice updated = updateCaptor.getValue();
         assertThat(updated.getStatus()).isEqualTo(DeviceConstant.DeviceStatus.ONLINE);
         assertThat(updated.getLongitude()).isEqualByComparingTo(new BigDecimal("120.123456"));
         assertThat(updated.getLatitude()).isEqualByComparingTo(new BigDecimal("30.123456"));
         assertThat(updated.getLastOnlineTime()).isNotNull();
 
-        // 5. Redis 实时状态缓存被写入
-        Mockito.verify(valueOps).set(
-                Mockito.eq(DeviceConstant.RedisKey.DEVICE_STATUS_PREFIX + deviceCode),
-                Mockito.eq(plainJson),
-                Mockito.eq(DeviceConstant.Timeout.DEVICE_OFFLINE_THRESHOLD_MINUTES + 1L),
-                Mockito.any()
-        );
-
-        // 6. WebSocket 推送
+        Mockito.verify(redisTemplate).executePipelined(Mockito.<RedisCallback<Object>>any());
         Mockito.verify(webSocketServer).pushDeviceStatus(deviceCode, plainJson);
-
-        // 历史状态写入由 persistAsync 负责，异步场景下此处不强制校验 insert
+        Mockito.verify(persistenceService).persistHistory(
+                Mockito.eq(device),
+                Mockito.any(MqttMessageModel.StatusReport.class),
+                Mockito.eq(plainJson));
+        // updateById 不应被直接调用，DB 写通过 persistenceService 异步执行
+        Mockito.verify(deviceMapper, Mockito.never()).updateById(Mockito.any(IotDevice.class));
     }
 
     @Test
-    void refreshKeepalivePresenceUpdatesRedisWithoutDb() throws Exception {
+    void refreshKeepalivePresenceUpdatesRedisWithoutDb() {
         String deviceCode = "DEV001";
 
-        @SuppressWarnings("unchecked")
-        ValueOperations<String, String> valueOps = Mockito.mock(ValueOperations.class);
-        when(redisTemplate.opsForValue()).thenReturn(valueOps);
+        handler.refreshKeepalivePresence(deviceCode, "ignored");
 
-        MqttMessageModel.StatusReport report = MqttMessageModel.StatusReport.builder()
-                .timestamp(System.currentTimeMillis())
-                .build();
-        String plainJson = objectMapper.writeValueAsString(report);
-        String encPayload = encryptService.encryptForDevice(deviceCode, plainJson);
-
-        handler.refreshKeepalivePresence(deviceCode, encPayload);
-
-        Mockito.verify(valueOps).set(
-                Mockito.eq(DeviceConstant.RedisKey.DEVICE_STATUS_PREFIX + deviceCode),
-                Mockito.eq(plainJson),
-                Mockito.eq(DeviceConstant.Timeout.DEVICE_OFFLINE_THRESHOLD_MINUTES + 1L),
-                Mockito.any()
-        );
-        Mockito.verify(redisTemplate.opsForSet()).add(DeviceConstant.RedisKey.DEVICE_ONLINE_SET, deviceCode);
+        Mockito.verify(redisTemplate).executePipelined(Mockito.<RedisCallback<Object>>any());
         Mockito.verifyNoInteractions(deviceMapper);
         Mockito.verifyNoInteractions(webSocketServer);
+        Mockito.verifyNoInteractions(persistenceService);
+    }
+
+    @Test
+    void handleKeepaliveSkipsDbAndWebSocket() throws Exception {
+        String deviceCode = "DEV001";
+        String plainJson = "{\"message\":\"keepalive\",\"timestamp\":" + System.currentTimeMillis() + "}";
+        String encPayload = encryptService.encryptForDevice(deviceCode, plainJson);
+
+        handler.handle(deviceCode, encPayload);
+
+        Mockito.verify(redisTemplate).executePipelined(Mockito.<RedisCallback<Object>>any());
+        Mockito.verifyNoInteractions(deviceMapper);
+        Mockito.verifyNoInteractions(webSocketServer);
+        Mockito.verifyNoInteractions(persistenceService);
     }
 }
-

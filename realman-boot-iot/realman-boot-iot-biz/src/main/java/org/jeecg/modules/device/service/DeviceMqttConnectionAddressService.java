@@ -23,7 +23,7 @@ public class DeviceMqttConnectionAddressService {
      * 将 EMQX {@code peerhost} 规范为 IP，再解析为行政区划文案（{@code device.mqtt-auth.ip-geo.provider}=amap|qqwry），写入 {@code iot_device.address}；
      * 解析失败或未配置数据源时写入纯 IP；内网 IP 写入「内网IP-{ip}」。
      */
-    @Async("deviceTaskExecutor")
+    @Async("devicePersistExecutor")
     public void updateAddressAfterAuthSuccess(String deviceId, String rawPeerHost) {
         if (deviceId == null || deviceId.isBlank()) {
             return;

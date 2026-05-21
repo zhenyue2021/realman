@@ -24,7 +24,7 @@ public class DeviceOperationLogServiceImpl
     private final IotDeviceMapper deviceMapper;
 
     @Override
-    @Async("deviceTaskExecutor")
+    @Async("devicePersistExecutor")
     public void recordLog(String deviceId, String deviceCode, String operationType,
                           String operationDesc, String operationDetail, String operationSource,
                           String operationResult, String failReason, String operator,

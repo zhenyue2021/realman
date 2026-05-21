@@ -49,7 +49,7 @@ public class IotSlamMapServiceImpl extends ServiceImpl<IotSlamMapMapper, IotSlam
     private static final long REFRESH_THRESHOLD_MINUTES = 60L;
 
     @Override
-    @Async("deviceTaskExecutor")
+    @Async("devicePersistExecutor")
     public void processGetCurrentMap(IotSlamCommandRecord record) {
         if (record.getAckDataJson() == null) {
             log.warn("[SlamMap] ackDataJson 为空，跳过地图处理: commandId={}", record.getCommandId());
