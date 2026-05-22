@@ -204,6 +204,7 @@ public class SysDepartServiceImpl extends ServiceImpl<SysDepartMapper, SysDepart
             sysDepart.setOrgType(String.valueOf(orgType));
             sysDepart.setCreateTime(new Date());
             sysDepart.setDelFlag(CommonConstant.DEL_FLAG_0.toString());
+            sysDepart.setStatus(CommonConstant.STATUS_1);
             //新添加的部门是叶子节点
             sysDepart.setIzLeaf(CommonConstant.IS_LEAF);
             // 【QQYUN-7172】数据库默认值兼容
@@ -211,7 +212,7 @@ public class SysDepartServiceImpl extends ServiceImpl<SysDepartMapper, SysDepart
                 if (oConvertUtils.isEmpty(sysDepart.getParentId())) {
                     sysDepart.setOrgCategory("1");
                 } else {
-                    sysDepart.setOrgCategory("2");
+                    sysDepart.setOrgCategory("4");
                 }
             }
             this.save(sysDepart);
