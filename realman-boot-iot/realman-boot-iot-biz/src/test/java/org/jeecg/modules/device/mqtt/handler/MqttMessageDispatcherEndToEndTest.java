@@ -121,7 +121,10 @@ public class MqttMessageDispatcherEndToEndTest {
 
         // 构造各 Handler 实例
         // DeviceStatusHandler 仅维护 Redis 在线态
-        DeviceStatusHandler statusHandler = new DeviceStatusHandler(redisTemplate);
+        DeviceStatusHandler statusHandler = new DeviceStatusHandler(
+                redisTemplate,
+                Mockito.mock(DeviceStatusPersistenceService.class),
+                new DeviceDbStatusCache());
 
         configAckHandler = new DeviceConfigAckHandler(
                 configMapper,

@@ -42,7 +42,8 @@ class DeviceOnlineOfflineHandlerTest {
                 new ObjectMapper(),
                 Mockito.mock(IDeviceOperationLogService.class),
                 pendingSyncService,
-                Mockito.mock(IIotDeviceRoomService.class));
+                Mockito.mock(IIotDeviceRoomService.class),
+                new DeviceDbStatusCache());
         SetOperations<String, String> setOps = Mockito.mock(SetOperations.class);
         when(redisTemplate.opsForSet()).thenReturn(setOps);
     }

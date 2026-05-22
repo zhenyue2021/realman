@@ -1,40 +1,59 @@
 package org.jeecg.modules.device.mqtt.handler;
 
+import org.jeecg.modules.device.constant.DeviceConstant;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
+import java.lang.reflect.Field;
 import java.util.Collections;
 
-import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
-/**
- * DeviceStatusHandler 单元测试：仅 Redis 在线态续期。
- */
-public class DeviceStatusHandlerTest {
+class DeviceStatusHandlerTest {
 
     private StringRedisTemplate redisTemplate;
+    private DeviceStatusPersistenceService persistenceService;
+    private DeviceDbStatusCache dbStatusCache;
     private DeviceStatusHandler handler;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
         redisTemplate = Mockito.mock(StringRedisTemplate.class);
-        handler = new DeviceStatusHandler(redisTemplate);
+        persistenceService = Mockito.mock(DeviceStatusPersistenceService.class);
+        dbStatusCache = new DeviceDbStatusCache();
+        handler = new DeviceStatusHandler(redisTemplate, persistenceService, dbStatusCache);
+        Field throttle = DeviceStatusHandler.class.getDeclaredField("offlinePromoteThrottleMs");
+        throttle.setAccessible(true);
+        throttle.set(handler, 60_000L);
         when(redisTemplate.executePipelined(Mockito.<RedisCallback<Object>>any()))
                 .thenReturn(Collections.emptyList());
     }
 
     @Test
+    @DisplayName("refreshPresence 始终刷新 Redis")
     void refreshPresenceUpdatesRedis() {
         handler.refreshPresence("DEV001", "");
-        Mockito.verify(redisTemplate).executePipelined(Mockito.<RedisCallback<Object>>any());
+        verify(redisTemplate).executePipelined(Mockito.<RedisCallback<Object>>any());
     }
 
     @Test
-    void refreshKeepalivePresenceDelegatesToRefreshPresence() {
-        handler.refreshKeepalivePresence("DEV001", "ignored");
-        Mockito.verify(redisTemplate).executePipelined(Mockito.<RedisCallback<Object>>any());
+    @DisplayName("DB 缓存已 ONLINE 时不触发异步写库")
+    void skipPromoteWhenDbCacheOnline() {
+        dbStatusCache.setStatus("DEV001", DeviceConstant.DeviceStatus.ONLINE);
+        handler.refreshPresence("DEV001", "");
+        verify(persistenceService, never()).promoteOnlineIfOffline(any());
+    }
+
+    @Test
+    @DisplayName("DB 缓存非 ONLINE 时异步 promote，且节流重复提交")
+    void promoteWhenNotOnlineWithThrottle() {
+        handler.refreshPresence("DEV002", "");
+        handler.refreshPresence("DEV002", "");
+        verify(persistenceService, Mockito.times(1)).promoteOnlineIfOffline("DEV002");
     }
 }

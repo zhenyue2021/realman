@@ -63,6 +63,7 @@ public class DeviceOnlineOfflineHandler {
     private final IDeviceOperationLogService logService;
     private final PendingSyncService pendingSyncService;
     private final IIotDeviceRoomService roomService;
+    private final DeviceDbStatusCache dbStatusCache;
 
     /** Darwin 集成未启用时为 null */
     @Autowired(required = false)
@@ -89,6 +90,8 @@ public class DeviceOnlineOfflineHandler {
             device.setStatus(DeviceConstant.DeviceStatus.ONLINE);
             device.setLastOnlineTime(LocalDateTime.now());
             deviceMapper.updateById(device);
+
+            dbStatusCache.setStatus(deviceCode, DeviceConstant.DeviceStatus.ONLINE);
 
             // 5. 维护 Redis 在线集合
             redisTemplate.opsForSet().add(DeviceConstant.RedisKey.DEVICE_ONLINE_SET, deviceCode);
@@ -136,6 +139,8 @@ public class DeviceOnlineOfflineHandler {
             device.setStatus(DeviceConstant.DeviceStatus.OFFLINE);
             device.setLastOfflineTime(LocalDateTime.now());
             deviceMapper.updateById(device);
+
+            dbStatusCache.setStatus(deviceCode, DeviceConstant.DeviceStatus.OFFLINE);
 
             // 3. 从 Redis 在线集合移除，并删除状态缓存（避免前端显示过期状态）
             redisTemplate.opsForSet().remove(DeviceConstant.RedisKey.DEVICE_ONLINE_SET, deviceCode);
