@@ -85,6 +85,7 @@ public class DeviceStatusPersistenceService {
             IotDevice device = deviceMapper.selectOne(
                     new LambdaQueryWrapper<IotDevice>()
                             .eq(IotDevice::getDeviceCode, deviceCode)
+                            .eq(IotDevice::getDelFlag, 0)
                             .last("LIMIT 1"));
             if (device == null) {
                 log.warn("[StatusPersist] 设备不存在，跳过上线同步 deviceCode={}", deviceCode);
