@@ -17,11 +17,11 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>职责：
  * <ol>
  *   <li>同步维护 Redis 在线态（Key TTL + 在线集合），供离线判定使用</li>
- *   <li>若 DB 上次非 ONLINE，异步同步 status + lastOnlineTime（已 ONLINE 则跳过）</li>
+ *   <li>若 DB 上次非 ONLINE，同步提升 status + lastOnlineTime（已 ONLINE 则跳过，节流防刷库）</li>
  * </ol>
  *
  * <p>由 {@link org.jeecg.modules.device.mqtt.handler.MqttMessageDispatcher} 投递到
- * {@code keepaliveExecutor}，DB 写经 {@link DeviceStatusPersistenceService} 异步执行，不阻塞本线程。
+ * {@code keepaliveExecutor} 执行，DB 写为同步调用以保证未激活设备能及时变为在线。
  */
 @Slf4j
 @Component
@@ -37,11 +37,11 @@ public class DeviceStatusHandler {
     private final DeviceStatusPersistenceService persistenceService;
     private final DeviceDbStatusCache dbStatusCache;
 
-    /** DB 离线→在线 异步提交节流（毫秒），避免 keepalive 风暴重复查库 */
+    /** DB 非 ONLINE→在线 同步写库节流（毫秒），避免 keepalive 风暴重复查库 */
     @Value("${mqtt.status-offline-promote-throttle-ms:60000}")
     private long offlinePromoteThrottleMs;
 
-    private final ConcurrentHashMap<String, Long> offlinePromoteSubmittedAt = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Long> offlinePromoteLastAt = new ConcurrentHashMap<>();
 
     /**
      * 刷新设备在线态：Key 不存在则创建并设 TTL，存在则续期；同时加入在线集合。
@@ -53,7 +53,7 @@ public class DeviceStatusHandler {
         } catch (Exception e) {
             log.warn("[StatusHandler] Redis presence 失败 deviceCode={}", deviceCode, e);
         }
-        schedulePromoteIfNeeded(deviceCode);
+        promoteOnlineIfNeeded(deviceCode);
     }
 
     /** 兼容旧调用名 */
@@ -73,18 +73,18 @@ public class DeviceStatusHandler {
     }
 
     /**
-     * DB 已 ONLINE 则跳过；否则节流后异步 {@link DeviceStatusPersistenceService#promoteOnlineIfOffline}。
+     * DB 已 ONLINE 则跳过；否则节流后同步 {@link DeviceStatusPersistenceService#promoteOnlineIfOfflineSync}。
      */
-    private void schedulePromoteIfNeeded(String deviceCode) {
+    private void promoteOnlineIfNeeded(String deviceCode) {
         if (dbStatusCache.isOnline(deviceCode)) {
             return;
         }
         long now = System.currentTimeMillis();
-        Long lastSubmitted = offlinePromoteSubmittedAt.get(deviceCode);
-        if (lastSubmitted != null && now - lastSubmitted < offlinePromoteThrottleMs) {
+        Long lastAt = offlinePromoteLastAt.get(deviceCode);
+        if (lastAt != null && now - lastAt < offlinePromoteThrottleMs) {
             return;
         }
-        offlinePromoteSubmittedAt.put(deviceCode, now);
-        persistenceService.promoteOnlineIfOffline(deviceCode);
+        offlinePromoteLastAt.put(deviceCode, now);
+        persistenceService.promoteOnlineIfOfflineSync(deviceCode);
     }
 }

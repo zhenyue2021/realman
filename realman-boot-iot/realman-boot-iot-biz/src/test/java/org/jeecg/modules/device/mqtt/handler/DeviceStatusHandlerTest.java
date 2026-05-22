@@ -42,18 +42,18 @@ class DeviceStatusHandlerTest {
     }
 
     @Test
-    @DisplayName("DB 缓存已 ONLINE 时不触发异步写库")
+    @DisplayName("DB 缓存已 ONLINE 时不触发同步写库")
     void skipPromoteWhenDbCacheOnline() {
         dbStatusCache.setStatus("DEV001", DeviceConstant.DeviceStatus.ONLINE);
         handler.refreshPresence("DEV001", "");
-        verify(persistenceService, never()).promoteOnlineIfOffline(any());
+        verify(persistenceService, never()).promoteOnlineIfOfflineSync(any());
     }
 
     @Test
-    @DisplayName("DB 缓存非 ONLINE 时异步 promote，且节流重复提交")
+    @DisplayName("DB 缓存非 ONLINE 时同步 promote，且节流重复提交")
     void promoteWhenNotOnlineWithThrottle() {
         handler.refreshPresence("DEV002", "");
         handler.refreshPresence("DEV002", "");
-        verify(persistenceService, Mockito.times(1)).promoteOnlineIfOffline("DEV002");
+        verify(persistenceService, Mockito.times(1)).promoteOnlineIfOfflineSync("DEV002");
     }
 }

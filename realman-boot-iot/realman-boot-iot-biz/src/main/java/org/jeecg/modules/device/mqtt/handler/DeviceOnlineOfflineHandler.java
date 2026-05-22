@@ -86,11 +86,15 @@ public class DeviceOnlineOfflineHandler {
             IotDevice device = findDevice(deviceCode);
             if (device == null) return;
 
-            // 4. 更新 DB 在线状态
+            // 4. 更新 DB 在线状态（含未激活→在线）
+            Integer prevStatus = device.getStatus();
             device.setStatus(DeviceConstant.DeviceStatus.ONLINE);
             device.setLastOnlineTime(LocalDateTime.now());
-            deviceMapper.updateById(device);
-
+            int rows = deviceMapper.updateById(device);
+            if (rows <= 0) {
+                log.warn("[Online] 设备上线写库未生效 deviceCode={} prevStatus={}", deviceCode, prevStatus);
+                return;
+            }
             dbStatusCache.setStatus(deviceCode, DeviceConstant.DeviceStatus.ONLINE);
 
             // 5. 维护 Redis 在线集合

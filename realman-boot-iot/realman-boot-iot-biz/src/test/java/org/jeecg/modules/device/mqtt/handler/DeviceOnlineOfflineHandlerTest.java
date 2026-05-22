@@ -55,6 +55,7 @@ class DeviceOnlineOfflineHandlerTest {
         device.setId("id1");
         device.setDeviceCode("DEV001");
         when(deviceMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(device);
+        when(deviceMapper.updateById(any(IotDevice.class))).thenReturn(1);
 
         String topic = "$SYS/brokers/emqx@127.0.0.1/clients/DEV001/connected";
         String payload = "{\"username\":\"DEV001\",\"clientid\":\"DEV001\"}";

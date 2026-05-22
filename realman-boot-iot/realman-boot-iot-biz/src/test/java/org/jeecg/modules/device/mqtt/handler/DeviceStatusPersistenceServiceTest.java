@@ -37,7 +37,7 @@ class DeviceStatusPersistenceServiceTest {
         device.setStatus(DeviceConstant.DeviceStatus.ONLINE);
         when(deviceMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(device);
 
-        service.promoteOnlineIfOffline("DEV001");
+        service.promoteOnlineIfOfflineSync("DEV001");
 
         verify(deviceMapper, never()).updateById(any(IotDevice.class));
         assert dbStatusCache.isOnline("DEV001");
@@ -51,11 +51,28 @@ class DeviceStatusPersistenceServiceTest {
         device.setDeviceCode("DEV002");
         device.setStatus(DeviceConstant.DeviceStatus.OFFLINE);
         when(deviceMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(device);
+        when(deviceMapper.updateById(any(IotDevice.class))).thenReturn(1);
 
-        service.promoteOnlineIfOffline("DEV002");
+        service.promoteOnlineIfOfflineSync("DEV002");
 
         verify(deviceMapper).updateById(any(IotDevice.class));
         assert dbStatusCache.isOnline("DEV002");
+    }
+
+    @Test
+    @DisplayName("DB 为 INACTIVE 时更新为 ONLINE")
+    void promoteWhenInactive() {
+        IotDevice device = new IotDevice();
+        device.setId("id4");
+        device.setDeviceCode("DEV004");
+        device.setStatus(DeviceConstant.DeviceStatus.INACTIVE);
+        when(deviceMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(device);
+        when(deviceMapper.updateById(any(IotDevice.class))).thenReturn(1);
+
+        service.promoteOnlineIfOfflineSync("DEV004");
+
+        verify(deviceMapper).updateById(any(IotDevice.class));
+        assert dbStatusCache.isOnline("DEV004");
     }
 
     @Test
@@ -67,7 +84,7 @@ class DeviceStatusPersistenceServiceTest {
         device.setStatus(DeviceConstant.DeviceStatus.DISABLED);
         when(deviceMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(device);
 
-        service.promoteOnlineIfOffline("DEV003");
+        service.promoteOnlineIfOfflineSync("DEV003");
 
         verify(deviceMapper, never()).updateById(any(IotDevice.class));
     }

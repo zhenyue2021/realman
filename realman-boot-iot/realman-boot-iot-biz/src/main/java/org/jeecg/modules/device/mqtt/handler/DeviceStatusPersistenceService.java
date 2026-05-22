@@ -68,38 +68,53 @@ public class DeviceStatusPersistenceService {
     }
 
     /**
-     * keepalive 触发的 DB 同步：仅当 DB 当前非 ONLINE 时更新 status + lastOnlineTime。
-     * 已在 ONLINE 时只回填本地缓存，不写库。
+     * 异步包装：委托 {@link #promoteOnlineIfOfflineSync(String)}，供历史调用方兼容。
      */
     @Async("devicePersistExecutor")
     public void promoteOnlineIfOffline(String deviceCode) {
+        promoteOnlineIfOfflineSync(deviceCode);
+    }
+
+    /**
+     * 同步将 DB 非 ONLINE 设备提升为 ONLINE（keepalive / 主动上线上报使用）。
+     *
+     * @return true 表示已是 ONLINE 或本次写库成功；false 表示设备不存在、已禁用或写库失败
+     */
+    public boolean promoteOnlineIfOfflineSync(String deviceCode) {
         try {
             IotDevice device = deviceMapper.selectOne(
                     new LambdaQueryWrapper<IotDevice>()
                             .eq(IotDevice::getDeviceCode, deviceCode)
                             .last("LIMIT 1"));
             if (device == null) {
-                log.debug("[StatusPersist] 设备不存在，跳过上线同步 deviceCode={}", deviceCode);
-                return;
+                log.warn("[StatusPersist] 设备不存在，跳过上线同步 deviceCode={}", deviceCode);
+                return false;
             }
             if (Objects.equals(device.getStatus(), DeviceConstant.DeviceStatus.ONLINE)) {
                 dbStatusCache.setStatus(deviceCode, DeviceConstant.DeviceStatus.ONLINE);
-                return;
+                return true;
             }
             if (Objects.equals(device.getStatus(), DeviceConstant.DeviceStatus.DISABLED)) {
-                log.debug("[StatusPersist] 设备已禁用，跳过上线同步 deviceCode={}", deviceCode);
-                return;
+                log.info("[StatusPersist] 设备已禁用，跳过上线同步 deviceCode={}", deviceCode);
+                return false;
             }
+            Integer prevStatus = device.getStatus();
             IotDevice update = new IotDevice();
             update.setId(device.getId());
             update.setStatus(DeviceConstant.DeviceStatus.ONLINE);
             update.setLastOnlineTime(LocalDateTime.now());
-            deviceMapper.updateById(update);
-            dbStatusCache.setStatus(deviceCode, DeviceConstant.DeviceStatus.ONLINE);
-            log.info("[StatusPersist] 设备离线态同步为在线 deviceCode={} prevStatus={}",
-                    deviceCode, device.getStatus());
+            int rows = deviceMapper.updateById(update);
+            if (rows > 0) {
+                dbStatusCache.setStatus(deviceCode, DeviceConstant.DeviceStatus.ONLINE);
+                log.info("[StatusPersist] 设备同步为在线 deviceCode={} prevStatus={}",
+                        deviceCode, prevStatus);
+                return true;
+            }
+            log.warn("[StatusPersist] 设备上线写库未生效 deviceCode={} prevStatus={}", deviceCode, prevStatus);
+            return false;
         } catch (Exception e) {
             log.warn("[StatusPersist] 离线转在线失败 deviceCode={}", deviceCode, e);
+            return false;
         }
     }
 

@@ -18,6 +18,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.Objects;
 
 /**
  * 机器人设备主动上线信息上报处理器（Topic: device/{deviceCode}/datacollect/deviceOnline）
@@ -25,7 +26,7 @@ import java.time.ZoneId;
  * <p>设备 MQTT 连接建立后主动推送本消息，携带型号、固件版本及当前位置。
  * 平台收到后：
  * <ol>
- *   <li>将消息字段同步回 iot_device 表（device_model / firmware_version / latitude / longitude / last_online_time）</li>
+ *   <li>将消息字段同步回 iot_device 表（含 status=ONLINE、last_online_time 及型号/固件/坐标等）</li>
  *   <li>若 Darwin 集成已启用，向 RocketMQ 推送 ONLINE 事件（此为唯一推送点，DeviceStatusHandler 不再推送）</li>
  * </ol>
  *
@@ -38,7 +39,8 @@ import java.time.ZoneId;
 public class DeviceOnlineReportHandler {
 
     private final IotDeviceMapper deviceMapper;
-    private final ObjectMapper    objectMapper;
+    private final ObjectMapper objectMapper;
+    private final DeviceDbStatusCache dbStatusCache;
 
     /** darwin.integration.enabled=false 时 Bean 不存在，注入 null */
     @Autowired(required = false)
@@ -66,11 +68,15 @@ public class DeviceOnlineReportHandler {
             return;
         }
 
-        // 同步设备信息到 DB
+        Integer prevStatus = device.getStatus();
         updateDeviceFields(device, report);
+        applyOnlineStatus(device);
         deviceMapper.updateById(device);
-        log.info("[DeviceOnlineReport] 设备信息已同步 deviceCode={} payload={}",
-                deviceCode, payload);
+        if (!Objects.equals(device.getStatus(), DeviceConstant.DeviceStatus.DISABLED)) {
+            dbStatusCache.setStatus(deviceCode, DeviceConstant.DeviceStatus.ONLINE);
+        }
+        log.info("[DeviceOnlineReport] 设备信息已同步 deviceCode={} prevStatus={} status={}",
+                deviceCode, prevStatus, device.getStatus());
 
         // 仅机器人设备推送上线 MQ 事件
         if (deviceStatusProducer != null
@@ -79,6 +85,14 @@ public class DeviceOnlineReportHandler {
             deviceStatusProducer.sendOnlineEvent(
                     tenant, deviceCode, "SLAVE", device.getDeviceModel(), MDC.get("traceId"));
         }
+    }
+
+    /** 非禁用设备在主动上线上报时同步为 ONLINE（含未激活、离线）。 */
+    private static void applyOnlineStatus(IotDevice device) {
+        if (Objects.equals(device.getStatus(), DeviceConstant.DeviceStatus.DISABLED)) {
+            return;
+        }
+        device.setStatus(DeviceConstant.DeviceStatus.ONLINE);
     }
 
     private void updateDeviceFields(IotDevice device, MqttMessageModel.DeviceOnlineReport report) {
