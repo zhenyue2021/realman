@@ -1,0 +1,193 @@
+apiVersion: 1
+
+# ===== RealMan IoT 平台告警规则 =====
+# 数据源：Loki（uid: loki-realman，见 datasources/datasources.yml）
+# 通知渠道：realman-ops（见 contactpoints.yml，配置完通知方式后生效）
+#
+# 加载方式：将本文件放入 Grafana provisioning/alerting/ 目录，重启 Grafana 自动导入。
+# 若 Grafana 已在运行：docker compose restart grafana
+
+groups:
+  - orgId: 1
+    name: realman-iot-alerts
+    folder: RealMan 告警
+    interval: 1m          # 每分钟评估一次
+
+    rules:
+
+      # -------------------------------------------------------
+      # R1: ERROR 日志突增
+      # 触发条件：过去 5 分钟内 ERROR 日志超过 20 条
+      # 意义：捕获业务异常爆发，如 DB 连接失败、依赖服务宕机
+      # -------------------------------------------------------
+      - uid: iot-error-spike
+        title: "[IoT] ERROR日志突增"
+        condition: threshold
+        for: 2m             # 持续 2 分钟才触发，避免毛刺误报
+        annotations:
+          summary: "realman-iot ERROR日志 5分钟内超过20条"
+          description: "请前往 Grafana Loki 查询 {app=\"realman-iot\"} |= \"ERROR\" 排查原因"
+        labels:
+          severity: warning
+          team: iot
+        data:
+          - refId: A
+            datasourceUid: loki-realman
+            queryType: instant
+            model:
+              datasource:
+                type: loki
+                uid: loki-realman
+              expr: 'sum(count_over_time({app="realman-iot"} |= "ERROR" [5m]))'
+              instant: true
+              refId: A
+          - refId: threshold
+            datasourceUid: "-100"   # Grafana 内置表达式引擎
+            model:
+              type: threshold
+              conditions:
+                - evaluator:
+                    params: [20]
+                    type: gt          # greater than
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+              refId: threshold
+
+      # -------------------------------------------------------
+      # R2: MQTT 消息处理异常
+      # 触发条件：过去 5 分钟内 Dispatcher 处理消息异常超过 5 次
+      # 意义：设备上报消息解析失败，可能导致设备状态不同步
+      # -------------------------------------------------------
+      - uid: iot-mqtt-dispatch-error
+        title: "[IoT] MQTT消息处理异常"
+        condition: threshold
+        for: 0m             # 立即触发，MQTT 处理失败属于高优先级
+        annotations:
+          summary: "MQTT Dispatcher 5分钟内处理异常超过5次"
+          description: "请查询 Loki: {app=\"realman-iot\"} |= \"Dispatcher\" |= \"处理消息异常\""
+        labels:
+          severity: critical
+          team: iot
+        data:
+          - refId: A
+            datasourceUid: loki-realman
+            queryType: instant
+            model:
+              datasource:
+                type: loki
+                uid: loki-realman
+              expr: 'sum(count_over_time({app="realman-iot"} |= "[Dispatcher]" |= "处理消息异常" [5m]))'
+              instant: true
+              refId: A
+          - refId: threshold
+            datasourceUid: "-100"
+            model:
+              type: threshold
+              conditions:
+                - evaluator:
+                    params: [5]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+              refId: threshold
+
+      # -------------------------------------------------------
+      # R3: 设备批量离线
+      # 触发条件：过去 1 分钟内离线事件超过 10 次
+      # 意义：可能是网络抖动、EMQX 重启或大范围设备故障
+      # -------------------------------------------------------
+      - uid: iot-device-offline-spike
+        title: "[IoT] 设备批量离线"
+        condition: threshold
+        for: 0m
+        annotations:
+          summary: "1分钟内超过10台设备离线"
+          description: "请查询 Loki: {app=\"realman-iot\"} |= \"handleOffline\" 确认离线设备列表"
+        labels:
+          severity: critical
+          team: iot
+        data:
+          - refId: A
+            datasourceUid: loki-realman
+            queryType: instant
+            model:
+              datasource:
+                type: loki
+                uid: loki-realman
+              expr: 'sum(count_over_time({app="realman-iot"} |= "handleOffline" [1m]))'
+              instant: true
+              refId: A
+          - refId: threshold
+            datasourceUid: "-100"
+            model:
+              type: threshold
+              conditions:
+                - evaluator:
+                    params: [10]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+              refId: threshold
+
+      # -------------------------------------------------------
+      # R4: XXL-Job 定时任务执行异常
+      # 触发条件：过去 10 分钟内定时任务出现 ERROR 超过 3 次
+      # 意义：定时任务静默失败不易察觉，需要主动告警
+      # -------------------------------------------------------
+      - uid: iot-xxljob-error
+        title: "[IoT] 定时任务执行异常"
+        condition: threshold
+        for: 0m
+        annotations:
+          summary: "XXL-Job 定时任务 10分钟内出现 ERROR 超过3次"
+          description: "请查询 Loki: {app=\"realman-iot\"} |~ \"traceId=job-\" |= \"ERROR\""
+        labels:
+          severity: warning
+          team: iot
+        data:
+          - refId: A
+            datasourceUid: loki-realman
+            queryType: instant
+            model:
+              datasource:
+                type: loki
+                uid: loki-realman
+              expr: 'sum(count_over_time({app="realman-iot"} |~ "traceId=job-" |= "ERROR" [10m]))'
+              instant: true
+              refId: A
+          - refId: threshold
+            datasourceUid: "-100"
+            model:
+              type: threshold
+              conditions:
+                - evaluator:
+                    params: [3]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+              refId: threshold
+
+# ===== 告警路由：所有规则统一发送到 realman-ops =====
+policies:
+  - orgId: 1
+    receiver: realman-ops   # 与 contactpoints.yml 中 name 一致
+    group_by: [alertname, severity]
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 4h     # 同一告警 4 小时内不重复发送

@@ -1,0 +1,32 @@
+# Grafana Loki 单机部署（与 docs/集群模式下分布式链路追踪与日志管理-技术设计方案v3.md 一致）
+#
+# 方式 A — 仅服务器、不拷贝本仓库：SSH 登录后执行（需已安装 Docker）
+#   docker volume create loki-data 2>/dev/null; \
+#   docker run -d --name loki -p 3100:3100 --restart unless-stopped \
+#     -v loki-data:/loki \
+#     grafana/loki:2.9.0 \
+#     -config.file=/etc/loki/local-config.yaml
+#
+# 方式 B — 使用本文件：在含本文件的目录执行 docker compose up -d
+#
+# HTTP:   http://<服务器IP>:3100/ready  （就绪探针）
+# 推送:   http://<服务器IP>:3100/loki/api/v1/push  （Java loki4j / Promtail 等）
+# Grafana 数据源 URL: http://<服务器IP>:3100  （同机 Docker 网络内用 http://loki:3100）
+#
+# 调优与生产配置见 https://grafana.com/docs/loki/latest/
+
+services:
+  loki:
+    image: grafana/loki:2.9.0
+    container_name: loki
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - loki-data:/loki
+    environment:
+      TZ: Asia/Shanghai
+
+volumes:
+  loki-data:
