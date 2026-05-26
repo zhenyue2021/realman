@@ -21,13 +21,13 @@ import org.jeecg.modules.device.mapper.workorder.WorkOrderDeviceMapper;
 import org.jeecg.modules.device.datacollect.dto.mqtt.StartCollectCmd;
 import org.jeecg.modules.device.feign.SysAuthFeignClient;
 import org.jeecg.modules.device.datacollect.dto.mqtt.StopCollectCmd;
-import org.jeecg.modules.device.datacollect.config.DataCollectIntegrationProperties;
 import org.jeecg.modules.device.datacollect.service.DataCollectCommandService;
 import org.jeecg.modules.device.mapper.workorder.WorkOrderMapper;
 import org.jeecg.modules.device.service.workorder.IWorkOrderService;
 import org.jeecg.modules.device.service.workorder.IWorkOrderStateMachineService;
 import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,7 +49,7 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
     private final DeviceWebSocketServer deviceWebSocketServer;
     private final IWorkOrderStateMachineService workOrderStateMachine;
     private final IotDeviceMapper iotDeviceMapper;
-    private final DataCollectIntegrationProperties darwinProps;
+    private final Environment environment;
     /** darwin.integration.enabled=false 时 Bean 不存在，启动时注入 null，调用前做空判断 */
     @Autowired(required = false)
     private DataCollectCommandService dataCollectCommandService;
@@ -533,18 +533,20 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
     private void applyDarwinFields(WorkOrder order, String tenant,
                                    WorkOrderCreateMsg.WorkOrderItem item) {
         WorkOrderCreateMsg.CollectionPlan plan = item.getCollectionPlan();
-        order.setTaskName(plan != null ? plan.getName() : null);
+        WorkOrderCreateMsg.CollectionItem ci = item.getCollectionItem();
         order.setPlanStartTime(parseDateTime(plan != null ? plan.getBeginAt() : null));
         order.setPlanEndTime(parseDateTime(plan != null ? plan.getEndAt() : null));
-        order.setTaskDesc(formatTaskDesc(item.getCollectionItem()));
+        order.setRemark(plan != null ? plan.getName() : null);
+        order.setTaskDesc(formatTaskDesc(ci));
         order.setQuotaTotal(parseQuota(item.getQuotaValue()));
         order.setTenantId(tenant);
         order.setAgentId(tenant);
         order.setAgentName(resolveTenantName(tenant));
-        order.setDepartmentId(darwinProps.getDefaultDepartmentId());
-        order.setDepartmentName(darwinProps.getDefaultDepartmentName());
-        WorkOrderCreateMsg.CollectionItem ci = item.getCollectionItem();
+        // 每次从 Environment 读取，Nacos 热更新后无需依赖 @RefreshScope Bean 重建
+        order.setDepartmentId(environment.getProperty("darwin.integration.default-department-id", ""));
+        order.setDepartmentName(environment.getProperty("darwin.integration.default-department-name", ""));
         if (ci != null) {
+            order.setTaskName(ci.getName());
             order.setCollectionItemNameEn(ci.getNameEn());
         }
         if (item.getLevel1Scene() != null) {

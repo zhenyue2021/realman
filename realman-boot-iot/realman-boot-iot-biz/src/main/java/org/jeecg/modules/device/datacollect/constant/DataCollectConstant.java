@@ -77,10 +77,6 @@ public final class DataCollectConstant {
     public static final String MQ_TOPIC_DEVICE_STATUS    = "daily_GLN_PLATFORM";
     /** 上线/离线事件共用同一个 MQ Tag，用于 broker 侧过滤 */
     public static final String MQ_TAG_DEVICE_STATUS      = "DEVICE_STATUS";
-    /** @deprecated 使用 MQ_TAG_DEVICE_STATUS */
-    public static final String MQ_TAG_ONLINE             = MQ_TAG_DEVICE_STATUS;
-    /** @deprecated 使用 MQ_TAG_DEVICE_STATUS */
-    public static final String MQ_TAG_OFFLINE            = MQ_TAG_DEVICE_STATUS;
     /** 消息体 eventType 字段值：设备上线 */
     public static final String MQ_EVENT_ONLINE           = "ONLINE";
     /** 消息体 eventType 字段值：设备离线 */
