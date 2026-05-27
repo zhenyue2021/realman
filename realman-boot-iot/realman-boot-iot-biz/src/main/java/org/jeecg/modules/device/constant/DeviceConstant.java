@@ -316,6 +316,8 @@ public interface DeviceConstant {
     interface RedisKey {
         /** 设备实时状态缓存 Key：iot:device:status:{deviceCode}，TTL = 离线阈值 + 1min */
         String DEVICE_STATUS_PREFIX = "iot:device:status:";
+        /** DB status 镜像缓存 Key：iot:device:db-status:{deviceCode}，供 keepalive 软自愈多 Pod 共享 */
+        String DEVICE_DB_STATUS_PREFIX = "iot:device:db-status:";
         /** 设备 MQTT 密钥缓存 Key：iot:device:secret:{deviceCode}，TTL = 24h */
         String DEVICE_SECRET_PREFIX = "iot:device:secret:";
         /** 在线设备集合（Redis Set）：iot:device:online，成员为 deviceCode */

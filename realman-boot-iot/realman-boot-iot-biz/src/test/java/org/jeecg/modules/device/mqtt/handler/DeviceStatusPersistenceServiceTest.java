@@ -9,8 +9,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 
+import java.util.concurrent.TimeUnit;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -18,14 +24,20 @@ import static org.mockito.Mockito.when;
 class DeviceStatusPersistenceServiceTest {
 
     private IotDeviceMapper deviceMapper;
+    private StringRedisTemplate redisTemplate;
+    private ValueOperations<String, String> valueOps;
     private DeviceDbStatusCache dbStatusCache;
     private DeviceStatusPersistenceService service;
 
     @BeforeEach
     void setUp() {
         deviceMapper = Mockito.mock(IotDeviceMapper.class);
-        dbStatusCache = new DeviceDbStatusCache();
-        service = new DeviceStatusPersistenceService(deviceMapper, Mockito.mock(IotDeviceStatusMapper.class), dbStatusCache);
+        redisTemplate = Mockito.mock(StringRedisTemplate.class);
+        valueOps = Mockito.mock(ValueOperations.class);
+        when(redisTemplate.opsForValue()).thenReturn(valueOps);
+        dbStatusCache = new DeviceDbStatusCache(redisTemplate);
+        service = new DeviceStatusPersistenceService(
+                deviceMapper, Mockito.mock(IotDeviceStatusMapper.class), dbStatusCache);
     }
 
     @Test
@@ -40,7 +52,11 @@ class DeviceStatusPersistenceServiceTest {
         service.promoteOnlineIfOffline("DEV001");
 
         verify(deviceMapper, never()).updateById(any(IotDevice.class));
-        assert dbStatusCache.isOnline("DEV001");
+        verify(valueOps).set(
+                eq(DeviceDbStatusCache.cacheKey("DEV001")),
+                eq(String.valueOf(DeviceConstant.DeviceStatus.ONLINE)),
+                eq(24L),
+                eq(TimeUnit.HOURS));
     }
 
     @Test
@@ -53,10 +69,15 @@ class DeviceStatusPersistenceServiceTest {
         when(deviceMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(device);
         when(deviceMapper.updateById(any(IotDevice.class))).thenReturn(1);
 
-        service.promoteOnlineIfOffline("DEV002");
+        DeviceStatusPersistenceService.PromoteOnlineResult result = service.promoteOnlineIfOffline("DEV002");
 
         verify(deviceMapper).updateById(any(IotDevice.class));
-        assert dbStatusCache.isOnline("DEV002");
+        assertThat(result).isEqualTo(DeviceStatusPersistenceService.PromoteOnlineResult.PROMOTED);
+        verify(valueOps).set(
+                eq(DeviceDbStatusCache.cacheKey("DEV002")),
+                eq(String.valueOf(DeviceConstant.DeviceStatus.ONLINE)),
+                eq(24L),
+                eq(TimeUnit.HOURS));
     }
 
     @Test
@@ -72,7 +93,11 @@ class DeviceStatusPersistenceServiceTest {
         service.promoteOnlineIfOffline("DEV004");
 
         verify(deviceMapper).updateById(any(IotDevice.class));
-        assert dbStatusCache.isOnline("DEV004");
+        verify(valueOps).set(
+                eq(DeviceDbStatusCache.cacheKey("DEV004")),
+                eq(String.valueOf(DeviceConstant.DeviceStatus.ONLINE)),
+                eq(24L),
+                eq(TimeUnit.HOURS));
     }
 
     @Test

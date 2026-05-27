@@ -122,7 +122,7 @@ public class MqttMessageDispatcherEndToEndTest {
 
         // 构造各 Handler 实例
         // DeviceStatusHandler：Redis presence + keepalive 软自愈
-        DeviceDbStatusCache dbStatusCache = new DeviceDbStatusCache();
+        DeviceDbStatusCache dbStatusCache = new DeviceDbStatusCache(redisTemplate);
         DeviceStatusPersistenceService statusPersistenceService = new DeviceStatusPersistenceService(
                 deviceMapper, statusMapper, dbStatusCache);
         DeviceStatusHandler statusHandler = new DeviceStatusHandler(

@@ -1,5 +1,6 @@
 package org.jeecg.modules.device.mqtt.handler;
 
+import org.jeecg.modules.device.constant.DeviceConstant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,9 +33,9 @@ class DeviceStatusHandlerTest {
     void setUp() {
         redisTemplate = Mockito.mock(StringRedisTemplate.class);
         persistenceService = Mockito.mock(DeviceStatusPersistenceService.class);
-        dbStatusCache = new DeviceDbStatusCache();
         valueOps = Mockito.mock(ValueOperations.class);
         when(redisTemplate.opsForValue()).thenReturn(valueOps);
+        dbStatusCache = new DeviceDbStatusCache(redisTemplate);
         when(redisTemplate.executePipelined(Mockito.<RedisCallback<Object>>any()))
                 .thenReturn(Collections.emptyList());
         when(valueOps.setIfAbsent(anyString(), anyString(), anyLong(), eq(TimeUnit.MILLISECONDS)))
@@ -47,7 +48,8 @@ class DeviceStatusHandlerTest {
     @Test
     @DisplayName("refreshPresence 刷新 Redis")
     void refreshPresenceUpdatesRedis() {
-        dbStatusCache.setStatus("DEV001", org.jeecg.modules.device.constant.DeviceConstant.DeviceStatus.ONLINE);
+        when(valueOps.get(DeviceDbStatusCache.cacheKey("DEV001")))
+                .thenReturn(String.valueOf(DeviceConstant.DeviceStatus.ONLINE));
 
         handler.refreshPresence("DEV001", "{\"battery\":80}");
 
@@ -58,6 +60,7 @@ class DeviceStatusHandlerTest {
     @Test
     @DisplayName("DB 非 ONLINE 时 keepalive 触发软自愈")
     void refreshPresencePromotesDbWhenOffline() {
+        when(valueOps.get(DeviceDbStatusCache.cacheKey("DEV001"))).thenReturn(null);
         when(persistenceService.promoteOnlineIfOffline("DEV001"))
                 .thenReturn(DeviceStatusPersistenceService.PromoteOnlineResult.PROMOTED);
 

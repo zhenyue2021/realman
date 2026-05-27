@@ -49,7 +49,7 @@ class DeviceOnlineOfflineHandlerTest {
                 Mockito.mock(IDeviceOperationLogService.class),
                 pendingSyncService,
                 Mockito.mock(IIotDeviceRoomService.class),
-                new DeviceDbStatusCache());
+                new DeviceDbStatusCache(redisTemplate));
         Field idempotentSeconds = DeviceOnlineOfflineHandler.class.getDeclaredField("sysEventIdempotentSeconds");
         idempotentSeconds.setAccessible(true);
         idempotentSeconds.set(handler, 15L);
