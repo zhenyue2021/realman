@@ -7,9 +7,6 @@ import org.eclipse.paho.mqttv5.common.MqttMessage;
 import org.eclipse.paho.mqttv5.common.packet.MqttProperties;
 import org.eclipse.paho.mqttv5.common.packet.UserProperty;
 import org.jeecg.common.trace.TraceIdConst;
-import org.jeecg.modules.device.datacollect.constant.DataCollectConstant;
-import org.jeecg.modules.device.datacollect.handler.CollectUrlRequestHandler;
-import org.jeecg.modules.device.datacollect.handler.OssAddressReportHandler;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -80,27 +77,11 @@ public class MqttMessageDispatcher {
     /** 匹配 {deviceCode}/master/{path} 或 {deviceCode}/slave/{path}，group(1)=deviceCode，group(2)=role，group(3)=path */
     private static final Pattern RAW_DEVICE_TOPIC = Pattern.compile("^([^/]+)/(master|slave)/(.+)$");
 
-    private final DeviceStatusHandler                 statusHandler;
-    private final DeviceConfigAckHandler              configAckHandler;
-    private final DeviceCommandAckHandler             commandAckHandler;
-    private final MasterCommandAckHandler             masterCommandAckHandler;
-    private final OtaProgressHandler                  otaProgressHandler;
-    private final DeviceOperationLogHandler           operationLogHandler;
-    private final DeviceOnlineOfflineHandler          onlineOfflineHandler;
-    private final DeviceCameraStreamResponseHandler   deviceCameraStreamResponseHandler;
+    private final DeviceStatusHandler statusHandler;
+    private final DeviceOnlineOfflineHandler onlineOfflineHandler;
+    private final MqttDeviceTopicRouter deviceTopicRouter;
+    private final MasterCommandAckHandler masterCommandAckHandler;
     private final MasterAssociatedDeviceResponseHandler masterAssociatedDeviceResponseHandler;
-    private final RobotSlaveStatusHandler             robotSlaveStatusHandler;
-    private final SlamAckHandler                      slamAckHandler;
-    private final SlamStatesHandler                   slamStatesHandler;
-    private final ExtParamsRequestHandler             extParamsRequestHandler;
-    private final MasterCommandHandler                masterCommandHandler;
-    private final WebRtcAckHandler                    webRtcAckHandler;
-    private final WebRtcRestartHandler                webRtcRestartHandler;
-    private final OssAddressReportHandler             ossAddressReportHandler;
-    /** darwin.integration.enabled=false 时 Bean 不存在，注入 null，dispatch 时做空判断 */
-    @Autowired(required = false)
-    private CollectUrlRequestHandler                  collectUrlRequestHandler;
-    private final DeviceOnlineReportHandler           deviceOnlineReportHandler;
 
     /** IoT 设备任务线程池，由 AppConfig 定义，已内置 MDC 跨线程传播。
      *  非 final：@Qualifier 不随 Lombok @RequiredArgsConstructor 传播到构造器参数，
@@ -247,7 +228,7 @@ public class MqttMessageDispatcher {
             // 1. 标准业务 Topic：device/{deviceCode}/{path}
             Matcher m = DEVICE_TOPIC.matcher(topic);
             if (m.matches()) {
-                dispatchDeviceTopic(m.group(1), m.group(2), topic, payload);
+                deviceTopicRouter.routeDeviceTopic(m.group(1), m.group(2), topic, payload);
                 return;
             }
             // 2. 主控指令 ACK：master/{controllerCode}/command/{cmd}/ack
@@ -272,7 +253,7 @@ public class MqttMessageDispatcher {
             // 3. 主控/机器人原始上报 Topic：{deviceCode}/master/{path} 或 {deviceCode}/slave/{path}
             Matcher raw = RAW_DEVICE_TOPIC.matcher(topic);
             if (raw.matches()) {
-                dispatchRawTopic(raw.group(1), raw.group(2), raw.group(3), payload);
+                deviceTopicRouter.routeRawTopic(raw.group(1), raw.group(2), raw.group(3), payload);
                 return;
             }
 
@@ -295,70 +276,6 @@ public class MqttMessageDispatcher {
             }
         }
         return null;
-    }
-
-    /**
-     * 路由 device/{deviceCode}/{path} 格式的标准业务 Topic
-     */
-    private void dispatchDeviceTopic(String deviceCode, String path, String topic, String payload) throws Exception {
-        // 指令集通用 ACK：command/{cmd}/ack
-        if (path.startsWith("command/") && path.endsWith("/ack")) {
-            String cmd = path.substring("command/".length(), path.length() - "/ack".length());
-            if (cmd.contains("/")) {
-                log.warn("[Dispatcher] 未知指令ACK路径: {}", topic);
-                return;
-            }
-            commandAckHandler.handle(deviceCode, cmd, payload);
-            return;
-        }
-
-        switch (path) {
-            case "status/report"                      -> statusHandler.refreshPresence(deviceCode, payload);
-            case "config/ack"                         -> configAckHandler.handle(deviceCode, payload);
-            case "ota/progress"                       -> otaProgressHandler.handle(deviceCode, payload);
-            case "log/operation"                      -> operationLogHandler.handle(deviceCode, payload);
-            case "camera/stream/ack"                  -> deviceCameraStreamResponseHandler.handle(deviceCode, payload);
-            case "teleop/associated-device/ack"       -> masterAssociatedDeviceResponseHandler.handle(deviceCode, payload);
-            case "slam/ack"                           -> slamAckHandler.handle(deviceCode, payload);
-            case "slam/states"                        -> slamStatesHandler.handle(deviceCode, payload);
-            case "ext-params/request"                 -> extParamsRequestHandler.handle(deviceCode, payload);
-            case "webrtc/ack"                         -> webRtcAckHandler.handle(deviceCode, payload);
-            case "webrtc/restart"                     -> webRtcRestartHandler.handle(deviceCode, payload);
-            case DataCollectConstant.MQTT_UP_COLLECT_URL_REQUEST -> {
-                if (collectUrlRequestHandler != null) collectUrlRequestHandler.handle(deviceCode, payload);
-                else log.warn("[Dispatcher] Darwin 集成未启用，忽略 collectUrlRequest deviceCode={}", deviceCode);
-            }
-            case DataCollectConstant.MQTT_UP_OSS_ADDRESS_REPORT -> ossAddressReportHandler.handle(deviceCode, payload);
-            case DataCollectConstant.MQTT_UP_DEVICE_ONLINE      -> deviceOnlineReportHandler.handle(deviceCode, payload);
-            default -> log.warn("[Dispatcher] 未知路径: {}", topic);
-        }
-    }
-
-    /**
-     * 路由 {deviceCode}/master/{path} 或 {deviceCode}/slave/{path} 格式的原始上报 Topic
-     *
-     * @param deviceCode 设备编码
-     * @param role       master（主控）或 slave（机器人）
-     * @param path       路径部分（如 cmd / states / rtsp/ctrl）
-     * @param payload    原始 Payload（明文 JSON，非加密）
-     */
-    private void dispatchRawTopic(String deviceCode, String role, String path, String payload) {
-        // 机器人原始状态上报：{robotCode}/slave/states
-        if ("slave".equals(role) && "states".equals(path)) {
-            robotSlaveStatusHandler.handle(deviceCode, payload);
-            return;
-        }
-        // 主控设备原始状态上报：{robotCode}/master/states
-        if ("master".equals(role) && "states".equals(path)) {
-            robotSlaveStatusHandler.handleMasterStatus(deviceCode, payload);
-            return;
-        }
-        // 主控设备原始状态上报：{masterCode}/master/cmd
-        if ("master".equals(role) && "cmd".equals(path)) {
-            masterCommandHandler.handle(deviceCode, payload);
-            return;
-        }
-        log.debug("[Dispatcher] 原始上报 deviceCode={} role={} path={}", deviceCode, role, path);
     }
 
     /** 生成 16 位小写十六进制 spanId，与 Zipkin/Brave 格式一致 */

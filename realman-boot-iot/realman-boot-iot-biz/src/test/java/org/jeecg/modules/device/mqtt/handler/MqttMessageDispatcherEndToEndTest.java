@@ -30,6 +30,7 @@ import org.mockito.Mockito;
 import org.springframework.data.redis.core.SetOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -120,11 +121,19 @@ public class MqttMessageDispatcherEndToEndTest {
                 .thenReturn(java.util.Collections.emptyList());
 
         // 构造各 Handler 实例
-        // DeviceStatusHandler 仅维护 Redis 在线态
+        // DeviceStatusHandler：Redis presence + keepalive 软自愈
+        DeviceDbStatusCache dbStatusCache = new DeviceDbStatusCache();
+        DeviceStatusPersistenceService statusPersistenceService = new DeviceStatusPersistenceService(
+                deviceMapper, statusMapper, dbStatusCache);
         DeviceStatusHandler statusHandler = new DeviceStatusHandler(
-                redisTemplate,
-                Mockito.mock(DeviceStatusPersistenceService.class),
-                new DeviceDbStatusCache());
+                redisTemplate, statusPersistenceService, dbStatusCache);
+        ReflectionTestUtils.setField(statusHandler, "offlinePromoteThrottleMs", 60_000L);
+        @SuppressWarnings("unchecked")
+        ValueOperations<String, String> promoteThrottleOps = Mockito.mock(ValueOperations.class);
+        when(redisTemplate.opsForValue()).thenReturn(promoteThrottleOps);
+        when(promoteThrottleOps.setIfAbsent(
+                Mockito.anyString(), Mockito.anyString(), Mockito.anyLong(),
+                Mockito.eq(java.util.concurrent.TimeUnit.MILLISECONDS))).thenReturn(true);
 
         configAckHandler = new DeviceConfigAckHandler(
                 configMapper,
@@ -182,26 +191,34 @@ public class MqttMessageDispatcherEndToEndTest {
 
         RobotSlaveStatusHandler robotSlaveStatusHandler = Mockito.mock(RobotSlaveStatusHandler.class);
 
-        // 分发器使用真实实例
-        dispatcher = new MqttMessageDispatcher(
+        MqttDeviceTopicRouter deviceTopicRouter = new MqttDeviceTopicRouter(
                 statusHandler,
                 configAckHandler,
                 commandAckHandler,
-                masterCommandAckHandler,
                 otaProgressHandler,
                 operationLogHandler,
-                onlineOfflineHandler,
                 deviceCameraStreamResponseHandler,
                 masterAssociatedDeviceResponseHandler,
                 robotSlaveStatusHandler,
                 slamAckHandler,
                 slamStatesHandler,
                 extParamsRequestHandler,
-                masterCommandHandler,
                 webRtcAckHandler,
                 webRtcRestartHandler,
                 ossAddressReportHandler,
-                deviceOnlineReportHandler
+                deviceOnlineReportHandler,
+                masterCommandHandler
+        );
+        java.lang.reflect.Field routerCollect = MqttDeviceTopicRouter.class.getDeclaredField("collectUrlRequestHandler");
+        routerCollect.setAccessible(true);
+        routerCollect.set(deviceTopicRouter, collectUrlRequestHandler);
+
+        dispatcher = new MqttMessageDispatcher(
+                statusHandler,
+                onlineOfflineHandler,
+                deviceTopicRouter,
+                masterCommandAckHandler,
+                masterAssociatedDeviceResponseHandler
         );
         // taskExecutor 为非 final 字段（@Autowired 注入），反射注入同步 Executor 保证断言可立即执行
         java.lang.reflect.Field fe = MqttMessageDispatcher.class.getDeclaredField("taskExecutor");

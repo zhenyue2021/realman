@@ -320,6 +320,17 @@ public interface DeviceConstant {
         String DEVICE_SECRET_PREFIX = "iot:device:secret:";
         /** 在线设备集合（Redis Set）：iot:device:online，成员为 deviceCode */
         String DEVICE_ONLINE_SET    = "iot:device:online";
+        /**
+         * $SYS 上下线事件集群幂等 Key：iot:sys:event:{connected|disconnected}:{deviceCode}
+         * <p>多 Pod 同时收到 EMQX $SYS 事件时，仅首个 SET NX 成功的节点执行业务逻辑。
+         */
+        String SYS_EVENT_IDEMPOTENT_PREFIX = "iot:sys:event:";
+        /** keepalive DB 离线→在线 提交节流 Key：iot:device:keepalive:promote:{deviceCode} */
+        String KEEPALIVE_PROMOTE_THROTTLE_PREFIX = "iot:device:keepalive:promote:";
+        /** 启动 EMQX 对账全局锁：iot:emqx:startup-reconcile:lock */
+        String EMQX_STARTUP_RECONCILE_LOCK = "iot:emqx:startup-reconcile:lock";
+        /** EMQX 对账上线副作用幂等 Key：iot:reconcile:sidefx:{deviceCode} */
+        String RECONCILE_SIDE_EFFECT_PREFIX = "iot:reconcile:sidefx:";
         /** OTA 断点续传进度 Key：iot:ota:progress:{deviceCode}:{recordId}，值为已下载字节数 */
         String OTA_PROGRESS_PREFIX  = "iot:ota:progress:";
         /** 配置同步等待 Key：iot:config:sync:{deviceCode}:{commandId}，TTL = CONFIG_SYNC_TIMEOUT_SECONDS */

@@ -14,12 +14,15 @@ import org.jeecg.modules.device.service.PendingSyncService;
 import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 设备上下线事件处理器（Topic: $SYS/brokers/+/clients/+/connected|disconnected）
@@ -48,6 +51,8 @@ import java.util.Map;
  *   <li>记录操作日志（含断线原因）</li>
  * </ol>
  *
+ * <p>集群：$SYS 无法共享订阅，各 Pod 均会收到事件；通过 Redis SET NX 保证同一上下线事件仅一个节点处理。
+ *
  * @see PendingSyncService 设备上线后异步补推待同步消息
  */
 @Slf4j
@@ -69,6 +74,22 @@ public class DeviceOnlineOfflineHandler {
     @Autowired(required = false)
     private DeviceStatusProducer darwinProducer;
 
+    /** $SYS 上下线事件幂等窗口（秒），抑制多 Pod 重复处理同一连接事件 */
+    @Value("${mqtt.sys-event-idempotent-seconds:15}")
+    private long sysEventIdempotentSeconds;
+
+    /** EMQX 对账上线副作用（WS/Darwin/pending）幂等窗口（秒） */
+    @Value("${mqtt.emqx.reconcile-sidefx-idempotent-seconds:60}")
+    private long reconcileSideFxIdempotentSeconds;
+
+    private static final long PRESENCE_TTL_MINUTES =
+            DeviceConstant.Timeout.DEVICE_OFFLINE_THRESHOLD_MINUTES + 1;
+
+    /** EMQX 启动对账 / 保活之外的 DB+Redis 对齐结果 */
+    public enum ReconcileOnlineResult {
+        SKIPPED_PLATFORM, NOT_FOUND, SKIPPED_DISABLED, ALREADY_ONLINE, PROMOTED, FAILED
+    }
+
     /**
      * 处理设备上线事件
      *
@@ -82,46 +103,101 @@ public class DeviceOnlineOfflineHandler {
             // 2. 过滤平台自身服务账号（iot-platform-server 等），只处理真实设备
             if (deviceCode == null || deviceCode.startsWith("iot-platform")) return;
 
+            if (!tryAcquireSysEvent(deviceCode, "connected")) {
+                log.debug("[Online] 跳过重复 $SYS connected 事件 deviceCode={}", deviceCode);
+                return;
+            }
+
             // 3. 查询设备是否存在
             IotDevice device = findDevice(deviceCode);
             if (device == null) return;
 
-            // 4. 更新 DB 在线状态（含未激活→在线）
+            ReconcileOnlineResult result =
+                    reconcileOnlineInternal(device, deviceCode, "$SYS connected", true);
+            if (result == ReconcileOnlineResult.FAILED) {
+                log.warn("[Online] 设备上线写库未生效 deviceCode={}", deviceCode);
+            }
+        } catch (Exception e) {
+            log.error("[Online] 处理异常", e);
+        }
+    }
+
+    /**
+     * EMQX 启动对账：将 Broker 上仍连接的客户端与 DB/Redis 对齐（不依赖 $SYS 重放）。
+     */
+    public ReconcileOnlineResult reconcileOnline(String deviceCode) {
+        if (deviceCode == null || deviceCode.startsWith("iot-platform")) {
+            return ReconcileOnlineResult.SKIPPED_PLATFORM;
+        }
+        IotDevice device = findDevice(deviceCode);
+        if (device == null) {
+            return ReconcileOnlineResult.NOT_FOUND;
+        }
+        if (Objects.equals(device.getStatus(), DeviceConstant.DeviceStatus.DISABLED)) {
+            return ReconcileOnlineResult.SKIPPED_DISABLED;
+        }
+        return reconcileOnlineInternal(device, deviceCode, "emqx-reconcile", false);
+    }
+
+    private ReconcileOnlineResult reconcileOnlineInternal(
+            IotDevice device, String deviceCode, String source, boolean alwaysApplySideEffects) {
+        try {
+            boolean wasOnline = Objects.equals(device.getStatus(), DeviceConstant.DeviceStatus.ONLINE);
+            refreshOnlinePresence(deviceCode);
+
+            if (wasOnline) {
+                dbStatusCache.setStatus(deviceCode, DeviceConstant.DeviceStatus.ONLINE);
+                return ReconcileOnlineResult.ALREADY_ONLINE;
+            }
+
             Integer prevStatus = device.getStatus();
             device.setStatus(DeviceConstant.DeviceStatus.ONLINE);
             device.setLastOnlineTime(LocalDateTime.now());
             int rows = deviceMapper.updateById(device);
             if (rows <= 0) {
-                log.warn("[Online] 设备上线写库未生效 deviceCode={} prevStatus={}", deviceCode, prevStatus);
-                return;
+                log.warn("[Online] 设备上线写库未生效 deviceCode={} prevStatus={} source={}",
+                        deviceCode, prevStatus, source);
+                return ReconcileOnlineResult.FAILED;
             }
             dbStatusCache.setStatus(deviceCode, DeviceConstant.DeviceStatus.ONLINE);
 
-            // 5. 维护 Redis 在线集合
-            redisTemplate.opsForSet().add(DeviceConstant.RedisKey.DEVICE_ONLINE_SET, deviceCode);
-
-            // 6. WebSocket 推送上线事件
-            webSocketServer.pushDeviceOnlineStatus(deviceCode, true);
-
-            log.info("[Online] 设备[{}]上线", deviceCode);
-
-            // 7. 记录操作日志
-            logService.recordLog(device.getId(), deviceCode, DeviceConstant.OperationType.DEVICE_ONLINE,
-                    "设备MQTT连接建立，上线", null, DeviceConstant.OperationSource.DEVICE,
-                    "SUCCESS", null, null, null);
-
-            // 设备上线后补推离线期间待同步的配置/OTA 指令（异步，不阻塞 $SYS 路由线程）
-            pendingSyncService.flushPendingMessagesAsync(deviceCode);
-
-            // 向达尔文数采平台推送机器人上线事件（Darwin 集成未启用或非机器人设备时跳过）
-            /*if (darwinProducer != null
-                    && DeviceConstant.DeviceTypeInteger.ROBOT == device.getDeviceType()) {
-                String tenant = device.getTenantId() != null ? String.valueOf(device.getTenantId()) : "";
-                darwinProducer.sendOnlineEvent(tenant, deviceCode, "SLAVE", device.getDeviceModel(), MDC.get("traceId"));
-            }*/
+            if (alwaysApplySideEffects || tryAcquireReconcileSideEffects(deviceCode)) {
+                applyOnlineSideEffects(device, deviceCode, source);
+            }
+            log.info("[Online] 设备[{}]上线 source={}", deviceCode, source);
+            return ReconcileOnlineResult.PROMOTED;
         } catch (Exception e) {
-            log.error("[Online] 处理异常", e);
+            log.error("[Online] reconcile 异常 deviceCode={} source={}", deviceCode, source, e);
+            return ReconcileOnlineResult.FAILED;
         }
+    }
+
+    private void refreshOnlinePresence(String deviceCode) {
+        String statusKey = DeviceConstant.RedisKey.DEVICE_STATUS_PREFIX + deviceCode;
+        long ttlSeconds = PRESENCE_TTL_MINUTES * 60;
+        redisTemplate.opsForSet().add(DeviceConstant.RedisKey.DEVICE_ONLINE_SET, deviceCode);
+        redisTemplate.opsForValue().set(statusKey, "{\"reconciled\":true}",
+                ttlSeconds, java.util.concurrent.TimeUnit.SECONDS);
+    }
+
+    private void applyOnlineSideEffects(IotDevice device, String deviceCode, String source) {
+        webSocketServer.pushDeviceOnlineStatus(deviceCode, true);
+        logService.recordLog(device.getId(), deviceCode, DeviceConstant.OperationType.DEVICE_ONLINE,
+                "设备MQTT在线，source=" + source, null, DeviceConstant.OperationSource.DEVICE,
+                "SUCCESS", null, null, null);
+        pendingSyncService.flushPendingMessagesAsync(deviceCode);
+        if (darwinProducer != null
+                && DeviceConstant.DeviceTypeInteger.ROBOT == device.getDeviceType()) {
+            String tenant = device.getTenantId() != null ? String.valueOf(device.getTenantId()) : "";
+            darwinProducer.sendOnlineEvent(tenant, deviceCode, "SLAVE", device.getDeviceModel(), MDC.get("traceId"));
+        }
+    }
+
+    private boolean tryAcquireReconcileSideEffects(String deviceCode) {
+        String key = DeviceConstant.RedisKey.RECONCILE_SIDE_EFFECT_PREFIX + deviceCode;
+        Boolean acquired = redisTemplate.opsForValue().setIfAbsent(
+                key, "1", reconcileSideFxIdempotentSeconds, TimeUnit.SECONDS);
+        return Boolean.TRUE.equals(acquired);
     }
 
     /**
@@ -137,6 +213,11 @@ public class DeviceOnlineOfflineHandler {
 
         IotDevice device = findDevice(deviceCode);
         if (device == null) return;
+
+        if (!tryAcquireSysEvent(deviceCode, "disconnected")) {
+            log.debug("[Offline] 跳过重复 $SYS disconnected 事件 deviceCode={}", deviceCode);
+            return;
+        }
 
         try {
             // 2. 更新 DB 离线状态
@@ -229,6 +310,16 @@ public class DeviceOnlineOfflineHandler {
         } catch (Exception e) {
             return "unknown";
         }
+    }
+
+    /**
+     * 集群幂等：仅首个获得 SET NX 的节点处理本次 $SYS 事件。
+     */
+    private boolean tryAcquireSysEvent(String deviceCode, String eventType) {
+        String key = DeviceConstant.RedisKey.SYS_EVENT_IDEMPOTENT_PREFIX + eventType + ":" + deviceCode;
+        Boolean acquired = redisTemplate.opsForValue().setIfAbsent(
+                key, "1", sysEventIdempotentSeconds, TimeUnit.SECONDS);
+        return Boolean.TRUE.equals(acquired);
     }
 
     /**

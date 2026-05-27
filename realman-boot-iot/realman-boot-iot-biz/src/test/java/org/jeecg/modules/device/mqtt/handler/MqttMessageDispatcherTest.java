@@ -66,31 +66,36 @@ public class MqttMessageDispatcherTest {
         ossAddressReportHandler = Mockito.mock(OssAddressReportHandler.class);
         deviceOnlineReportHandler = Mockito.mock(DeviceOnlineReportHandler.class);
 
-        dispatcher = new MqttMessageDispatcher(
+        MqttDeviceTopicRouter deviceTopicRouter = new MqttDeviceTopicRouter(
                 statusHandler,
                 configAckHandler,
                 commandAckHandler,
-                masterCommandAckHandler,
                 otaProgressHandler,
                 operationLogHandler,
-                onlineOfflineHandler,
                 deviceCameraStreamResponseHandler,
                 masterAssociatedDeviceResponseHandler,
                 robotSlaveStatusHandler,
                 slamAckHandler,
                 slamStatesHandler,
                 extParamsRequestHandler,
-                masterCommandHandler,
                 webRtcAckHandler,
                 webRtcRestartHandler,
                 ossAddressReportHandler,
-                deviceOnlineReportHandler
+                deviceOnlineReportHandler,
+                masterCommandHandler
         );
-        // collectUrlRequestHandler / taskExecutor 均为非 final 字段（@Autowired 注入），需反射设值
-        Field f = MqttMessageDispatcher.class.getDeclaredField("collectUrlRequestHandler");
-        f.setAccessible(true);
-        f.set(dispatcher, collectUrlRequestHandler);
-        // 测试用同步 Executor：在调用线程立即执行，Mockito.verify() 无需等待
+        Field routerCollect = MqttDeviceTopicRouter.class.getDeclaredField("collectUrlRequestHandler");
+        routerCollect.setAccessible(true);
+        routerCollect.set(deviceTopicRouter, collectUrlRequestHandler);
+
+        dispatcher = new MqttMessageDispatcher(
+                statusHandler,
+                onlineOfflineHandler,
+                deviceTopicRouter,
+                masterCommandAckHandler,
+                masterAssociatedDeviceResponseHandler
+        );
+        // taskExecutor 为非 final 字段（@Autowired 注入），需反射设值
         Field fe = MqttMessageDispatcher.class.getDeclaredField("taskExecutor");
         fe.setAccessible(true);
         fe.set(dispatcher, (java.util.concurrent.Executor) Runnable::run);
