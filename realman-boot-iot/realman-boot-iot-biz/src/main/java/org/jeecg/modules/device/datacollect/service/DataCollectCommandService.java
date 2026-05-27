@@ -49,6 +49,19 @@ public class DataCollectCommandService {
         publish(deviceCode, DataCollectConstant.MQTT_DOWN_COLLECT_URL_RESP, cmd, "collectUrlResponse");
     }
 
+    /** OSS 授权失败时通知设备，避免设备盲重试（code=1, params=null） */
+    public void sendCollectUrlFailure(String deviceCode, String requestId, String errorMessage) {
+        CollectUrlResponseCmd cmd = CollectUrlResponseCmd.builder()
+                .requestId(requestId)
+                .timestamp(System.currentTimeMillis())
+                .deviceSn(deviceCode)
+                .code(1)
+                .message(errorMessage != null ? errorMessage : "OSS authorization failed")
+                .params(null)
+                .build();
+        publish(deviceCode, DataCollectConstant.MQTT_DOWN_COLLECT_URL_RESP, cmd, "collectUrlResponseFailure");
+    }
+
     private void publish(String deviceCode, String topicPath, Object payload, String cmdName) {
         String topic = "device/" + deviceCode + "/" + topicPath;
         try {

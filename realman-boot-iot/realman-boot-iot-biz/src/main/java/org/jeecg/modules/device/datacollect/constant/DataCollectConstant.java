@@ -43,6 +43,10 @@ public final class DataCollectConstant {
     // ===== 链路一 Redis Keys =====
     /** requestId → deviceCode 映射，TTL 2 小时；Key = prefix + requestId */
     public static final String REDIS_OSS_REQUEST_PREFIX  = "datacollect:oss:req:";
+    /** collectUrlRequest requestId 集群去重；Key = prefix + requestId，TTL = mqtt.collect-url-request-dedup-ms */
+    public static final String REDIS_COLLECT_URL_REQ_DEDUP_PREFIX = "datacollect:collect-url:req:";
+    /** collectUrlRequest 同设备转发节流；Key = prefix + deviceCode，TTL = mqtt.collect-url-device-throttle-ms */
+    public static final String REDIS_COLLECT_URL_DEVICE_THROTTLE_PREFIX = "datacollect:collect-url:throttle:";
 
     // =========================================================================
     // 链路二：OSS 文件地址上报
