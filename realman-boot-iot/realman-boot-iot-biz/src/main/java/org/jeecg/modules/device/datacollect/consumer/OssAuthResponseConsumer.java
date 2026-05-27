@@ -22,6 +22,9 @@ import java.nio.charset.StandardCharsets;
 /**
  * Darwin → Teleop（RocketMQ）：接收数采平台返回的 OSS STS 凭证，
  * 通过 Redis 反查目标设备，再经 MQTT 下推给机器人。
+ *
+ * <p>Poison 消息（反序列化失败、缺少必填字段）：记录 {@code [POISON_MESSAGE]} 后 SUCCESS 跳过，避免无限重试。
+ * 业务失败：下发 MQTT code=1 失败响应，设备可感知后重试。
  */
 @Slf4j
 @Component
@@ -49,13 +52,15 @@ public class OssAuthResponseConsumer implements RocketMQListener {
         try {
             resp = objectMapper.readValue(message, OssAuthResponseMsg.class);
         } catch (Exception e) {
-            log.error("[DataCollect] OSS授权响应反序列化失败 payload={}", message, e);
+            log.error("[POISON_MESSAGE][DataCollect] OSS授权响应反序列化失败 messageId={} payload={}",
+                    messageView.getMessageId(), message, e);
             return ConsumeResult.SUCCESS;
         }
         String requestId = resp.getRequestId();
         OssAuthResponseMsg.MsgData data = resp.getData();
         if (data == null || requestId == null || requestId.isBlank()) {
-            log.error("[DataCollect] OSS授权响应缺少 data 或 requestId");
+            log.error("[POISON_MESSAGE][DataCollect] OSS授权响应缺少 data 或 requestId messageId={} payload={}",
+                    messageView.getMessageId(), message);
             return ConsumeResult.SUCCESS;
         }
 
@@ -64,7 +69,6 @@ public class OssAuthResponseConsumer implements RocketMQListener {
         }
 
         try {
-            // 优先使用消息体中的 deviceCode，Redis 反查作为兜底（requestId 与 MQTT 请求对应）
             String deviceCode = resp.getDeviceCode();
             String redisKey = DataCollectConstant.REDIS_OSS_REQUEST_PREFIX + requestId;
             if (deviceCode == null || deviceCode.isBlank()) {
@@ -78,10 +82,12 @@ public class OssAuthResponseConsumer implements RocketMQListener {
                 return ConsumeResult.SUCCESS;
             }
 
-            // 授权失败：设备会自动重试，无需下发通知
             if (!data.isSuccess()) {
-                log.warn("[DataCollect] 数采平台 OSS 授权失败，设备将自动重试 requestId={} deviceCode={} errorCode={} errorMsg={}",
+                String errMsg = data.getErrorMsg() != null ? data.getErrorMsg()
+                        : ("errorCode=" + data.getErrorCode());
+                log.warn("[DataCollect] 数采平台 OSS 授权失败 requestId={} deviceCode={} errorCode={} errorMsg={}",
                         requestId, deviceCode, data.getErrorCode(), data.getErrorMsg());
+                notifyDeviceFailure(deviceCode, requestId, errMsg);
                 return ConsumeResult.SUCCESS;
             }
 
@@ -116,6 +122,20 @@ public class OssAuthResponseConsumer implements RocketMQListener {
             return ConsumeResult.FAILURE;
         } finally {
             MDC.remove("traceId");
+        }
+    }
+
+    private void notifyDeviceFailure(String deviceCode, String requestId, String errorMessage) {
+        if (commandService == null) {
+            log.warn("[DataCollect] MQTT未启用，无法下发 OSS 失败通知 requestId={} deviceCode={}",
+                    requestId, deviceCode);
+            return;
+        }
+        try {
+            commandService.sendCollectUrlFailure(deviceCode, requestId, errorMessage);
+            log.info("[DataCollect] OSS 失败通知已下发 requestId={} deviceCode={}", requestId, deviceCode);
+        } catch (Exception e) {
+            log.warn("[DataCollect] OSS 失败通知下发异常 requestId={} deviceCode={}", requestId, deviceCode, e);
         }
     }
 }
