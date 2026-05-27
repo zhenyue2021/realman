@@ -2,6 +2,7 @@ package org.jeecg.modules.device.config;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jeecg.modules.device.emqx.DeviceOnlineReconcileService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
@@ -20,10 +21,12 @@ import org.springframework.stereotype.Component;
 public class MqttApplicationReadyListener {
 
     private final MqttConfig mqttConfig;
+    private final DeviceOnlineReconcileService reconcileService;
 
     @EventListener(ApplicationReadyEvent.class)
     public void onApplicationReady() {
         log.info("[MQTT] ApplicationReady，补执行 ensureSubscribed");
         mqttConfig.ensureSubscribed();
+        reconcileService.reconcileOnStartup();
     }
 }

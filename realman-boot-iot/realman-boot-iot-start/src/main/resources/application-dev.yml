@@ -94,6 +94,16 @@ mqtt:
   high-freq-throttle-ms: 500  # slam/states 等高频 Topic 节流间隔(ms)：500=2次/秒，1000=1次/秒，0=不限
   collect-url-request-dedup-ms: 60000
   collect-url-device-throttle-ms: 45000
+  sys-event-idempotent-seconds: 15   # $SYS 上下线多 Pod 幂等窗口(秒)
+  status-offline-promote-throttle-ms: 60000  # keepalive DB 离线→在线 提交节流(ms)
+  emqx:
+    api-url: http://172.16.44.66:18083   # 留空则从 mqtt.broker.url 推导 http://host:18083
+    api-username: 1f36cde522c1f8ab
+    api-password: vtsY7uLXarr2xeuCjJCDwq7etrBSbrcbSwj59B9AuZHtF
+    api-timeout-ms: 5000
+    reconcile-enabled: true
+    reconcile-lock-seconds: 120
+    reconcile-sidefx-idempotent-seconds: 60
   watchdog:
     idle-timeout-seconds: 90  # 空闲超时(秒)=心跳间隔45s×2；须 < 设备离线判定阈值 300s
   broker:

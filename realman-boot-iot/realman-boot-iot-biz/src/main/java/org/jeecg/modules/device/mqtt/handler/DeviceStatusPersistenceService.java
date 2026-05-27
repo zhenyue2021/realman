@@ -67,20 +67,23 @@ public class DeviceStatusPersistenceService {
         }
     }
 
-    /**
-     * 异步包装：委托 {@link #promoteOnlineIfOfflineSync(String)}，供历史调用方兼容。
-     */
-    @Async("devicePersistExecutor")
-    public void promoteOnlineIfOffline(String deviceCode) {
-        promoteOnlineIfOfflineSync(deviceCode);
+    /** keepalive / 对账 将 DB 提升为 ONLINE 的结果 */
+    public enum PromoteOnlineResult {
+        ALREADY_ONLINE, PROMOTED, SKIPPED_DISABLED, NOT_FOUND, FAILED
     }
 
     /**
-     * 同步将 DB 非 ONLINE 设备提升为 ONLINE（keepalive / 主动上线上报使用）。
-     *
-     * @return true 表示已是 ONLINE 或本次写库成功；false 表示设备不存在、已禁用或写库失败
+     * 异步包装：委托 {@link #promoteOnlineIfOffline(String)}，供历史调用方兼容。
      */
-    public boolean promoteOnlineIfOfflineSync(String deviceCode) {
+    @Async("devicePersistExecutor")
+    public void promoteOnlineIfOfflineAsync(String deviceCode) {
+        promoteOnlineIfOffline(deviceCode);
+    }
+
+    /**
+     * 同步将 DB 非 ONLINE 设备提升为 ONLINE（keepalive / EMQX 对账使用）。
+     */
+    public PromoteOnlineResult promoteOnlineIfOffline(String deviceCode) {
         try {
             IotDevice device = deviceMapper.selectOne(
                     new LambdaQueryWrapper<IotDevice>()
@@ -89,15 +92,15 @@ public class DeviceStatusPersistenceService {
                             .last("LIMIT 1"));
             if (device == null) {
                 log.warn("[StatusPersist] 设备不存在，跳过上线同步 deviceCode={}", deviceCode);
-                return false;
+                return PromoteOnlineResult.NOT_FOUND;
             }
             if (Objects.equals(device.getStatus(), DeviceConstant.DeviceStatus.ONLINE)) {
                 dbStatusCache.setStatus(deviceCode, DeviceConstant.DeviceStatus.ONLINE);
-                return true;
+                return PromoteOnlineResult.ALREADY_ONLINE;
             }
             if (Objects.equals(device.getStatus(), DeviceConstant.DeviceStatus.DISABLED)) {
                 log.info("[StatusPersist] 设备已禁用，跳过上线同步 deviceCode={}", deviceCode);
-                return false;
+                return PromoteOnlineResult.SKIPPED_DISABLED;
             }
             Integer prevStatus = device.getStatus();
             IotDevice update = new IotDevice();
@@ -109,14 +112,24 @@ public class DeviceStatusPersistenceService {
                 dbStatusCache.setStatus(deviceCode, DeviceConstant.DeviceStatus.ONLINE);
                 log.info("[StatusPersist] 设备同步为在线 deviceCode={} prevStatus={}",
                         deviceCode, prevStatus);
-                return true;
+                return PromoteOnlineResult.PROMOTED;
             }
             log.warn("[StatusPersist] 设备上线写库未生效 deviceCode={} prevStatus={}", deviceCode, prevStatus);
-            return false;
+            return PromoteOnlineResult.FAILED;
         } catch (Exception e) {
             log.warn("[StatusPersist] 离线转在线失败 deviceCode={}", deviceCode, e);
-            return false;
+            return PromoteOnlineResult.FAILED;
         }
+    }
+
+    /**
+     * @return true 表示已是 ONLINE 或本次写库成功；false 表示设备不存在、已禁用或写库失败
+     * @deprecated 请使用 {@link #promoteOnlineIfOffline(String)}
+     */
+    @Deprecated
+    public boolean promoteOnlineIfOfflineSync(String deviceCode) {
+        PromoteOnlineResult result = promoteOnlineIfOffline(deviceCode);
+        return result == PromoteOnlineResult.ALREADY_ONLINE || result == PromoteOnlineResult.PROMOTED;
     }
 
 }
