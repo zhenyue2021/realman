@@ -8,6 +8,7 @@ import org.jeecg.modules.device.mapper.IotDeviceMapper;
 import org.jeecg.modules.device.service.IDeviceOperationLogService;
 import org.jeecg.modules.device.service.IIotDeviceRoomService;
 import org.jeecg.modules.device.service.PendingSyncService;
+import org.jeecg.modules.device.service.impl.master.TeleopRelationCacheService;
 import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -49,7 +50,8 @@ class DeviceOnlineOfflineHandlerTest {
                 Mockito.mock(IDeviceOperationLogService.class),
                 pendingSyncService,
                 Mockito.mock(IIotDeviceRoomService.class),
-                new DeviceDbStatusCache(redisTemplate));
+                new DeviceDbStatusCache(redisTemplate),
+                Mockito.mock(TeleopRelationCacheService.class));
         Field idempotentSeconds = DeviceOnlineOfflineHandler.class.getDeclaredField("sysEventIdempotentSeconds");
         idempotentSeconds.setAccessible(true);
         idempotentSeconds.set(handler, 15L);

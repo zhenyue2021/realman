@@ -11,6 +11,7 @@ import org.jeecg.modules.device.mapper.IotDeviceMapper;
 import org.jeecg.modules.device.service.IDeviceOperationLogService;
 import org.jeecg.modules.device.service.IIotDeviceRoomService;
 import org.jeecg.modules.device.service.PendingSyncService;
+import org.jeecg.modules.device.service.impl.master.TeleopRelationCacheService;
 import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -69,6 +70,7 @@ public class DeviceOnlineOfflineHandler {
     private final PendingSyncService pendingSyncService;
     private final IIotDeviceRoomService roomService;
     private final DeviceDbStatusCache dbStatusCache;
+    private final TeleopRelationCacheService teleopRelationCacheService;
 
     /** Darwin 集成未启用时为 null */
     @Autowired(required = false)
@@ -254,6 +256,8 @@ public class DeviceOnlineOfflineHandler {
                 log.warn("[Offline] 房间销毁失败 deviceCode={}", deviceCode, roomEx);
             }
 
+            clearTeleopCacheOnOffline(device, deviceCode);
+
             // 向达尔文数采平台推送机器人下线事件（Darwin 集成未启用或非机器人设备时跳过）
             if (darwinProducer != null
                     && DeviceConstant.DeviceTypeInteger.ROBOT == device.getDeviceType()) {
@@ -262,6 +266,18 @@ public class DeviceOnlineOfflineHandler {
             }
         } catch (Exception e) {
             log.error("[Offline] 处理异常", e);
+        }
+    }
+
+    private void clearTeleopCacheOnOffline(IotDevice device, String deviceCode) {
+        try {
+            if (DeviceConstant.DeviceTypeInteger.CONTROLLER == device.getDeviceType()) {
+                teleopRelationCacheService.clearByMaster(deviceCode);
+            } else if (DeviceConstant.DeviceTypeInteger.ROBOT == device.getDeviceType()) {
+                teleopRelationCacheService.clearByRobot(deviceCode);
+            }
+        } catch (Exception ex) {
+            log.warn("[Offline] 遥操缓存清理失败 deviceCode={}", deviceCode, ex);
         }
     }
 
