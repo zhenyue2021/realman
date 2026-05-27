@@ -10,6 +10,7 @@ import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.mapper.IotDeviceMapper;
 import org.jeecg.modules.device.service.DeviceMqttConnectionAddressService;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.stereotype.Component;
 
 import java.util.concurrent.TimeUnit;
@@ -21,6 +22,8 @@ import java.util.concurrent.TimeUnit;
  * clientId = deviceCode | username = deviceCode | password = deviceSecret
  * EMQX HTTP Auth 插件 → POST /internal/mqtt/auth → 本服务validateSecret()
  * 验证通过后MQTT连接建立，后续消息体中无需携带任何鉴权信息
+ *
+ * <p>密钥校验路径：Redis 缓存优先 → 未命中再查 DB；禁用设备通过 {@link #evict(String)} 失效缓存。
  */
 @Slf4j
 @Component
@@ -56,20 +59,29 @@ public class DeviceSecretService {
      * @param mqttPeerHost EMQX 请求体中的 {@code peerhost}，鉴权成功后会异步写入 {@code iot_device.address}，不阻塞本方法
      */
     public boolean validateSecret(String deviceCode, String secret, String mqttPeerHost) {
-        if (deviceCode == null || secret == null) return false;
-        // 查询设备是否存在或被禁用
-        IotDevice device = deviceMapper.selectOne(new LambdaQueryWrapper<IotDevice>()
-                .eq(IotDevice::getDeviceCode, deviceCode)
-                .ne(IotDevice::getStatus, DeviceConstant.DeviceStatus.DISABLED));
+        if (deviceCode == null || secret == null) {
+            return false;
+        }
+
+        String cachedSecret = getCachedSecret(deviceCode);
+        if (cachedSecret != null) {
+            if (!secret.equals(cachedSecret)) {
+                log.warn("[Secret] 设备[{}]密钥不匹配(缓存)", deviceCode);
+                return false;
+            }
+            onAuthSuccess(deviceCode, mqttPeerHost, null);
+            return true;
+        }
+
+        IotDevice device = loadActiveDevice(deviceCode);
         if (device == null) {
             log.warn("[Secret] 设备[{}]不存在或已禁用", deviceCode);
             return false;
         }
-        // 计算期望密码比对
         boolean ok = secret.equals(device.getDeviceSecret());
         if (ok) {
-            cache(deviceCode, secret);
-            mqttConnectionAddressService.updateAddressAfterAuthSuccess(device.getId(), mqttPeerHost);
+            cache(deviceCode, device.getDeviceSecret());
+            onAuthSuccess(deviceCode, mqttPeerHost, device.getId());
         } else {
             log.warn("[Secret] 设备[{}]密钥不匹配", deviceCode);
         }
@@ -102,12 +114,46 @@ public class DeviceSecretService {
      * 禁用设备时调用，使缓存立即失效
      */
     public void evict(String deviceCode) {
-        redisTemplate.delete(DeviceConstant.RedisKey.DEVICE_SECRET_PREFIX + deviceCode);
+        redisTemplate.delete(secretCacheKey(deviceCode));
+    }
+
+    private void onAuthSuccess(String deviceCode, String mqttPeerHost, String deviceId) {
+        if (mqttPeerHost == null || mqttPeerHost.isBlank()) {
+            return;
+        }
+        String resolvedDeviceId = deviceId != null ? deviceId : resolveActiveDeviceId(deviceCode);
+        if (resolvedDeviceId != null) {
+            mqttConnectionAddressService.updateAddressAfterAuthSuccess(resolvedDeviceId, mqttPeerHost);
+        }
+    }
+
+    private String resolveActiveDeviceId(String deviceCode) {
+        IotDevice device = deviceMapper.selectOne(new LambdaQueryWrapper<IotDevice>()
+                .select(IotDevice::getId)
+                .eq(IotDevice::getDeviceCode, deviceCode)
+                .ne(IotDevice::getStatus, DeviceConstant.DeviceStatus.DISABLED)
+                .last("LIMIT 1"));
+        return device != null ? device.getId() : null;
+    }
+
+    private IotDevice loadActiveDevice(String deviceCode) {
+        return deviceMapper.selectOne(new LambdaQueryWrapper<IotDevice>()
+                .eq(IotDevice::getDeviceCode, deviceCode)
+                .ne(IotDevice::getStatus, DeviceConstant.DeviceStatus.DISABLED)
+                .last("LIMIT 1"));
+    }
+
+    private String getCachedSecret(String deviceCode) {
+        return redisTemplate.opsForValue().get(secretCacheKey(deviceCode));
     }
 
     private void cache(String deviceCode, String secret) {
         redisTemplate.opsForValue().set(
-                DeviceConstant.RedisKey.DEVICE_SECRET_PREFIX + deviceCode,
+                secretCacheKey(deviceCode),
                 secret, CACHE_HOURS, TimeUnit.HOURS);
+    }
+
+    private static String secretCacheKey(String deviceCode) {
+        return DeviceConstant.RedisKey.DEVICE_SECRET_PREFIX + deviceCode;
     }
 }
