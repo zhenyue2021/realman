@@ -30,4 +30,19 @@
         ORDER BY wo.actual_start_time DESC
     </select>
 
+    <!-- 按机器人设备代码集合查询关联工单 -->
+    <select id="listWorkOrders" resultType="org.jeecg.modules.device.entity.workorder.WorkOrder">
+        SELECT DISTINCT wo.*
+        FROM work_order wo
+        INNER JOIN work_order_device wod ON wod.work_order_id = wo.id
+        WHERE wo.del_flag = 0 AND wod.device_type = '1'
+        <if test="robotCodes != null and robotCodes.size() > 0">
+            AND wod.device_code IN
+            <foreach collection="robotCodes" item="code" open="(" separator="," close=")">
+                #{code}
+            </foreach>
+        </if>
+        ORDER BY wo.plan_start_time DESC
+    </select>
+
 </mapper>

@@ -80,5 +80,10 @@ public interface IWorkOrderService extends IService<WorkOrder> {
      * 设备无 Darwin 工单时静默返回。
      */
     void pushDarwinWorkOrdersForDevice(String deviceCode);
+
+    /**
+     * 按机器人设备码查询关联工单
+     */
+    List<WorkOrder> listPendingForRobotCodes(List<String> robotCodes);
 }
 

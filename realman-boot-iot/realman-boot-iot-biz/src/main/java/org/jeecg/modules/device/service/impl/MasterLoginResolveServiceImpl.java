@@ -1,5 +1,6 @@
 package org.jeecg.modules.device.service.impl;
 
+import cn.hutool.core.collection.CollectionUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -123,18 +124,25 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
         MasterLoginResolveVO vo = new MasterLoginResolveVO();
         vo.setController(controller);
         List<UsageStatusVO.RobotBasicVO> availableRobots = authValidateService.buildAvailableRobots(auths);
+        if (CollectionUtil.isEmpty(availableRobots)) {
+            log.warn("主控登录无可用机器人: operatorId={} deviceCode={}", dto.getOperatorId(), dto.getDeviceCode());
+            return vo;
+        }
         vo.setAvailableRobots(availableRobots);
 
-        List<WorkOrder> pendingOrders = workOrderService
-                .listPendingForControllerAndDepartments(controller.getDeviceCode(), departIds);
+        List<String> robotCodes = availableRobots.stream()
+                .map(UsageStatusVO.RobotBasicVO::getRobotCode)
+                .toList();
+        List<WorkOrder> pendingOrders = workOrderService.listPendingForRobotCodes(robotCodes);
         if (pendingOrders == null || pendingOrders.isEmpty()) {
+            log.info("主控登录无待处理工单: operatorId={} deviceCode={}", dto.getOperatorId(), dto.getDeviceCode());
             IotMasterLoginLog loginLog = recordLogin(buildLoginLogDto(controller, dto));
             vo.setLoginLogId(loginLog != null ? loginLog.getId() : null);
             return vo;
         }
         vo.setPendingWorkOrders(pendingOrders);
 
-        WorkOrder firstOrder = pendingOrders.get(0);
+        WorkOrder firstOrder = pendingOrders.getFirst();
         IotDevice robot = workOrderResolveService.resolveRobotByWorkOrder(firstOrder.getId());
         authValidateService.assertRobotAuthorized(robot, availableRobots);
 
@@ -154,6 +162,10 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
         if (robot != null) {
             vo.setCurrentRobot(authValidateService.toRobotBasicVO(robot));
         }
+
+        log.info("主控登录解析成功: operatorId={} deviceCode={} workOrderId={} robotCode={}",
+                dto.getOperatorId(), dto.getDeviceCode(), firstOrder.getId(),
+                robot != null ? robot.getDeviceCode() : "null");
         return vo;
     }
 

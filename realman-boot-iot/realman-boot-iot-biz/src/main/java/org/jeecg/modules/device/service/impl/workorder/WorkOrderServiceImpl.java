@@ -70,6 +70,15 @@ public class WorkOrderServiceImpl extends ServiceImpl<WorkOrderMapper, WorkOrder
     }
 
     @Override
+    public List<WorkOrder> listPendingForRobotCodes(List<String> robotCodes) {
+        List<WorkOrder> workOrders = List.of();
+        if (robotCodes == null || robotCodes.isEmpty()) {
+            return workOrders;
+        }
+        return workOrderMapper.listWorkOrders(robotCodes);
+    }
+
+    @Override
     public List<WorkOrder> listPendingForController(String controllerCode) {
         return listPendingForControllerAndDepartments(controllerCode, null);
     }
