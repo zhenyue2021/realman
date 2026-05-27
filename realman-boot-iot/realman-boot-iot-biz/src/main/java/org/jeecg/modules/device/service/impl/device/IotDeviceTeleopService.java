@@ -14,6 +14,7 @@ import org.jeecg.modules.device.service.IDeviceOperationLogService;
 import org.jeecg.modules.device.service.IIotDeviceCommandRecordService;
 import org.jeecg.modules.device.service.IIotDeviceRoomService;
 import org.jeecg.modules.device.service.WebRtcAckPendingService;
+import org.jeecg.modules.device.service.impl.master.TeleopRelationCacheService;
 import org.jeecg.modules.device.vo.DeviceCameraStreamVO;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -43,6 +44,7 @@ public class IotDeviceTeleopService {
     private final IDeviceOperationLogService logService;
     private final IIotDeviceCommandRecordService commandRecordService;
     private final StringRedisTemplate redisTemplate;
+    private final TeleopRelationCacheService teleopRelationCacheService;
     private final IotDeviceCameraStreamService cameraStreamService;
     private final IIotDeviceRoomService roomService;
     private final WebRtcAckPendingService webRtcAckPendingService;
@@ -196,9 +198,7 @@ public class IotDeviceTeleopService {
                     DeviceConstant.OperationType.COMMAND_SEND,
                     "停止遥操：设备使用状态置为空闲", "{commandId:" + stopForRobotCommandId + "}",
                     DeviceConstant.OperationSource.PLATFORM, "SUCCESS", null, operator, null);
-//            redisTemplate.delete(DeviceConstant.RedisKey.TELEOP_MASTER_TO_ROBOT + controllerDeviceCode);
-//            redisTemplate.delete(DeviceConstant.RedisKey.TELEOP_ROBOT_TO_MASTER + robotDeviceCode);
-//            log.info("[TeleopCache] 清除遥操关系缓存: master={} robot={}", controllerDeviceCode, robotDeviceCode);
+//            teleopRelationCacheService.clearByMaster(controllerDeviceCode);
             sendWebRtcStop(robotDeviceCode, robot.getId(), operator);
             roomService.destroyRoom(controllerDeviceCode);
         } catch (Exception e) {
@@ -270,9 +270,8 @@ public class IotDeviceTeleopService {
                     DeviceConstant.OperationSource.PLATFORM, "SUCCESS", null, operator, null);
 
             // 6. 清理遥操关系缓存
-//            redisTemplate.delete(DeviceConstant.RedisKey.TELEOP_MASTER_TO_ROBOT + controllerCode);
-//            redisTemplate.delete(DeviceConstant.RedisKey.TELEOP_ROBOT_TO_MASTER + robotCode);
-            log.info("[TeleopCache] 清除遥操关系缓存: master={} robot={}", controllerCode, robotCode);
+//            teleopRelationCacheService.clearByMaster(controllerCode);
+//            log.info("[TeleopCache] 清除遥操关系缓存: master={} robot={}", controllerCode, robotCode);
 
             // 7. 下发 WebRTC stop 不等待 ACK
             sendWebRtcStopFireAndForget(robotCode, robot.getId(), operator);

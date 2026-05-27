@@ -142,6 +142,8 @@ jeecg:
 device:
   encrypt:
     enabled: false
+  master:
+    allow-default-device-code: true
   ota:
     chunk-temp-dir: /tmp/iot-ota-chunks
 

@@ -19,13 +19,13 @@ import org.jeecg.modules.device.mapper.IotMasterLoginLogMapper;
 import org.jeecg.modules.device.service.IMasterLoginResolveService;
 import org.jeecg.modules.device.service.impl.master.MasterAuthValidateService;
 import org.jeecg.modules.device.service.impl.master.MasterWorkOrderResolveService;
+import org.jeecg.modules.device.service.impl.master.TeleopRelationCacheService;
 import org.jeecg.modules.device.service.workorder.IWorkOrderService;
 import org.jeecg.modules.device.vo.MasterLoginResolveVO;
 import org.jeecg.modules.device.vo.UsageStatusVO;
 import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -33,7 +33,6 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 /**
  * 主控登录门面：协调授权校验、工单解析、登录记录、遥操缓存、WebSocket 推送。
@@ -53,13 +52,16 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
     private final IWorkOrderService workOrderService;
     private final DeviceWebSocketServer deviceWebSocketServer;
     private final ObjectMapper objectMapper;
-    private final StringRedisTemplate redisTemplate;
     private final MasterAuthValidateService authValidateService;
     private final MasterWorkOrderResolveService workOrderResolveService;
+    private final TeleopRelationCacheService teleopRelationCacheService;
 
-    /** 配置中心配置的 master 设备编码（未传时使用此默认值） */
+    /** dev 环境缺省主控编码（仅 allow-default-device-code=true 时生效） */
     @Value("${device.master.device_code:master_develop001_30-50-f1-01-cc-5f}")
-    private String masterCode;
+    private String defaultMasterCode;
+
+    @Value("${device.master.allow-default-device-code:false}")
+    private boolean allowDefaultDeviceCode;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -107,12 +109,11 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
         if (dto == null) {
             throw new RuntimeException("请求体不能为空");
         }
-        if (dto.getDeviceCode() == null) {
-            dto.setDeviceCode(masterCode);
-        }
-        log.info("主控登录解析请求: {} deviceCode={}", dto, dto.getDeviceCode());
 
-        // 1. 校验控制器与操作员授权
+        authValidateService.bindOperatorFromLogin(request, dto);
+        resolveDeviceCode(dto);
+        log.info("主控登录解析请求: operatorId={} deviceCode={}", dto.getOperatorId(), dto.getDeviceCode());
+
         IotDevice controller = authValidateService.lookupController(dto.getDeviceCode());
         authValidateService.checkControllerOnline(controller);
         LocalDateTime now = LocalDateTime.now();
@@ -121,22 +122,21 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
 
         MasterLoginResolveVO vo = new MasterLoginResolveVO();
         vo.setController(controller);
-        vo.setAvailableRobots(authValidateService.buildAvailableRobots(auths));
+        List<UsageStatusVO.RobotBasicVO> availableRobots = authValidateService.buildAvailableRobots(auths);
+        vo.setAvailableRobots(availableRobots);
 
-        // 2. 查询当前主控及部门关联的待开始/进行中工单
         List<WorkOrder> pendingOrders = workOrderService
                 .listPendingForControllerAndDepartments(controller.getDeviceCode(), departIds);
         if (pendingOrders == null || pendingOrders.isEmpty()) {
-            // 无工单：仅写登录日志，不推送工单/机器人信息
             IotMasterLoginLog loginLog = recordLogin(buildLoginLogDto(controller, dto));
             vo.setLoginLogId(loginLog != null ? loginLog.getId() : null);
             return vo;
         }
         vo.setPendingWorkOrders(pendingOrders);
 
-        // 3. 解析第一个工单绑定的机器人
         WorkOrder firstOrder = pendingOrders.get(0);
         IotDevice robot = workOrderResolveService.resolveRobotByWorkOrder(firstOrder.getId());
+        authValidateService.assertRobotAuthorized(robot, availableRobots);
 
         MasterLoginDTO logDto = buildLoginLogDto(controller, dto);
         if (robot != null) {
@@ -144,39 +144,11 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
             logDto.setAssociatedRobotCode(robot.getDeviceCode());
         }
 
-        // 4. 写登录日志
         IotMasterLoginLog loginLog = recordLogin(logDto);
         vo.setLoginLogId(loginLog != null ? loginLog.getId() : null);
 
-        // 5. 写入遥操关系缓存（事务提交后执行，避免回滚后 Redis 留脏数据）
-        if (robot != null) {
-            final String masterDeviceCode = controller.getDeviceCode();
-            final String robotDeviceCode = robot.getDeviceCode();
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    // 若主控之前绑定了其他机器人，清理掉旧机器人的反向缓存，避免脏数据
-                    String prevRobotCode = redisTemplate.opsForValue()
-                            .get(DeviceConstant.RedisKey.TELEOP_MASTER_TO_ROBOT + masterDeviceCode);
-                    if (prevRobotCode != null && !prevRobotCode.equals(robotDeviceCode)) {
-                        redisTemplate.delete(DeviceConstant.RedisKey.TELEOP_ROBOT_TO_MASTER + prevRobotCode);
-                        log.info("[TeleopCache] 清理旧机器人反向缓存: oldRobot={} master={}", prevRobotCode, masterDeviceCode);
-                    }
-                    redisTemplate.opsForValue().set(
-                            DeviceConstant.RedisKey.TELEOP_MASTER_TO_ROBOT + masterDeviceCode, robotDeviceCode,
-                            24, TimeUnit.HOURS);
-                    redisTemplate.opsForValue().set(
-                            DeviceConstant.RedisKey.TELEOP_ROBOT_TO_MASTER + robotDeviceCode, masterDeviceCode,
-                            24, TimeUnit.HOURS);
-                    log.info("[TeleopCache] 写入遥操关系缓存: master={} robot={}", masterDeviceCode, robotDeviceCode);
-                }
-            });
-        }
+        registerAfterCommitSideEffects(controller, firstOrder, robot);
 
-        // 6. WebSocket 推送工单与关联设备信息
-        pushWorkOrderViaWebSocket(controller, firstOrder, robot);
-
-        // 7. 组装返回 VO
         WorkOrderDTO workOrderDTO = workOrderResolveService.buildWorkOrderDto(firstOrder);
         vo.setPendingWorkOrder(workOrderDTO);
         if (robot != null) {
@@ -185,9 +157,42 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
         return vo;
     }
 
-    // ─── 私有辅助方法 ────────────────────────────────────────────────────────────
+    private void resolveDeviceCode(MasterLoginDTO dto) {
+        if (dto.getDeviceCode() != null && !dto.getDeviceCode().isBlank()) {
+            return;
+        }
+        if (allowDefaultDeviceCode && defaultMasterCode != null && !defaultMasterCode.isBlank()) {
+            dto.setDeviceCode(defaultMasterCode);
+            log.warn("[ControllerLogin] 未传 deviceCode，使用配置缺省值（allow-default-device-code=true）");
+            return;
+        }
+        throw new RuntimeException("deviceCode 不能为空");
+    }
 
-    /** 构建登录日志 DTO（公共基础部分，机器人信息由调用方按需补全）。 */
+    private void registerAfterCommitSideEffects(IotDevice controller, WorkOrder firstOrder, IotDevice robot) {
+        final String masterDeviceCode = controller.getDeviceCode();
+        final String robotDeviceCode = robot != null ? robot.getDeviceCode() : null;
+        final String orderStatus = firstOrder.getStatus();
+        final String workOrderJson;
+        final String robotJson;
+        try {
+            workOrderJson = objectMapper.writeValueAsString(firstOrder);
+            robotJson = robot != null ? objectMapper.writeValueAsString(robot) : null;
+        } catch (Exception e) {
+            throw new RuntimeException("序列化工单/机器人信息失败", e);
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                if (robotDeviceCode != null) {
+                    teleopRelationCacheService.bind(masterDeviceCode, robotDeviceCode);
+                }
+                pushWorkOrderViaWebSocket(masterDeviceCode, orderStatus, workOrderJson, robotJson);
+            }
+        });
+    }
+
     private MasterLoginDTO buildLoginLogDto(IotDevice controller, MasterLoginDTO dto) {
         MasterLoginDTO logDto = new MasterLoginDTO();
         logDto.setDeviceId(controller.getId());
@@ -197,20 +202,20 @@ public class MasterLoginResolveServiceImpl extends ServiceImpl<IotMasterLoginLog
         return logDto;
     }
 
-    /** 通过 WebSocket 向前端推送工单状态及关联机器人信息。 */
-    private void pushWorkOrderViaWebSocket(IotDevice controller, WorkOrder firstOrder, IotDevice robot) {
+    private void pushWorkOrderViaWebSocket(
+            String masterDeviceCode, String orderStatus, String workOrderJson, String robotJson) {
         try {
-            String workOrderJson = objectMapper.writeValueAsString(firstOrder);
-            if (WorkOrderConstant.ORDER_STATUS.PENDING.equals(firstOrder.getStatus())) {
-                deviceWebSocketServer.pushPendingWorkOrder(controller.getDeviceCode(), workOrderJson);
-            } else if (WorkOrderConstant.ORDER_STATUS.STARTED.equals(firstOrder.getStatus())) {
-                deviceWebSocketServer.pushStartedWorkOrder(controller.getDeviceCode(), workOrderJson);
+            if (WorkOrderConstant.ORDER_STATUS.PENDING.equals(orderStatus)) {
+                deviceWebSocketServer.pushPendingWorkOrder(masterDeviceCode, workOrderJson);
+            } else if (WorkOrderConstant.ORDER_STATUS.STARTED.equals(orderStatus)) {
+                deviceWebSocketServer.pushStartedWorkOrder(masterDeviceCode, workOrderJson);
             }
-            deviceWebSocketServer.pushAssociatedDeviceInfo(
-                    controller.getDeviceCode(), objectMapper.writeValueAsString(robot));
+            if (robotJson != null) {
+                deviceWebSocketServer.pushAssociatedDeviceInfo(masterDeviceCode, robotJson);
+            }
         } catch (Exception e) {
-            log.warn("[ControllerLogin] WebSocket 推送工单失败: workOrderId={}, err={}",
-                    firstOrder.getId(), e.getMessage());
+            log.warn("[ControllerLogin] WebSocket 推送工单失败: master={} err={}",
+                    masterDeviceCode, e.getMessage());
         }
     }
 }

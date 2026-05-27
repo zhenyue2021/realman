@@ -3,7 +3,11 @@ package org.jeecg.modules.device.service.impl.master;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.apache.shiro.SecurityUtils;
+import org.jeecg.common.system.vo.LoginUser;
+import org.jeecg.common.util.oConvertUtils;
 import org.jeecg.modules.device.constant.DeviceConstant;
+import org.jeecg.modules.device.dto.MasterLoginDTO;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.entity.IotDeviceAuth;
 import org.jeecg.modules.device.mapper.IotDeviceAuthMapper;
@@ -32,6 +36,51 @@ public class MasterAuthValidateService {
     private final IotDeviceMapper deviceMapper;
     private final IotDeviceAuthMapper deviceAuthMapper;
     private final SysAuthFeignClient sysAuthFeignClient;
+
+    /**
+     * 从 JWT / Shiro 会话绑定操作员，禁止信任请求体中的 operatorId。
+     */
+    public String bindOperatorFromLogin(HttpServletRequest request, MasterLoginDTO dto) {
+        LoginUser loginUser = resolveLoginUser();
+        if (dto.getOperatorId() != null && !dto.getOperatorId().isBlank()
+                && !Objects.equals(dto.getOperatorId(), loginUser.getId())) {
+            throw new RuntimeException("操作员ID与登录用户不一致");
+        }
+        dto.setOperatorId(loginUser.getId());
+        if (dto.getOperatorName() == null || dto.getOperatorName().isBlank()) {
+            dto.setOperatorName(oConvertUtils.isNotEmpty(loginUser.getRealname())
+                    ? loginUser.getRealname()
+                    : loginUser.getUsername());
+        }
+        return loginUser.getId();
+    }
+
+    /**
+     * 校验工单解析出的机器人在当前主控授权范围内。
+     */
+    public void assertRobotAuthorized(IotDevice robot, List<UsageStatusVO.RobotBasicVO> availableRobots) {
+        if (robot == null) {
+            return;
+        }
+        if (availableRobots == null || availableRobots.isEmpty()) {
+            throw new RuntimeException("无权限：当前主控无可用机器人授权");
+        }
+        boolean allowed = availableRobots.stream()
+                .anyMatch(item -> Objects.equals(item.getRobotId(), robot.getId()));
+        if (!allowed) {
+            throw new RuntimeException("无权限：工单绑定的机器人不在当前主控授权范围内");
+        }
+    }
+
+    private LoginUser resolveLoginUser() {
+        Object principal = SecurityUtils.getSubject().getPrincipal();
+        if (principal instanceof LoginUser loginUser
+                && loginUser.getId() != null
+                && !loginUser.getId().isBlank()) {
+            return loginUser;
+        }
+        throw new RuntimeException("未登录或会话已失效");
+    }
 
     /**
      * 通过设备编码查询主控设备，不存在或类型不符则抛异常。
