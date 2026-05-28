@@ -100,27 +100,38 @@ public class DeviceOnlineOfflineHandler {
      */
     public void handleOnline(String topic, String payload) {
         try {
-            // 1. 从 Topic 路径中提取 clientId（即 deviceCode），Payload 作为兜底
+            log.info("[Online] 处理 $SYS connected 事件 topic={} payload={}", topic, payload);
             String deviceCode = extractClientId(topic, payload);
-            // 2. 过滤平台自身服务账号（iot-platform-server 等），只处理真实设备
-            if (deviceCode == null || deviceCode.startsWith("iot-platform")) return;
-
-            if (!tryAcquireSysEvent(deviceCode, "connected")) {
-                log.debug("[Online] 跳过重复 $SYS connected 事件 deviceCode={}", deviceCode);
-                return;
-            }
-
-            // 3. 查询设备是否存在
-            IotDevice device = findDevice(deviceCode);
-            if (device == null) return;
-
-            ReconcileOnlineResult result =
-                    reconcileOnlineInternal(device, deviceCode, "$SYS connected", true);
-            if (result == ReconcileOnlineResult.FAILED) {
-                log.warn("[Online] 设备上线写库未生效 deviceCode={}", deviceCode);
-            }
+            processDeviceConnected(deviceCode, "$SYS connected");
         } catch (Exception e) {
             log.error("[Online] 处理异常", e);
+        }
+    }
+
+    /**
+     * EMQX HTTP Auth 鉴权成功后触发（{@link org.jeecg.modules.device.service.DeviceMqttAuthConnectService}）。
+     */
+    public void handleDeviceConnectedFromAuth(String deviceCode) {
+        log.info("[Online] 处理 mqtt-auth connected 事件 deviceCode={}", deviceCode);
+        processDeviceConnected(deviceCode, "mqtt-auth");
+    }
+
+    private void processDeviceConnected(String deviceCode, String source) {
+        if (deviceCode == null || deviceCode.startsWith("iot-platform")) {
+            return;
+        }
+        if (!tryAcquireSysEvent(deviceCode, "connected")) {
+            log.info("[Online] 跳过重复 connected 事件 deviceCode={} source={}（{}s 幂等窗口内）",
+                    deviceCode, source, sysEventIdempotentSeconds);
+            return;
+        }
+        IotDevice device = findDevice(deviceCode);
+        if (device == null) {
+            return;
+        }
+        ReconcileOnlineResult result = reconcileOnlineInternal(device, deviceCode, source, true);
+        if (result == ReconcileOnlineResult.FAILED) {
+            log.warn("[Online] 设备上线写库未生效 deviceCode={} source={}", deviceCode, source);
         }
     }
 
@@ -149,6 +160,10 @@ public class DeviceOnlineOfflineHandler {
 
             if (wasOnline) {
                 dbStatusCache.setStatus(deviceCode, DeviceConstant.DeviceStatus.ONLINE);
+                if (alwaysApplySideEffects && tryAcquireReconcileSideEffects(deviceCode)) {
+                    applyOnlineSideEffects(device, deviceCode, source);
+                    log.info("[Online] 设备[{}]重连补发副作用 source={}", deviceCode, source);
+                }
                 return ReconcileOnlineResult.ALREADY_ONLINE;
             }
 
@@ -228,6 +243,7 @@ public class DeviceOnlineOfflineHandler {
             deviceMapper.updateById(device);
 
             dbStatusCache.setStatus(deviceCode, DeviceConstant.DeviceStatus.OFFLINE);
+            releaseSysEventLock(deviceCode, "connected");
 
             // 3. 从 Redis 在线集合移除，并删除状态缓存（避免前端显示过期状态）
             redisTemplate.opsForSet().remove(DeviceConstant.RedisKey.DEVICE_ONLINE_SET, deviceCode);
@@ -332,10 +348,18 @@ public class DeviceOnlineOfflineHandler {
      * 集群幂等：仅首个获得 SET NX 的节点处理本次 $SYS 事件。
      */
     private boolean tryAcquireSysEvent(String deviceCode, String eventType) {
-        String key = DeviceConstant.RedisKey.SYS_EVENT_IDEMPOTENT_PREFIX + eventType + ":" + deviceCode;
+        String key = sysEventLockKey(deviceCode, eventType);
         Boolean acquired = redisTemplate.opsForValue().setIfAbsent(
                 key, "1", sysEventIdempotentSeconds, TimeUnit.SECONDS);
         return Boolean.TRUE.equals(acquired);
+    }
+
+    private void releaseSysEventLock(String deviceCode, String eventType) {
+        redisTemplate.delete(sysEventLockKey(deviceCode, eventType));
+    }
+
+    private static String sysEventLockKey(String deviceCode, String eventType) {
+        return DeviceConstant.RedisKey.SYS_EVENT_IDEMPOTENT_PREFIX + eventType + ":" + deviceCode;
     }
 
     /**

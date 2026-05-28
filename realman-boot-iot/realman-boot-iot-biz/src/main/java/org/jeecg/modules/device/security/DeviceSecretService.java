@@ -8,7 +8,9 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.jeecg.modules.device.constant.DeviceConstant;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.mapper.IotDeviceMapper;
+import org.jeecg.modules.device.service.DeviceMqttAuthConnectService;
 import org.jeecg.modules.device.service.DeviceMqttConnectionAddressService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.stereotype.Component;
@@ -33,6 +35,10 @@ public class DeviceSecretService {
     private final StringRedisTemplate redisTemplate;
     private final IotDeviceMapper deviceMapper;
     private final DeviceMqttConnectionAddressService mqttConnectionAddressService;
+
+    @Autowired(required = false)
+    private DeviceMqttAuthConnectService mqttAuthConnectService;
+
     private static final long CACHE_HOURS = 24L;
 
     /**
@@ -118,6 +124,9 @@ public class DeviceSecretService {
     }
 
     private void onAuthSuccess(String deviceCode, String mqttPeerHost, String deviceId) {
+        if (mqttAuthConnectService != null) {
+            mqttAuthConnectService.onDeviceAuthSuccess(deviceCode);
+        }
         if (mqttPeerHost == null || mqttPeerHost.isBlank()) {
             return;
         }

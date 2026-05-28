@@ -7,6 +7,8 @@ import org.jeecg.config.shiro.IgnoreAuth;
 import org.jeecg.modules.device.security.DeviceSecretService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 
@@ -42,30 +44,29 @@ import java.util.Map;
 public class MqttAuthController {
 
     private final DeviceSecretService secretService;
-
     /**
-     * EMQX HTTP Auth 认证回调
-     * 返回 {"result":"allow"} 或 {"result":"deny"}
+     * EMQX HTTP Auth 认证回调。
+     * <p>
+     * 平台账号需 {@code is_superuser=true}，否则 EMQX 拒绝订阅 {@code $SYS/#}（SUBACK reasonCode=135）。
      */
     @IgnoreAuth
     @PostMapping("/auth")
-    public ResponseEntity<Map<String, String>> auth(@RequestBody Map<String, String> body) {
+    public ResponseEntity<Map<String, Object>> auth(@RequestBody Map<String, String> body) {
         log.info("[MqttAuth] requestBody={}", body);
-        String clientId = body.get("clientid");
-        String username = body.get("username");
-        String password = body.get("password");
-        String peerHost = body.get("peerhost");
-        String peername = body.get("peername");
+        String clientId = textField(body, "clientid", "clientId");
+        String username = textField(body, "username");
+        String password = textField(body, "password");
+        String peerHost = textField(body, "peerhost", "peerHost");
+        String peername = textField(body, "peername", "peerName");
 
-        // 平台服务账号直接放行（与 ACL 端点对称）
-        if (clientId != null && clientId.startsWith("iot-platform")) {
-            log.info("[MqttAuth] 平台账号放行: clientId={}", clientId);
-            return allow();
+        if (isPlatformAccount(clientId, username)) {
+            log.info("[MqttAuth] 平台账号放行(superuser): clientId={} username={}", clientId, username);
+            return allowPlatformSuperuser();
         }
 
         boolean ok = secretService.validateSecret(username, password, peerHost);
         log.info("[MqttAuth] clientId={} peerhost={} peername={} allow={}", clientId, peerHost, peername, ok);
-        return ok ? allow() :deny();
+        return ok ? allow() : deny();
     }
 
     /**
@@ -74,24 +75,62 @@ public class MqttAuthController {
      */
     @IgnoreAuth
     @PostMapping("/acl")
-    public ResponseEntity<Map<String, String>> acl(@RequestBody Map<String, String> body) {
+    public ResponseEntity<Map<String, Object>> acl(@RequestBody Map<String, String> body) {
         log.info("[MqttAcl] requestBody={}", body);
-        String clientId = body.get("clientid");
-        String username = body.get("username");
-        String topic    = body.get("topic");
+        String clientId = textField(body, "clientid", "clientId");
+        String username = textField(body, "username");
+        String topic    = textField(body, "topic");
+        String action   = textField(body, "action");
 
-        if (clientId != null && clientId.startsWith("iot-platform")) return allow();
+        if (isPlatformAccount(clientId, username)) {
+            log.debug("[MqttAcl] 平台账号放行: clientId={} username={} topic={} action={}",
+                    clientId, username, topic, action);
+            return allow();
+        }
 
         boolean ok = secretService.validateAcl(username, topic);
         return ok ? allow() : deny();
     }
 
 
-    private ResponseEntity<Map<String, String>> allow() {
+    /**
+     * 平台 MQTT 客户端：superuser 才能订阅 $SYS/#（EMQX SUBACK 135 = Not authorized）
+     */
+
+    private static boolean isPlatformAccount(String clientId, String username) {
+        return (clientId != null && clientId.startsWith("iot-platform"))
+                || (username != null && username.startsWith("iot-platform"));
+    }
+
+    private ResponseEntity<Map<String, Object>> allowPlatformSuperuser() {
+        Map<String, Object> body = new HashMap<>(4);
+        body.put("result", "allow");
+        body.put("is_superuser", true);
+        // EMQX 5.8+：HTTP Auth 响应内嵌 ACL，兜底 $SYS 订阅（内置库先于 HTTP 匹配时仍可能不生效）
+        body.put("acl", List.of(
+                Map.of("permission", "allow", "action", "subscribe", "topic", "$SYS/#"),
+                Map.of("permission", "allow", "action", "all", "topic", "#")
+        ));
+        return ResponseEntity.ok(body);
+    }
+
+
+    private ResponseEntity<Map<String, Object>> allow() {
         return ResponseEntity.ok(Map.of("result", "allow"));
     }
 
-    private ResponseEntity<Map<String, String>> deny() {
+    private ResponseEntity<Map<String, Object>> deny() {
         return ResponseEntity.ok(Map.of("result", "deny"));
+    }
+
+    /** 兼容 EMQX 模板 {@code clientid} 与 Dashboard 常见写法 {@code clientId}。 */
+    private static String textField(Map<String, String> body, String... keys) {
+        for (String key : keys) {
+            String value = body.get(key);
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
     }
 }

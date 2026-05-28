@@ -120,21 +120,37 @@ public class MqttMessageDispatcher {
     private final ExecutorService keepaliveExecutor = Executors.newSingleThreadExecutor(
             r -> new Thread(r, "device-keepalive"));
 
+    /**
+     * $SYS connected/disconnected 专用单线程池：不进入 deviceTaskExecutor，
+     * 避免高频业务消息占满队列导致上下线事件被延迟或丢弃，进而跳过 Darwin ONLINE。
+     */
+    private final ExecutorService sysEventExecutor = Executors.newSingleThreadExecutor(
+            r -> new Thread(r, "device-sys-event"));
+
     @PreDestroy
     void shutdownKeepaliveExecutor() {
-        keepaliveExecutor.shutdown();
+        shutdownExecutor(keepaliveExecutor, "keepaliveExecutor");
+    }
+
+    @PreDestroy
+    void shutdownSysEventExecutor() {
+        shutdownExecutor(sysEventExecutor, "sysEventExecutor");
+    }
+
+    private void shutdownExecutor(ExecutorService executor, String name) {
+        executor.shutdown();
         try {
-            if (!keepaliveExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
-                keepaliveExecutor.shutdownNow();
-                if (!keepaliveExecutor.awaitTermination(2, TimeUnit.SECONDS)) {
-                    log.warn("[Dispatcher] keepaliveExecutor 未在时限内结束，可能仍有任务未完成");
+            if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+                executor.shutdownNow();
+                if (!executor.awaitTermination(2, TimeUnit.SECONDS)) {
+                    log.warn("[Dispatcher] {} 未在时限内结束，可能仍有任务未完成", name);
                 }
             }
         } catch (InterruptedException e) {
-            keepaliveExecutor.shutdownNow();
+            executor.shutdownNow();
             Thread.currentThread().interrupt();
         }
-        log.info("[Dispatcher] keepaliveExecutor 已关闭");
+        log.info("[Dispatcher] {} 已关闭", name);
     }
 
     /**
@@ -171,6 +187,13 @@ public class MqttMessageDispatcher {
         if (statusReport.matches()) {
             String deviceCode = statusReport.group(1);
             keepaliveExecutor.execute(() -> statusHandler.refreshPresence(deviceCode, payload));
+            return;
+        }
+
+        if ((topicNorm.contains("/clients/") && topicNorm.contains("/connected"))
+                || (topicNorm.contains("/clients/") && topicNorm.contains("/disconnected"))) {
+            log.info("[Dispatcher] 收到 $SYS 事件 topic={}", topicNorm);
+            sysEventExecutor.execute(() -> doDispatch(topicNorm, payload, traceId));
             return;
         }
 

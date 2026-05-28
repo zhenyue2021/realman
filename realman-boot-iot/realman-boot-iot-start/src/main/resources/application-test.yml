@@ -106,6 +106,7 @@ mqtt:
     api-username: 1f36cde522c1f8ab
     api-password: ${EMQX_API_PASSWORD:SHe6JIzjwnBpOgOfksPMlIFGdYYHkybmXI00ARQKm9BG}
     api-timeout-ms: 5000
+    ensure-platform-superuser: true
     reconcile-enabled: true
     reconcile-lock-seconds: 120
     reconcile-sidefx-idempotent-seconds: 60

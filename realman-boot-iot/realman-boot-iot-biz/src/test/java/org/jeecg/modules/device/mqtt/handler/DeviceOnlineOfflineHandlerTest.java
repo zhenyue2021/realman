@@ -83,6 +83,21 @@ class DeviceOnlineOfflineHandlerTest {
     }
 
     @Test
+    @DisplayName("mqtt-auth 上线：补推待同步消息")
+    void authConnectTriggersAsyncPendingSync() {
+        IotDevice device = new IotDevice();
+        device.setId("id1");
+        device.setDeviceCode("DEV001");
+        when(deviceMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(device);
+        when(deviceMapper.updateById(any(IotDevice.class))).thenReturn(1);
+
+        handler.handleDeviceConnectedFromAuth("DEV001");
+
+        verify(pendingSyncService).flushPendingMessagesAsync("DEV001");
+        verify(webSocketServer).pushDeviceOnlineStatus("DEV001", true);
+    }
+
+    @Test
     @DisplayName("设备上线：重复 $SYS 事件被 Redis 幂等跳过")
     void onlineSkippedWhenIdempotentLockNotAcquired() {
         ValueOperations<String, String> valueOps = redisTemplate.opsForValue();

@@ -121,20 +121,8 @@ public class MqttMessageDispatcherEndToEndTest {
                 .thenReturn(java.util.Collections.emptyList());
 
         // 构造各 Handler 实例
-        // DeviceStatusHandler：Redis presence + keepalive 软自愈
-        DeviceDbStatusCache dbStatusCache = new DeviceDbStatusCache(redisTemplate);
-        DeviceStatusPersistenceService statusPersistenceService = new DeviceStatusPersistenceService(
-                deviceMapper, statusMapper, dbStatusCache);
-        DeviceStatusHandler statusHandler = new DeviceStatusHandler(
-                redisTemplate, statusPersistenceService, dbStatusCache);
-        ReflectionTestUtils.setField(statusHandler, "offlinePromoteThrottleMs", 60_000L);
-        @SuppressWarnings("unchecked")
-        ValueOperations<String, String> promoteThrottleOps = Mockito.mock(ValueOperations.class);
-        when(redisTemplate.opsForValue()).thenReturn(promoteThrottleOps);
-        when(promoteThrottleOps.setIfAbsent(
-                Mockito.anyString(), Mockito.anyString(), Mockito.anyLong(),
-                Mockito.eq(java.util.concurrent.TimeUnit.MILLISECONDS))).thenReturn(true);
-
+        // DeviceStatusHandler：仅 Redis presence
+        DeviceStatusHandler statusHandler = new DeviceStatusHandler(redisTemplate);
         configAckHandler = new DeviceConfigAckHandler(
                 configMapper,
                 encryptService,

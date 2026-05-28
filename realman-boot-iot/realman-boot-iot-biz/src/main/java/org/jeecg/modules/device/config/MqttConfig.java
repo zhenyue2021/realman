@@ -268,8 +268,7 @@ public class MqttConfig {
         client.connect(opts);
         log.info("[MQTT] 平台已连接 EMQX: {}", brokerUrl);
 
-        client.subscribe(topics, qosArr);
-        log.info("[MQTT] 已订阅{}个业务Topic", topics.length);
+        subscribeAllWithReasonLog("冷启动");
         return client;
     }
 
@@ -350,8 +349,7 @@ public class MqttConfig {
         for (int attempt = 1; attempt <= 3; attempt++) {
             try {
                 client.connect(savedOpts);
-                client.subscribe(savedTopics, savedQosArr);
-                log.info("[MQTT] 连接重建完成，已重新订阅 {} 个 Topic", savedTopics.length);
+                subscribeAllWithReasonLog("restartConnection");
                 return;
             } catch (MqttException e) {
                 log.warn("[MQTT] 重建连接第 {} 次失败: {}", attempt, e.getMessage());
@@ -371,26 +369,40 @@ public class MqttConfig {
     }
 
     /**
-     * HTTP 服务就绪后补一次订阅（解决冷启动/重启时 EMQX HTTP ACL 不可用导致首次 subscribe 失败）。
-     * MQTT SUBSCRIBE 幂等，重复调用安全。
+     * HTTP 服务就绪后重建连接并订阅。
+     *
+     * <p>冷启动时 {@link #mqttClient()} 在 Tomcat/HTTP Auth 未就绪前即 CONNECT + SUBSCRIBE：
+     * <ul>
+     *   <li>EMQX HTTP Auth 未返回 {@code is_superuser=true} → {@code $SYS/#} SUBACK 135</li>
+     *   <li>仅重试 subscribe 无法修复（superuser 在 CONNECT 鉴权时绑定到 Session）</li>
+     * </ul>
+     * 因此 ApplicationReady 后必须 disconnect + connect 触发 EMQX 重新鉴权，再订阅。
      */
-    public synchronized void ensureSubscribed() {
-        if (client == null || !client.isConnected()) {
-            log.warn("[MQTT] ensureSubscribed 跳过：订阅客户端未连接");
+    public synchronized void reconnectAfterHttpReady() {
+        if (client == null || savedOpts == null || savedTopics == null || savedQosArr == null) {
+            log.warn("[MQTT] reconnectAfterHttpReady 跳过：MQTT 客户端未初始化");
             return;
         }
-        if (savedTopics == null || savedQosArr == null) {
-            log.warn("[MQTT] ensureSubscribed 跳过：订阅列表未初始化");
-            return;
+        log.info("[MQTT] HTTP 就绪，重建平台连接以触发 EMQX Auth(superuser) 并重订阅 $SYS");
+        try {
+            if (client.isConnected()) {
+                client.disconnectForcibly(0L, 3000L);
+            }
+        } catch (Exception e) {
+            log.warn("[MQTT] 断开冷启动连接异常（忽略，继续重连）", e);
         }
         for (int attempt = 1; attempt <= 3; attempt++) {
             try {
-                client.subscribe(savedTopics, savedQosArr);
+                client.connect(savedOpts);
                 MqttMessageDispatcher.lastReceivedTs.set(System.currentTimeMillis());
-                log.info("[MQTT] ensureSubscribed 完成，共 {} 个 Topic", savedTopics.length);
+                int sysFailCount = subscribeAllWithReasonLog("HTTP就绪重连");
+                if (sysFailCount > 0) {
+                    log.error("[MQTT] $SYS 仍订阅失败：请确认 EMQX Built-in 用户 iot-platform 已勾选 Superuser，"
+                            + "或删除 Built-in 用户改由 HTTP Auth 鉴权；Darwin ONLINE 暂依赖 mqtt-auth 兜底");
+                }
                 return;
             } catch (MqttException e) {
-                log.warn("[MQTT] ensureSubscribed 第 {} 次失败", attempt, e);
+                log.warn("[MQTT] HTTP 就绪后重连第 {} 次失败", attempt, e);
                 if (attempt < 3) {
                     try {
                         Thread.sleep(2000L * attempt);
@@ -401,7 +413,30 @@ public class MqttConfig {
                 }
             }
         }
-        log.error("[MQTT] ensureSubscribed 3 次均失败，等待 Watchdog 重建连接");
+        log.error("[MQTT] HTTP 就绪后重连 3 次均失败，$SYS 订阅与 Darwin ONLINE 可能不可用");
+    }
+
+    private int subscribeAllWithReasonLog(String context) throws MqttException {
+        IMqttToken token = client.subscribe(savedTopics, savedQosArr);
+        token.waitForCompletion();
+        int[] reasonCodes = token.getReasonCodes();
+        int failCount = 0;
+        int sysFailCount = 0;
+        for (int i = 0; i < savedTopics.length; i++) {
+            if (reasonCodes != null && i < reasonCodes.length && reasonCodes[i] > 1) {
+                failCount++;
+                log.warn("[MQTT] {} 订阅失败 topic={} reasonCode={}", context, savedTopics[i], reasonCodes[i]);
+                if (savedTopics[i].startsWith("$SYS/")) {
+                    sysFailCount++;
+                }
+            }
+        }
+        if (sysFailCount > 0) {
+            log.error("[MQTT] {} $SYS 订阅失败 {} 个（135=superuser 未生效；Built-in 用户 iot-platform 可能先于 HTTP Auth 匹配）",
+                    context, sysFailCount);
+        }
+        log.info("[MQTT] {} 订阅完成，共 {} 个 Topic，失败 {} 个", context, savedTopics.length, failCount);
+        return sysFailCount;
     }
 
     /**

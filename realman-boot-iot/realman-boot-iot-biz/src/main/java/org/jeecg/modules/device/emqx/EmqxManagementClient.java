@@ -8,8 +8,10 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -18,7 +20,9 @@ import jakarta.annotation.PostConstruct;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * EMQX Management API 客户端：查询 Broker 上当前已连接的 MQTT 客户端。
@@ -29,6 +33,9 @@ import java.util.List;
 public class EmqxManagementClient {
 
     private static final int PAGE_SIZE = 1000;
+
+    /** EMQX 全局认证链中 Built-in Database 的 authenticator id（URL 编码后） */
+    private static final String BUILT_IN_AUTH_ID = "password_based%3Abuilt_in_database";
 
     private RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
@@ -47,6 +54,12 @@ public class EmqxManagementClient {
 
     @Value("${mqtt.emqx.api-timeout-ms:5000}")
     private int apiTimeoutMs;
+
+    @Value("${mqtt.broker.username:iot-platform}")
+    private String platformUsername;
+
+    @Value("${mqtt.emqx.ensure-platform-superuser:true}")
+    private boolean ensurePlatformSuperuserEnabled;
 
     public EmqxManagementClient(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
@@ -111,6 +124,49 @@ public class EmqxManagementClient {
             page++;
         }
         return deviceCodes;
+    }
+
+    /**
+     * 将 EMQX Built-in Database 中的平台账号设为 superuser，以允许订阅 {@code $SYS/#}。
+     *
+     * <p>部署文档要求在 Built-in 添加 {@code iot-platform} 用户；该用户若先于 HTTP Auth 匹配，
+     * CONNECT 不会回调 {@code /internal/mqtt/auth}，{@code is_superuser} 无法通过 HTTP 下发。
+     */
+    public boolean ensurePlatformSuperuser() {
+        if (!ensurePlatformSuperuserEnabled) {
+            log.info("[EmqxApi] mqtt.emqx.ensure-platform-superuser=false，跳过 superuser 修复");
+            return false;
+        }
+        String baseUrl = resolveApiUrl();
+        if (baseUrl == null || baseUrl.isBlank()) {
+            log.warn("[EmqxApi] 未配置 mqtt.emqx.api-url，无法自动设置平台 superuser");
+            return false;
+        }
+        URI uri = UriComponentsBuilder.fromHttpUrl(baseUrl)
+                .path("/api/v5/authentication/")
+                .path(BUILT_IN_AUTH_ID)
+                .path("/users/")
+                .path(platformUsername)
+                .build(true)
+                .toUri();
+        Map<String, Object> body = new HashMap<>(1);
+        body.put("is_superuser", true);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        if (apiUsername != null && !apiUsername.isBlank()) {
+            headers.setBasicAuth(apiUsername, apiPassword != null ? apiPassword : "");
+        }
+        try {
+            restTemplate.exchange(uri, HttpMethod.PUT, new HttpEntity<>(body, headers), String.class);
+            log.info("[EmqxApi] 已将 Built-in 用户 {} 设为 superuser（$SYS 订阅）", platformUsername);
+            return true;
+        } catch (HttpClientErrorException.NotFound e) {
+            log.info("[EmqxApi] Built-in 无用户 {}，平台 CONNECT 应走 HTTP Auth", platformUsername);
+            return false;
+        } catch (RestClientException e) {
+            log.warn("[EmqxApi] 设置 superuser 失败 user={} url={}", platformUsername, uri, e);
+            return false;
+        }
     }
 
     private String resolveDeviceCode(JsonNode client) {
