@@ -48,10 +48,16 @@ public class MqSendHelper {
                 .setTag(parseTag(destination))
                 .setCallerClass(callerClass)
                 .setMessageBody(extractBody(springMessage));
+        if (mdcContext != null) {
+            record.setTraceId(mdcContext.get("traceId"));
+        }
 
-        CompletableFuture<SendReceipt> future = new CompletableFuture<>();
+        // 必须在 RocketMQ 返回的 future0 上注册回调。
+        // 若只监听传入的 holder Future，依赖模板内部 future0→holder 桥接；桥接未触发时
+        // MQ 已发送成功但 whenComplete/iot_mq_message_log(direction=1) 均不会执行。
+        CompletableFuture<SendReceipt> sendFuture;
         try {
-            rocketMQClientTemplate.asyncSendNormalMessage(destination, springMessage, future);
+            sendFuture = rocketMQClientTemplate.asyncSendNormalMessage(destination, springMessage, null);
         } catch (Exception e) {
             record.setCostTime(System.currentTimeMillis() - start)
                     .setStatus(2)
@@ -61,18 +67,27 @@ public class MqSendHelper {
             return;
         }
 
-        future.whenComplete((receipt, ex) -> {
-            if (mdcContext != null) MDC.setContextMap(mdcContext);
+        sendFuture.whenComplete((receipt, ex) -> {
+            if (mdcContext != null) {
+                MDC.setContextMap(mdcContext);
+            }
             try {
                 record.setCostTime(System.currentTimeMillis() - start);
-                if (ex == null) {
+                if (ex != null) {
+                    record.setStatus(2).setFailReason(truncate(ex.getMessage(), 500));
+                } else if (receipt != null && receipt.getMessageId() != null) {
                     record.setStatus(1).setMessageId(receipt.getMessageId().toString());
                 } else {
-                    record.setStatus(2).setFailReason(truncate(ex.getMessage(), 500));
+                    record.setStatus(2).setFailReason("SendReceipt or messageId is null");
                 }
-                // MDC 已恢复，asyncSave 可从中捕获 traceId
                 mqMessageLogService.asyncSave(record);
-                if (onComplete != null) onComplete.accept(receipt, ex);
+                if (onComplete != null) {
+                    onComplete.accept(receipt, ex);
+                }
+            } catch (Exception callbackEx) {
+                log.warn("[MqSend] 发送回调异常 topic={} tag={}", record.getTopic(), record.getTag(), callbackEx);
+                record.setStatus(2).setFailReason(truncate(callbackEx.getMessage(), 500));
+                mqMessageLogService.asyncSave(record);
             } finally {
                 MDC.clear();
             }

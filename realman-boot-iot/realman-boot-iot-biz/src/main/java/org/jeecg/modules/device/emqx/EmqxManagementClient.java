@@ -58,6 +58,9 @@ public class EmqxManagementClient {
     @Value("${mqtt.broker.username:iot-platform}")
     private String platformUsername;
 
+    @Value("${mqtt.broker.password:}")
+    private String platformPassword;
+
     @Value("${mqtt.emqx.ensure-platform-superuser:true}")
     private boolean ensurePlatformSuperuserEnabled;
 
@@ -142,6 +145,10 @@ public class EmqxManagementClient {
             log.warn("[EmqxApi] 未配置 mqtt.emqx.api-url，无法自动设置平台 superuser");
             return false;
         }
+        if (platformPassword == null || platformPassword.isBlank()) {
+            log.info("[EmqxApi] 未配置 mqtt.broker.password，跳过 Built-in superuser 自动修复（$SYS 已手动放行时可忽略）");
+            return false;
+        }
         URI uri = UriComponentsBuilder.fromHttpUrl(baseUrl)
                 .path("/api/v5/authentication/")
                 .path(BUILT_IN_AUTH_ID)
@@ -149,7 +156,8 @@ public class EmqxManagementClient {
                 .path(platformUsername)
                 .build(true)
                 .toUri();
-        Map<String, Object> body = new HashMap<>(1);
+        Map<String, Object> body = new HashMap<>(2);
+        body.put("password", platformPassword);
         body.put("is_superuser", true);
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -162,6 +170,10 @@ public class EmqxManagementClient {
             return true;
         } catch (HttpClientErrorException.NotFound e) {
             log.info("[EmqxApi] Built-in 无用户 {}，平台 CONNECT 应走 HTTP Auth", platformUsername);
+            return false;
+        } catch (HttpClientErrorException.BadRequest e) {
+            log.warn("[EmqxApi] 设置 superuser 请求无效 user={}（EMQX 要求 PUT 时携带 password）: {}",
+                    platformUsername, e.getResponseBodyAsString());
             return false;
         } catch (RestClientException e) {
             log.warn("[EmqxApi] 设置 superuser 失败 user={} url={}", platformUsername, uri, e);
