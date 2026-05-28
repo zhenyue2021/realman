@@ -7,7 +7,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class MasterAssociatedDevicePendingService
-        extends RedisClusterPendingService<MqttMessageModel.AssociatedDeviceResponse> {
+        extends MqttAckPendingService<MqttMessageModel.AssociatedDeviceResponse> {
 
     public static final String CHANNEL_PREFIX = "iot:pending:associated-device:";
 

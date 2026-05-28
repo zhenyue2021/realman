@@ -6,7 +6,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 @Service
-public class WebRtcAckPendingService extends RedisClusterPendingService<MqttMessageModel.WebRtcAck> {
+public class WebRtcAckPendingService extends MqttAckPendingService<MqttMessageModel.WebRtcAck> {
 
     public static final String CHANNEL_PREFIX = "iot:pending:webrtc:";
 

@@ -6,7 +6,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 @Service
-public class SlamCommandPendingService extends RedisClusterPendingService<MqttMessageModel.SlamAck> {
+public class SlamCommandPendingService extends MqttAckPendingService<MqttMessageModel.SlamAck> {
 
     public static final String CHANNEL_PREFIX = "iot:pending:slam-cmd:";
 

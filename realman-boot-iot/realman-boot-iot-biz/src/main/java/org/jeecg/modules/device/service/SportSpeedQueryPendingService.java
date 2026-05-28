@@ -6,7 +6,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 @Service
-public class SportSpeedQueryPendingService extends RedisClusterPendingService<SportSpeedVO> {
+public class SportSpeedQueryPendingService extends MqttAckPendingService<SportSpeedVO> {
 
     public static final String CHANNEL_PREFIX = "iot:pending:sport-speed:";
 

@@ -16,24 +16,17 @@ import org.springframework.data.redis.listener.PatternTopic;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 
 /**
- * 跨节点 PendingService 的 Redis Pub/Sub 监听注册
+ * 跨节点 MQTT 协调服务的 Redis Pub/Sub 监听注册
  *
- * <p>每个 PendingService 实现了 {@link org.springframework.data.redis.connection.MessageListener}，
- * 此处将它们绑定到各自的 Redis 频道前缀（PatternTopic）。
+ * <p>{@link MqttAckPendingService}：单次 MQTT ACK → {@link java.util.concurrent.CompletableFuture}；
+ * {@link ClusterScheduledMonitor}：长周期任务停止广播。
  *
- * <p>工作原理：
+ * <p>工作原理（ACK 等待）：
  * <pre>
- *   Node A  sendCommand() → register(commandId) → Future 存入本地 map → 发 MQTT → future.get(30s) 阻塞
- *   Node B  处理 MQTT ack  → handleAck() → 更新 DB → pendingService.complete(commandId, ack)
- *                                                      → redisTemplate.convertAndSend(channel, json)
- *   Node A  onMessage() 收到 Redis 消息 → 从本地 map 找到 Future → future.complete(ack) → 解锁
+ *   Node A  sendCommand() → register(commandId) → Future 阻塞 → 发 MQTT
+ *   Node B  处理 MQTT ack → complete(commandId, ack) → Redis publish
+ *   Node A  onMessage() → future.complete(ack)
  * </pre>
- *
- * <p>配合 EMQX {@code $share/iot-cluster/} 共享订阅使用：
- * <ul>
- *   <li>MQTT 消息只有一个节点处理，消除重复 DB 写入</li>
- *   <li>Redis Pub/Sub 保证结果广播到持有 Future 的节点</li>
- * </ul>
  */
 @Configuration
 @RequiredArgsConstructor

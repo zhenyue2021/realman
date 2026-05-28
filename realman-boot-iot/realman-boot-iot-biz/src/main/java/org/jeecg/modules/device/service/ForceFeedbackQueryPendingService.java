@@ -7,7 +7,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 @Service
-public class ForceFeedbackQueryPendingService extends RedisClusterPendingService<ForceFeedbackVO> {
+public class ForceFeedbackQueryPendingService extends MqttAckPendingService<ForceFeedbackVO> {
 
     public static final String CHANNEL_PREFIX = "iot:pending:force-feedback:";
 

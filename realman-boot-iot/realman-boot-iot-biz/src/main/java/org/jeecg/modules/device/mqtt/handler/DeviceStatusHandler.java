@@ -44,7 +44,7 @@ public class DeviceStatusHandler {
      * 刷新设备 Redis 在线 presence，并在 DB 非 ONLINE 时尝试软自愈。
      */
     public void refreshPresence(String deviceCode, String payload) {
-        log.debug("[StatusHandler] [{}] keepalive 刷新 Redis presence", deviceCode);
+        log.info("[StatusHandler] [{}] keepalive 刷新 Redis presence", deviceCode);
         try {
             touchPresence(deviceCode, payload);
             healDbIfNeeded(deviceCode);
@@ -63,7 +63,7 @@ public class DeviceStatusHandler {
             return;
         }
         if (!tryAcquirePromoteThrottle(deviceCode)) {
-            log.debug("[StatusHandler] [{}] keepalive DB 自愈节流中", deviceCode);
+            log.info("[StatusHandler] [{}] keepalive DB 自愈节流中", deviceCode);
             return;
         }
         DeviceStatusPersistenceService.PromoteOnlineResult result =

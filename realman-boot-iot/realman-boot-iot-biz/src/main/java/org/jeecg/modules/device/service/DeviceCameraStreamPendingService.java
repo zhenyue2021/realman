@@ -9,7 +9,7 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 
 @Service
-public class DeviceCameraStreamPendingService extends RedisClusterPendingService<List<MqttMessageModel.CameraInfo>> {
+public class DeviceCameraStreamPendingService extends MqttAckPendingService<List<MqttMessageModel.CameraInfo>> {
 
     public static final String CHANNEL_PREFIX = "iot:pending:camera:";
 
