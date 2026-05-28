@@ -44,7 +44,7 @@ public class DeviceStatusHandler {
      * 刷新设备 Redis 在线 presence，并在 DB 非 ONLINE 时尝试软自愈。
      */
     public void refreshPresence(String deviceCode, String payload) {
-        log.info("[StatusHandler] [{}] keepalive 刷新 Redis presence", deviceCode);
+        log.info("[StatusHandler] [{}] keepalive 刷新 Redis presence, {}", deviceCode, payload);
         try {
             touchPresence(deviceCode, payload);
             healDbIfNeeded(deviceCode);

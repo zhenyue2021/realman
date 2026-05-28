@@ -3,18 +3,13 @@ package org.jeecg.modules.device.datacollect.producer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.rocketmq.client.apis.producer.SendReceipt;
-import org.apache.rocketmq.client.core.RocketMQClientTemplate;
+import org.jeecg.modules.device.datacollect.MqSendHelper;
 import org.jeecg.modules.device.datacollect.constant.DataCollectConstant;
 import org.jeecg.modules.device.datacollect.dto.mq.FileAddressReportMsg;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.stereotype.Component;
 
-import org.slf4j.MDC;
-
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 
 /**
  * 将机器人上报的 OSS 文件地址转发给数采平台（Teleop → Darwin）。
@@ -25,7 +20,7 @@ import java.util.concurrent.CompletableFuture;
 @RequiredArgsConstructor
 public class FileAddressReportProducer {
 
-    private final RocketMQClientTemplate rocketMQClientTemplate;
+    private final MqSendHelper mqSendHelper;
     private final ObjectMapper objectMapper;
 
     public void send(String tenant, String deviceCode, String workOrderId, String taskId,
@@ -49,26 +44,17 @@ public class FileAddressReportProducer {
             var springMessage = MessageBuilder.withPayload(objectMapper.writeValueAsString(msg))
                     .setHeader("deviceCode", deviceCode)
                     .build();
-            Map<String, String> mdcContext = MDC.getCopyOfContextMap();
-            CompletableFuture<SendReceipt> future = new CompletableFuture<>();
-            rocketMQClientTemplate.asyncSendNormalMessage(destination, springMessage, future);
-            future.whenComplete((receipt, ex) -> {
-                if (mdcContext != null) {
-                    MDC.setContextMap(mdcContext);
-                }
-                try {
-                    if (ex != null) {
-                        log.warn("[DataCollect] OSS地址上报失败，不阻塞主流程 deviceCode={}", deviceCode, ex);
-                    } else {
-                        log.info("[DataCollect] OSS地址已上报至数采平台 deviceCode={} fileCount={} msgId={}",
-                                deviceCode, fileList != null ? fileList.size() : 0, receipt.getMessageId());
-                    }
-                } finally {
-                    MDC.clear();
+            mqSendHelper.asyncSend(destination, springMessage, getClass().getSimpleName(), (receipt, ex) -> {
+                if (ex != null) {
+                    log.warn("[DataCollect] OSS地址上报失败，不阻塞主流程 deviceCode={}", deviceCode, ex);
+                } else {
+                    log.info("[DataCollect] OSS地址已上报至数采平台 deviceCode={} fileCount={} msgId={}",
+                            deviceCode, fileList != null ? fileList.size() : 0, receipt.getMessageId());
                 }
             });
         } catch (Exception e) {
             log.warn("[DataCollect] OSS地址上报序列化失败，不阻塞主流程 deviceCode={}", deviceCode, e);
+            mqSendHelper.logSendFailure(destination, null, getClass().getSimpleName(), traceId, e);
         }
     }
 }

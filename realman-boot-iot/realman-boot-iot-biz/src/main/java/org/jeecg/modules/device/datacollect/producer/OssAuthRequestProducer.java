@@ -3,17 +3,13 @@ package org.jeecg.modules.device.datacollect.producer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.rocketmq.client.apis.producer.SendReceipt;
-import org.apache.rocketmq.client.core.RocketMQClientTemplate;
+import org.jeecg.modules.device.datacollect.MqSendHelper;
 import org.jeecg.modules.device.datacollect.constant.DataCollectConstant;
 import org.jeecg.modules.device.datacollect.dto.mq.OssAuthRequestMsg;
-import org.slf4j.MDC;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.stereotype.Component;
 
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -32,7 +28,7 @@ public class OssAuthRequestProducer {
 
     private static final long REQUEST_TTL_HOURS = 2;
 
-    private final RocketMQClientTemplate rocketMQClientTemplate;
+    private final MqSendHelper mqSendHelper;
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
 
@@ -59,30 +55,21 @@ public class OssAuthRequestProducer {
             var springMessage = MessageBuilder.withPayload(objectMapper.writeValueAsString(msg))
                     .setHeader("deviceCode", deviceCode)
                     .build();
-            Map<String, String> mdcContext = MDC.getCopyOfContextMap();
-            CompletableFuture<SendReceipt> future = new CompletableFuture<>();
-            rocketMQClientTemplate.asyncSendNormalMessage(destination, springMessage, future);
-            future.whenComplete((receipt, ex) -> {
-                if (mdcContext != null) {
-                    MDC.setContextMap(mdcContext);
-                }
-                try {
-                    if (ex != null) {
-                        redisTemplate.delete(redisKey);
-                        log.error("[DataCollect] OSS授权请求转发失败 requestId={} deviceCode={}",
-                                requestId, deviceCode, ex);
-                    } else {
-                        log.info("[DataCollect] OSS授权请求已转发 requestId={} deviceCode={} msgId={}",
-                                requestId, deviceCode, receipt.getMessageId());
-                    }
-                } finally {
-                    MDC.clear();
+            mqSendHelper.asyncSend(destination, springMessage, getClass().getSimpleName(), (receipt, ex) -> {
+                if (ex != null) {
+                    redisTemplate.delete(redisKey);
+                    log.error("[DataCollect] OSS授权请求转发失败 requestId={} deviceCode={}",
+                            requestId, deviceCode, ex);
+                } else {
+                    log.info("[DataCollect] OSS授权请求已转发 requestId={} deviceCode={} msgId={}",
+                            requestId, deviceCode, receipt.getMessageId());
                 }
             });
         } catch (Exception e) {
             redisTemplate.delete(redisKey);
             log.error("[DataCollect] OSS授权请求序列化失败 requestId={} deviceCode={}",
                     requestId, deviceCode, e);
+            mqSendHelper.logSendFailure(destination, null, getClass().getSimpleName(), traceId, e);
         }
     }
 }
