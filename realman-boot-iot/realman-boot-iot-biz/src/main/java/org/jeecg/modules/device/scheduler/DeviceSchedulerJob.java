@@ -24,9 +24,12 @@ import org.jeecg.modules.device.mqtt.handler.RobotSlaveStatusHandler;
 import org.jeecg.modules.device.service.IIotDeviceCommandRecordService;
 import org.jeecg.modules.device.service.workorder.IWorkOrderService;
 import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
+import org.springframework.data.redis.connection.StringRedisConnection;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -99,27 +102,42 @@ public class DeviceSchedulerJob {
         List<IotDevice> onlineDevices = deviceMapper.selectList(
                 new LambdaQueryWrapper<IotDevice>()
                         .eq(IotDevice::getStatus, DeviceConstant.DeviceStatus.ONLINE));
-        int cnt = 0;
-        for (IotDevice d : onlineDevices) {
-            String key = DeviceConstant.RedisKey.DEVICE_STATUS_PREFIX + d.getDeviceCode();
-            // Redis Key 不存在说明设备超过 DEVICE_OFFLINE_THRESHOLD_MINUTES 分钟未上报状态
-            if (!redisTemplate.hasKey(key)) {
-                d.setStatus(DeviceConstant.DeviceStatus.OFFLINE);
-                d.setLastOfflineTime(LocalDateTime.now());
-                deviceMapper.updateById(d);
-                dbStatusCache.setStatus(d.getDeviceCode(), DeviceConstant.DeviceStatus.OFFLINE);
-                redisTemplate.opsForSet().remove(DeviceConstant.RedisKey.DEVICE_ONLINE_SET, d.getDeviceCode());
-                statusPersistenceService.persistConnectionStatus(
-                        d, DeviceConstant.DeviceStatus.STATUS_RECORD_OFFLINE, "heartbeat-timeout", null);
-                // 机器人设备异常离线时推送 RocketMQ（兜底场景：心跳超时，EMQX $SYS 事件未触发）
-                if (deviceStatusProducer != null
-                        && DeviceConstant.DeviceTypeInteger.ROBOT == d.getDeviceType()) {
-                    String tenant = d.getTenantId() != null ? String.valueOf(d.getTenantId()) : "";
-                    deviceStatusProducer.sendOfflineEvent(
-                            tenant, d.getDeviceCode(), "SLAVE", d.getDeviceModel(), "heartbeat_timeout", MDC.get("traceId"));
-                }
-                cnt++;
+        if (onlineDevices.isEmpty()) {
+            return;
+        }
+
+        // Pipeline 批量检查所有 presence key，一次 Redis 往返替代 N 次 hasKey
+        List<String> keys = onlineDevices.stream()
+                .map(d -> DeviceConstant.RedisKey.DEVICE_STATUS_PREFIX + d.getDeviceCode())
+                .toList();
+        List<Object> existsResults = redisTemplate.executePipelined((RedisCallback<Object>) connection -> {
+            StringRedisConnection conn = (StringRedisConnection) connection;
+            for (String key : keys) {
+                conn.exists(key);
             }
+            return null;
+        });
+
+        int cnt = 0;
+        for (int i = 0; i < onlineDevices.size(); i++) {
+            if (Boolean.TRUE.equals(existsResults.get(i))) {
+                continue;
+            }
+            IotDevice d = onlineDevices.get(i);
+            d.setStatus(DeviceConstant.DeviceStatus.OFFLINE);
+            d.setLastOfflineTime(LocalDateTime.now());
+            deviceMapper.updateById(d);
+            dbStatusCache.setStatus(d.getDeviceCode(), DeviceConstant.DeviceStatus.OFFLINE);
+            redisTemplate.opsForSet().remove(DeviceConstant.RedisKey.DEVICE_ONLINE_SET, d.getDeviceCode());
+            statusPersistenceService.persistConnectionStatus(
+                    d, DeviceConstant.DeviceStatus.STATUS_RECORD_OFFLINE, "heartbeat-timeout", null);
+            if (deviceStatusProducer != null
+                    && DeviceConstant.DeviceTypeInteger.ROBOT == d.getDeviceType()) {
+                String tenant = d.getTenantId() != null ? String.valueOf(d.getTenantId()) : "";
+                deviceStatusProducer.sendOfflineEvent(
+                        tenant, d.getDeviceCode(), "SLAVE", d.getDeviceModel(), "heartbeat_timeout", MDC.get("traceId"));
+            }
+            cnt++;
         }
         if (cnt > 0) log.info("[OfflineCheck] 本次检测标记{}台设备为离线", cnt);
     }
