@@ -69,7 +69,7 @@ public class WorkOrderSchedulerServiceImpl implements IWorkOrderSchedulerService
         Map<String, WorkOrderComplianceConfig> configMap = loadConfigs(candidates);
         int alerted = 0;
         for (WorkOrder o : candidates) {
-            WorkOrderComplianceConfig cfg = configMap.get(o.getComplianceId());
+            WorkOrderComplianceConfig cfg = getComplianceConfig(configMap, o);
             // 合规配置不存在或未启用超时提醒，跳过
             if (cfg == null || cfg.getTimeoutAlertEnabled() == null || cfg.getTimeoutAlertEnabled() != 1) {
                 continue;
@@ -109,6 +109,15 @@ public class WorkOrderSchedulerServiceImpl implements IWorkOrderSchedulerService
         Map<String, WorkOrderComplianceConfig> configMap = loadConfigs(candidates);
         int updated = 0;
         for (WorkOrder o : candidates) {
+            // 远程数采工单无 complianceId：STARTED 由 darwinAutoSubmit 自动提交，此处仅处理 PENDING
+            if (isBlankComplianceId(o.getComplianceId())) {
+                if (!WorkOrderConstant.ORDER_STATUS.PENDING.equals(o.getStatus())) {
+                    continue;
+                }
+                markOrderTimeout(o);
+                updated++;
+                continue;
+            }
             WorkOrderComplianceConfig cfg = configMap.get(o.getComplianceId());
             // 未启用任务限制，不做超时标记
             if (cfg == null || cfg.getTaskLimitEnabled() == null || cfg.getTaskLimitEnabled() != 1) {
@@ -125,12 +134,10 @@ public class WorkOrderSchedulerServiceImpl implements IWorkOrderSchedulerService
                 o.setCloseBy("系统");
                 o.setUpdateBy("系统");
                 o.setCloseReason("操作员超时未完成，系统自动关单");
+            } else {
+                continue;
             }
-            workOrderMapper.updateById(o);
-            // 同步结束操作记录，结束时间取计划结束时间
-            if (o.getPlanEndTime() != null) {
-                operationRecordService.finishByWorkOrder(o.getId(), o.getPlanEndTime());
-            }
+            persistTimeoutUpdate(o);
             updated++;
         }
         if (updated > 0) {
@@ -157,7 +164,7 @@ public class WorkOrderSchedulerServiceImpl implements IWorkOrderSchedulerService
         Map<String, WorkOrderComplianceConfig> configMap = loadConfigs(candidates);
         int closed = 0;
         for (WorkOrder o : candidates) {
-            WorkOrderComplianceConfig cfg = configMap.get(o.getComplianceId());
+            WorkOrderComplianceConfig cfg = getComplianceConfig(configMap, o);
             // 未启用自动关闭，跳过
             if (cfg == null || cfg.getAutoCloseEnabled() == null || cfg.getAutoCloseEnabled() != 1) {
                 continue;
@@ -286,6 +293,29 @@ public class WorkOrderSchedulerServiceImpl implements IWorkOrderSchedulerService
                                 : d.getDeviceCode(),
                         (a, b) -> a  // 同一工单多条记录取第一条
                 ));
+    }
+
+    private static boolean isBlankComplianceId(String complianceId) {
+        return complianceId == null || complianceId.isBlank();
+    }
+
+    private WorkOrderComplianceConfig getComplianceConfig(Map<String, WorkOrderComplianceConfig> configMap, WorkOrder order) {
+        if (isBlankComplianceId(order.getComplianceId())) {
+            return null;
+        }
+        return configMap.get(order.getComplianceId());
+    }
+
+    private void markOrderTimeout(WorkOrder order) {
+        order.setStatus(WorkOrderConstant.ORDER_STATUS.TIMEOUT);
+        persistTimeoutUpdate(order);
+    }
+
+    private void persistTimeoutUpdate(WorkOrder order) {
+        workOrderMapper.updateById(order);
+        if (order.getPlanEndTime() != null) {
+            operationRecordService.finishByWorkOrder(order.getId(), order.getPlanEndTime());
+        }
     }
 
     /**
