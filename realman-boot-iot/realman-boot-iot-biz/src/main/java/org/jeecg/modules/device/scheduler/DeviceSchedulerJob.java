@@ -19,6 +19,7 @@ import org.jeecg.modules.device.mapper.IotDeviceStatusMapper;
 import org.jeecg.modules.device.mapper.IotOtaUpgradeRecordMapper;
 import org.jeecg.modules.device.mapper.IotOtaUpgradeTaskMapper;
 import org.jeecg.modules.device.mqtt.handler.DeviceDbStatusCache;
+import org.jeecg.modules.device.mqtt.handler.DeviceStatusPersistenceService;
 import org.jeecg.modules.device.mqtt.handler.RobotSlaveStatusHandler;
 import org.jeecg.modules.device.service.IIotDeviceCommandRecordService;
 import org.jeecg.modules.device.service.workorder.IWorkOrderService;
@@ -66,6 +67,7 @@ public class DeviceSchedulerJob {
     private final IWorkOrderService              workOrderService;
     private final IIotDeviceCommandRecordService commandRecordService;
     private final DeviceDbStatusCache dbStatusCache;
+    private final DeviceStatusPersistenceService statusPersistenceService;
     /** mqtt.enabled=false 时 Bean 不存在，注入 null，任务方法内做空判断 */
     @Autowired(required = false)
     private RobotSlaveStatusHandler robotSlaveStatusHandler;
@@ -107,6 +109,8 @@ public class DeviceSchedulerJob {
                 deviceMapper.updateById(d);
                 dbStatusCache.setStatus(d.getDeviceCode(), DeviceConstant.DeviceStatus.OFFLINE);
                 redisTemplate.opsForSet().remove(DeviceConstant.RedisKey.DEVICE_ONLINE_SET, d.getDeviceCode());
+                statusPersistenceService.persistConnectionStatus(
+                        d, DeviceConstant.DeviceStatus.STATUS_RECORD_OFFLINE, "heartbeat-timeout", null);
                 // 机器人设备异常离线时推送 RocketMQ（兜底场景：心跳超时，EMQX $SYS 事件未触发）
                 if (deviceStatusProducer != null
                         && DeviceConstant.DeviceTypeInteger.ROBOT == d.getDeviceType()) {

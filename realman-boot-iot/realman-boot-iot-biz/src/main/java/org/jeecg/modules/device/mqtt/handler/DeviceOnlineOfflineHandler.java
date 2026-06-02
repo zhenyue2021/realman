@@ -71,6 +71,7 @@ public class DeviceOnlineOfflineHandler {
     private final IIotDeviceRoomService roomService;
     private final DeviceDbStatusCache dbStatusCache;
     private final TeleopRelationCacheService teleopRelationCacheService;
+    private final DeviceStatusPersistenceService statusPersistenceService;
 
     /** Darwin 集成未启用时为 null */
     @Autowired(required = false)
@@ -181,6 +182,8 @@ public class DeviceOnlineOfflineHandler {
             if (alwaysApplySideEffects || tryAcquireReconcileSideEffects(deviceCode)) {
                 applyOnlineSideEffects(device, deviceCode, source);
             }
+            statusPersistenceService.persistConnectionStatus(
+                    device, DeviceConstant.DeviceStatus.STATUS_RECORD_ONLINE, source, null);
             log.info("[Online] 设备[{}]上线 source={}", deviceCode, source);
             return ReconcileOnlineResult.PROMOTED;
         } catch (Exception e) {
@@ -254,6 +257,8 @@ public class DeviceOnlineOfflineHandler {
 
             // 5. 从 Payload 提取断线原因（EMQX 提供：normal/kicked/timeout 等）
             String reason = extractField(payload, "reason");
+            statusPersistenceService.persistConnectionStatus(
+                    device, DeviceConstant.DeviceStatus.STATUS_RECORD_OFFLINE, "mqtt-disconnected", reason);
             log.info("[Offline] 设备[{}]下线, reason={}", deviceCode, reason);
 
             // 6. 记录操作日志（含断线原因，便于排查异常断线）

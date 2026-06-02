@@ -9,12 +9,15 @@ import org.jeecg.modules.device.mapper.IotDeviceMapper;
 import org.jeecg.modules.device.mapper.IotDeviceStatusMapper;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -28,6 +31,7 @@ public class DeviceStatusPersistenceService {
     private final IotDeviceMapper deviceMapper;
     private final IotDeviceStatusMapper statusMapper;
     private final DeviceDbStatusCache dbStatusCache;
+    private final ObjectMapper objectMapper;
 
     /**
      * 异步写入历史状态表。
@@ -110,6 +114,8 @@ public class DeviceStatusPersistenceService {
             int rows = deviceMapper.updateById(update);
             if (rows > 0) {
                 dbStatusCache.setStatus(deviceCode, DeviceConstant.DeviceStatus.ONLINE);
+                insertConnectionStatus(device, DeviceConstant.DeviceStatus.STATUS_RECORD_ONLINE,
+                        "keepalive-reconcile", null);
                 log.info("[StatusPersist] 设备同步为在线 deviceCode={} prevStatus={}",
                         deviceCode, prevStatus);
                 return PromoteOnlineResult.PROMOTED;
@@ -130,6 +136,53 @@ public class DeviceStatusPersistenceService {
     public boolean promoteOnlineIfOfflineSync(String deviceCode) {
         PromoteOnlineResult result = promoteOnlineIfOffline(deviceCode);
         return result == PromoteOnlineResult.ALREADY_ONLINE || result == PromoteOnlineResult.PROMOTED;
+    }
+
+    /**
+     * 异步写入设备连接态（上线/离线）到 iot_device_status。
+     */
+    @Async("devicePersistExecutor")
+    public void persistConnectionStatus(IotDevice device, int connectionStatus, String source, String detail) {
+        insertConnectionStatus(device, connectionStatus, source, detail);
+    }
+
+    /**
+     * 同步写入设备连接态记录。
+     */
+    public void insertConnectionStatus(IotDevice device, int connectionStatus, String source, String detail) {
+        if (device == null || device.getId() == null || device.getDeviceCode() == null) {
+            return;
+        }
+        try {
+            LocalDateTime now = LocalDateTime.now();
+            IotDeviceStatus record = new IotDeviceStatus();
+            record.setDeviceId(device.getId());
+            record.setDeviceCode(device.getDeviceCode());
+            record.setRunStatus(connectionStatus);
+            record.setReportTime(now);
+            record.setReceiveTime(now);
+            record.setRawData(buildConnectionRawData(connectionStatus, source, detail, now));
+            statusMapper.insert(record);
+        } catch (Exception e) {
+            log.warn("[StatusPersist] 连接态历史写入失败 deviceCode={} status={}",
+                    device.getDeviceCode(), connectionStatus, e);
+        }
+    }
+
+    private String buildConnectionRawData(int connectionStatus, String source, String detail, LocalDateTime now)
+            throws com.fasterxml.jackson.core.JsonProcessingException {
+        Map<String, Object> raw = new LinkedHashMap<>();
+        raw.put("eventType", DeviceConstant.StatusRecordEvent.CONNECTION);
+        raw.put("status", connectionStatus == DeviceConstant.DeviceStatus.STATUS_RECORD_ONLINE ? "ONLINE" : "OFFLINE");
+        raw.put("statusCode", connectionStatus);
+        if (source != null && !source.isBlank()) {
+            raw.put("source", source);
+        }
+        if (detail != null && !detail.isBlank()) {
+            raw.put("detail", detail);
+        }
+        raw.put("timestamp", now.toString());
+        return objectMapper.writeValueAsString(raw);
     }
 
 }

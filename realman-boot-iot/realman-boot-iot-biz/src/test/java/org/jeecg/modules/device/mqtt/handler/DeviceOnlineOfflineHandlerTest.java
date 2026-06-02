@@ -34,6 +34,7 @@ class DeviceOnlineOfflineHandlerTest {
     private StringRedisTemplate redisTemplate;
     private DeviceWebSocketServer webSocketServer;
     private PendingSyncService pendingSyncService;
+    private DeviceStatusPersistenceService statusPersistenceService;
     private DeviceOnlineOfflineHandler handler;
 
     @BeforeEach
@@ -42,6 +43,7 @@ class DeviceOnlineOfflineHandlerTest {
         redisTemplate = Mockito.mock(StringRedisTemplate.class);
         webSocketServer = Mockito.mock(DeviceWebSocketServer.class);
         pendingSyncService = Mockito.mock(PendingSyncService.class);
+        statusPersistenceService = Mockito.mock(DeviceStatusPersistenceService.class);
         handler = new DeviceOnlineOfflineHandler(
                 deviceMapper,
                 redisTemplate,
@@ -51,7 +53,8 @@ class DeviceOnlineOfflineHandlerTest {
                 pendingSyncService,
                 Mockito.mock(IIotDeviceRoomService.class),
                 new DeviceDbStatusCache(redisTemplate),
-                Mockito.mock(TeleopRelationCacheService.class));
+                Mockito.mock(TeleopRelationCacheService.class),
+                statusPersistenceService);
         Field idempotentSeconds = DeviceOnlineOfflineHandler.class.getDeclaredField("sysEventIdempotentSeconds");
         idempotentSeconds.setAccessible(true);
         idempotentSeconds.set(handler, 15L);
@@ -80,6 +83,11 @@ class DeviceOnlineOfflineHandlerTest {
 
         verify(pendingSyncService).flushPendingMessagesAsync("DEV001");
         verify(webSocketServer).pushDeviceOnlineStatus("DEV001", true);
+        verify(statusPersistenceService).persistConnectionStatus(
+                eq(device),
+                eq(DeviceConstant.DeviceStatus.STATUS_RECORD_ONLINE),
+                eq("$SYS connected"),
+                eq(null));
     }
 
     @Test
@@ -95,6 +103,11 @@ class DeviceOnlineOfflineHandlerTest {
 
         verify(pendingSyncService).flushPendingMessagesAsync("DEV001");
         verify(webSocketServer).pushDeviceOnlineStatus("DEV001", true);
+        verify(statusPersistenceService).persistConnectionStatus(
+                eq(device),
+                eq(DeviceConstant.DeviceStatus.STATUS_RECORD_ONLINE),
+                eq("mqtt-auth"),
+                eq(null));
     }
 
     @Test

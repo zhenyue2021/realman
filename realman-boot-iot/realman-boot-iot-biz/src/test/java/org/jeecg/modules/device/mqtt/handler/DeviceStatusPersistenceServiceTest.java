@@ -1,8 +1,10 @@
 package org.jeecg.modules.device.mqtt.handler;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.jeecg.modules.device.constant.DeviceConstant;
 import org.jeecg.modules.device.entity.IotDevice;
+import org.jeecg.modules.device.entity.IotDeviceStatus;
 import org.jeecg.modules.device.mapper.IotDeviceMapper;
 import org.jeecg.modules.device.mapper.IotDeviceStatusMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,6 +26,7 @@ import static org.mockito.Mockito.when;
 class DeviceStatusPersistenceServiceTest {
 
     private IotDeviceMapper deviceMapper;
+    private IotDeviceStatusMapper statusMapper;
     private StringRedisTemplate redisTemplate;
     private ValueOperations<String, String> valueOps;
     private DeviceDbStatusCache dbStatusCache;
@@ -32,12 +35,13 @@ class DeviceStatusPersistenceServiceTest {
     @BeforeEach
     void setUp() {
         deviceMapper = Mockito.mock(IotDeviceMapper.class);
+        statusMapper = Mockito.mock(IotDeviceStatusMapper.class);
         redisTemplate = Mockito.mock(StringRedisTemplate.class);
         valueOps = Mockito.mock(ValueOperations.class);
         when(redisTemplate.opsForValue()).thenReturn(valueOps);
         dbStatusCache = new DeviceDbStatusCache(redisTemplate);
         service = new DeviceStatusPersistenceService(
-                deviceMapper, Mockito.mock(IotDeviceStatusMapper.class), dbStatusCache);
+                deviceMapper, statusMapper, dbStatusCache, new ObjectMapper());
     }
 
     @Test
@@ -73,6 +77,7 @@ class DeviceStatusPersistenceServiceTest {
 
         verify(deviceMapper).updateById(any(IotDevice.class));
         assertThat(result).isEqualTo(DeviceStatusPersistenceService.PromoteOnlineResult.PROMOTED);
+        verify(statusMapper).insert(any(IotDeviceStatus.class));
         verify(valueOps).set(
                 eq(DeviceDbStatusCache.cacheKey("DEV002")),
                 eq(String.valueOf(DeviceConstant.DeviceStatus.ONLINE)),
@@ -112,5 +117,17 @@ class DeviceStatusPersistenceServiceTest {
         service.promoteOnlineIfOffline("DEV003");
 
         verify(deviceMapper, never()).updateById(any(IotDevice.class));
+    }
+
+    @Test
+    @DisplayName("连接态上线写入 iot_device_status")
+    void insertConnectionStatusOnline() {
+        IotDevice device = new IotDevice();
+        device.setId("id5");
+        device.setDeviceCode("DEV005");
+
+        service.insertConnectionStatus(device, DeviceConstant.DeviceStatus.STATUS_RECORD_ONLINE, "mqtt-auth", null);
+
+        verify(statusMapper).insert(any(IotDeviceStatus.class));
     }
 }

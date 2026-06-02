@@ -27,10 +27,20 @@ public interface DeviceConstant {
         int ONLINE    = 1;
         /** 离线（MQTT 连接断开 或 超时无心跳） */
         int OFFLINE   = 2;
+
+        /** iot_device_status.run_status：连接态上线记录 */
+        int STATUS_RECORD_ONLINE  = ONLINE;
+        /** iot_device_status.run_status：连接态离线记录 */
+        int STATUS_RECORD_OFFLINE = OFFLINE;
         /** 已禁用（禁用后立即清除密钥缓存，EMQX 将拒绝该设备连接） */
         int DISABLED  = 3;
         /** 使用中（遥操中） */
         int IN_USE    = 4;
+    }
+
+    /** iot_device_status.raw_data 中连接态事件标识 */
+    interface StatusRecordEvent {
+        String CONNECTION = "CONNECTION";
     }
 
     /**
