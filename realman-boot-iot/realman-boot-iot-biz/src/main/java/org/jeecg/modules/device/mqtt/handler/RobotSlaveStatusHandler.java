@@ -180,5 +180,6 @@ public class RobotSlaveStatusHandler {
         LocalDateTime now = LocalDateTime.now();
         s.setReportTime(now);
         s.setReceiveTime(now);
+        statusMapper.insert(s);
     }
 }
