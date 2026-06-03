@@ -327,10 +327,10 @@ public class IotDeviceTeleopService {
             log.info("[WebRtc] 已下发 start 指令 device={} commandId={} roomId={}",
                     robotDeviceCode, webRtcCommandId, webRtcCommand.getRoomId());
             logService.recordLog(robotId, robotDeviceCode,
-                    DeviceConstant.OperationType.COMMAND_SEND,
-                    "平台下发WebRTC start指令，等待机器人建立连接",
-                    "{commandId:" + webRtcCommandId + "}",
-                    DeviceConstant.OperationSource.PLATFORM, "SUCCESS", null, operator, LocalDateTime.now());
+                    DeviceConstant.OperationType.WEBRTC,
+                    "平台下发 WebRTC start 指令，等待机器人建立连接",
+                    "{commandId:" + webRtcCommandId + ",topic:device/" + robotDeviceCode + "/webrtc/request}",
+                    DeviceConstant.OperationSource.PLATFORM, "PENDING", null, operator, LocalDateTime.now());
         } catch (Exception e) {
             webRtcAckPendingService.completeExceptionally(webRtcCommandId, e);
             throw new RuntimeException("WebRTC 开始指令发送失败: " + e.getMessage(), e);
@@ -371,6 +371,11 @@ public class IotDeviceTeleopService {
                     stopCmdPayload, MqttConstant.MQTT_QOS.QOS_1);
             commandRecordService.recordSend(commandId, robotId, robotDeviceCode,
                     "stop-webrtc", DeviceConstant.CommandDeviceType.DEVICE, operator, stopCmdPayload);
+            logService.recordLog(robotId, robotDeviceCode,
+                    DeviceConstant.OperationType.WEBRTC,
+                    "平台下发 WebRTC stop 指令",
+                    "{commandId:" + commandId + ",topic:" + topic + "}",
+                    DeviceConstant.OperationSource.PLATFORM, "PENDING", null, operator, null);
             log.info("[WebRtc] 已下发 stop 指令 device={}", robotDeviceCode);
         } catch (Exception e) {
             // stop 是 fire-and-forget，失败只记录，不影响主流程
@@ -400,6 +405,11 @@ public class IotDeviceTeleopService {
                     stopCmdPayload, MqttConstant.MQTT_QOS.QOS_1);
             commandRecordService.recordSend(commandId, robotId, robotDeviceCode,
                     "stop-webrtc", DeviceConstant.CommandDeviceType.DEVICE, operator, stopCmdPayload);
+            logService.recordLog(robotId, robotDeviceCode,
+                    DeviceConstant.OperationType.WEBRTC,
+                    "平台下发 WebRTC stop 指令（不等待 ACK）",
+                    "{commandId:" + commandId + ",topic:" + topic + "}",
+                    DeviceConstant.OperationSource.PLATFORM, "PENDING", null, operator, null);
             log.info("[WebRtc] 已下发 stop 指令（不等待ACK）device={}", robotDeviceCode);
         } catch (Exception e) {
             log.warn("[WebRtc] fire-and-forget stop 指令发送失败 device={}", robotDeviceCode, e);

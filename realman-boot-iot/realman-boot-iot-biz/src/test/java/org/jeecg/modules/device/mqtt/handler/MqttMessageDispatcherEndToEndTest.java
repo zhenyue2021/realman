@@ -171,7 +171,8 @@ public class MqttMessageDispatcherEndToEndTest {
         DeviceCameraStreamResponseHandler deviceCameraStreamResponseHandler = new DeviceCameraStreamResponseHandler(
                 encryptService,
                 objectMapper,
-                cameraStreamPendingService
+                cameraStreamPendingService,
+                logService
         );
 
         MasterAssociatedDeviceResponseHandler masterAssociatedDeviceResponseHandler =

@@ -3,9 +3,12 @@ package org.jeecg.modules.device.mqtt.handler;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jeecg.modules.device.constant.DeviceConstant;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.security.CommandEncryptService;
+import org.jeecg.modules.device.service.IDeviceOperationLogService;
 import org.jeecg.modules.device.service.MasterAssociatedDevicePendingService;
+import org.jeecg.modules.device.util.OperationLogDetail;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -28,12 +31,25 @@ public class MasterAssociatedDeviceResponseHandler {
     private final CommandEncryptService encryptService;
     private final ObjectMapper objectMapper;
     private final MasterAssociatedDevicePendingService pendingService;
+    private final IDeviceOperationLogService logService;
 
     public void handle(String controllerCode, String payload) {
         try {
             String decrypted = encryptService.decryptFromDevice(controllerCode, payload);
             MqttMessageModel.AssociatedDeviceResponse resp =
                     objectMapper.readValue(decrypted, MqttMessageModel.AssociatedDeviceResponse.class);
+
+            String ackTopic = String.format(DeviceConstant.MqttTopic.ASSOCIATED_DEVICE_ACK, controllerCode);
+            int code = resp.getCode();
+            boolean success = code == 0;
+            logService.recordLog(null, controllerCode,
+                    DeviceConstant.OperationType.COMMAND_SEND,
+                    "主控响应关联设备查询" + (success ? "成功" : "失败"),
+                    OperationLogDetail.ofCommand(resp.getCommandId(), ackTopic, code),
+                    DeviceConstant.OperationSource.DEVICE,
+                    success ? "SUCCESS" : "FAIL",
+                    success ? null : resp.getMessage(),
+                    null, null);
 
             boolean completed = pendingService.complete(resp.getCommandId(), resp);
             if (!completed) {

@@ -4,8 +4,12 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jeecg.modules.device.constant.DeviceConstant;
+import org.jeecg.modules.device.datacollect.constant.DataCollectConstant;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.mapper.IotDeviceMapper;
+import org.jeecg.modules.device.service.IDeviceOperationLogService;
+import org.jeecg.modules.device.util.OperationLogDetail;
 import org.jeecg.modules.device.mqtt.model.DeviceOnlineReport;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -33,6 +37,7 @@ public class DeviceOnlineReportHandler {
 
     private final IotDeviceMapper deviceMapper;
     private final ObjectMapper objectMapper;
+    private final IDeviceOperationLogService logService;
 
     /**
      * 处理设备主动上线上报消息
@@ -61,6 +66,13 @@ public class DeviceOnlineReportHandler {
         deviceMapper.updateById(device);
         log.info("[DeviceOnlineReport] 设备元数据已同步 deviceCode={} prevStatus={} status={}",
                 deviceCode, prevStatus, device.getStatus());
+        String topic = "device/" + deviceCode + "/" + DataCollectConstant.MQTT_UP_DEVICE_ONLINE;
+        logService.recordLog(device.getId(), deviceCode,
+                DeviceConstant.OperationType.DEVICE_METADATA,
+                "设备上报上线元数据已同步: model=" + device.getDeviceModel()
+                        + ", firmware=" + device.getFirmwareVersion(),
+                OperationLogDetail.ofTopic(topic),
+                DeviceConstant.OperationSource.DEVICE, "SUCCESS", null, null, null);
     }
 
     private void updateDeviceFields(IotDevice device, DeviceOnlineReport report) {

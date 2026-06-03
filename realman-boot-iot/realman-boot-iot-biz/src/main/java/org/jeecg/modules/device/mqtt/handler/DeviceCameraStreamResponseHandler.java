@@ -3,9 +3,12 @@ package org.jeecg.modules.device.mqtt.handler;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jeecg.modules.device.constant.DeviceConstant;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.security.CommandEncryptService;
 import org.jeecg.modules.device.service.DeviceCameraStreamPendingService;
+import org.jeecg.modules.device.service.IDeviceOperationLogService;
+import org.jeecg.modules.device.util.OperationLogDetail;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -38,6 +41,7 @@ public class DeviceCameraStreamResponseHandler {
     private final CommandEncryptService encryptService;
     private final ObjectMapper          objectMapper;
     private final DeviceCameraStreamPendingService pendingService;
+    private final IDeviceOperationLogService logService;
 
     public void handle(String deviceCode, String payload) {
         try {
@@ -46,8 +50,14 @@ public class DeviceCameraStreamResponseHandler {
             MqttMessageModel.CameraStreamResponse resp = objectMapper.readValue(decrypted, MqttMessageModel.CameraStreamResponse.class);
             log.info("[DeviceCameraStreamResponseHandler] 设备[{}] commandId={} code={}", deviceCode, resp.getCommandId(), resp.getCode());
 
+            String ackTopic = String.format(DeviceConstant.MqttTopic.CAMERA_STREAM_RESPONSE, deviceCode);
             if (resp.getCode() != 0) {
                 log.warn("[CameraStream] 设备[{}]响应失败 code={} msg={}", deviceCode, resp.getCode(), resp.getMessage());
+                logService.recordLog(null, deviceCode,
+                        DeviceConstant.OperationType.CAMERA_STREAM,
+                        "设备响应摄像头流查询失败",
+                        OperationLogDetail.ofCommand(resp.getCommandId(), ackTopic, resp.getCode()),
+                        DeviceConstant.OperationSource.DEVICE, "FAIL", resp.getMessage(), null, null);
                 pendingService.completeExceptionally(resp.getCommandId(),
                         new RuntimeException("设备响应失败: " + resp.getMessage()));
                 return;
@@ -55,7 +65,14 @@ public class DeviceCameraStreamResponseHandler {
 
             boolean found = pendingService.complete(resp.getCommandId(),
                     resp.getCameras() != null ? resp.getCameras() : Collections.emptyList());
-            if (!found) {
+            if (found) {
+                int cameraCount = resp.getCameras() != null ? resp.getCameras().size() : 0;
+                logService.recordLog(null, deviceCode,
+                        DeviceConstant.OperationType.CAMERA_STREAM,
+                        "设备响应摄像头流查询成功，路数=" + cameraCount,
+                        OperationLogDetail.ofCommand(resp.getCommandId(), ackTopic, 0),
+                        DeviceConstant.OperationSource.DEVICE, "SUCCESS", null, null, null);
+            } else {
                 log.warn("[CameraStream] 设备[{}]响应已超时或重复 commandId={}", deviceCode, resp.getCommandId());
             }
         } catch (Exception e) {

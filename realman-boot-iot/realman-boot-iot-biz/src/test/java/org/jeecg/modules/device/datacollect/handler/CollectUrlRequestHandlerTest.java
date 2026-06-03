@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.jeecg.modules.device.datacollect.constant.DataCollectConstant;
 import org.jeecg.modules.device.datacollect.producer.OssAuthRequestProducer;
 import org.jeecg.modules.device.datacollect.service.DeviceTenantResolver;
+import org.jeecg.modules.device.service.IDeviceOperationLogService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -36,7 +37,8 @@ class CollectUrlRequestHandlerTest {
         redisTemplate = Mockito.mock(StringRedisTemplate.class);
         valueOps = Mockito.mock(ValueOperations.class);
         when(redisTemplate.opsForValue()).thenReturn(valueOps);
-        handler = new CollectUrlRequestHandler(producer, tenantResolver, redisTemplate, new ObjectMapper());
+        handler = new CollectUrlRequestHandler(producer, tenantResolver, redisTemplate,
+                new ObjectMapper(), Mockito.mock(IDeviceOperationLogService.class));
         Field dedup = CollectUrlRequestHandler.class.getDeclaredField("requestDedupMs");
         dedup.setAccessible(true);
         dedup.set(handler, 60_000L);

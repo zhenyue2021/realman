@@ -6,16 +6,22 @@ import org.jeecg.modules.device.constant.MqttConstant;
 import org.jeecg.modules.device.mapper.ExtParamRecordIotMapper;
 import org.jeecg.modules.device.mqtt.publisher.MqttPublisher;
 import org.jeecg.modules.device.security.CommandEncryptService;
+import org.jeecg.modules.device.service.IDeviceOperationLogService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import java.lang.reflect.Field;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
@@ -29,6 +35,8 @@ class ExtParamsRequestHandlerTest {
     private MqttPublisher mqttPublisher;
     private RedisUtil redisUtil;
     private ExtParamRecordIotMapper extParamRecordIotMapper;
+    private IDeviceOperationLogService logService;
+    private StringRedisTemplate stringRedisTemplate;
     private Executor mqttPublishExecutor;
     private ExtParamsRequestHandler handler;
 
@@ -38,9 +46,16 @@ class ExtParamsRequestHandlerTest {
         mqttPublisher = Mockito.mock(MqttPublisher.class);
         redisUtil = Mockito.mock(RedisUtil.class);
         extParamRecordIotMapper = Mockito.mock(ExtParamRecordIotMapper.class);
+        logService = Mockito.mock(IDeviceOperationLogService.class);
+        stringRedisTemplate = Mockito.mock(StringRedisTemplate.class);
+        @SuppressWarnings("unchecked")
+        ValueOperations<String, String> valueOps = Mockito.mock(ValueOperations.class);
+        when(stringRedisTemplate.opsForValue()).thenReturn(valueOps);
+        when(valueOps.setIfAbsent(any(), any(), anyLong(), any(TimeUnit.class))).thenReturn(true);
         mqttPublishExecutor = Mockito.mock(Executor.class);
         handler = new ExtParamsRequestHandler(
-                encryptService, new ObjectMapper(), mqttPublisher, redisUtil, extParamRecordIotMapper);
+                encryptService, new ObjectMapper(), mqttPublisher, redisUtil, extParamRecordIotMapper,
+                logService, stringRedisTemplate);
         Field executorField = ExtParamsRequestHandler.class.getDeclaredField("mqttPublishExecutor");
         executorField.setAccessible(true);
         executorField.set(handler, mqttPublishExecutor);

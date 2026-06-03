@@ -14,6 +14,8 @@ import org.jeecg.modules.device.mapper.IotDeviceConfigMapper;
 import org.jeecg.modules.device.mapper.IotOtaUpgradeRecordMapper;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.mqtt.publisher.MqttPublisher;
+import org.jeecg.modules.device.service.IDeviceOperationLogService;
+import org.jeecg.modules.device.util.OperationLogDetail;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
@@ -53,6 +55,7 @@ public class PendingSyncService {
     @Lazy
     private final MqttPublisher mqttPublisher;
     private final ObjectMapper objectMapper;
+    private final IDeviceOperationLogService logService;
 
     /**
      * 设备上线时补推所有待同步的离线消息
@@ -94,11 +97,22 @@ public class PendingSyncService {
                         MqttMessageModel.ConfigPush.builder()
                                 .commandId(commandId).params(params)
                                 .timestamp(System.currentTimeMillis()).build());
-                mqttPublisher.publishToDevice(deviceCode,
-                        String.format(DeviceConstant.MqttTopic.CONFIG_PUSH, deviceCode), payload, MqttConstant.MQTT_QOS.QOS_1);
+                String topic = String.format(DeviceConstant.MqttTopic.CONFIG_PUSH, deviceCode);
+                mqttPublisher.publishToDevice(deviceCode, topic, payload, MqttConstant.MQTT_QOS.QOS_1);
                 log.info("[PendingSync] 设备[{}]上线，补推{}条待同步配置", deviceCode, params.size());
+                logService.recordLog(null, deviceCode,
+                        DeviceConstant.OperationType.PARAM_MODIFY,
+                        "设备上线补推待同步配置，共" + params.size() + "项",
+                        OperationLogDetail.ofCommand(commandId, topic),
+                        DeviceConstant.OperationSource.PLATFORM, "PENDING", null, null, null);
             } catch (Exception e) {
                 log.error("[PendingSync] 补推配置失败 deviceCode={}", deviceCode, e);
+                logService.recordLog(null, deviceCode,
+                        DeviceConstant.OperationType.PARAM_MODIFY,
+                        "设备上线补推配置失败",
+                        OperationLogDetail.ofTopic(
+                                String.format(DeviceConstant.MqttTopic.CONFIG_PUSH, deviceCode)),
+                        DeviceConstant.OperationSource.PLATFORM, "FAIL", e.getMessage(), null, null);
             }
         }
 

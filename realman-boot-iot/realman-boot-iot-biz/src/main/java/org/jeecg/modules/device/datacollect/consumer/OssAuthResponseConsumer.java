@@ -10,7 +10,10 @@ import org.apache.rocketmq.client.core.RocketMQListener;
 import org.jeecg.modules.device.datacollect.constant.DataCollectConstant;
 import org.jeecg.modules.device.datacollect.dto.mq.OssAuthResponseMsg;
 import org.jeecg.modules.device.datacollect.dto.mqtt.CollectUrlResponseCmd;
+import org.jeecg.modules.device.constant.DeviceConstant;
 import org.jeecg.modules.device.datacollect.service.DataCollectCommandService;
+import org.jeecg.modules.device.service.IDeviceOperationLogService;
+import org.jeecg.modules.device.util.OperationLogDetail;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -43,6 +46,7 @@ public class OssAuthResponseConsumer implements RocketMQListener {
     private DataCollectCommandService commandService;
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
+    private final IDeviceOperationLogService logService;
 
     @Override
     public ConsumeResult consume(MessageView messageView) {
@@ -79,6 +83,12 @@ public class OssAuthResponseConsumer implements RocketMQListener {
             if (deviceCode == null || deviceCode.isBlank()) {
                 log.warn("[DataCollect] 未找到 requestId 对应设备，可能已超时或重复处理 requestId={}",
                         requestId);
+                logService.recordLog(null, null,
+                        DeviceConstant.OperationType.DATA_COLLECT,
+                        "OSS 授权响应无法关联设备",
+                        OperationLogDetail.ofRequest(requestId, DataCollectConstant.MQ_TOPIC_OSS_AUTH_RESPONSE),
+                        DeviceConstant.OperationSource.PLATFORM, "FAIL",
+                        "requestId 无对应 deviceCode", null, null);
                 return ConsumeResult.SUCCESS;
             }
 
@@ -87,6 +97,12 @@ public class OssAuthResponseConsumer implements RocketMQListener {
                         : ("errorCode=" + data.getErrorCode());
                 log.warn("[DataCollect] 数采平台 OSS 授权失败 requestId={} deviceCode={} errorCode={} errorMsg={}",
                         requestId, deviceCode, data.getErrorCode(), data.getErrorMsg());
+                logService.recordLog(null, deviceCode,
+                        DeviceConstant.OperationType.DATA_COLLECT,
+                        "数采平台 OSS 授权失败",
+                        OperationLogDetail.ofRequest(requestId,
+                                "device/" + deviceCode + "/" + DataCollectConstant.MQTT_DOWN_COLLECT_URL_RESP),
+                        DeviceConstant.OperationSource.PLATFORM, "FAIL", errMsg, null, null);
                 notifyDeviceFailure(deviceCode, requestId, errMsg);
                 return ConsumeResult.SUCCESS;
             }

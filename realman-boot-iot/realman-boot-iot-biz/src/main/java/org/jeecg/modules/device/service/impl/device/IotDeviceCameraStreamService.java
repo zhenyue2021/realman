@@ -13,7 +13,9 @@ import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.mqtt.publisher.MqttPublisher;
 import org.jeecg.modules.device.service.DeviceCameraStreamPendingService;
+import org.jeecg.modules.device.service.IDeviceOperationLogService;
 import org.jeecg.modules.device.stream.ZlMediaKitPlayUrlClient;
+import org.jeecg.modules.device.util.OperationLogDetail;
 import org.jeecg.modules.device.vo.DeviceCameraStreamVO;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
@@ -39,6 +41,7 @@ public class IotDeviceCameraStreamService {
     private final ZlMediaKitPlayUrlClient zlMediaKitPlayUrlClient;
     private final MqttPublisher mqttPublisher;
     private final ObjectMapper objectMapper;
+    private final IDeviceOperationLogService logService;
 
     @Value("${device.stream.host:172.16.44.66}")
     private String host;
@@ -71,6 +74,11 @@ public class IotDeviceCameraStreamService {
             String payload = objectMapper.writeValueAsString(query);
             String topic = String.format(DeviceConstant.MqttTopic.CAMERA_STREAM_QUERY, device.getDeviceCode());
             mqttPublisher.publishToDevice(device.getDeviceCode(), topic, payload, MqttConstant.MQTT_QOS.QOS_1);
+            logService.recordLog(deviceId, device.getDeviceCode(),
+                    DeviceConstant.OperationType.CAMERA_STREAM,
+                    "平台下发摄像头流查询",
+                    OperationLogDetail.ofCommand(commandId, topic),
+                    DeviceConstant.OperationSource.PLATFORM, "PENDING", null, null, null);
         } catch (Exception e) {
             deviceCameraStreamPendingService.completeExceptionally(commandId, e);
             throw new RuntimeException("摄像头流查询指令发送失败: " + e.getMessage(), e);
@@ -88,6 +96,12 @@ public class IotDeviceCameraStreamService {
                     .collect(Collectors.toList());
         } catch (java.util.concurrent.TimeoutException e) {
             deviceCameraStreamPendingService.completeExceptionally(commandId, e);
+            String topic = String.format(DeviceConstant.MqttTopic.CAMERA_STREAM_QUERY, device.getDeviceCode());
+            logService.recordLog(deviceId, device.getDeviceCode(),
+                    DeviceConstant.OperationType.CAMERA_STREAM,
+                    "摄像头流查询超时（10s）",
+                    OperationLogDetail.ofCommand(commandId, topic),
+                    DeviceConstant.OperationSource.PLATFORM, "FAIL", e.getMessage(), null, null);
             throw new RuntimeException("等待摄像头流地址超时（10s），设备未响应");
         } catch (Exception e) {
             throw new RuntimeException("获取摄像头流地址失败: " + e.getMessage(), e);

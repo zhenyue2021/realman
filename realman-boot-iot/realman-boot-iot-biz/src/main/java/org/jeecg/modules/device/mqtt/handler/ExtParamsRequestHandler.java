@@ -11,14 +11,18 @@ import org.jeecg.modules.device.mapper.ExtParamRecordIotMapper;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.mqtt.publisher.MqttPublisher;
 import org.jeecg.modules.device.security.CommandEncryptService;
+import org.jeecg.modules.device.service.IDeviceOperationLogService;
+import org.jeecg.modules.device.util.OperationLogDetail;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 处理设备请求外部系统服务参数（上行）
@@ -42,12 +46,16 @@ public class ExtParamsRequestHandler {
 
     private static final String REDIS_KEY_PREFIX = "realman:ext:param:";
     private static final long DEFAULT_TTL_SECONDS = 3600L;
+    /** 成功响应写入 operation_log 的按设备节流窗口（秒） */
+    private static final long OPLOG_SUCCESS_THROTTLE_SECONDS = 300L;
 
     private final CommandEncryptService encryptService;
     private final ObjectMapper objectMapper;
     private final MqttPublisher mqttPublisher;
     private final RedisUtil redisUtil;
     private final ExtParamRecordIotMapper extParamRecordIotMapper;
+    private final IDeviceOperationLogService logService;
+    private final StringRedisTemplate stringRedisTemplate;
 
     @Autowired
     @Qualifier("mqttPublishExecutor")
@@ -64,6 +72,13 @@ public class ExtParamsRequestHandler {
         log.info("[ExtParams] 设备请求外部参数: deviceCode={}, requestId={}, sourceSystem={}, targetSystem={}, bizType={}",
                 deviceCode, req.getRequestId(), sourceSystem, targetSystem, req.getBizType());
 
+        String requestTopic = String.format(DeviceConstant.MqttTopic.EXT_PARAMS_REQUEST, deviceCode);
+        logService.recordLog(null, deviceCode,
+                DeviceConstant.OperationType.EXT_PARAMS,
+                "设备请求外部系统参数",
+                OperationLogDetail.ofRequest(req.getRequestId(), requestTopic),
+                DeviceConstant.OperationSource.DEVICE, "PENDING", null, null, null);
+
         MqttMessageModel.ExtParamsResponse resp = buildResponse(req.getRequestId(), sourceSystem, targetSystem);
         String respTopic = String.format(DeviceConstant.MqttTopic.EXT_PARAMS_RESPONSE, deviceCode);
         String respJson = objectMapper.writeValueAsString(resp);
@@ -72,11 +87,41 @@ public class ExtParamsRequestHandler {
             try {
                 mqttPublisher.publishToDevice(deviceCode, respTopic, respJson, MqttConstant.MQTT_QOS.QOS_1);
                 log.debug("[ExtParams] 已异步下发 ack deviceCode={} requestId={}", deviceCode, req.getRequestId());
+                recordPlatformResponseLog(deviceCode, req.getRequestId(), respTopic, resp);
             } catch (Exception e) {
                 log.error("[ExtParams] 异步下发 ack 失败 deviceCode={} requestId={}",
                         deviceCode, req.getRequestId(), e);
+                logService.recordLog(null, deviceCode,
+                        DeviceConstant.OperationType.EXT_PARAMS,
+                        "平台下发外部参数响应失败",
+                        OperationLogDetail.ofRequest(req.getRequestId(), respTopic),
+                        DeviceConstant.OperationSource.PLATFORM, "FAIL", e.getMessage(), null, null);
             }
         });
+    }
+
+    private void recordPlatformResponseLog(String deviceCode, String requestId,
+                                           String respTopic, MqttMessageModel.ExtParamsResponse resp) {
+        Integer code = resp.getCode();
+        boolean success = code != null && code == 200;
+        if (success && isSuccessOpLogThrottled(deviceCode)) {
+            return;
+        }
+        logService.recordLog(null, deviceCode,
+                DeviceConstant.OperationType.EXT_PARAMS,
+                success ? "平台下发外部参数响应成功" : "平台下发外部参数响应失败",
+                OperationLogDetail.ofRequest(requestId, respTopic, code),
+                DeviceConstant.OperationSource.PLATFORM,
+                success ? "SUCCESS" : "FAIL",
+                success ? null : resp.getMessage(),
+                null, null);
+    }
+
+    private boolean isSuccessOpLogThrottled(String deviceCode) {
+        String key = DeviceConstant.RedisKey.OPLOG_EXT_PARAMS_OK_THROTTLE_PREFIX + deviceCode;
+        Boolean isNew = stringRedisTemplate.opsForValue()
+                .setIfAbsent(key, "1", OPLOG_SUCCESS_THROTTLE_SECONDS, TimeUnit.SECONDS);
+        return !Boolean.TRUE.equals(isNew);
     }
 
     @SuppressWarnings("unchecked")
