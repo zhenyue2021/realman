@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -36,6 +37,11 @@ import java.util.concurrent.TimeoutException;
 public class IotDeviceTeleopService {
 
     private static final int WEBRTC_ACK_TIMEOUT_SECONDS = 5;
+
+    /** WebRTC start/stop 下行 {@code commandId}：32 位十六进制大写 */
+    private static String newWebRtcCommandId() {
+        return IdUtil.fastSimpleUUID().toUpperCase(Locale.ROOT);
+    }
 
     private final IotDeviceSupport deviceSupport;
     private final IotDeviceMapper deviceMapper;
@@ -308,7 +314,7 @@ public class IotDeviceTeleopService {
      */
     private void sendWebRtcStartAndAwait(String masterDeviceCode, String robotDeviceCode,
                                           String robotId, String operator) throws Exception {
-        String webRtcCommandId = IdUtil.fastSimpleUUID();
+        String webRtcCommandId = newWebRtcCommandId();
         CompletableFuture<MqttMessageModel.WebRtcAck> future =
                 webRtcAckPendingService.register(webRtcCommandId);
 
@@ -359,7 +365,7 @@ public class IotDeviceTeleopService {
      */
     private void sendWebRtcStop(String robotDeviceCode, String robotId, String operator) {
         try {
-            String commandId = IdUtil.fastSimpleUUID();
+            String commandId = newWebRtcCommandId();
             MqttMessageModel.WebRtcCommand stopCmd = MqttMessageModel.WebRtcCommand.builder()
                     .command("stop")
                     .commandId(commandId)
@@ -393,7 +399,7 @@ public class IotDeviceTeleopService {
      */
     private void sendWebRtcStopFireAndForget(String robotDeviceCode, String robotId, String operator) {
         try {
-            String commandId = IdUtil.fastSimpleUUID();
+            String commandId = newWebRtcCommandId();
             MqttMessageModel.WebRtcCommand stopCmd = MqttMessageModel.WebRtcCommand.builder()
                     .command("stop")
                     .commandId(commandId)
@@ -423,7 +429,7 @@ public class IotDeviceTeleopService {
      * @throws RuntimeException 超时或机器人返回失败时
      */
     private void sendWebRtcStopAndAwait(String robotDeviceCode, String robotId, String operator) throws Exception {
-        String commandId = IdUtil.fastSimpleUUID();
+        String commandId = newWebRtcCommandId();
         CompletableFuture<MqttMessageModel.WebRtcAck> future =
                 webRtcAckPendingService.register(commandId);
         try {
