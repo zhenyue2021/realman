@@ -11,6 +11,8 @@ import org.jeecg.modules.device.mapper.IotDeviceCommandRecordMapper;
 import org.jeecg.modules.device.service.IIotDeviceCommandRecordService;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Objects;
@@ -29,7 +31,11 @@ public class IotDeviceCommandRecordServiceImpl
 
     private final StringRedisTemplate redisTemplate;
 
+    /**
+     * 独立事务提交，避免外层 {@code startTeleop/stopTeleop} 回滚时抹掉已下发的指令审计记录。
+     */
     @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
     public void recordSend(String commandId, String deviceId, String deviceCode,
                            String commandType, String deviceType, String operator,
                            String paramsJson) {
@@ -57,6 +63,7 @@ public class IotDeviceCommandRecordServiceImpl
     }
 
     @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
     public void ack(String commandId, boolean success, String failReason, String ackDataJson) {
         if (commandId == null || commandId.isEmpty()) {
             return;
