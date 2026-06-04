@@ -73,9 +73,9 @@ public class IotDeviceTeleopService {
                     .timestamp(now)
                     .build();
             String assignPayload = objectMapper.writeValueAsString(assignCmd);
-            mqttPublisher.publishToDevice(controllerDeviceCode, topic, assignPayload, MqttConstant.MQTT_QOS.QOS_1);
             commandRecordService.recordSend(commandId, controller.getId(), controllerDeviceCode,
                     "teleop-assign", DeviceConstant.CommandDeviceType.MASTER, operator, assignPayload);
+            mqttPublisher.publishToDevice(controllerDeviceCode, topic, assignPayload, MqttConstant.MQTT_QOS.QOS_1);
 
             robot.setUseStatus(DeviceConstant.UseStatus.IN_USE);
             deviceMapper.updateById(robot);
@@ -169,10 +169,10 @@ public class IotDeviceTeleopService {
                     .timestamp(now)
                     .build();
             String controllerStopPayload = objectMapper.writeValueAsString(stopForController);
-            mqttPublisher.publishToDevice(controllerDeviceCode, controllerTopic,
-                    controllerStopPayload, MqttConstant.MQTT_QOS.QOS_1);
             commandRecordService.recordSend(stopForControllerCommandId, controller.getId(), controllerDeviceCode,
                     "stop-control", DeviceConstant.CommandDeviceType.MASTER, operator, controllerStopPayload);
+            mqttPublisher.publishToDevice(controllerDeviceCode, controllerTopic,
+                    controllerStopPayload, MqttConstant.MQTT_QOS.QOS_1);
 
             String stopForRobotCommandId = IdUtil.fastSimpleUUID();
             String robotTopic = String.format(DeviceConstant.MqttTopic.DEVICE_STOP_CONTROL, robotDeviceCode);
@@ -183,10 +183,10 @@ public class IotDeviceTeleopService {
                     .timestamp(now)
                     .build();
             String stopForRobotPayload = objectMapper.writeValueAsString(stopForRobot);
-            mqttPublisher.publishToDevice(robotDeviceCode, robotTopic,
-                    stopForRobotPayload, MqttConstant.MQTT_QOS.QOS_1);
             commandRecordService.recordSend(stopForRobotCommandId, robot.getId(), robotDeviceCode,
                     "stop-slave", DeviceConstant.CommandDeviceType.DEVICE, operator, stopForRobotPayload);
+            mqttPublisher.publishToDevice(robotDeviceCode, robotTopic,
+                    stopForRobotPayload, MqttConstant.MQTT_QOS.QOS_1);
             robot.setUseStatus(DeviceConstant.UseStatus.IDLE);
             deviceMapper.updateById(robot);
 
@@ -239,10 +239,10 @@ public class IotDeviceTeleopService {
                     MqttMessageModel.RobotAssignCommand.builder()
                             .commandId(controllerTopicCommandId).robotCode(controllerCode)
                             .workOrderId("STOP_MASTER").timestamp(now).build());
-            mqttPublisher.publishToDevice(controllerCode, controllerTopic,
-                    controllerStopPayload, MqttConstant.MQTT_QOS.QOS_1);
             commandRecordService.recordSend(controllerTopicCommandId, controller.getId(), controllerCode,
                     "stop-control", DeviceConstant.CommandDeviceType.MASTER, operator, controllerStopPayload);
+            mqttPublisher.publishToDevice(controllerCode, controllerTopic,
+                    controllerStopPayload, MqttConstant.MQTT_QOS.QOS_1);
 
             // 3. 通知机器人停止遥操
             String robotTopicCommandId = IdUtil.fastSimpleUUID();
@@ -250,11 +250,11 @@ public class IotDeviceTeleopService {
             String stopSlavePayload = objectMapper.writeValueAsString(MqttMessageModel.RobotAssignCommand.builder()
                     .commandId(robotTopicCommandId).robotCode(robotCode)
                     .workOrderId("STOP_SLAVE").timestamp(now).build());
+            commandRecordService.recordSend(robotTopicCommandId, robot.getId(), robotCode,
+                    "stop-slave", DeviceConstant.CommandDeviceType.DEVICE, operator, stopSlavePayload);
             mqttPublisher.publishToDevice(robotCode, robotTopic,
                     stopSlavePayload,
                     MqttConstant.MQTT_QOS.QOS_1);
-            commandRecordService.recordSend(robotTopicCommandId, robot.getId(), robotCode,
-                    "stop-slave", DeviceConstant.CommandDeviceType.DEVICE, operator, stopSlavePayload);
             // 4. 更新机器人使用状态
             robot.setUseStatus(DeviceConstant.UseStatus.IDLE);
             deviceMapper.updateById(robot);
@@ -320,10 +320,10 @@ public class IotDeviceTeleopService {
 
             String topic = String.format(DeviceConstant.MqttTopic.WEBRTC_REQUEST, robotDeviceCode);
             String startWebrtcPayload = objectMapper.writeValueAsString(webRtcCommand);
-            mqttPublisher.publishToDevice(robotDeviceCode, topic,
-                    startWebrtcPayload, MqttConstant.MQTT_QOS.QOS_1);
             commandRecordService.recordSend(webRtcCommandId, robotId, robotDeviceCode,
                     "start-webrtc", DeviceConstant.CommandDeviceType.DEVICE, operator, startWebrtcPayload);
+            mqttPublisher.publishToDevice(robotDeviceCode, topic,
+                    startWebrtcPayload, MqttConstant.MQTT_QOS.QOS_1);
             log.info("[WebRtc] 已下发 start 指令 device={} commandId={} roomId={}",
                     robotDeviceCode, webRtcCommandId, webRtcCommand.getRoomId());
             logService.recordLog(robotId, robotDeviceCode,
@@ -367,10 +367,10 @@ public class IotDeviceTeleopService {
                     .build();
             String topic = String.format(DeviceConstant.MqttTopic.WEBRTC_REQUEST, robotDeviceCode);
             String stopCmdPayload = objectMapper.writeValueAsString(stopCmd);
-            mqttPublisher.publishToDevice(robotDeviceCode, topic,
-                    stopCmdPayload, MqttConstant.MQTT_QOS.QOS_1);
             commandRecordService.recordSend(commandId, robotId, robotDeviceCode,
                     "stop-webrtc", DeviceConstant.CommandDeviceType.DEVICE, operator, stopCmdPayload);
+            mqttPublisher.publishToDevice(robotDeviceCode, topic,
+                    stopCmdPayload, MqttConstant.MQTT_QOS.QOS_1);
             logService.recordLog(robotId, robotDeviceCode,
                     DeviceConstant.OperationType.WEBRTC,
                     "平台下发 WebRTC stop 指令",
@@ -401,10 +401,10 @@ public class IotDeviceTeleopService {
                     .build();
             String topic = String.format(DeviceConstant.MqttTopic.WEBRTC_REQUEST, robotDeviceCode);
             String stopCmdPayload = objectMapper.writeValueAsString(stopCmd);
-            mqttPublisher.publishToDevice(robotDeviceCode, topic,
-                    stopCmdPayload, MqttConstant.MQTT_QOS.QOS_1);
             commandRecordService.recordSend(commandId, robotId, robotDeviceCode,
                     "stop-webrtc", DeviceConstant.CommandDeviceType.DEVICE, operator, stopCmdPayload);
+            mqttPublisher.publishToDevice(robotDeviceCode, topic,
+                    stopCmdPayload, MqttConstant.MQTT_QOS.QOS_1);
             logService.recordLog(robotId, robotDeviceCode,
                     DeviceConstant.OperationType.WEBRTC,
                     "平台下发 WebRTC stop 指令（不等待 ACK）",
@@ -422,7 +422,7 @@ public class IotDeviceTeleopService {
      * @param robotDeviceCode 机器人设备编码
      * @throws RuntimeException 超时或机器人返回失败时
      */
-    private void sendWebRtcStopAndAwait(String robotDeviceCode) throws Exception {
+    private void sendWebRtcStopAndAwait(String robotDeviceCode, String robotId, String operator) throws Exception {
         String commandId = IdUtil.fastSimpleUUID();
         CompletableFuture<MqttMessageModel.WebRtcAck> future =
                 webRtcAckPendingService.register(commandId);
@@ -433,8 +433,11 @@ public class IotDeviceTeleopService {
                     .timestamp(System.currentTimeMillis())
                     .build();
             String topic = String.format(DeviceConstant.MqttTopic.WEBRTC_REQUEST, robotDeviceCode);
+            String stopPayload = objectMapper.writeValueAsString(stopCmd);
+            commandRecordService.recordSend(commandId, robotId, robotDeviceCode,
+                    "stop-webrtc", DeviceConstant.CommandDeviceType.DEVICE, operator, stopPayload);
             mqttPublisher.publishToDevice(robotDeviceCode, topic,
-                    objectMapper.writeValueAsString(stopCmd), MqttConstant.MQTT_QOS.QOS_1);
+                    stopPayload, MqttConstant.MQTT_QOS.QOS_1);
             log.info("[WebRtc] 已下发 stop 指令（等待ACK）device={} commandId={}", robotDeviceCode, commandId);
         } catch (Exception e) {
             webRtcAckPendingService.completeExceptionally(commandId, e);

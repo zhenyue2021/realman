@@ -357,6 +357,8 @@ public interface DeviceConstant {
         String OTA_PROGRESS_PREFIX  = "iot:ota:progress:";
         /** 配置同步等待 Key：iot:config:sync:{deviceCode}:{commandId}，TTL = CONFIG_SYNC_TIMEOUT_SECONDS */
         String CONFIG_SYNC_PREFIX   = "iot:config:sync:";
+        /** 无下发记录的 ACK 告警去重：iot:cmd:ack:orphan-warn:{commandId}，TTL 24h */
+        String COMMAND_ACK_ORPHAN_WARN_PREFIX = "iot:cmd:ack:orphan-warn:";
         /** 固件分片上传进度 Key：iot:upload:chunk:{uploadId}，值为 Set<chunkIndex> */
         String UPLOAD_CHUNK_PREFIX  = "iot:upload:chunk:";
         /** SLAM 上传会话缓存：iot:slam:upload:session:{deviceCode}:{requestId} */
