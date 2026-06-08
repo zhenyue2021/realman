@@ -96,11 +96,12 @@ public class MqttAuthControllerTest {
     }
 
     /**
-     * 平台服务账号（clientId 以 iot-platform 开头）应直接放行，不走密钥校验
+     * 平台服务账号（username 为 iot-platform）应直接放行，不走密钥校验
      */
     @Test
     void testAuthAllowForPlatformClient() throws Exception {
         String clientId = "iot-platform-server";
+        String username = "iot-platform";
 
         String body = """
                 {
@@ -109,7 +110,7 @@ public class MqttAuthControllerTest {
                   "password": "any-password",
                   "peerhost": "%s"
                 }
-                """.formatted(clientId, clientId, PEER_HOST);
+                """.formatted(clientId, username, PEER_HOST);
 
         mockMvc.perform(post("/internal/mqtt/auth")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -118,6 +119,33 @@ public class MqttAuthControllerTest {
                 .andExpect(jsonPath("$.result").value("allow"));
 
         Mockito.verifyNoInteractions(secretService);
+    }
+
+    /**
+     * 设备 clientId 带 iot-platform- 前缀但 username 为 deviceCode 时，应走设备密钥校验而非平台放行
+     */
+    @Test
+    void testAuthDeviceWithPlatformPrefixedClientId() throws Exception {
+        String deviceCode = "master_bj002_30-50-f1-01-cc-73";
+        String clientId = "iot-platform-" + deviceCode;
+        String password = "7fabced4ee0a989e38c9182152678904";
+
+        when(secretService.validateSecret(eq(deviceCode), eq(password), any())).thenReturn(false);
+
+        String body = """
+                {
+                  "clientid": "%s",
+                  "username": "%s",
+                  "password": "%s",
+                  "peerhost": "%s"
+                }
+                """.formatted(clientId, deviceCode, password, PEER_HOST);
+
+        mockMvc.perform(post("/internal/mqtt/auth")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result").value("deny"));
     }
 
     /**
@@ -176,6 +204,7 @@ public class MqttAuthControllerTest {
     @Test
     void testAclAllowForPlatformClient() throws Exception {
         String clientId = "iot-platform-job";
+        String username = "iot-platform";
         String topic = "device/ANY/status/report";
 
         String body = """
@@ -184,7 +213,7 @@ public class MqttAuthControllerTest {
                   "username": "%s",
                   "topic": "%s"
                 }
-                """.formatted(clientId, clientId, topic);
+                """.formatted(clientId, username, topic);
 
         mockMvc.perform(post("/internal/mqtt/acl")
                         .contentType(MediaType.APPLICATION_JSON)
