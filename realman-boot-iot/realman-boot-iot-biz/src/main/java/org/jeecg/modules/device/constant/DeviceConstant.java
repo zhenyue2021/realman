@@ -394,7 +394,7 @@ public interface DeviceConstant {
         /** 设备离线判定阈值（分钟）：状态 Redis Key 的 TTL，Key 消失即视为设备离线 */
         long DEVICE_OFFLINE_THRESHOLD_MINUTES = 5L;
         /** 通用指令 ACK 超时阈值（秒）：超过此时间 PENDING 未收到 ACK 则标记为 TIMEOUT */
-        long COMMAND_ACK_TIMEOUT_SECONDS = 120L;
+        long COMMAND_ACK_TIMEOUT_SECONDS = 300L;
         /** SLAM 上传许可有效期（分钟） */
         long SLAM_UPLOAD_PERMIT_MINUTES = 30L;
     }
