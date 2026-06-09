@@ -33,13 +33,6 @@
         <dependency>
             <groupId>org.jeecgframework.boot3</groupId>
             <artifactId>realman-system-biz</artifactId>
-            <!-- 排除demo模块，demo模块采用微服务独立启动 -->
-            <exclusions>
-                <exclusion>
-                    <groupId>org.jeecgframework.boot3</groupId>
-                    <artifactId>realman-module-demo</artifactId>
-                </exclusion>
-            </exclusions>
         </dependency>
 
         <dependency>

@@ -9,7 +9,7 @@ import java.util.Map;
 /**
  * IoT 侧对 integration_external_param_record 表的只读访问。
  *
- * <p>该表由 realman-module-system 写入，IoT 模块仅在 Redis 缓存未命中时
+ * <p>该表由 realman-boot-system 写入，IoT 模块仅在 Redis 缓存未命中时
  * 作为降级手段从数据库查询最新一条记录，不做任何写操作。
  */
 @Mapper

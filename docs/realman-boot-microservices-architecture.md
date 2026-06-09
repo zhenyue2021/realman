@@ -1,6 +1,6 @@
 # Realman-Boot 微服务架构图
 
-本文档依据仓库 `jeecg-server-cloud`、`realman-module-system`、`realman-boot-iot` 等模块的 **Maven 结构与默认端口配置** 整理，描述 **Spring Cloud + Nacos** 形态下的微服务拓扑；单体部署形态见 [软件架构设计.md](./软件架构设计.md)。
+本文档依据仓库 `jeecg-server-cloud`、`realman-boot-system`、`realman-boot-iot` 等模块的 **Maven 结构与默认端口配置** 整理，描述 **Spring Cloud + Nacos** 形态下的微服务拓扑；单体部署形态见 [软件架构设计.md](./软件架构设计.md)。
 
 ## 架构总览（图示）
 

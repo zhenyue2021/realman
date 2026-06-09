@@ -154,11 +154,10 @@ flowchart TB
 ```
 realman-boot-parent (3.9.1)
 ├── realman-boot-base-core      # 公共核心：安全、MyBatis、Redis、统一响应、租户插件等
-├── realman-module-system       # 系统管理
+├── realman-boot-system       # 系统管理
 │   ├── realman-system-api      # 接口契约（local-api / cloud-api）
 │   ├── realman-system-biz      # 用户、组织、权限、租户、字典、日志、消息等
 │   └── realman-system-start    # 单体入口：RealmanSystemApplication
-├── realman-boot-module         # 扩展业务（当前含 demo；airag 等可按需引入）
 └── realman-boot-iot            # IoT 设备管理
     ├── realman-boot-iot-api    # REST Controller、DTO/VO（HTTP 接入层）
     ├── realman-boot-iot-biz    # 领域实现：MQTT、OTA、工单、遥操、数采等
@@ -204,7 +203,7 @@ IoT 模块分层说明与演进计划见 [realman-boot-iot/docs/IOT-MODULE-LAYER
 
 ## 功能说明
 
-### 系统服务（realman-module-system）
+### 系统服务（realman-boot-system）
 
 基于 Jeecg 平台能力，面向所有业务提供基础支撑：
 
@@ -239,8 +238,7 @@ IoT 模块分层说明与演进计划见 [realman-boot-iot/docs/IOT-MODULE-LAYER
 ```
 realman-boot/
 ├── realman-boot-base-core/       # 公共核心
-├── realman-module-system/       # 系统管理（api / biz / start）
-├── realman-boot-module/         # 扩展模块（demo 等）
+├── realman-boot-system/       # 系统管理（api / biz / start）
 ├── realman-boot-iot/             # IoT（api / biz / start / sql / docs）
 ├── jeecg-server-cloud/          # 微服务组件（独立 Maven 工程）
 ├── db/                          # Nacos、XXL-Job 等初始化 SQL
@@ -286,7 +284,7 @@ mvn test -DskipTests=false
 ### 仅构建单体系统服务
 
 ```bash
-mvn clean package -pl realman-module-system/realman-system-start -am -DskipTests
+mvn clean package -pl realman-boot-system/realman-system-start -am -DskipTests
 ```
 
 ### 仅构建 IoT 服务
@@ -299,7 +297,7 @@ mvn clean package -pl realman-boot-iot/realman-boot-iot-start -am -DskipTests
 
 ```bash
 # 系统服务（默认 dev，端口 8080，context-path /realman-boot）
-java -jar realman-module-system/realman-system-start/target/realman-system-start-3.9.1.jar
+java -jar realman-boot-system/realman-system-start/target/realman-system-start-3.9.1.jar
 
 # IoT 服务（端口 8085，context-path /realman-iot）
 # 需配置 MySQL、Redis、MQTT、DEVICE_ENCRYPT_MASTER_KEY 等，见 application-dev.yml

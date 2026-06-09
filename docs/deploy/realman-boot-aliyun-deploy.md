@@ -793,7 +793,7 @@ networks:
 
 ### 7.1 realman-system
 
-路径：`realman-module-system/realman-system-start/Dockerfile`
+路径：`realman-boot-system/realman-system-start/Dockerfile`
 
 ```dockerfile
 FROM eclipse-temurin:21-jre-alpine
@@ -871,7 +871,7 @@ echo "本次发布版本：${GIT_SHA}"
 
 # 构建 realman-system
 mvn clean package \
-  -pl realman-module-system/realman-system-start \
+  -pl realman-boot-system/realman-system-start \
   -am -DskipTests -Pprod
 
 # 构建 realman-iot
@@ -886,10 +886,10 @@ mvn clean package \
 SERVER="root@<服务器公网IP>"
 
 # ——— realman-system ———
-scp realman-module-system/realman-system-start/Dockerfile \
+scp realman-boot-system/realman-system-start/Dockerfile \
     ${SERVER}:/opt/realman/app/build/realman-system/
 
-scp realman-module-system/realman-system-start/target/realman-system-start-*.jar \
+scp realman-boot-system/realman-system-start/target/realman-system-start-*.jar \
     ${SERVER}:/opt/realman/app/build/realman-system/target/
 
 # ——— realman-iot ———

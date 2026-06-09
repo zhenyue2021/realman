@@ -92,8 +92,7 @@
 
 	<modules>
         <module>realman-boot-base-core</module>
-        <module>realman-module-system</module>
-		<module>realman-boot-module</module>
+        <module>realman-boot-system</module>
         <module>realman-boot-iot</module>
     </modules>
 
