@@ -4,7 +4,8 @@
 
 | 项目 | 说明 |
 |------|------|
-| 版本 | **3.9.1**（`realman-boot-parent`） |
+| 版本 | **1.0.0**（`realman-boot-parent`，Maven `groupId`: `org.realmanframework.boot`） |
+| Jeecg 基线 | **3.9.1**（固定，见 `jeecg-boot.version`） |
 | JDK | **21**（亦支持 17 / 24，以 CI 为准） |
 | 建设单位 | 睿尔曼智能科技（北京）有限公司 |
 | 官网 | [https://www.realman-robotics.cn](https://www.realman-robotics.cn) |
@@ -152,7 +153,7 @@ flowchart TB
 ### Maven 顶层模块（`pom.xml` `<modules>`）
 
 ```
-realman-boot-parent (3.9.1)
+realman-boot-parent (1.0.0，基线 JeecgBoot 3.9.1)
 ├── realman-boot-base-core      # 公共核心：安全、MyBatis、Redis、统一响应、租户插件等
 ├── realman-boot-system       # 系统管理
 │   ├── realman-system-api      # 接口契约（local-api / cloud-api）
@@ -267,6 +268,28 @@ realman-boot/
 
 ---
 
+## Maven 坐标（私服 / 对外依赖）
+
+| 项 | 值 |
+|----|-----|
+| groupId | `org.realmanframework.boot` |
+| 发布版本 | `${realman-boot.version}` → **1.0.0** |
+| Jeecg 基线 | `${jeecg-boot.version}` → **3.9.1**（固定） |
+
+下游项目引用示例：
+
+```xml
+<parent>
+    <groupId>org.realmanframework.boot</groupId>
+    <artifactId>realman-boot-parent</artifactId>
+    <version>1.0.0</version>
+</parent>
+```
+
+发布到私服：`mvn deploy -DskipTests`（需在 `settings.xml` 配置 `realman-releases` / `realman-snapshots` 账号，并按环境覆盖 `realman.maven.releases.url`）。
+
+---
+
 ## 本地构建与启动
 
 ### 全量编译
@@ -297,12 +320,12 @@ mvn clean package -pl realman-boot-iot/realman-boot-iot-start -am -DskipTests
 
 ```bash
 # 系统服务（默认 dev，端口 8080，context-path /realman-boot）
-java -jar realman-boot-system/realman-system-start/target/realman-system-start-3.9.1.jar
+java -jar realman-boot-system/realman-system-start/target/realman-system-start-1.0.0.jar
 
 # IoT 服务（端口 8085，context-path /realman-iot）
 # 需配置 MySQL、Redis、MQTT、DEVICE_ENCRYPT_MASTER_KEY 等，见 application-dev.yml
 java -DDEVICE_ENCRYPT_MASTER_KEY=<32字节主密钥> \
-     -jar realman-boot-iot/realman-boot-iot-start/target/realman-boot-iot-start-3.9.1.jar
+     -jar realman-boot-iot/realman-boot-iot-start/target/realman-boot-iot-start-1.0.0.jar
 ```
 
 ### IoT 数据库初始化

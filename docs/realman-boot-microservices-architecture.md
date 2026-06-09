@@ -87,4 +87,4 @@ flowchart TB
 
 ---
 
-**版本信息**：与父 POM `realman-boot-parent` 3.9.1、Spring Cloud 2025.0.0、Spring Cloud Alibaba 2023.0.3.3 一致。
+**版本信息**：Realman Boot `1.0.0`（`org.realmanframework.boot`），JeecgBoot 基线 `3.9.1`；Spring Cloud 2025.0.0、Spring Cloud Alibaba 2023.0.3.3。

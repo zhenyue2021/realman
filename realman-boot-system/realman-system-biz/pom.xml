@@ -1,10 +1,10 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0"
+﻿<project xmlns="http://maven.apache.org/POM/4.0.0"
 		 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 		 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<parent>
-		<groupId>org.jeecgframework.boot3</groupId>
+		<groupId>org.realmanframework.boot</groupId>
 		<artifactId>realman-boot-system</artifactId>
-		<version>3.9.1</version>
+		<version>1.0.0</version>
 	</parent>
 	<modelVersion>4.0.0</modelVersion>
 
@@ -28,7 +28,7 @@
 			<version>${mybatis-plus.version}</version>
 		</dependency>
 		<dependency>
-			<groupId>org.jeecgframework.boot3</groupId>
+			<groupId>org.realmanframework.boot</groupId>
 			<artifactId>realman-system-local-api</artifactId>
 		</dependency>
 		<dependency>
