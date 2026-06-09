@@ -84,14 +84,7 @@ rocketmq:
     access-key: MnZdSW6d1U3r1spP
     secret-key: 8scK0fvHum30JA44
 
-# 设为 true 时加载 Darwin RocketMQ Bean；未部署 RocketMQ 时请保持 false 或使用环境变量覆盖
-darwin:
-  integration:
-    enabled: true
-    auto-submit-minutes: 5   # Darwin 工单开启后超时自动提交阈值（分钟），0=禁用
-    default-department-id: "1958496759810363394"
-    default-department-name: "城市运营管理集团有限公司"
-
+# darwin.integration 统一由 Nacos realman-iot.yaml 管理；勿在此写，否则会覆盖 Nacos（见 mqtt 注释同理）
 
 # mqtt（enabled 勿在此写 false，否则会覆盖 Nacos 的 realman-iot.yaml；仅作无 Nacos 时的 broker 兜底）
 mqtt:
