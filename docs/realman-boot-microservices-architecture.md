@@ -1,6 +1,6 @@
-# Realman-Boot 微服务架构图
+﻿# Realman-Boot 微服务架构图
 
-本文档依据仓库 `jeecg-server-cloud`、`realman-boot-system`、`realman-boot-iot` 等模块的 **Maven 结构与默认端口配置** 整理，描述 **Spring Cloud + Nacos** 形态下的微服务拓扑；单体部署形态见 [软件架构设计.md](./软件架构设计.md)。
+本文档依据仓库 `realman-server-cloud`、`realman-boot-system`、`realman-boot-iot` 等模块的 **Maven 结构与默认端口配置** 整理，描述 **Spring Cloud + Nacos** 形态下的微服务拓扑；单体部署形态见 [软件架构设计.md](./软件架构设计.md)。
 
 ## 架构总览（图示）
 
@@ -24,11 +24,11 @@ flowchart TB
   end
 
   subgraph biz["业务微服务"]
-    SYS["系统服务\njeecg-system\njeecg-system-cloud-start :7001"]
-    IOT["IoT 服务\nrealman-iot\nrealman-boot-iot-start :8085\ncontext-path: /realman-iot"]
+    SYS["系统服务\n jeecg-system\n realman-system-cloud-start :7001"]
+    IOT["IoT 服务\n realman-iot\n realman-boot-iot-start :8085\n context-path: /realman-iot"]
   end
 
-  subgraph optional["可选 / 运维组件（jeecg-visual）"]
+  subgraph optional["可选 / 运维组件（realman-visual）"]
     SENT["Sentinel Dashboard\n:9000\n(网关限流规则源)"]
     MON["Spring Boot Admin\njeecg-monitor :9111"]
     XXL["XXL-Job Admin\n:9080\n/xxl-job-admin"]
@@ -67,23 +67,23 @@ flowchart TB
 
 | 组件 | 应用名 / 模块 | 默认端口 | 说明 |
 |------|----------------|----------|------|
-| API 网关 | `realman-gateway`，`jeecg-cloud-gateway` | 9999 | 统一入口；路由可从 Nacos 动态加载；与 Sentinel 控制台联动（`jeecg-boot-sentinel:9000`） |
-| 注册 / 配置中心 | Nacos，`jeecg-cloud-nacos` | 8848 | 服务发现、共享配置（如 `jeecg.yaml`、各服务 `*.yaml`） |
-| 系统微服务 | `jeecg-system`，`jeecg-system-cloud-start` | 7001 | 用户、权限、租户、字典、报表等；网关示例路由见 `jeecg-cloud-nacos/docs/config/jeecg-gateway-router.json`（`/sys/**` 等 → `lb://jeecg-system`） |
+| API 网关 | `realman-gateway`，`realman-cloud-gateway` | 9999 | 统一入口；路由可从 Nacos 动态加载；与 Sentinel 控制台联动（`jeecg-boot-sentinel:9000`） |
+| 注册 / 配置中心 | Nacos，`realman-cloud-nacos` | 8848 | 服务发现、共享配置（如 `jeecg.yaml`、各服务 `*.yaml`） |
+| 系统微服务 | `jeecg-system`，`realman-system-cloud-start` | 7001 | 用户、权限、租户、字典、报表等；网关示例路由见 `realman-cloud-nacos/docs/config/jeecg-gateway-router.json`（`/sys/**` 等 → `lb://jeecg-system`） |
 | IoT 微服务 | `realman-iot`，`realman-boot-iot-start` | 8085 | 设备、MQTT、工单等；`context-path` 为 `/realman-iot`；Feign 调用系统服务时常用 `realman.system.context-path`（默认 `/realman-boot`） |
-| Sentinel | `jeecg-cloud-sentinel` | 9000 | 流控控制台；网关 `application.yml` 中 `spring.cloud.sentinel.transport.dashboard` 指向该地址 |
+| Sentinel | `realman-cloud-sentinel` | 9000 | 流控控制台；网关 `application.yml` 中 `spring.cloud.sentinel.transport.dashboard` 指向该地址 |
 | 监控 | `jeecg-monitor` | 9111 | Spring Boot Admin UI |
-| 定时任务 | `jeecg-cloud-xxljob` | 9080 | XXL-Job 管理端，`context-path` `/xxl-job-admin` |
+| 定时任务 | `realman-cloud-xxljob` | 9080 | XXL-Job 管理端，`context-path` `/xxl-job-admin` |
 
 ## 与代码中的服务名对照
 
-- **系统服务**：微服务启动模块注册名为 `jeecg-system`（`jeecg-system-cloud-start`）；单体启动模块为 `realman-boot`（`realman-system-start`）。`ServiceNameConstants.SERVICE_SYSTEM` 仍为 `realman-boot`，用于部分 Feign 常量场景，部署时需以 **实际 Nacos 注册名** 为准。
+- **系统服务**：微服务启动模块注册名为 `jeecg-system`（`realman-system-cloud-start`）；单体启动模块为 `realman-boot`（`realman-system-start`）。`ServiceNameConstants.SERVICE_SYSTEM` 仍为 `realman-boot`，用于部分 Feign 常量场景，部署时需以 **实际 Nacos 注册名** 为准。
 - **IoT 服务**：`ServiceNameConstants.SERVICE_IOT = "realman-iot"`，与 `realman-boot-iot-start` 中 `spring.application.name` 一致。
 
 ## 部署提示
 
-- `jeecg-server-cloud/pom.xml` 中 **Demo 微服务**（`jeecg-demo-cloud-start`）默认注释；Nacos 示例路由里仍保留 `jeecg-demo` 相关片段，启用 Demo 时需一并打开模块并部署进程。
-- 根目录 `docker-compose.yml` 与 `jeecg-server-cloud/docker-compose.yml` 可能包含 MySQL、Redis、Nacos、Gateway 等组合，以实际运维使用的 Compose 文件为准。
+- `realman-server-cloud/pom.xml` 中 **Demo 微服务**（`jeecg-demo-cloud-start`）默认注释；Nacos 示例路由里仍保留 `jeecg-demo` 相关片段，启用 Demo 时需一并打开模块并部署进程。
+- 根目录 `docker-compose.yml` 与 `realman-server-cloud/docker-compose.yml` 可能包含 MySQL、Redis、Nacos、Gateway 等组合，以实际运维使用的 Compose 文件为准。
 
 ---
 

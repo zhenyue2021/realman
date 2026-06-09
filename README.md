@@ -1,4 +1,4 @@
-# Realman Boot
+﻿# Realman Boot
 
 睿尔曼智能后端工程，基于 **[Jeecg Boot 3.x](https://help.jeecg.com)** 定制扩展。在保留企业级系统管理（用户、组织、权限、租户、字典等）能力的同时，提供 **IoT 设备接入与管理**（MQTT / EMQX、遥操、OTA、SLAM、工单、远程数采、WebRTC 等），支持 **单体双进程** 与 **Spring Cloud + Nacos 微服务** 两种部署形态。
 
@@ -101,7 +101,7 @@ flowchart TB
 | 形态 | 说明 | 典型进程 |
 |------|------|----------|
 | **单体（推荐）** | 系统 + IoT 两个 Spring Boot 进程，共享 MySQL / Redis；MQTT 可按 `mqtt.enabled` 开关 | `RealmanSystemApplication`（8080）、`RealmanDeviceApplication`（8085） |
-| **微服务** | `jeecg-server-cloud` 目录单独构建：Nacos、Gateway、系统云启动包等；IoT 注册为 `realman-iot` | Nacos、Gateway、`JeecgSystemCloudApplication`、可选 `realman-boot-iot-start` |
+| **微服务** | `realman-server-cloud` 目录单独构建：Nacos、Gateway、系统云启动包等；IoT 注册为 `realman-iot` | Nacos、Gateway、`RealmanSystemCloudApplication`、可选 `realman-boot-iot-start` |
 
 > 微服务拓扑、默认端口与 Nacos 服务名对照见 [docs/realman-boot-microservices-architecture.md](docs/realman-boot-microservices-architecture.md)。
 
@@ -128,9 +128,9 @@ flowchart TB
 | 语言 | Java | 21 |
 | 微服务 | Spring Cloud | 2025.0.0 |
 | 微服务 | Spring Cloud Alibaba | 2023.0.3.3 |
-| 注册 / 配置 | Nacos | 2.x（`jeecg-cloud-nacos`） |
-| 网关 | Spring Cloud Gateway | `jeecg-cloud-gateway` |
-| 限流 | Sentinel | 控制台 `jeecg-cloud-sentinel` |
+| 注册 / 配置 | Nacos | 2.x（`realman-cloud-nacos`） |
+| 网关 | Spring Cloud Gateway | `realman-cloud-gateway` |
+| 限流 | Sentinel | 控制台 `realman-cloud-sentinel` |
 | Web | Spring MVC、WebSocket | IoT 设备实时推送 |
 | 安全 | Apache Shiro、java-jwt | 与 Jeecg 体系一致 |
 | 持久层 | MyBatis-Plus、Druid、动态数据源 | 支持多库、国产库驱动 |
@@ -168,14 +168,14 @@ realman-boot-parent (1.0.0，基线 JeecgBoot 3.9.1)
 ### 微服务目录（独立构建，未纳入父 POM modules）
 
 ```
-jeecg-server-cloud/
-├── jeecg-cloud-gateway         # API 网关 :9999
-├── jeecg-cloud-nacos           # 注册 / 配置中心 :8848
-├── jeecg-system-cloud-start    # 系统微服务 :7001（注册名 jeecg-system）
-└── jeecg-visual/
-    ├── jeecg-cloud-sentinel    # 流控控制台 :9000
-    ├── jeecg-cloud-monitor     # Spring Boot Admin :9111
-    └── jeecg-cloud-xxljob      # XXL-Job 管理端 :9080
+realman-server-cloud/
+├── realman-cloud-gateway         # API 网关 :9999
+├── realman-cloud-nacos           # 注册 / 配置中心 :8848
+├── realman-system-cloud-start    # 系统微服务 :7001（注册名 jeecg-system）
+└── realman-visual/
+    ├── realman-cloud-sentinel    # 流控控制台 :9000
+    ├── realman-cloud-monitor     # Spring Boot Admin :9111
+    └── realman-cloud-xxljob      # XXL-Job 管理端 :9080
 ```
 
 ### 运行时服务对照
@@ -184,8 +184,8 @@ jeecg-server-cloud/
 |------|---------------------------|----------|--------------|--------|
 | 系统（单体） | `realman-boot` | 8080 | `/realman-boot`（dev） | `org.jeecg.RealmanSystemApplication` |
 | IoT | `realman-iot` | 8085 | `/realman-iot` | `org.jeecg.modules.device.RealmanDeviceApplication` |
-| 系统（微服务） | `jeecg-system` | 7001 | 见 Nacos 配置 | `org.jeecg.JeecgSystemCloudApplication` |
-| 网关 | `jeecg-gateway` 等 | 9999 | — | `org.jeecg.JeecgGatewayApplication` |
+| 系统（微服务） | `jeecg-system` | 7001 | 见 Nacos 配置 | `org.jeecg.RealmanSystemCloudApplication` |
+| 网关 | `jeecg-gateway` 等 | 9999 | — | `org.jeecg.RealmanGatewayApplication` |
 
 > 生产 / Docker 等 profile 下 `context-path` 可能为 `/jeecg-boot`，以对应 `application-*.yml` 为准。
 
@@ -241,7 +241,7 @@ realman-boot/
 ├── realman-boot-base-core/       # 公共核心
 ├── realman-boot-system/       # 系统管理（api / biz / start）
 ├── realman-boot-iot/             # IoT（api / biz / start / sql / docs）
-├── jeecg-server-cloud/          # 微服务组件（独立 Maven 工程）
+├── realman-server-cloud/          # 微服务组件（独立 Maven 工程）
 ├── db/                          # Nacos、XXL-Job 等初始化 SQL
 ├── docs/                        # 架构、部署、设计文档
 ├── docker-compose.yml           # 中间件 Compose（MySQL、Redis、Nacos、EMQX、MinIO 等）
@@ -350,7 +350,7 @@ mysql -u root -p < realman-boot-iot/sql/iot_init.sql
 ### 微服务构建（可选）
 
 ```bash
-cd jeecg-server-cloud
+cd realman-server-cloud
 mvn clean package -DskipTests
 # 按运维顺序启动：Nacos → Gateway → System Cloud → IoT（注册 realman-iot）
 ```

@@ -1,4 +1,4 @@
-# 这个是单体启动项目
+﻿# 这个是单体启动项目
 - 项目： jeecg-module-system/jeecg-system-start
 - 启动类：jeecg-module-system/jeecg-system-start/src/main/java/org/jeecg/JeecgSystemApplication.java
 
@@ -8,5 +8,5 @@
 
 
 # 微服务启动项目在这里
-- 项目： jeecg-server-cloud/jeecg-system-cloud-start
-- 启动类：jeecg-server-cloud/jeecg-system-cloud-start/src/main/java/org/jeecg/JeecgSystemCloudApplication.java
+- 项目： realman-server-cloud/realman-system-cloud-start
+- 启动类：realman-server-cloud/realman-system-cloud-start/src/main/java/org/jeecg/RealmanSystemCloudApplication.java
