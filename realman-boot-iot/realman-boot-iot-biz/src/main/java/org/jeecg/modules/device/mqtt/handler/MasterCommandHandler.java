@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.constant.DeviceConstant;
 import org.jeecg.modules.device.security.CommandEncryptService;
+import org.jeecg.modules.device.service.IDeviceOperationLogService;
+import org.jeecg.modules.device.util.OperationLogDetail;
 import org.jeecg.modules.device.websocket.DeviceWebSocketServer;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
@@ -22,6 +24,7 @@ public class MasterCommandHandler {
     private final CommandEncryptService  encryptService;
     private final DeviceWebSocketServer  webSocketServer;
     private final StringRedisTemplate    redisTemplate;
+    private final IDeviceOperationLogService logService;
 
     public void handle(String robotCode, String payload) {
         String masterCode = redisTemplate.opsForValue()
@@ -32,6 +35,12 @@ public class MasterCommandHandler {
         }
         String decrypted = encryptService.decryptFromDevice(masterCode, payload);
         log.info("[MasterCommandHandler] 解密成功, 机器人={} 主控={} 消息体={}", robotCode, masterCode, decrypted);
+        String topic = robotCode + "/master/cmd";
+        logService.recordLog(null, masterCode,
+                DeviceConstant.OperationType.COMMAND_SEND,
+                "主控原始指令上报(机器人=" + robotCode + ")",
+                OperationLogDetail.ofTopic(topic),
+                DeviceConstant.OperationSource.DEVICE, "SUCCESS", null, null, null);
         webSocketServer.pushMasterCmdStatus(masterCode, decrypted);
     }
 

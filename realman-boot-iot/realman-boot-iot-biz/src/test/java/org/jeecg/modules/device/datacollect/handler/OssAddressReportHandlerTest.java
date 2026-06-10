@@ -2,6 +2,7 @@ package org.jeecg.modules.device.datacollect.handler;
 
 import org.jeecg.modules.device.datacollect.producer.FileAddressReportProducer;
 import org.jeecg.modules.device.datacollect.service.DeviceTenantResolver;
+import org.jeecg.modules.device.service.IDeviceOperationLogService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -37,7 +38,8 @@ class OssAddressReportHandlerTest {
         redisTemplate = Mockito.mock(StringRedisTemplate.class);
         valueOps = Mockito.mock(ValueOperations.class);
         when(redisTemplate.opsForValue()).thenReturn(valueOps);
-        handler = new OssAddressReportHandler(producer, tenantResolver, redisTemplate, new ObjectMapper());
+        handler = new OssAddressReportHandler(producer, tenantResolver, redisTemplate,
+                new ObjectMapper(), Mockito.mock(IDeviceOperationLogService.class));
     }
 
     @Test

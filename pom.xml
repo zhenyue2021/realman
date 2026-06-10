@@ -1,8 +1,8 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+﻿<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <groupId>org.jeecgframework.boot3</groupId>
+  <groupId>org.realmanframework.boot</groupId>
   <artifactId>realman-boot-parent</artifactId>
-  <version>3.9.1</version>
+  <version>1.0.0</version>
   <packaging>pom</packaging>
   <name>REALMAN BOOT ${project.version}</name>
 
@@ -28,7 +28,13 @@
 	</parent>
 
 	<properties>
-		<realman-boot.version>3.9.1</realman-boot.version>
+		<!-- Realman 自研模块发布版本（对外私服 / Maven 依赖使用） -->
+		<realman-boot.version>1.0.0</realman-boot.version>
+		<!-- JeecgBoot 基座版本（固定，不随 Realman 发布版本变化） -->
+		<jeecg-boot.version>3.9.1</jeecg-boot.version>
+		<!-- Realman 私服地址（可在 settings.xml 或 CI 中覆盖） -->
+		<realman.maven.releases.url>https://nexus.realman-robotics.com/repository/maven-releases/</realman.maven.releases.url>
+		<realman.maven.snapshots.url>https://nexus.realman-robotics.com/repository/maven-snapshots/</realman.maven.snapshots.url>
 		<!-- JDK版本支持17、21、24 -->
 		<java.version>21</java.version>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -92,8 +98,7 @@
 
 	<modules>
         <module>realman-boot-base-core</module>
-        <module>realman-module-system</module>
-		<module>realman-boot-module</module>
+        <module>realman-boot-system</module>
         <module>realman-boot-iot</module>
     </modules>
 
@@ -123,6 +128,14 @@
 			</releases>
 			<snapshots>
 				<enabled>true</enabled>
+			</snapshots>
+		</repository>
+		<repository>
+			<id>realman-releases</id>
+			<name>Realman Release Repository</name>
+			<url>${realman.maven.releases.url}</url>
+			<snapshots>
+				<enabled>false</enabled>
 			</snapshots>
 		</repository>
 	</repositories>
@@ -188,61 +201,67 @@
 				<scope>import</scope>
 			</dependency>
 
-			<!-- system 模块-->
+			<!-- Realman 自研模块 -->
 			<dependency>
-				<groupId>org.jeecgframework.boot3</groupId>
-				<artifactId>realman-system-biz</artifactId>
-				<version>${realman-boot.version}</version>
-			</dependency>
-
-			<!-- jeecg tools -->
-			<dependency>
-				<groupId>org.jeecgframework.boot3</groupId>
-				<artifactId>jeecg-boot-common</artifactId>
-				<version>${realman-boot.version}</version>
-			</dependency>
-			<!-- jeecg core -->
-			<dependency>
-				<groupId>org.jeecgframework.boot3</groupId>
+				<groupId>org.realmanframework.boot</groupId>
 				<artifactId>realman-boot-base-core</artifactId>
 				<version>${realman-boot.version}</version>
 			</dependency>
-			<!-- system 单体 api -->
 			<dependency>
-				<groupId>org.jeecgframework.boot3</groupId>
+				<groupId>org.realmanframework.boot</groupId>
+				<artifactId>realman-system-biz</artifactId>
+				<version>${realman-boot.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.realmanframework.boot</groupId>
 				<artifactId>realman-system-local-api</artifactId>
 				<version>${realman-boot.version}</version>
 			</dependency>
-			<!-- system 微服务 api -->
 			<dependency>
-				<groupId>org.jeecgframework.boot3</groupId>
+				<groupId>org.realmanframework.boot</groupId>
 				<artifactId>realman-system-cloud-api</artifactId>
 				<version>${realman-boot.version}</version>
 			</dependency>
+			<dependency>
+				<groupId>org.realmanframework.boot</groupId>
+				<artifactId>realman-boot-iot-api</artifactId>
+				<version>${realman-boot.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.realmanframework.boot</groupId>
+				<artifactId>realman-boot-iot-biz</artifactId>
+				<version>${realman-boot.version}</version>
+			</dependency>
 
+			<!-- JeecgBoot 基座依赖 -->
+			<dependency>
+				<groupId>org.jeecgframework.boot3</groupId>
+				<artifactId>jeecg-boot-common</artifactId>
+				<version>${jeecg-boot.version}</version>
+			</dependency>
             <!--微服务启动依赖-->
             <dependency>
                 <groupId>org.jeecgframework.boot3</groupId>
                 <artifactId>jeecg-boot-starter-cloud</artifactId>
-                <version>${realman-boot.version}</version>
+                <version>${jeecg-boot.version}</version>
             </dependency>
 			<!--xxl-job定时任务-->
 			<dependency>
 				<groupId>org.jeecgframework.boot3</groupId>
 				<artifactId>jeecg-boot-starter-job</artifactId>
-				<version>3.9.1</version>
+				<version>${jeecg-boot.version}</version>
 			</dependency>
 			<!--redis分布式锁-->
 			<dependency>
 				<groupId>org.jeecgframework.boot3</groupId>
 				<artifactId>jeecg-boot-starter-lock</artifactId>
-				<version>${realman-boot.version}</version>
+				<version>${jeecg-boot.version}</version>
 			</dependency>
 			<!--rabbitmq消息队列-->
 			<dependency>
 				<groupId>org.jeecgframework.boot3</groupId>
 				<artifactId>jeecg-boot-starter-rabbitmq</artifactId>
-				<version>${realman-boot.version}</version>
+				<version>${jeecg-boot.version}</version>
 				<exclusions>
 					<exclusion>
 						<groupId>joda-time</groupId>
@@ -254,7 +273,7 @@
 			<dependency>
 				<groupId>org.jeecgframework.boot3</groupId>
 				<artifactId>jeecg-boot-starter-rocketmq</artifactId>
-				<version>${realman-boot.version}</version>
+				<version>${jeecg-boot.version}</version>
 			</dependency>
 			<!--mqtt-->
 			<dependency>
@@ -266,12 +285,12 @@
 			<dependency>
 				<groupId>org.jeecgframework.boot3</groupId>
 				<artifactId>jeecg-boot-starter-shardingsphere</artifactId>
-				<version>3.9.1</version>
+				<version>${jeecg-boot.version}</version>
 			</dependency>
 			<dependency>
 				<groupId>org.jeecgframework.boot3</groupId>
 				<artifactId>jeecg-boot-starter-shardingsphere-nacos</artifactId>
-				<version>3.9.1</version>
+				<version>${jeecg-boot.version}</version>
 			</dependency>
 			<dependency>
 				<groupId>org.hibernate</groupId>
@@ -294,7 +313,7 @@
 			<!--<dependency>
 				<groupId>org.jeecgframework.boot3</groupId>
 				<artifactId>jeecg-boot-starter-mongon</artifactId>
-				<version>${realman-boot.version}</version>
+				<version>${jeecg-boot.version}</version>
 			</dependency>-->
 			<!-- 七牛云SDK -->
 			<dependency>
@@ -564,14 +583,14 @@
 
 	<distributionManagement>
 		<repository>
-			<id>jeecg</id>
-			<name>jeecg Repository</name>
-			<url>http://maven.jeecg.com:8090/nexus/content/repositories/jeecg</url>
+			<id>realman-releases</id>
+			<name>Realman Release Repository</name>
+			<url>${realman.maven.releases.url}</url>
 		</repository>
 		<snapshotRepository>
-			<id>jeecg-snapshots</id>
-			<name>jeecg Snapshot Repository</name>
-			<url>http://maven.jeecg.com:8090/nexus/content/repositories/snapshots/</url>
+			<id>realman-snapshots</id>
+			<name>Realman Snapshot Repository</name>
+			<url>${realman.maven.snapshots.url}</url>
 		</snapshotRepository>
 	</distributionManagement>
 	
@@ -674,7 +693,7 @@
 			</activation>
 			<modules>
 				<!-- 微服务模块 -->
-				<module>jeecg-server-cloud</module>
+				<module>realman-server-cloud</module>
 			</modules>
 		</profile>
     </profiles>

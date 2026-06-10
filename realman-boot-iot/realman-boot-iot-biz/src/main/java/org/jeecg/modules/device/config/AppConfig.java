@@ -60,7 +60,7 @@ public class AppConfig {
     /** MQTT 路由池见 {@link DeviceRoutingExecutor}（deviceTaskExecutor） */
 
     /**
-     * DB/IO 异步写池：专用于 persistAsync、recordLog、recordSend 等持久化操作，
+     * DB/IO 异步写池：专用于 persistAsync、recordLog 等持久化操作（指令记录 recordSend 已改为同步），
      * 与 MQTT 路由池（deviceTaskExecutor）隔离，防止 DB 慢查询阻塞消息吞吐。
      */
     @Bean("devicePersistExecutor")

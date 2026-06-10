@@ -268,6 +268,7 @@ public class DeviceSchedulerJob {
      *       此处 UPDATE 命中零行，不会覆盖 ACK 结果</li>
      *   <li>反之若超时任务先执行，随后 ACK 到达，{@link IIotDeviceCommandRecordService#ack} 内
      *       同样带 {@code status = 'PENDING'} 条件，会命中零行并打印 WARN 日志，不产生脏写</li>
+     *   <li>{@link IIotDeviceCommandRecordService#recordSend} 使用 REQUIRES_NEW，遥操等业务事务回滚不会撤销已插入的指令记录</li>
      * </ul>
      *
      * <p>XXL-Job Handler Name：{@code commandAckTimeoutCheckJob}，建议 Cron：{@code 0 * * * * ?}

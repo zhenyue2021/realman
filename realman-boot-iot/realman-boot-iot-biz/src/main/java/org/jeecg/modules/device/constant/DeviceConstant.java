@@ -280,6 +280,16 @@ public interface DeviceConstant {
         String DEVICE_REGISTER   = "DEVICE_REGISTER";
         /** 向设备发送指令 */
         String COMMAND_SEND      = "COMMAND_SEND";
+        /** 摄像头流查询 */
+        String CAMERA_STREAM     = "CAMERA_STREAM";
+        /** WebRTC 遥操视频 */
+        String WEBRTC            = "WEBRTC";
+        /** 外部系统参数（STS 等） */
+        String EXT_PARAMS        = "EXT_PARAMS";
+        /** 数采（OSS 授权、采集控制等） */
+        String DATA_COLLECT      = "DATA_COLLECT";
+        /** 设备元数据同步（如 datacollect/deviceOnline） */
+        String DEVICE_METADATA   = "DEVICE_METADATA";
         /** 设备密钥重置 */
         String TOKEN_REFRESH     = "SECRET_RESET";
     }
@@ -347,6 +357,8 @@ public interface DeviceConstant {
         String OTA_PROGRESS_PREFIX  = "iot:ota:progress:";
         /** 配置同步等待 Key：iot:config:sync:{deviceCode}:{commandId}，TTL = CONFIG_SYNC_TIMEOUT_SECONDS */
         String CONFIG_SYNC_PREFIX   = "iot:config:sync:";
+        /** 无下发记录的 ACK 告警去重：iot:cmd:ack:orphan-warn:{commandId}，TTL 24h */
+        String COMMAND_ACK_ORPHAN_WARN_PREFIX = "iot:cmd:ack:orphan-warn:";
         /** 固件分片上传进度 Key：iot:upload:chunk:{uploadId}，值为 Set<chunkIndex> */
         String UPLOAD_CHUNK_PREFIX  = "iot:upload:chunk:";
         /** SLAM 上传会话缓存：iot:slam:upload:session:{deviceCode}:{requestId} */
@@ -355,6 +367,8 @@ public interface DeviceConstant {
         String TELEOP_MASTER_TO_ROBOT = "iot:teleop:master2robot:";
         /** 遥操关系缓存（机器人→主控）：iot:teleop:robot2master:{robotCode}，值为 masterCode */
         String TELEOP_ROBOT_TO_MASTER = "iot:teleop:robot2master:";
+        /** ext-params 成功操作日志节流（按设备）：iot:oplog:ext-params:ok:{deviceCode}，TTL 5min */
+        String OPLOG_EXT_PARAMS_OK_THROTTLE_PREFIX = "iot:oplog:ext-params:ok:";
         /** 设备房间缓存（按主控）：iot:room:master:{masterCode}，值为 JSON(DeviceRoomVO)，TTL=24h */
         String ROOM_MASTER_PREFIX = "iot:room:master:";
         /** 设备房间反查索引（按机器人）：iot:room:robot:{robotCode}，值为 masterCode，TTL=24h */
@@ -380,7 +394,7 @@ public interface DeviceConstant {
         /** 设备离线判定阈值（分钟）：状态 Redis Key 的 TTL，Key 消失即视为设备离线 */
         long DEVICE_OFFLINE_THRESHOLD_MINUTES = 5L;
         /** 通用指令 ACK 超时阈值（秒）：超过此时间 PENDING 未收到 ACK 则标记为 TIMEOUT */
-        long COMMAND_ACK_TIMEOUT_SECONDS = 60L;
+        long COMMAND_ACK_TIMEOUT_SECONDS = 300L;
         /** SLAM 上传许可有效期（分钟） */
         long SLAM_UPLOAD_PERMIT_MINUTES = 30L;
     }

@@ -172,8 +172,8 @@ services:
   # ============================================================
   # 应用服务（CI/CD 独立镜像部署，取消注释即可）
   # 构建命令示例：
-  #   mvn -pl realman-module-system/realman-system-start package -DskipTests
-  #   docker build -t lorete/realman-system:latest realman-module-system/realman-system-start
+  #   mvn -pl realman-boot-system/realman-system-start package -DskipTests
+  #   docker build -t lorete/realman-system:latest realman-boot-system/realman-system-start
   # ============================================================
 
   # realman-system:

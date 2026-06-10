@@ -5,8 +5,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.datacollect.constant.DataCollectConstant;
 import org.jeecg.modules.device.datacollect.dto.mqtt.CollectUrlRequestMsg;
+import org.jeecg.modules.device.constant.DeviceConstant;
 import org.jeecg.modules.device.datacollect.producer.OssAuthRequestProducer;
 import org.jeecg.modules.device.datacollect.service.DeviceTenantResolver;
+import org.jeecg.modules.device.service.IDeviceOperationLogService;
+import org.jeecg.modules.device.util.OperationLogDetail;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
@@ -36,6 +39,7 @@ public class CollectUrlRequestHandler {
     private final DeviceTenantResolver tenantResolver;
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
+    private final IDeviceOperationLogService logService;
 
     /** 同 requestId 去重窗口（毫秒），防止设备重复上报同一 requestId */
     @Value("${mqtt.collect-url-request-dedup-ms:60000}")
@@ -74,6 +78,12 @@ public class CollectUrlRequestHandler {
         String tenant = tenantResolver.resolveTenantId(deviceCode);
         ossAuthRequestProducer.sendAndStore(
                 msg.getRequestId(), tenant, deviceCode, null, MDC.get("traceId"));
+        String topic = "device/" + deviceCode + "/" + DataCollectConstant.MQTT_UP_COLLECT_URL_REQUEST;
+        logService.recordLog(null, deviceCode,
+                DeviceConstant.OperationType.DATA_COLLECT,
+                "设备请求 OSS 上传授权，已转发数采平台",
+                OperationLogDetail.ofRequest(msg.getRequestId(), topic),
+                DeviceConstant.OperationSource.DEVICE, "PENDING", null, null, null);
     }
 
     private boolean isDuplicateRequest(String requestId) {

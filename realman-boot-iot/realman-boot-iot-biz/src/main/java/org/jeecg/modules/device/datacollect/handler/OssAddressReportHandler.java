@@ -5,8 +5,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.datacollect.constant.DataCollectConstant;
 import org.jeecg.modules.device.datacollect.dto.mqtt.OssAddressReportMsg;
+import org.jeecg.modules.device.constant.DeviceConstant;
 import org.jeecg.modules.device.datacollect.producer.FileAddressReportProducer;
 import org.jeecg.modules.device.datacollect.service.DeviceTenantResolver;
+import org.jeecg.modules.device.service.IDeviceOperationLogService;
+import org.jeecg.modules.device.util.OperationLogDetail;
 import org.slf4j.MDC;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -37,6 +40,7 @@ public class OssAddressReportHandler {
     private final DeviceTenantResolver tenantResolver;
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
+    private final IDeviceOperationLogService logService;
 
     public void handle(String deviceCode, String payload) {
         OssAddressReportMsg msg;
@@ -74,5 +78,11 @@ public class OssAddressReportHandler {
                 MDC.get("traceId")
         );
         log.info("[DataCollect] OSS地址已上报 deviceCode={} fileCount={}", deviceCode, oss.getList().size());
+        String topic = "device/" + deviceCode + "/" + DataCollectConstant.MQTT_UP_OSS_ADDRESS_REPORT;
+        logService.recordLog(null, deviceCode,
+                DeviceConstant.OperationType.DATA_COLLECT,
+                "设备上报 OSS 文件地址，已转发数采平台，文件数=" + oss.getList().size(),
+                OperationLogDetail.ofRequest(businessKey, topic),
+                DeviceConstant.OperationSource.DEVICE, "SUCCESS", null, null, null);
     }
 }

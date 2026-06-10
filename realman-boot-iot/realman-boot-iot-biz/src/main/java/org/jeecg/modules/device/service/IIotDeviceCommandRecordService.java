@@ -7,7 +7,7 @@ public interface IIotDeviceCommandRecordService extends IService<IotDeviceComman
 
     /**
      * 记录指令下发，初始状态 PENDING。
-     * 异步写入，不阻塞发送主流程。
+     * 须在 MQTT publish 之前同步调用；使用独立事务提交，外层业务事务回滚不会删除本记录。
      *
      * @param paramsJson 下发的明文 JSON（序列化后、AES 加密前）
      */
@@ -17,7 +17,7 @@ public interface IIotDeviceCommandRecordService extends IService<IotDeviceComman
 
     /**
      * 收到设备 ACK 后更新状态、ackTime 和响应报文。
-     * 若 commandId 为空或记录已非 PENDING 则静默忽略。
+     * 仅当 status=PENDING 时更新；重复 ACK、晚到 ACK、无下发记录等见实现类日志级别。
      *
      * @param ackDataJson 设备回复的完整明文 JSON
      */

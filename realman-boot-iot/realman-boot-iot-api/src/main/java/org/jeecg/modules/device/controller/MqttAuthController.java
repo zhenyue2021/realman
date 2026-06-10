@@ -59,7 +59,7 @@ public class MqttAuthController {
         String peerHost = textField(body, "peerhost", "peerHost");
         String peername = textField(body, "peername", "peerName");
 
-        if (isPlatformAccount(clientId, username)) {
+        if (isPlatformAccount(username)) {
             log.info("[MqttAuth] 平台账号放行(superuser): clientId={} username={}", clientId, username);
             return allowPlatformSuperuser();
         }
@@ -82,7 +82,7 @@ public class MqttAuthController {
         String topic    = textField(body, "topic");
         String action   = textField(body, "action");
 
-        if (isPlatformAccount(clientId, username)) {
+        if (isPlatformAccount(username)) {
             log.debug("[MqttAcl] 平台账号放行: clientId={} username={} topic={} action={}",
                     clientId, username, topic, action);
             return allow();
@@ -94,12 +94,12 @@ public class MqttAuthController {
 
 
     /**
-     * 平台 MQTT 客户端：superuser 才能订阅 $SYS/#（EMQX SUBACK 135 = Not authorized）
+     * 平台 MQTT 客户端：username 固定为 {@code iot-platform}，superuser 才能订阅 $SYS/#。
+     *
+     * <p>设备端 clientId 可能带 {@code iot-platform-} 前缀，但 username 为 deviceCode，不能仅凭 clientId 放行。
      */
-
-    private static boolean isPlatformAccount(String clientId, String username) {
-        return (clientId != null && clientId.startsWith("iot-platform"))
-                || (username != null && username.startsWith("iot-platform"));
+    private static boolean isPlatformAccount(String username) {
+        return username != null && username.startsWith("iot-platform");
     }
 
     private ResponseEntity<Map<String, Object>> allowPlatformSuperuser() {

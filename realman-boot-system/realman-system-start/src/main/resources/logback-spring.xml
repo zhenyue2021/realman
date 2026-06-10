@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- 从 Spring 环境读取配置，支持 application.yml 中的占位符 -->
+    <springProperty scope="context" name="APP_NAME"
+                    source="spring.application.name" defaultValue="realman-system"/>
+    <springProperty scope="context" name="LOG_HOME"
+                    source="logging.file.path"        defaultValue="logs/realman-system"/>
+    <springProperty scope="context" name="LOKI_URL"
+                    source="loki.url"                 defaultValue="http://loki:3100/loki/api/v1/push"/>
+
+    <!-- ===== 1. 控制台：开发可读格式（含 traceId / spanId） ===== -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level [%X{traceId:-N/A},%X{spanId:-N/A}] %logger{36} - %msg%n</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- ===== 2. 本地文件：JSON 格式，Loki 故障时的兜底 ===== -->
+    <appender name="FILE_JSON" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_HOME}/${APP_NAME}.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_HOME}/${APP_NAME}.%d{yyyy-MM-dd}.log.gz</fileNamePattern>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>3GB</totalSizeCap>
+        </rollingPolicy>
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <includeMdcKeyName>traceId</includeMdcKeyName>
+            <includeMdcKeyName>spanId</includeMdcKeyName>
+            <includeMdcKeyName>service</includeMdcKeyName>
+            <includeMdcKeyName>instance</includeMdcKeyName>
+            <includeMdcKeyName>source</includeMdcKeyName>
+            <customFields>{"app":"${APP_NAME}"}</customFields>
+        </encoder>
+    </appender>
+
+    <!-- ===== 3. Loki 直推：集群日志聚合 ===== -->
+    <appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
+        <http>
+            <url>${LOKI_URL}</url>
+        </http>
+        <format>
+            <label>
+                <pattern>app=${APP_NAME},host=${HOSTNAME:-unknown},level=%level</pattern>
+            </label>
+            <message>
+                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [traceId=%X{traceId:-},spanId=%X{spanId:-}] %logger{50} - %msg%n%ex</pattern>
+            </message>
+        </format>
+    </appender>
+
+    <!-- ===== 包级别日志配置 ===== -->
+    <logger name="com.alibaba.nacos" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+
+    <!-- 三方组件降噪 -->
+    <logger name="org.springframework"         level="INFO"/>
+    <logger name="com.baomidou.mybatisplus"    level="WARN"/>
+    <logger name="io.micrometer"               level="WARN"/>
+
+    <!-- myibatis log configure（仅开发阶段调试用，生产保持 WARN） -->
+    <logger name="org.apache.ibatis"      level="WARN"/>
+    <logger name="java.sql.Connection"    level="WARN"/>
+    <logger name="java.sql.Statement"     level="WARN"/>
+    <logger name="java.sql.PreparedStatement" level="WARN"/>
+
+    <!-- ===== 根日志：INFO 级别，三路输出 ===== -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE_JSON"/>
+        <appender-ref ref="LOKI"/>
+    </root>
+</configuration>

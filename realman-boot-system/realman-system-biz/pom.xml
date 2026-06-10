@@ -1,0 +1,50 @@
+﻿<project xmlns="http://maven.apache.org/POM/4.0.0"
+		 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<parent>
+		<groupId>org.realmanframework.boot</groupId>
+		<artifactId>realman-boot-system</artifactId>
+		<version>1.0.0</version>
+	</parent>
+	<modelVersion>4.0.0</modelVersion>
+
+	<artifactId>realman-system-biz</artifactId>
+
+	<dependencies>
+		<dependency>
+			<groupId>com.baomidou</groupId>
+			<artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+			<version>${mybatis-plus.version}</version>
+		</dependency>
+		<!-- 多数据源支持 -->
+		<dependency>
+			<groupId>com.baomidou</groupId>
+			<artifactId>dynamic-datasource-spring-boot3-starter</artifactId>
+			<version>${dynamic-datasource-spring-boot-starter.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>com.baomidou</groupId>
+			<artifactId>mybatis-plus-jsqlparser-4.9</artifactId>
+			<version>${mybatis-plus.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.realmanframework.boot</groupId>
+			<artifactId>realman-system-local-api</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.hibernate</groupId>
+			<artifactId>hibernate-core</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.jeecgframework.boot3</groupId>
+			<artifactId>hibernate-re</artifactId>
+		</dependency>
+
+		<!-- 企业微信/钉钉 api -->
+		<dependency>
+			<groupId>org.jeecgframework</groupId>
+			<artifactId>weixin4j</artifactId>
+		</dependency>
+	</dependencies>
+	
+</project>
