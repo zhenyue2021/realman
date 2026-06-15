@@ -1,0 +1,22 @@
+# Nacos dataId: realman-iot.yaml  (group: REALMAN_GROUP)
+# 将以下片段合并到现有 realman-iot.yaml；若 Nacos 已配置 spring.data.redis，以 Nacos 为准并确保含 timeout/max-wait。
+
+spring:
+  data:
+    redis:
+      timeout: 3000              # 命令超时(ms)，防止 Lettuce pipeline 永久阻塞
+      lettuce:
+        pool:
+          max-wait: 2000         # 借连接等待超时(ms)
+        shutdown-timeout: 200ms
+
+mqtt:
+  collect-url-request-dedup-ms: 60000   # collectUrlRequest requestId 去重窗口
+  collect-url-device-throttle-ms: 45000 # collectUrlRequest 同 deviceCode 转发节流
+  sys-event-idempotent-seconds: 15      # $SYS 上下线多 Pod 幂等窗口(秒)
+  status-offline-promote-throttle-ms: 60000
+  emqx:
+    ensure-platform-superuser: true   # 启动时经 Management API 将 Built-in iot-platform 设为 superuser（$SYS 订阅）
+    reconcile-enabled: true
+    reconcile-lock-seconds: 120
+    reconcile-sidefx-idempotent-seconds: 60
