@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.datacollect.MqSendHelper;
 import org.jeecg.modules.device.datacollect.constant.DataCollectConstant;
 import org.jeecg.modules.device.datacollect.dto.mq.OssAuthRequestMsg;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.stereotype.Component;
@@ -24,6 +25,7 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@ConditionalOnProperty(prefix = "darwin.integration", name = "enabled", havingValue = "true")
 public class OssAuthRequestProducer {
 
     private static final long REQUEST_TTL_HOURS = 2;

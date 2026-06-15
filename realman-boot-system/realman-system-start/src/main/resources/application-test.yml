@@ -101,17 +101,7 @@ spring:
       matching-strategy: ant_path_matcher
   resource:
     static-locations: classpath:/static/,classpath:/public/
-  # Docker / 内网部署：与 compose 中 nacos 服务名一致；勿依赖 dev，否则 server-addr 为 null 导致注册失败
-  cloud:
-    nacos:
-      discovery:
-        server-addr: ${NACOS_SERVER_ADDR:realman-nacos:8848}
-        namespace: ${NACOS_NAMESPACE:}
-        group: ${NACOS_GROUP:REALMAN_GROUP}
-      config:
-        server-addr: ${NACOS_SERVER_ADDR:realman-nacos:8848}
-        namespace: ${NACOS_NAMESPACE:}
-        group: ${NACOS_GROUP:REALMAN_GROUP}
+  # Nacos 连接见 application.yml（prod/test/dev 共用）
   autoconfigure:
     exclude:
       - com.alibaba.druid.spring.boot3.autoconfigure.DruidDataSourceAutoConfigure

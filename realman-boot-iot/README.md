@@ -26,11 +26,12 @@ DeviceSecretService.validateSecret()（Redis缓存 → DB降级）
 allow / deny 返回给 EMQX
 ```
 
-连接建立后，消息 Payload 使用 **Per-Device AES-256-CBC** 加密：
+连接建立后，消息 Payload 使用 **Per-Device AES-256-CBC** 加密（见 `CommandEncryptService`）：
 ```
-deviceAesKey = SHA256(masterKey + ":" + deviceSecret)[0..31]
+deviceAesKey = SHA256(deviceCode)[0..31]
 密文格式: ivHex(32char) + ":" + Base64(AES密文)
 ```
+由 Nacos `device.encrypt.enabled` 控制开关（生产建议 `true`；本地调试可设为 `false` 使用明文）。
 
 ## 快速启动
 
@@ -58,7 +59,7 @@ mysql -u root -p < sql/iot_init.sql
 - 修改 Redis 连接信息
 - 修改 MQTT Broker 地址
 - 修改 MinIO 地址和密钥
-- 设置 `DEVICE_ENCRYPT_MASTER_KEY` 环境变量
+- 确认 Nacos `realman-iot.yaml` 中 `device.encrypt.enabled`（生产建议 `true`）
 
 ### 4. EMQX HTTP Auth 配置
 
@@ -91,8 +92,7 @@ authorization {
 
 ```bash
 mvn clean package -DskipTests
-java -DDEVICE_ENCRYPT_MASTER_KEY=your-32-bytes-master-key \
-     -jar device-start/target/device-start-1.0.0.jar
+java -jar device-start/target/device-start-1.0.0.jar
 ```
 
 ### 6. 访问

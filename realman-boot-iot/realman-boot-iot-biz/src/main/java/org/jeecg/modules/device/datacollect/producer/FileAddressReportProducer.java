@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.datacollect.MqSendHelper;
 import org.jeecg.modules.device.datacollect.constant.DataCollectConstant;
 import org.jeecg.modules.device.datacollect.dto.mq.FileAddressReportMsg;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.stereotype.Component;
 
@@ -18,6 +19,7 @@ import java.util.List;
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@ConditionalOnProperty(prefix = "darwin.integration", name = "enabled", havingValue = "true")
 public class FileAddressReportProducer {
 
     private final MqSendHelper mqSendHelper;

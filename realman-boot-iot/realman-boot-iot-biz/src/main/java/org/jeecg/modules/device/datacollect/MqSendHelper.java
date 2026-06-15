@@ -7,6 +7,7 @@ import org.apache.rocketmq.client.core.RocketMQClientTemplate;
 import org.jeecg.modules.device.datacollect.log.MqMessageLogService;
 import org.jeecg.modules.device.entity.IotMqMessageLog;
 import org.slf4j.MDC;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.lang.Nullable;
 import org.springframework.messaging.Message;
 import org.springframework.stereotype.Component;
@@ -22,6 +23,7 @@ import java.util.function.BiConsumer;
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@ConditionalOnProperty(prefix = "darwin.integration", name = "enabled", havingValue = "true")
 public class MqSendHelper {
 
     private final RocketMQClientTemplate rocketMQClientTemplate;

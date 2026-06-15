@@ -113,7 +113,7 @@ flowchart TB
 平台端 ──REST──► Controller ──► Service ──► MqttPublisher ──► EMQX ──► 设备端
 
 连接鉴权：EMQX HTTP Auth/ACL ──POST──► MqttAuthController（/internal/mqtt/*）
-业务报文：Per-Device AES-256-CBC（密钥由 deviceSecret 派生）
+业务报文：Per-Device AES-256-CBC（密钥由 SHA256(deviceCode) 派生，见 `CommandEncryptService`）
 ```
 
 ---
@@ -323,9 +323,8 @@ mvn clean package -pl realman-boot-iot/realman-boot-iot-start -am -DskipTests
 java -jar realman-boot-system/realman-system-start/target/realman-system-start-1.0.0.jar
 
 # IoT 服务（端口 8085，context-path /realman-iot）
-# 需配置 MySQL、Redis、MQTT、DEVICE_ENCRYPT_MASTER_KEY 等，见 application-dev.yml
-java -DDEVICE_ENCRYPT_MASTER_KEY=<32字节主密钥> \
-     -jar realman-boot-iot/realman-boot-iot-start/target/realman-boot-iot-start-1.0.0.jar
+# 需配置 MySQL、Redis、MQTT 等，见 application-dev.yml / Nacos realman-iot.yaml
+java -jar realman-boot-iot/realman-boot-iot-start/target/realman-boot-iot-start-1.0.0.jar
 ```
 
 ### IoT 数据库初始化
