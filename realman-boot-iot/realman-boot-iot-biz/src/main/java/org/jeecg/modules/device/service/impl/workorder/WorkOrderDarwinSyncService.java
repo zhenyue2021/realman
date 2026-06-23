@@ -34,7 +34,7 @@ import java.util.List;
 public class WorkOrderDarwinSyncService extends ServiceImpl<WorkOrderMapper, WorkOrder> {
 
     private static final DateTimeFormatter DARWIN_DT_FMT =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss[.[SSSSSSSSS][SSSSSS][SSS]]");
 
     private final ObjectMapper objectMapper;
     private final WorkOrderDeviceMapper workOrderDeviceMapper;

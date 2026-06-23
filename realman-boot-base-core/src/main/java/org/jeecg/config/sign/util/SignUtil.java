@@ -37,10 +37,17 @@ public class SignUtil {
         if (params == null || StringUtils.isEmpty(headerSign)) {
             return false;
         }
-        // 把参数加密
-        String paramsSign = getParamsSign(params);
+        // 复制一份参与签名的参数，避免修改原始请求参数集合
+        SortedMap<String, String> signParams = new TreeMap<>(params);
+        String paramsSign = getParamsSign(signParams);
         log.debug("Param Sign : {}", paramsSign);
-        return !StringUtils.isEmpty(paramsSign) && headerSign.equals(paramsSign);
+        boolean matched = !StringUtils.isEmpty(paramsSign) && headerSign.equalsIgnoreCase(paramsSign);
+        if (!matched) {
+            signParams.remove("_t");
+            log.error("签名不匹配, 客户端Sign: {}, 服务端Sign: {}, 参数JSON: {}",
+                    headerSign, paramsSign, JSONObject.toJSONString(signParams));
+        }
+        return matched;
     }
 
     /**
@@ -185,7 +192,7 @@ public class SignUtil {
         if (oConvertUtils.isEmpty(signatureSecret) || signatureSecret.contains(curlyBracket)) {
             throw new JeecgBootException("签名密钥 ${jeecg.signatureSecret} 缺少配置 ！！");
         }
-        return signatureSecret;
+        return signatureSecret.trim();
     }
 
 }

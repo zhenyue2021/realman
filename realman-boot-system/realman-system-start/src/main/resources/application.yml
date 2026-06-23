@@ -27,7 +27,7 @@ spring:
     import:
       - optional:classpath:config/application-liteflow.yml
       # DataId 与 Nacos 控制台一致（REALMAN_GROUP / realman-system.yaml）
-      - optional:nacos:realman-system.yaml?refreshEnabled=true
+      - optional:nacos:realman-system.yaml?group=REALMAN_GROUP&refreshEnabled=true
   profiles:
     active: '@profile.name@'
 
