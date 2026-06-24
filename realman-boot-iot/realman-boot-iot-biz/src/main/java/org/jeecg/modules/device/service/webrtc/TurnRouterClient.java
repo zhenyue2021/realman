@@ -27,8 +27,13 @@ public class TurnRouterClient {
     private final RestTemplate restTemplate;
 
     public TurnRouterClient(WebRtcProperties webRtcProperties) {
+        this(webRtcProperties, buildRestTemplate(webRtcProperties));
+    }
+
+    /** 供单元测试注入 Mock RestTemplate */
+    TurnRouterClient(WebRtcProperties webRtcProperties, RestTemplate restTemplate) {
         this.webRtcProperties = webRtcProperties;
-        this.restTemplate = buildRestTemplate();
+        this.restTemplate = restTemplate;
     }
 
     public TurnRouteResult route(String callId,
@@ -78,6 +83,11 @@ public class TurnRouterClient {
                 throw new RuntimeException("turn_router 返回 serverIp 为空");
             }
 
+            String signalKey = stringVal(resp.get("signalKey"));
+            if (signalKey == null || signalKey.isBlank()) {
+                throw new RuntimeException("turn_router 返回 signalKey 为空");
+            }
+
             int serverPort = intVal(resp.get("serverPort"), 3479);
             log.info("[TurnRouter] 调度成功 callId={} serverIp={} serverPort={} serverName={}",
                     callId, serverIp, serverPort, resp.get("serverName"));
@@ -87,6 +97,7 @@ public class TurnRouterClient {
                     .serverIp(serverIp)
                     .serverPort(serverPort)
                     .serverName(stringVal(resp.get("serverName")))
+                    .signalKey(signalKey)
                     .build();
         } catch (RuntimeException e) {
             throw e;
@@ -122,7 +133,7 @@ public class TurnRouterClient {
         return defaultValue;
     }
 
-    private RestTemplate buildRestTemplate() {
+    private static RestTemplate buildRestTemplate(WebRtcProperties webRtcProperties) {
         WebRtcProperties.TurnRouter router = webRtcProperties.getTurnRouter();
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(Math.max(router.getConnectTimeoutMs(), 1_000));

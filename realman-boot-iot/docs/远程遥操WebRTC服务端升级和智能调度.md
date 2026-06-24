@@ -222,6 +222,7 @@ json
     "serverIp": "47.102.207.121",
     "serverPort": 3479,
     "serverName": "上海TURN服务器1",
+    "signalKey": "room-key-from-turn-router",
     "message": ""
 }
 ```
@@ -250,6 +251,7 @@ json
 | `serverIp` | string | TURN服务器公网IP |
 | `serverPort` | int | TURN服务器端口（3479） |
 | `serverName` | string | TURN服务器名称 |
+| `signalKey` | string | 信令服务器房间密钥，业务侧原样下发给浏览器/机器人 |
 | `message` | string | 错误信息（仅失败时返回） |
 
 ### 近期任务规划

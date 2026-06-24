@@ -14,4 +14,5 @@ public class TurnRouteResult {
     private String serverIp;
     private int serverPort;
     private String serverName;
+    private String signalKey;
 }

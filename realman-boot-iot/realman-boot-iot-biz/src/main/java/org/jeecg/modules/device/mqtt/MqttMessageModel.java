@@ -734,7 +734,7 @@ public class MqttMessageModel {
         private String roomId;
         /** 信令服务器 URL（start 时携带） */
         private String signalUrl;
-        /** 信令服务器访问密钥（start 时携带，每日凌晨 2:00 轮换） */
+        /** 信令服务器访问密钥（start 时携带，由 turn_router 调度接口返回） */
         private String signalKey;
         /** TURN 服务器列表（start 时携带，stop 时为 null） */
         private List<TurnServer> turnServers;

@@ -1749,10 +1749,16 @@ xxl:
     accessToken:
 
 webrtc:
+  turn-server:
+    username: "realman"
+    password: "TBdWj0HhwTK56AzK"
   signaling:
     server:
-      auto-push:
-        enabled: true
+      port: 8091
+  turn-router:
+    base-url: "http://turn-router:8081"
+    connect-timeout-ms: 5000
+    read-timeout-ms: 5000
 
 # 未部署 Darwin 数采 / RocketMQ 时保持 false（现场默认）
 darwin:

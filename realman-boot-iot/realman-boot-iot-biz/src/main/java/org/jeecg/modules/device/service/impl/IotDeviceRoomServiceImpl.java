@@ -13,7 +13,6 @@ import org.jeecg.modules.device.mapper.IotDeviceRoomMapper;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.service.IIotDeviceRoomService;
 import org.jeecg.modules.device.service.impl.device.IotDeviceSupport;
-import org.jeecg.modules.device.service.signaling.SignalingKeyService;
 import org.jeecg.modules.device.service.webrtc.RoomTurnRouteCache;
 import org.jeecg.modules.device.service.webrtc.TurnRouteResult;
 import org.jeecg.modules.device.service.webrtc.TurnRouterClient;
@@ -51,7 +50,6 @@ public class IotDeviceRoomServiceImpl extends ServiceImpl<IotDeviceRoomMapper, I
 
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
-    private final SignalingKeyService signalingKeyService;
     private final TurnRouterClient turnRouterClient;
     private final WebRtcEndpointAssembler webRtcEndpointAssembler;
     private final IotDeviceSupport deviceSupport;
@@ -87,8 +85,7 @@ public class IotDeviceRoomServiceImpl extends ServiceImpl<IotDeviceRoomMapper, I
                     roomId,
                     robotLoc.province(), robotLoc.city(),
                     browserLoc.province(), browserLoc.city());
-            String signalKey = signalingKeyService.generateAndPushSessionKey(route.getServerIp());
-            routeCache = new RoomTurnRouteCache(route.getServerIp(), route.getServerPort(), signalKey);
+            routeCache = new RoomTurnRouteCache(route.getServerIp(), route.getServerPort(), route.getSignalKey());
             putTurnRouteCache(masterCode, routeCache);
         }
 
