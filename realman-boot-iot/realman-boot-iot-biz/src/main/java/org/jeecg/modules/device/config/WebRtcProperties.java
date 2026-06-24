@@ -5,21 +5,22 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
 /**
- * WebRTC 服务配置（TURN / STUN 服务器）
+ * WebRTC 服务配置（TURN 凭证、信令端口、turn_router 调度地址）。
  *
  * <p>配置示例（application.yml / Nacos）：
  * <pre>
  * webrtc:
- *   turn-servers:
- *     - url: "192.168.1.100:3478"
- *       username: "user"
- *       password: "pass"
- *   stun-servers: "192.168.1.100:3478,192.168.1.101:3478"
+ *   turn-server:
+ *     username: "realman"
+ *     password: "pass"
+ *   signaling:
+ *     server:
+ *       port: 8091
+ *   turn-router:
+ *     base-url: "http://8.141.21.23:8081"
+ *     connect-timeout-ms: 5000
+ *     read-timeout-ms: 5000
  * </pre>
  */
 @Data
@@ -28,35 +29,34 @@ import java.util.List;
 @RefreshScope
 public class WebRtcProperties {
 
-    /** TURN 服务器列表，下发给机器人设备 */
-    private List<TurnServer> turnServers = new ArrayList<>();
+    /** TURN 认证凭证（地址由 turn_router 动态返回） */
+    private TurnServer turnServer = new TurnServer();
 
-    /**
-     * STUN 服务器列表（英文逗号分隔），下发给机器人设备
-     *
-     * <p>示例：{@code 192.168.1.100:3478,192.168.1.101:3478}
-     */
-    private String stunServers = "";
+    private Signaling signaling = new Signaling();
 
-    /** 将逗号分隔的 stunServers 字符串拆分为 List */
-    public List<String> getStunServerList() {
-        if (stunServers == null || stunServers.isBlank()) {
-            return List.of();
-        }
-        return Arrays.stream(stunServers.split(","))
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .toList();
-    }
+    private TurnRouter turnRouter = new TurnRouter();
 
-    /** TURN 服务器配置 */
     @Data
     public static class TurnServer {
-        /** TURN 服务器地址，例如 192.168.1.100:3478 */
-        private String url;
-        /** 用户名 */
         private String username;
-        /** 密码 */
         private String password;
+    }
+
+    @Data
+    public static class Signaling {
+        private Server server = new Server();
+
+        @Data
+        public static class Server {
+            /** 信令 WebSocket 端口，serverIp 来自 turn_router */
+            private int port = 8091;
+        }
+    }
+
+    @Data
+    public static class TurnRouter {
+        private String baseUrl = "";
+        private int connectTimeoutMs = 5_000;
+        private int readTimeoutMs = 5_000;
     }
 }

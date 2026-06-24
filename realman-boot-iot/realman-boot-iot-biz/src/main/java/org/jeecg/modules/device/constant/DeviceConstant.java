@@ -373,14 +373,10 @@ public interface DeviceConstant {
         String ROOM_MASTER_PREFIX = "iot:room:master:";
         /** 设备房间反查索引（按机器人）：iot:room:robot:{robotCode}，值为 masterCode，TTL=24h */
         String ROOM_ROBOT_PREFIX = "iot:room:robot:";
-        /** 活跃房间集合：iot:room:active，成员为 masterCode（WAITING/ACTIVE 状态的房间） */
+        /** 活跃房间集合：iot:room:active，成员为 masterCode（ACTIVE 状态的房间） */
         String ROOM_ACTIVE_SET = "iot:room:active";
-        /**
-         * 信令服务器房间密钥：iot:signaling:key:{serverUrl}，值为 64 位 Hex 密钥，TTL=26h
-         *
-         * <p>完整 Key 示例：{@code iot:signaling:key:192.168.1.100}
-         */
-        String SIGNALING_KEY_PREFIX = "iot:signaling:key:";
+        /** 房间 TURN/信令路由缓存：iot:room:turn-route:{masterCode}，值为 JSON(RoomTurnRouteCache)，TTL=24h */
+        String ROOM_TURN_ROUTE_PREFIX = "iot:room:turn-route:";
     }
 
     /**

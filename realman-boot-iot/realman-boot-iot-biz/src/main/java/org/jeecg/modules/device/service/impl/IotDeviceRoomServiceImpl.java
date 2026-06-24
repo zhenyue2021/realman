@@ -5,24 +5,30 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jeecg.modules.device.config.WebRtcProperties;
 import org.jeecg.modules.device.constant.DeviceConstant;
+import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.entity.IotDeviceRoom;
+import org.jeecg.modules.device.geo.AdministrativeAddressParser;
 import org.jeecg.modules.device.mapper.IotDeviceRoomMapper;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.service.IIotDeviceRoomService;
+import org.jeecg.modules.device.service.impl.device.IotDeviceSupport;
 import org.jeecg.modules.device.service.signaling.SignalingKeyService;
+import org.jeecg.modules.device.service.webrtc.RoomTurnRouteCache;
+import org.jeecg.modules.device.service.webrtc.TurnRouteResult;
+import org.jeecg.modules.device.service.webrtc.TurnRouterClient;
+import org.jeecg.modules.device.service.webrtc.WebRtcEndpointAssembler;
 import org.jeecg.modules.device.vo.DeviceRoomVO;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -31,9 +37,10 @@ import java.util.concurrent.TimeUnit;
  *
  * <p>缓存策略：
  * <ul>
- *   <li>{@code iot:room:master:{masterCode}} → JSON(DeviceRoomVO)，TTL=24h，主查询路径</li>
- *   <li>{@code iot:room:robot:{robotCode}}   → masterCode 字符串，TTL=24h，离线时反查</li>
- *   <li>{@code iot:room:active}              → Set&lt;masterCode&gt;，用于列表查询</li>
+ *   <li>{@code iot:room:master:{masterCode}} → JSON(DeviceRoomVO)，TTL=24h</li>
+ *   <li>{@code iot:room:robot:{robotCode}}   → masterCode 字符串，TTL=24h</li>
+ *   <li>{@code iot:room:turn-route:{masterCode}} → JSON(RoomTurnRouteCache)，TTL=24h</li>
+ *   <li>{@code iot:room:active}              → Set&lt;masterCode&gt;</li>
  * </ul>
  */
 @Slf4j
@@ -45,96 +52,50 @@ public class IotDeviceRoomServiceImpl extends ServiceImpl<IotDeviceRoomMapper, I
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
     private final SignalingKeyService signalingKeyService;
-    private final WebRtcProperties webRtcProperties;
+    private final TurnRouterClient turnRouterClient;
+    private final WebRtcEndpointAssembler webRtcEndpointAssembler;
+    private final IotDeviceSupport deviceSupport;
 
     private static final long ROOM_CACHE_TTL_HOURS = 24L;
 
-    // -------------------------------------------------------------------------
-    // 公开方法
-    // -------------------------------------------------------------------------
-
-    @Override
-    public MqttMessageModel.WebRtcCommand queryOrCreate(String masterCode) {
-        // 构建 TURN 服务器列表
-        List<MqttMessageModel.WebRtcCommand.TurnServer> turnServers =
-                webRtcProperties.getTurnServers().stream()
-                        .map(t -> MqttMessageModel.WebRtcCommand.TurnServer.builder()
-                                .url(t.getUrl())
-                                .username(t.getUsername())
-                                .password(t.getPassword())
-                                .build())
-                        .toList();
-
-        MqttMessageModel.WebRtcCommand startCmd = MqttMessageModel.WebRtcCommand.builder()
-                .signalUrl(signalingKeyService.getServerUrl())
-                .signalKey(signalingKeyService.getCurrentKey())
-                .turnServers(turnServers)
-                .stunServers(webRtcProperties.getStunServerList())
-                .timestamp(System.currentTimeMillis())
-                .build();
-        // 1. 缓存命中 —— 同时校验 DB 记录仍存活，防止缓存脏数据
-        DeviceRoomVO cached = getFromCache(masterCode);
-        if (cached != null) {
-            IotDeviceRoom cachedRoom = baseMapper.selectActiveByMasterCode(masterCode);
-            if (cachedRoom != null) {
-                startCmd.setRoomId(cached.getRoomId());
-                return startCmd;
-            }
-            log.warn("[Room] 缓存命中但 DB 记录不存在，清除脏缓存 masterCode={}", masterCode);
-            evictCache(masterCode, null);
-        }
-
-        // 2. DB 查询活跃房间
-        IotDeviceRoom room = baseMapper.selectActiveByMasterCode(masterCode);
-        if (room == null) {
-            // 3. 不存在则创建
-            room = new IotDeviceRoom();
-            room.setMasterCode(masterCode);
-            room.setStatus(IotDeviceRoom.Status.WAITING);
-            save(room);
-            log.info("[Room] 创建新房间 roomId={} masterCode={}", room.getId(), masterCode);
-        }
-
-        DeviceRoomVO vo = toVO(room);
-        // 若当前处于外部事务中（如 startTeleopNoStream），延迟到事务提交后再写缓存，
-        // 防止事务回滚导致 Redis 缓存与 DB 不一致。
-        if (TransactionSynchronizationManager.isActualTransactionActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    putCache(masterCode, vo);
-                }
-            });
-        } else {
-            putCache(masterCode, vo);
-        }
-        startCmd.setRoomId(room.getId());
-        return startCmd;
-    }
-
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void robotJoin(String masterCode, String robotCode) {
-        IotDeviceRoom room = baseMapper.selectActiveByMasterCode(masterCode);
-        if (room == null) {
-            log.warn("[Room] robotJoin 时找不到活跃房间 masterCode={}，清除脏缓存", masterCode);
-            evictCache(masterCode, robotCode);
-            return;
+    public MqttMessageModel.WebRtcCommand queryOrCreate(String masterCode, String robotCode) {
+        if (masterCode == null || masterCode.isBlank()) {
+            throw new RuntimeException("masterCode 不能为空");
+        }
+        if (robotCode == null || robotCode.isBlank()) {
+            throw new RuntimeException("robotCode 不能为空");
         }
 
-        room.setRobotCode(robotCode);
-        room.setStatus(IotDeviceRoom.Status.ACTIVE);
-        updateById(room);
+        IotDevice master = deviceSupport.requireByDeviceCode(masterCode);
+        IotDevice robot = deviceSupport.requireByDeviceCode(robotCode);
+        requireDeviceType(master, DeviceConstant.DeviceTypeInteger.CONTROLLER, "主控");
+        requireDeviceType(robot, DeviceConstant.DeviceTypeInteger.ROBOT, "机器人");
 
-        // 刷新主控缓存
-        putCache(masterCode, toVO(room));
-        // 建立机器人反查索引
-        redisTemplate.opsForValue().set(
-                DeviceConstant.RedisKey.ROOM_ROBOT_PREFIX + robotCode,
-                masterCode,
-                ROOM_CACHE_TTL_HOURS, TimeUnit.HOURS);
+        AdministrativeAddressParser.ProvinceCity browserLoc =
+                AdministrativeAddressParser.parse(master.getAddress());
+        AdministrativeAddressParser.ProvinceCity robotLoc =
+                AdministrativeAddressParser.parse(robot.getAddress());
 
-        log.info("[Room] 机器人加入房间 roomId={} master={} robot={}", room.getId(), masterCode, robotCode);
+        IotDeviceRoom room = resolveRoom(masterCode, robotCode);
+        String roomId = room.getId();
+
+        RoomTurnRouteCache routeCache = getTurnRouteCache(masterCode);
+        if (routeCache == null) {
+            TurnRouteResult route = turnRouterClient.route(
+                    roomId,
+                    robotLoc.province(), robotLoc.city(),
+                    browserLoc.province(), browserLoc.city());
+            String signalKey = signalingKeyService.generateAndPushSessionKey(route.getServerIp());
+            routeCache = new RoomTurnRouteCache(route.getServerIp(), route.getServerPort(), signalKey);
+            putTurnRouteCache(masterCode, routeCache);
+        }
+
+        MqttMessageModel.WebRtcCommand startCmd = webRtcEndpointAssembler.assemble(routeCache);
+        startCmd.setRoomId(roomId);
+        startCmd.setTimestamp(System.currentTimeMillis());
+        return startCmd;
     }
 
     @Override
@@ -142,7 +103,6 @@ public class IotDeviceRoomServiceImpl extends ServiceImpl<IotDeviceRoomMapper, I
     public void destroyRoom(String masterCode) {
         IotDeviceRoom room = baseMapper.selectActiveByMasterCode(masterCode);
         if (room == null) {
-            // 房间不存在或已销毁，只清缓存即可
             evictCache(masterCode, null);
             return;
         }
@@ -158,7 +118,6 @@ public class IotDeviceRoomServiceImpl extends ServiceImpl<IotDeviceRoomMapper, I
 
     @Override
     public void destroyRoomByRobotCode(String robotCode) {
-        // 1. 缓存反查 masterCode
         String masterCode = redisTemplate.opsForValue()
                 .get(DeviceConstant.RedisKey.ROOM_ROBOT_PREFIX + robotCode);
         if (masterCode != null && !masterCode.isBlank()) {
@@ -166,7 +125,6 @@ public class IotDeviceRoomServiceImpl extends ServiceImpl<IotDeviceRoomMapper, I
             return;
         }
 
-        // 2. 降级走 DB
         IotDeviceRoom room = baseMapper.selectActiveByRobotCode(robotCode);
         if (room != null) {
             destroyRoom(room.getMasterCode());
@@ -175,7 +133,6 @@ public class IotDeviceRoomServiceImpl extends ServiceImpl<IotDeviceRoomMapper, I
 
     @Override
     public List<DeviceRoomVO> listActiveRooms() {
-        // 1. 从活跃集合取所有 masterCode
         Set<String> masterCodes = redisTemplate.opsForSet()
                 .members(DeviceConstant.RedisKey.ROOM_ACTIVE_SET);
 
@@ -192,15 +149,14 @@ public class IotDeviceRoomServiceImpl extends ServiceImpl<IotDeviceRoomMapper, I
             }
         }
 
-        // 2. 降级：DB 查询并重建缓存
         log.info("[Room] listActiveRooms 缓存未命中，降级查 DB");
         List<IotDeviceRoom> rooms = list(new LambdaQueryWrapper<IotDeviceRoom>()
-                .in(IotDeviceRoom::getStatus, IotDeviceRoom.Status.WAITING, IotDeviceRoom.Status.ACTIVE));
+                .eq(IotDeviceRoom::getStatus, IotDeviceRoom.Status.ACTIVE));
 
         List<DeviceRoomVO> result = new ArrayList<>(rooms.size());
         for (IotDeviceRoom room : rooms) {
             DeviceRoomVO vo = toVO(room);
-            putCache(room.getMasterCode(), vo);
+            putCache(room.getMasterCode(), room.getRobotCode(), vo);
             result.add(vo);
         }
         return result;
@@ -209,6 +165,99 @@ public class IotDeviceRoomServiceImpl extends ServiceImpl<IotDeviceRoomMapper, I
     // -------------------------------------------------------------------------
     // 私有辅助
     // -------------------------------------------------------------------------
+
+    private IotDeviceRoom resolveRoom(String masterCode, String robotCode) {
+        DeviceRoomVO cached = getFromCache(masterCode);
+        if (cached != null) {
+            IotDeviceRoom cachedRoom = baseMapper.selectActiveByMasterCode(masterCode);
+            if (cachedRoom != null) {
+                if (!Objects.equals(cachedRoom.getRobotCode(), robotCode)) {
+                    return updateRoomRobot(cachedRoom, robotCode);
+                }
+                return cachedRoom;
+            }
+            log.warn("[Room] 缓存命中但 DB 记录不存在，清除脏缓存 masterCode={}", masterCode);
+            evictCache(masterCode, cached.getRobotCode());
+        }
+
+        IotDeviceRoom room = baseMapper.selectActiveByMasterCode(masterCode);
+        if (room == null) {
+            room = new IotDeviceRoom();
+            room.setMasterCode(masterCode);
+            room.setRobotCode(robotCode);
+            room.setStatus(IotDeviceRoom.Status.ACTIVE);
+            save(room);
+            log.info("[Room] 创建新房间 roomId={} master={} robot={}", room.getId(), masterCode, robotCode);
+        } else if (!Objects.equals(room.getRobotCode(), robotCode)) {
+            room = updateRoomRobot(room, robotCode);
+        }
+
+        DeviceRoomVO vo = toVO(room);
+        scheduleCacheWrite(masterCode, robotCode, vo);
+        return room;
+    }
+
+    private IotDeviceRoom updateRoomRobot(IotDeviceRoom room, String robotCode) {
+        String oldRobotCode = room.getRobotCode();
+        if (oldRobotCode != null && !oldRobotCode.isBlank() && !oldRobotCode.equals(robotCode)) {
+            redisTemplate.delete(DeviceConstant.RedisKey.ROOM_ROBOT_PREFIX + oldRobotCode);
+            evictTurnRouteCache(room.getMasterCode());
+        }
+        room.setRobotCode(robotCode);
+        room.setStatus(IotDeviceRoom.Status.ACTIVE);
+        updateById(room);
+        log.info("[Room] 更新房间机器人 roomId={} master={} robot={}", room.getId(), room.getMasterCode(), robotCode);
+        scheduleCacheWrite(room.getMasterCode(), robotCode, toVO(room));
+        return room;
+    }
+
+    private void scheduleCacheWrite(String masterCode, String robotCode, DeviceRoomVO vo) {
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    putCache(masterCode, robotCode, vo);
+                }
+            });
+        } else {
+            putCache(masterCode, robotCode, vo);
+        }
+    }
+
+    private static void requireDeviceType(IotDevice device, int expectType, String label) {
+        if (!Objects.equals(device.getDeviceType(), expectType)) {
+            throw new RuntimeException("设备类型不匹配：[" + device.getDeviceCode() + "] 不是" + label + "设备");
+        }
+    }
+
+    private RoomTurnRouteCache getTurnRouteCache(String masterCode) {
+        try {
+            String json = redisTemplate.opsForValue()
+                    .get(DeviceConstant.RedisKey.ROOM_TURN_ROUTE_PREFIX + masterCode);
+            if (json != null) {
+                return objectMapper.readValue(json, RoomTurnRouteCache.class);
+            }
+        } catch (Exception e) {
+            log.warn("[Room] TURN 路由缓存读取失败 masterCode={}", masterCode, e);
+        }
+        return null;
+    }
+
+    private void putTurnRouteCache(String masterCode, RoomTurnRouteCache cache) {
+        try {
+            String json = objectMapper.writeValueAsString(cache);
+            redisTemplate.opsForValue().set(
+                    DeviceConstant.RedisKey.ROOM_TURN_ROUTE_PREFIX + masterCode,
+                    json,
+                    ROOM_CACHE_TTL_HOURS, TimeUnit.HOURS);
+        } catch (Exception e) {
+            log.warn("[Room] TURN 路由缓存写入失败 masterCode={}", masterCode, e);
+        }
+    }
+
+    private void evictTurnRouteCache(String masterCode) {
+        redisTemplate.delete(DeviceConstant.RedisKey.ROOM_TURN_ROUTE_PREFIX + masterCode);
+    }
 
     private DeviceRoomVO getFromCache(String masterCode) {
         try {
@@ -223,7 +272,7 @@ public class IotDeviceRoomServiceImpl extends ServiceImpl<IotDeviceRoomMapper, I
         return null;
     }
 
-    private void putCache(String masterCode, DeviceRoomVO vo) {
+    private void putCache(String masterCode, String robotCode, DeviceRoomVO vo) {
         try {
             String json = objectMapper.writeValueAsString(vo);
             redisTemplate.opsForValue().set(
@@ -231,6 +280,12 @@ public class IotDeviceRoomServiceImpl extends ServiceImpl<IotDeviceRoomMapper, I
                     json,
                     ROOM_CACHE_TTL_HOURS, TimeUnit.HOURS);
             redisTemplate.opsForSet().add(DeviceConstant.RedisKey.ROOM_ACTIVE_SET, masterCode);
+            if (robotCode != null && !robotCode.isBlank()) {
+                redisTemplate.opsForValue().set(
+                        DeviceConstant.RedisKey.ROOM_ROBOT_PREFIX + robotCode,
+                        masterCode,
+                        ROOM_CACHE_TTL_HOURS, TimeUnit.HOURS);
+            }
         } catch (Exception e) {
             log.warn("[Room] 缓存写入失败 masterCode={}", masterCode, e);
         }
@@ -239,6 +294,7 @@ public class IotDeviceRoomServiceImpl extends ServiceImpl<IotDeviceRoomMapper, I
     private void evictCache(String masterCode, String robotCode) {
         redisTemplate.delete(DeviceConstant.RedisKey.ROOM_MASTER_PREFIX + masterCode);
         redisTemplate.opsForSet().remove(DeviceConstant.RedisKey.ROOM_ACTIVE_SET, masterCode);
+        evictTurnRouteCache(masterCode);
         if (robotCode != null && !robotCode.isBlank()) {
             redisTemplate.delete(DeviceConstant.RedisKey.ROOM_ROBOT_PREFIX + robotCode);
         }

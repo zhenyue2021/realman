@@ -138,7 +138,6 @@ public class IotDeviceTeleopService {
                     "主控连接设备，设备使用状态置为使用中", "{commandId:" + commandId + ",controllerDeviceCode:" + controllerDeviceCode + "}",
                     DeviceConstant.OperationSource.PLATFORM, "SUCCESS", null, operator, null);*/
             sendWebRtcStartAndAwait(controllerDeviceCode, robotDeviceCode, robotId, operator);
-            roomService.robotJoin(controllerDeviceCode, robotDeviceCode);
         } catch (Exception e) {
             throw new RuntimeException("开始遥操失败: " + e.getMessage(), e);
         }
@@ -320,7 +319,7 @@ public class IotDeviceTeleopService {
 
         try {
             // 获取房间（按主控编码查询或创建），command 字段已由 queryOrCreate 设为 "start"
-            MqttMessageModel.WebRtcCommand webRtcCommand = roomService.queryOrCreate(masterDeviceCode);
+            MqttMessageModel.WebRtcCommand webRtcCommand = roomService.queryOrCreate(masterDeviceCode, robotDeviceCode);
             webRtcCommand.setCommandId(webRtcCommandId);
             webRtcCommand.setCommand("start");
 

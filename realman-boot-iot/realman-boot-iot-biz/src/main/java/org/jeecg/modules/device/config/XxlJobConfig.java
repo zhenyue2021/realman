@@ -19,7 +19,6 @@ import org.springframework.context.annotation.Configuration;
  * <ul>
  *   <li>{@code deviceOfflineCheckJob}      - 设备离线检测（建议 Cron: 0 * * * * ?）</li>
  *   <li>{@code otaUpgradeTimeoutCheckJob}  - OTA 超时检测（建议 Cron: 0 0/5 * * * ?）</li>
- *   <li>{@code signalingKeyRenewJob}       - 信令服务器密钥刷新（建议 Cron: 0 0 2 * * ?，路由策略：第一个/故障转移）</li>
  *   <li>{@code workOrderTimeoutAlertJob}   - 工单超时提醒（建议 Cron: 0 0/1 * * * ?）</li>
  *   <li>{@code workOrderTimeoutMarkJob}    - 工单超时标记（建议 Cron: 0 0/1 * * * ?）</li>
  *   <li>{@code workOrderAutoCloseJob}      - 工单超时自动关闭（建议 Cron: 0 0/1 * * * ?）</li>

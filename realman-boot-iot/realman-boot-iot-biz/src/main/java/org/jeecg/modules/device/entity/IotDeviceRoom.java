@@ -11,9 +11,8 @@ import java.time.LocalDateTime;
  *
  * <p>生命周期：
  * <pre>
- *   主控查询服务地址 → 创建房间（status=0 WAITING）
- *   开始遥操         → 机器人加入（status=1 ACTIVE，写入 robot_code）
- *   停止遥操/设备离线 → 销毁房间（status=2 DESTROYED，del_flag=1）
+ *   主控 queryRoom(masterCode, robotCode) → 创建房间（status=ACTIVE，写入 master_code + robot_code）
+ *   停止遥操/设备离线 → 销毁房间（status=DESTROYED，del_flag=1）
  * </pre>
  */
 @Data
