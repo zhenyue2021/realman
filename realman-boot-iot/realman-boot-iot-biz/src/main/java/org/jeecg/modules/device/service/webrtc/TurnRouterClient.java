@@ -2,6 +2,7 @@ package org.jeecg.modules.device.service.webrtc;
 
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.config.WebRtcProperties;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -26,6 +27,7 @@ public class TurnRouterClient {
     private final WebRtcProperties webRtcProperties;
     private final RestTemplate restTemplate;
 
+    @Autowired
     public TurnRouterClient(WebRtcProperties webRtcProperties) {
         this(webRtcProperties, buildRestTemplate(webRtcProperties));
     }
