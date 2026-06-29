@@ -12,6 +12,8 @@ public final class DataCollectConstant {
     // ② 遥操平台 →  数采平台  MQ    MQ_TOPIC_OSS_AUTH_REQUEST : MQ_TAG_REQUEST
     //      Producer: OssAuthRequestProducer
     //      Redis   : REDIS_OSS_REQUEST_PREFIX + requestId → deviceCode（TTL 2h）
+    //                REDIS_OSS_CRED_PREFIX + deviceCode → STS JSON（TTL = utcExpiration - buffer）
+    //                REDIS_OSS_INFLIGHT_PREFIX + deviceCode → 进行中的 requestId（TTL 可配置）
     // ③ 数采平台 →  遥操平台  MQ    MQ_TOPIC_OSS_AUTH_RESPONSE : MQ_TAG_RESPONSE
     //      Consumer: OssAuthResponseConsumer（Group: MQ_GROUP_OSS_AUTH_RESPONSE）
     // ④ 遥操平台 →  机器人    MQTT  MQTT_DOWN_COLLECT_URL_RESP
@@ -47,6 +49,10 @@ public final class DataCollectConstant {
     public static final String REDIS_COLLECT_URL_REQ_DEDUP_PREFIX = "datacollect:collect-url:req:";
     /** collectUrlRequest 同设备转发节流；Key = prefix + deviceCode，TTL = mqtt.collect-url-device-throttle-ms */
     public static final String REDIS_COLLECT_URL_DEVICE_THROTTLE_PREFIX = "datacollect:collect-url:throttle:";
+    /** 设备 OSS STS 凭证缓存；Key = prefix + deviceCode，TTL = utcExpiration - mqtt.collect-url-sts-cache-buffer-seconds */
+    public static final String REDIS_OSS_CRED_PREFIX = "datacollect:oss:cred:";
+    /** 设备 OSS 授权进行中标记；Key = prefix + deviceCode，TTL = mqtt.collect-url-inflight-timeout-seconds */
+    public static final String REDIS_OSS_INFLIGHT_PREFIX = "datacollect:oss:inflight:";
 
     // =========================================================================
     // 链路二：OSS 文件地址上报

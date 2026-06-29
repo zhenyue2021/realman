@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.datacollect.MqSendHelper;
 import org.jeecg.modules.device.datacollect.constant.DataCollectConstant;
 import org.jeecg.modules.device.datacollect.dto.mq.OssAuthRequestMsg;
+import org.jeecg.modules.device.datacollect.service.OssCredentialCacheService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.messaging.support.MessageBuilder;
@@ -33,6 +34,7 @@ public class OssAuthRequestProducer {
     private final MqSendHelper mqSendHelper;
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
+    private final OssCredentialCacheService credentialCache;
 
     public void sendAndStore(String requestId, String tenant, String deviceCode,
                              String taskId, String traceId) {
@@ -60,6 +62,7 @@ public class OssAuthRequestProducer {
             mqSendHelper.asyncSend(destination, springMessage, getClass().getSimpleName(), (receipt, ex) -> {
                 if (ex != null) {
                     redisTemplate.delete(redisKey);
+                    credentialCache.releaseInflight(deviceCode);
                     log.error("[DataCollect] OSS授权请求转发失败 requestId={} deviceCode={}",
                             requestId, deviceCode, ex);
                 } else {
@@ -69,6 +72,7 @@ public class OssAuthRequestProducer {
             });
         } catch (Exception e) {
             redisTemplate.delete(redisKey);
+            credentialCache.releaseInflight(deviceCode);
             log.error("[DataCollect] OSS授权请求序列化失败 requestId={} deviceCode={}",
                     requestId, deviceCode, e);
             mqSendHelper.logSendFailure(destination, null, getClass().getSimpleName(), traceId, e);
