@@ -157,6 +157,14 @@ zipkin:
     database: zipkin          # Zipkin 所在的 MySQL 数据库名
     batch-size: 5000          # 每批删除行数，避免大事务锁表
 
+# IoT 日志归档（指令记录 / 操作日志 / MQ 消息日志）
+iot:
+  log:
+    archive:
+      retention-days: 90           # 主表保留天数（约 3 个月）
+      history-retention-days: 365  # 历史表保留天数（按 backup_time）
+      batch-size: 2000             # 每批归档/删除行数
+
 # WebRTC 服务配置（TURN 凭证 + turn_router 动态调度）
 webrtc:
   turn-server:

@@ -23,3 +23,10 @@ mqtt:
     reconcile-enabled: true
     reconcile-lock-seconds: 120
     reconcile-sidefx-idempotent-seconds: 60
+
+iot:
+  log:
+    archive:
+      retention-days: 90
+      history-retention-days: 365
+      batch-size: 2000
