@@ -140,13 +140,17 @@ xxl:
 
 jeecg:
   shiro:
-    excludeUrls: /internal/mqtt/**,/api/ota/**
+    excludeUrls: /internal/mqtt/**,/internal/device/**,/api/ota/**
 
 device:
   encrypt:
     enabled: false
   master:
     allow-default-device-code: true
+  provision:
+    enabled: true
+    timestamp-skew-seconds: 300
+    default-tenant-id: 1000
   ota:
     chunk-temp-dir: /tmp/iot-ota-chunks
 
