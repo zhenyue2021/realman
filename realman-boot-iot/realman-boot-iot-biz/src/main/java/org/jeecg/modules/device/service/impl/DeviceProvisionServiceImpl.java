@@ -10,6 +10,7 @@ import org.jeecg.modules.device.dto.DeviceProvisionRequestDTO;
 import org.jeecg.modules.device.dto.DeviceProvisionResponseDTO;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.mapper.IotDeviceMapper;
+import org.jeecg.modules.device.security.DeviceSecretService;
 import org.jeecg.modules.device.service.IDeviceOperationLogService;
 import org.jeecg.modules.device.service.IDeviceProvisionService;
 import org.jeecg.modules.device.service.impl.device.IotDeviceLifecycleService;
@@ -19,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
@@ -37,6 +39,7 @@ public class DeviceProvisionServiceImpl implements IDeviceProvisionService {
     private final IotDeviceMapper deviceMapper;
     private final IotDeviceLifecycleService lifecycleService;
     private final IDeviceOperationLogService logService;
+    private final DeviceSecretService secretService;
 
     @Value("${mqtt.broker.url:tcp://localhost:1883}")
     private String mqttBrokerUrl;
@@ -75,7 +78,11 @@ public class DeviceProvisionServiceImpl implements IDeviceProvisionService {
         device.setMacAddress(macAddress);
         device.setDescription(trimToNull(request.getDescription()));
         device.setTenantId(provisionProperties.getDefaultTenantId());
-
+        device.setStatus(DeviceConstant.DeviceStatus.INACTIVE);
+        device.setCreateTime(LocalDateTime.now());
+        device.setCreateBy("设备自动注册");
+        String generateSecret = secretService.generateSecret(device.getDeviceCode());
+        device.setDeviceSecret(generateSecret);
         IotDevice saved = lifecycleService.addDevice(device);
         logService.recordLog(saved.getId(), saved.getDeviceCode(),
                 DeviceConstant.OperationType.DEVICE_REGISTER,
