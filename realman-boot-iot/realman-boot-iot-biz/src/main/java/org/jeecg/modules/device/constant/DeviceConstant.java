@@ -375,8 +375,12 @@ public interface DeviceConstant {
         String ROOM_ROBOT_PREFIX = "iot:room:robot:";
         /** 活跃房间集合：iot:room:active，成员为 masterCode（ACTIVE 状态的房间） */
         String ROOM_ACTIVE_SET = "iot:room:active";
-        /** 房间 TURN/信令路由缓存：iot:room:turn-route:{masterCode}，值为 JSON(RoomTurnRouteCache)，TTL=24h */
+        /** 房间 TURN/信令路由缓存：iot:room:turn-route:{masterCode}，值为 JSON(RoomTurnRouteCache)，TTL=12h */
         String ROOM_TURN_ROUTE_PREFIX = "iot:room:turn-route:";
+        /** 午夜 TURN 路由缓存清理分布式锁：iot:room:turn-route:refresh:lock */
+        String ROOM_TURN_ROUTE_REFRESH_LOCK = "iot:room:turn-route:refresh:lock";
+        /** IP 行政区划解析缓存：iot:ip-geo:{provider}:{ip}，值为 address 文案 */
+        String IP_GEO_PREFIX = "iot:ip-geo:";
     }
 
     /**

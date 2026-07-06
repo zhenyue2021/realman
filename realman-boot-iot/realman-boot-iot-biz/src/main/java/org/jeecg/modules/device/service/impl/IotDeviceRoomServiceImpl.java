@@ -14,8 +14,7 @@ import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.service.IIotDeviceRoomService;
 import org.jeecg.modules.device.service.impl.device.IotDeviceSupport;
 import org.jeecg.modules.device.service.webrtc.RoomTurnRouteCache;
-import org.jeecg.modules.device.service.webrtc.TurnRouteResult;
-import org.jeecg.modules.device.service.webrtc.TurnRouterClient;
+import org.jeecg.modules.device.service.webrtc.RoomTurnRouteCacheService;
 import org.jeecg.modules.device.service.webrtc.WebRtcEndpointAssembler;
 import org.jeecg.modules.device.vo.DeviceRoomVO;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -38,7 +37,7 @@ import java.util.concurrent.TimeUnit;
  * <ul>
  *   <li>{@code iot:room:master:{masterCode}} → JSON(DeviceRoomVO)，TTL=24h</li>
  *   <li>{@code iot:room:robot:{robotCode}}   → masterCode 字符串，TTL=24h</li>
- *   <li>{@code iot:room:turn-route:{masterCode}} → JSON(RoomTurnRouteCache)，TTL=24h</li>
+ *   <li>{@code iot:room:turn-route:{masterCode}} → JSON(RoomTurnRouteCache)，TTL=12h</li>
  *   <li>{@code iot:room:active}              → Set&lt;masterCode&gt;</li>
  * </ul>
  */
@@ -50,7 +49,7 @@ public class IotDeviceRoomServiceImpl extends ServiceImpl<IotDeviceRoomMapper, I
 
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
-    private final TurnRouterClient turnRouterClient;
+    private final RoomTurnRouteCacheService roomTurnRouteCacheService;
     private final WebRtcEndpointAssembler webRtcEndpointAssembler;
     private final IotDeviceSupport deviceSupport;
 
@@ -79,15 +78,11 @@ public class IotDeviceRoomServiceImpl extends ServiceImpl<IotDeviceRoomMapper, I
         IotDeviceRoom room = resolveRoom(masterCode, robotCode);
         String roomId = room.getId();
 
-        RoomTurnRouteCache routeCache = getTurnRouteCache(masterCode);
-        if (routeCache == null) {
-            TurnRouteResult route = turnRouterClient.route(
-                    roomId,
-                    robotLoc.province(), robotLoc.city(),
-                    browserLoc.province(), browserLoc.city());
-            routeCache = new RoomTurnRouteCache(route.getServerIp(), route.getServerPort(), route.getSignalKey());
-            putTurnRouteCache(masterCode, routeCache);
-        }
+        RoomTurnRouteCache routeCache = roomTurnRouteCacheService.getOrFetch(
+                masterCode,
+                roomId,
+                robotLoc.province(), robotLoc.city(),
+                browserLoc.province(), browserLoc.city());
 
         MqttMessageModel.WebRtcCommand startCmd = webRtcEndpointAssembler.assemble(routeCache);
         startCmd.setRoomId(roomId);
@@ -198,7 +193,7 @@ public class IotDeviceRoomServiceImpl extends ServiceImpl<IotDeviceRoomMapper, I
         String oldRobotCode = room.getRobotCode();
         if (oldRobotCode != null && !oldRobotCode.isBlank() && !oldRobotCode.equals(robotCode)) {
             redisTemplate.delete(DeviceConstant.RedisKey.ROOM_ROBOT_PREFIX + oldRobotCode);
-            evictTurnRouteCache(room.getMasterCode());
+            roomTurnRouteCacheService.evict(room.getMasterCode());
         }
         room.setRobotCode(robotCode);
         room.setStatus(IotDeviceRoom.Status.ACTIVE);
@@ -225,35 +220,6 @@ public class IotDeviceRoomServiceImpl extends ServiceImpl<IotDeviceRoomMapper, I
         if (!Objects.equals(device.getDeviceType(), expectType)) {
             throw new RuntimeException("设备类型不匹配：[" + device.getDeviceCode() + "] 不是" + label + "设备");
         }
-    }
-
-    private RoomTurnRouteCache getTurnRouteCache(String masterCode) {
-        try {
-            String json = redisTemplate.opsForValue()
-                    .get(DeviceConstant.RedisKey.ROOM_TURN_ROUTE_PREFIX + masterCode);
-            if (json != null) {
-                return objectMapper.readValue(json, RoomTurnRouteCache.class);
-            }
-        } catch (Exception e) {
-            log.warn("[Room] TURN 路由缓存读取失败 masterCode={}", masterCode, e);
-        }
-        return null;
-    }
-
-    private void putTurnRouteCache(String masterCode, RoomTurnRouteCache cache) {
-        try {
-            String json = objectMapper.writeValueAsString(cache);
-            redisTemplate.opsForValue().set(
-                    DeviceConstant.RedisKey.ROOM_TURN_ROUTE_PREFIX + masterCode,
-                    json,
-                    ROOM_CACHE_TTL_HOURS, TimeUnit.HOURS);
-        } catch (Exception e) {
-            log.warn("[Room] TURN 路由缓存写入失败 masterCode={}", masterCode, e);
-        }
-    }
-
-    private void evictTurnRouteCache(String masterCode) {
-        redisTemplate.delete(DeviceConstant.RedisKey.ROOM_TURN_ROUTE_PREFIX + masterCode);
     }
 
     private DeviceRoomVO getFromCache(String masterCode) {
@@ -291,7 +257,7 @@ public class IotDeviceRoomServiceImpl extends ServiceImpl<IotDeviceRoomMapper, I
     private void evictCache(String masterCode, String robotCode) {
         redisTemplate.delete(DeviceConstant.RedisKey.ROOM_MASTER_PREFIX + masterCode);
         redisTemplate.opsForSet().remove(DeviceConstant.RedisKey.ROOM_ACTIVE_SET, masterCode);
-        evictTurnRouteCache(masterCode);
+        roomTurnRouteCacheService.evict(masterCode);
         if (robotCode != null && !robotCode.isBlank()) {
             redisTemplate.delete(DeviceConstant.RedisKey.ROOM_ROBOT_PREFIX + robotCode);
         }

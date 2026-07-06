@@ -58,5 +58,9 @@ public class WebRtcProperties {
         private String baseUrl = "";
         private int connectTimeoutMs = 5_000;
         private int readTimeoutMs = 5_000;
+        /** TURN 智能调度结果 Redis 缓存 TTL（小时） */
+        private int routeCacheTtlHours = 12;
+        /** 是否允许 XXL-Job 清理全部 TURN 路由缓存（不主动拉取，由调用方触发 getOrFetch） */
+        private boolean routeCacheMidnightEvict = true;
     }
 }
