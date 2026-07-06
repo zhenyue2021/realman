@@ -8,6 +8,7 @@ import org.jeecg.modules.device.dto.DeviceProvisionRequestDTO;
 import org.jeecg.modules.device.dto.DeviceProvisionResponseDTO;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.mapper.IotDeviceMapper;
+import org.jeecg.modules.device.security.DeviceSecretService;
 import org.jeecg.modules.device.service.impl.DeviceProvisionServiceImpl;
 import org.jeecg.modules.device.service.impl.device.IotDeviceLifecycleService;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,6 +36,7 @@ class DeviceProvisionServiceImplTest {
     private IotDeviceMapper deviceMapper;
     private IotDeviceLifecycleService lifecycleService;
     private IDeviceOperationLogService logService;
+    private DeviceSecretService secretService;
     private DeviceProvisionServiceImpl service;
 
     @BeforeEach
@@ -47,7 +49,9 @@ class DeviceProvisionServiceImplTest {
         deviceMapper = Mockito.mock(IotDeviceMapper.class);
         lifecycleService = Mockito.mock(IotDeviceLifecycleService.class);
         logService = Mockito.mock(IDeviceOperationLogService.class);
-        service = new DeviceProvisionServiceImpl(properties, deviceMapper, lifecycleService, logService);
+        secretService = Mockito.mock(DeviceSecretService.class);
+        when(secretService.generateSecret(DEVICE_CODE)).thenReturn("md5-secret");
+        service = new DeviceProvisionServiceImpl(properties, deviceMapper, lifecycleService, logService, secretService);
         org.springframework.test.util.ReflectionTestUtils.setField(service, "mqttBrokerUrl", "tcp://broker:1883");
     }
 
@@ -76,7 +80,9 @@ class DeviceProvisionServiceImplTest {
         assertThat(toSave.getMacAddress()).isEqualTo(MAC);
         assertThat(toSave.getDeviceModel()).isEqualTo("RM-X1");
         assertThat(toSave.getDeviceType()).isEqualTo(DeviceConstant.DeviceTypeInteger.ROBOT);
+        assertThat(toSave.getDeviceSecret()).isEqualTo("md5-secret");
         assertThat(toSave.getTenantId()).isEqualTo(1000);
+        verify(secretService).generateSecret(DEVICE_CODE);
     }
 
     @Test
