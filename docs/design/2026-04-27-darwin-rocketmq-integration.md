@@ -1,9 +1,11 @@
 # 达尔文数采平台 RocketMQ 集成设计
 
+> **已被取代**：SaaS 平台化后数据处理模块（Darwin）与设备通信中台同域，不再需要跨系统 RocketMQ 桥接，本设计的 4 条链路已改为 HTTP 直连方案，详见 [V2 架构升级设计 · 第六章](./2026-07-07-darwin-platform-v2-capability-bus-and-comm-hub.md#六数据处理模块解耦rocketmq--http-直连) 与 [ADR-0002](../adr/0002-device-foundation-comm-hub-capability-bus.md)。本文档保留作为历史记录。
+
 - **文档版本**：v1.0
 - **日期**：2026-04-27
 - **作者**：lorete
-- **状态**：已确认，待实现
+- **状态**：已确认，待实现（已被 HTTP 直连方案取代，见上方提示）
 
 **RocketMQ 版本约定**（与父 `pom.xml` 一致）：`rocketmq-spring-boot-starter` 见 **`rocketmq-spring.version`**（**2.3.1**）；独立 Broker / NameServer 容器镜像 **`apache/rocketmq:${rocketmq-broker-docker.version}`**（**5.3.2**）。
 

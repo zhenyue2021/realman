@@ -3,6 +3,7 @@
 本文档依据仓库 `realman-server-cloud`、`realman-boot-system`、`realman-boot-iot` 等模块的 **Maven 结构与默认端口配置** 整理，描述 **Spring Cloud + Nacos** 形态下的微服务拓扑；单体部署形态见 [软件架构设计.md](./软件架构设计.md)。
 
 > **架构升级（规划中）**：IoT 将拆分为设备中台、MQTT 集成平台、OTA 平台与瘦身 IoT 业务服务，详见 [IoT 平台架构升级设计](./design/2026-06-30-iot-platform-architecture-upgrade.md) 与 [ADR-0001](./adr/0001-iot-platform-split-device-mqtt-ota.md)。
+> **V2 修订（规划中）**：设备管理二次拆分为设备基座/设备管理业务平台、设备通信中台新增 HTTP 设备网关、新增平台能力总线治理层、数据处理模块桥接由 RocketMQ 改为 HTTP 直连，详见 [V2 架构升级设计](./design/2026-07-07-darwin-platform-v2-capability-bus-and-comm-hub.md) 与 [ADR-0002](./adr/0002-device-foundation-comm-hub-capability-bus.md)。
 
 ## 架构总览（图示）
 

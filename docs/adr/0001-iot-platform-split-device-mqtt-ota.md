@@ -1,8 +1,10 @@
 # ADR-0001: IoT 平台拆分为设备中台、MQTT 集成平台与 OTA 平台
 
+> **已被部分修订**：设备管理的拆分粒度（二次拆为设备基座/设备管理业务平台）、设备通信中台的协议范围（新增 HTTP 设备网关）、数据处理模块的桥接方式（RocketMQ → HTTP 直连）以及新增的"平台能力总线"治理层，详见 [ADR-0002](./0002-device-foundation-comm-hub-capability-bus.md) 与 [V2 架构升级设计](../design/2026-07-07-darwin-platform-v2-capability-bus-and-comm-hub.md)。本文档"三中台拆分 + 分阶段迁移"的总体方向不变，仍作为基线参考。
+
 | 项 | 内容 |
 |---|---|
-| **状态** | 提议 |
+| **状态** | 提议（部分内容被 ADR-0002 修订，见上方提示） |
 | **日期** | 2026-06-30 |
 | **决策者** | 架构组 / IoT 团队（待确认） |
 | **影响模块** | `realman-boot-iot`、`realman-server-cloud`（Gateway）、新建 `realman-boot-device-hub`、`realman-boot-mqtt-hub`、`realman-boot-ota` |
