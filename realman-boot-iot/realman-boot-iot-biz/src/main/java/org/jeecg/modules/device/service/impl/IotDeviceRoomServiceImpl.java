@@ -9,6 +9,7 @@ import org.jeecg.modules.device.constant.DeviceConstant;
 import org.jeecg.modules.device.entity.IotDevice;
 import org.jeecg.modules.device.entity.IotDeviceRoom;
 import org.jeecg.modules.device.geo.AdministrativeAddressParser;
+import org.jeecg.modules.device.geo.DeviceRoutingLocationResolver;
 import org.jeecg.modules.device.mapper.IotDeviceRoomMapper;
 import org.jeecg.modules.device.mqtt.MqttMessageModel;
 import org.jeecg.modules.device.service.IIotDeviceRoomService;
@@ -52,6 +53,7 @@ public class IotDeviceRoomServiceImpl extends ServiceImpl<IotDeviceRoomMapper, I
     private final RoomTurnRouteCacheService roomTurnRouteCacheService;
     private final WebRtcEndpointAssembler webRtcEndpointAssembler;
     private final IotDeviceSupport deviceSupport;
+    private final DeviceRoutingLocationResolver routingLocationResolver;
 
     private static final long ROOM_CACHE_TTL_HOURS = 24L;
 
@@ -71,9 +73,9 @@ public class IotDeviceRoomServiceImpl extends ServiceImpl<IotDeviceRoomMapper, I
         requireDeviceType(robot, DeviceConstant.DeviceTypeInteger.ROBOT, "机器人");
 
         AdministrativeAddressParser.ProvinceCity browserLoc =
-                AdministrativeAddressParser.parse(master.getAddress());
+                routingLocationResolver.resolve(master.getAddress());
         AdministrativeAddressParser.ProvinceCity robotLoc =
-                AdministrativeAddressParser.parse(robot.getAddress());
+                routingLocationResolver.resolve(robot.getAddress());
 
         IotDeviceRoom room = resolveRoom(masterCode, robotCode);
         String roomId = room.getId();
