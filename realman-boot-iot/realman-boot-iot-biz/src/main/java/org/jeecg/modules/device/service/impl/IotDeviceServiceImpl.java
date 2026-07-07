@@ -152,12 +152,8 @@ public class IotDeviceServiceImpl extends ServiceImpl<IotDeviceMapper, IotDevice
     }
 
     @Override
-    public MqttMessageModel.WebRtcCommand queryOrCreateRoom(String masterCode) {
-        IotDevice device = iotDeviceSupport.requireByDeviceCode(masterCode);
-        if (!Objects.equals(device.getDeviceType(), DeviceConstant.DeviceTypeInteger.CONTROLLER)) {
-            throw new RuntimeException("设备类型不匹配：[" + masterCode + "] 不是主控设备");
-        }
-        return roomService.queryOrCreate(masterCode);
+    public MqttMessageModel.WebRtcCommand queryOrCreateRoom(String masterCode, String robotCode) {
+        return roomService.queryOrCreate(masterCode, robotCode);
     }
 
     /**

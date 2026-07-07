@@ -1,215 +1,30 @@
 package org.jeecg.modules.device.service.signaling;
 
-import cn.hutool.core.util.HexUtil;
-import cn.hutool.crypto.digest.DigestUtil;
-import lombok.extern.slf4j.Slf4j;
-import org.jeecg.modules.device.constant.DeviceConstant;
-import org.springframework.beans.factory.annotation.Value;
+import org.jeecg.modules.device.config.WebRtcProperties;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.http.*;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
-
-import java.security.SecureRandom;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.Locale;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 /**
- * 信令服务器房间密钥管理
- *
- * <p>职责：
- * <ol>
- *   <li>生成 32 字节（64 位 Hex）的随机房间密钥</li>
- *   <li>通过 POST 接口推送给信令服务器</li>
- *   <li>推送成功后写入 Redis，以信令服务器地址为 Key，TTL=26h</li>
- * </ol>
- *
- * <p>配置示例（application.yml / Nacos）：
- * <pre>
- * webrtc:
- *  signaling:
- *   server:
- *     url: 192.168.1.100
- *     port: 8091
- * </pre>
+ * 信令 WebSocket 地址组装（serverIp 来自 turn_router，port 来自配置）。
  */
-@Slf4j
 @Service
 @RefreshScope
 public class SignalingKeyService {
 
-    /**
-     * 信令服务器根地址，例如 192.168.1.100
-     */
-    @Value("${webrtc.signaling.server.url:}")
-    private String serverUrl;
-    /**
-     * 信令服务器根服务端口，例如 8091
-     */
-    @Value("${webrtc.signaling.server.port:}")
-    private String serverPort;
+    private final WebRtcProperties webRtcProperties;
 
-    /**
-     * 密钥推送接口路径
-     */
-    private static final String KEY_API_PATH = "/api/set_key";
-
-    /**
-     * Redis 中密钥的 TTL（比 24h 多 2h 作为缓冲，防止定时任务短暂延迟导致 Key 过期）
-     */
-    private static final long KEY_TTL_HOURS = 26L;
-
-    /** 密钥缺失时自动恢复的分布式锁 Key，防止多节点并发重复推送 */
-    private static final String RECOVER_LOCK_KEY      = "iot:signaling:recover:lock";
-    /** 恢复锁 TTL（秒）：推送+写入的合理上限；失败时主动释放，成功时让锁自然过期避免重入 */
-    private static final long   RECOVER_LOCK_TTL_SECONDS = 60L;
-
-    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
-
-    private final StringRedisTemplate redisTemplate;
-    private final RestTemplate restTemplate;
-
-    public SignalingKeyService(StringRedisTemplate redisTemplate) {
-        this.redisTemplate = redisTemplate;
-        this.restTemplate = buildRestTemplate();
+    public SignalingKeyService(WebRtcProperties webRtcProperties) {
+        this.webRtcProperties = webRtcProperties;
     }
 
     /**
-     * 生成新密钥并推送给信令服务器，成功后更新 Redis 缓存。
-     *
-     * <p>若信令服务器地址未配置（{@code signaling.server.url} 为空），则跳过并记录警告。
-     * 若推送失败，Redis 中保留旧密钥，不做替换，确保信令服务器与缓存始终一致。
+     * 返回信令 WebSocket URL（供 WebRTC 指令填充 signalUrl 字段）。
      */
-    public void generateAndPush() {
-        if (serverUrl == null || serverUrl.isBlank()) {
-            log.warn("[Signaling] signaling.server.url 未配置，跳过密钥生成");
-            return;
-        }
-
-        String newKey = generateKey();
-        boolean pushed = pushToServer(newKey);
-        if (pushed) {
-            try {
-                storeInRedis(newKey);
-                log.info("[Signaling] 密钥已更新并推送至信令服务器 url={}", serverUrl);
-            } catch (Exception e) {
-                log.error("[Signaling] 密钥已推送信令服务器但 Redis 写入失败，信令/缓存不一致 url={}", serverUrl, e);
-            }
-        } else {
-            log.warn("[Signaling] 密钥推送失败，Redis 保留旧密钥 url={}", serverUrl);
-        }
-    }
-
-    /**
-     * 从 Redis 查询当前有效密钥；若缺失则自动重新生成并推送（幂等，集群内只有一个节点执行）。
-     *
-     * @return 当前密钥；若信令服务器不可达或未配置则返回 null
-     */
-    public String getCurrentKey() {
-        String key = redisTemplate.opsForValue().get(redisKey());
-        if (key != null) {
-            return key;
-        }
-        log.warn("[Signaling] Redis 中密钥缺失，尝试自动恢复 url={}", serverUrl);
-        Boolean acquired = redisTemplate.opsForValue()
-                .setIfAbsent(RECOVER_LOCK_KEY, "1", RECOVER_LOCK_TTL_SECONDS, TimeUnit.SECONDS);
-        if (Boolean.TRUE.equals(acquired)) {
-            try {
-                generateAndPush();
-            } catch (Exception e) {
-                log.error("[Signaling] 密钥自动恢复失败，释放锁 url={}", serverUrl, e);
-                redisTemplate.delete(RECOVER_LOCK_KEY);
-            }
-        } else {
-            log.info("[Signaling] 其他节点正在恢复密钥，本次跳过 url={}", serverUrl);
-        }
-        return redisTemplate.opsForValue().get(redisKey());
-    }
-
-    /**
-     * 返回信令服务器 URL（供下行 WebRTC 指令填充 signalUrl 字段使用）。
-     *
-     * @return 例如 {@code 192.168.1.100}
-     */
-    public String getServerUrl() {
-        if (serverUrl == null || serverUrl.isBlank() || serverPort == null || serverPort.isBlank()) {
+    public String buildSignalUrl(String serverIp) {
+        if (serverIp == null || serverIp.isBlank()) {
             return null;
         }
-        return "ws://" + serverUrl + ":" + serverPort;
+        int port = webRtcProperties.getSignaling().getServer().getPort();
+        return "ws://" + serverIp + ":" + port;
     }
-
-    // -------------------------------------------------------------------------
-    // 私有方法
-    // -------------------------------------------------------------------------
-
-    /**
-     * 生成 32 字节（64 位 Hex）安全随机密钥
-     */
-    private static String generateKey() {
-        byte[] bytes = new byte[32];
-        SECURE_RANDOM.nextBytes(bytes);
-        String timestampStr = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssS"));
-        String randomHex = HexUtil.encodeHexStr(bytes);
-        return timestampStr + "_"+ DigestUtil.md5Hex(randomHex).toUpperCase(Locale.ROOT);
-    }
-
-    /**
-     * 推送密钥至信令服务器，返回是否成功
-     */
-    private boolean pushToServer(String key) {
-        String url = "http://" + serverUrl + ":" + serverPort + KEY_API_PATH;
-        try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<Map<String, String>> request = new HttpEntity<>(
-                    Map.of("room_key", key), headers);
-
-            ResponseEntity<Map> response = restTemplate.exchange(
-                    url, HttpMethod.POST, request, Map.class);
-
-            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                Object success = response.getBody().get("success");
-                if (Boolean.TRUE.equals(success)) {
-                    log.info("[Signaling] 推送响应 success=TRUE url={} body={}", url, response.getBody());
-                    return true;
-                }
-                log.warn("[Signaling] 推送响应 success=false url={} body={}", url, response.getBody());
-            } else {
-                log.warn("[Signaling] 推送响应非 2xx url={} status={}", url, response.getStatusCode());
-            }
-        } catch (Exception e) {
-            log.error("[Signaling] 推送密钥异常 url={}", url, e);
-        }
-        return false;
-    }
-
-    /**
-     * 将密钥写入 Redis，Key 为信令服务器地址，TTL=26h
-     */
-    private void storeInRedis(String key) {
-        redisTemplate.opsForValue().set(redisKey(), key, KEY_TTL_HOURS, TimeUnit.HOURS);
-    }
-
-    /**
-     * Redis Key：固定前缀 + 信令服务器地址
-     */
-    private String redisKey() {
-        return DeviceConstant.RedisKey.SIGNALING_KEY_PREFIX + serverUrl;
-    }
-
-    /**
-     * 构造带超时限制的 RestTemplate（避免信令服务器无响应时阻塞线程）
-     */
-    private static RestTemplate buildRestTemplate() {
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(5_000);
-        factory.setReadTimeout(10_000);
-        return new RestTemplate(factory);
-    }
-
 }

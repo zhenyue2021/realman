@@ -24,6 +24,12 @@ spring:
         refresh-enabled: true
         # 命名空间填控制台「Namespace ID」；使用 public 时请勿填 public 字样，直接省略本项
         # namespace: ${NACOS_NAMESPACE:}
+      discovery:
+        server-addr: ${NACOS_SERVER_ADDR:realman-nacos:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${NACOS_GROUP:REALMAN_GROUP}
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:nacos}
   config:
     import:
       # liteflow 等本地片段

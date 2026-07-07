@@ -247,6 +247,25 @@ public class MasterDeviceController {
         return ApiResult.ok(cameraStreams, "开始遥操指令已下发，并尝试获取视频流");
     }
 
+    /**
+     * 查询主控房间（不存在则自动创建）
+     *
+     * <p>调用方拿主控设备编码查询服务器地址时使用。
+     * 返回的 roomId 即为本次会话的房间号，后续机器人加入及销毁均以此为索引。
+     */
+    @GetMapping("/{masterCode}/room")
+    @Operation(summary = "查询主控房间")
+    public ApiResult<MqttMessageModel.WebRtcCommand> queryRoom(@PathVariable String masterCode,
+                                                               @RequestParam String robotCode) {
+        if (masterCode == null || masterCode.isBlank()) {
+            return ApiResult.fail("[masterCode] 主控设备编码不能为空");
+        }
+        if (robotCode == null || robotCode.isBlank()) {
+            return ApiResult.fail("[robotCode] 机器人编码不能为空");
+        }
+        return ApiResult.ok(deviceService.queryOrCreateRoom(masterCode, robotCode));
+    }
+
     /** 开始遥操（通知主控关联目标机器人，不等待ACK） */
     @PostMapping("/{controllerId}/teleop/startOperation")
     @Operation(summary = "主控关联目标机器人，并开始遥操")
@@ -327,20 +346,6 @@ public class MasterDeviceController {
         return ApiResult.ok(vo);
     }
 
-    /**
-     * 查询主控房间（不存在则自动创建）
-     *
-     * <p>调用方拿主控设备编码查询服务器地址时使用。
-     * 返回的 roomId 即为本次会话的房间号，后续机器人加入及销毁均以此为索引。
-     */
-    @GetMapping("/{masterCode}/room")
-    @Operation(summary = "查询主控房间")
-    public ApiResult<MqttMessageModel.WebRtcCommand> queryRoom(@PathVariable String masterCode) {
-        if (masterCode == null || masterCode.isBlank()) {
-            return ApiResult.fail("masterCode 不能为空");
-        }
-        return ApiResult.ok(deviceService.queryOrCreateRoom(masterCode));
-    }
 
     /** 导出主控设备列表为 Excel（条件与 list 一致，逻辑删除的不导出） */
     @PostMapping("/export")

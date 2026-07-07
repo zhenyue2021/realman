@@ -1,0 +1,13 @@
+#!/bin/sh
+# Strip Cursor Agent attribution trailers from commit messages.
+#
+# Enable for this repo (run once after clone):
+#   git config core.hooksPath .githooks
+
+COMMIT_MSG_FILE=$1
+[ -n "$COMMIT_MSG_FILE" ] && [ -f "$COMMIT_MSG_FILE" ] || exit 0
+
+tmp=$(mktemp 2>/dev/null || mktemp -t prepare-commit-msg)
+grep -v -E '^(Co-authored-by: Cursor <cursoragent@cursor.com>|Made-with: Cursor)[[:space:]]*$' \
+  "$COMMIT_MSG_FILE" > "$tmp" && mv "$tmp" "$COMMIT_MSG_FILE"
+exit 0

@@ -1,8 +1,33 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /realman-boot
+
 spring:
   application:
     name: realman-boot
+  cloud:
+    nacos:
+      config:
+        # 必须在主 application.yml 中配置，否则 NacosConfigData 解析 import 时 server-addr 未就绪
+        server-addr: ${NACOS_SERVER_ADDR:realman-nacos:8848}
+        group: ${NACOS_GROUP:REALMAN_GROUP}
+        file-extension: yaml
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:nacos}
+        refresh-enabled: true
+        # namespace: ${NACOS_NAMESPACE:}
+      discovery:
+        server-addr: ${NACOS_SERVER_ADDR:realman-nacos:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${NACOS_GROUP:REALMAN_GROUP}
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:nacos}
   config:
-    import: optional:classpath:config/application-liteflow.yml
+    import:
+      - optional:classpath:config/application-liteflow.yml
+      # DataId 与 Nacos 控制台一致（REALMAN_GROUP / realman-system.yaml）
+      - optional:nacos:realman-system.yaml?group=REALMAN_GROUP&refreshEnabled=true
   profiles:
     active: '@profile.name@'
 

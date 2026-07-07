@@ -1,0 +1,50 @@
+# Nacos 控制台：Group=REALMAN_GROUP，Namespace=public（留空），DataId=realman-system.yaml
+# 若 docker-compose 使用 lorete-* 服务名，请将 realman-* 替换为 lorete-*。
+# 禁止配置 server.servlet.context-path（须保持 jar 内 /realman-boot）。
+
+spring:
+  datasource:
+    dynamic:
+      datasource:
+        master:
+          url: jdbc:mysql://realman-mysql:3306/realman-boot?characterEncoding=UTF-8&useUnicode=true&useSSL=false&tinyInt1isBit=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
+          username: root
+          password: root@123456
+          driver-class-name: com.mysql.cj.jdbc.Driver
+  data:
+    redis:
+      database: 0
+      host: realman-redis
+      port: 6379
+      password:
+
+jeecg:
+  firewall:
+    dataSourceSafe: false
+    lowCodeMode: dev
+    is-concurrent: true
+  signatureSecret: dd05f1c54d63749eda95f9fa6d49v442a
+  uploadType: local
+  domainUrl:
+    pc: http://localhost:3100
+    app: http://localhost:8051
+  path:
+    upload: /opt/upFiles
+    webapp: /opt/webapp
+  shiro:
+    excludeUrls: /sys/api/**,/test/jeecgDemo/demo3,/test/jeecgDemo/redisDemo/**,/bigscreen/category/**,/bigscreen/visual/**,/bigscreen/map/**
+  xxljob:
+    enabled: false
+    adminAddresses: http://realman-xxljob:8080/xxl-job-admin
+    appname: realman-boot
+    accessToken: ''
+    address: realman-xxljob:30007
+    ip: realman-xxljob
+    port: 30007
+    logPath: logs/jeecg/job/jobhandler/
+    logRetentionDays: 30
+  redisson:
+    address: realman-redis:6379
+    password:
+    type: STANDALONE
+    enabled: true

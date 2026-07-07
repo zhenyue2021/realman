@@ -839,8 +839,8 @@ Payload: AES-256-CBC 加密后的 JSON 字符串
 | `iot:upload:chunk:{uploadId}`              | Hash   | —       | 固件分片上传进度                        |
 | `iot:room:master:{masterCode}`             | String | 24小时    | 主控房间信息 JSON（DeviceRoomVO）        |
 | `iot:room:robot:{robotCode}`               | String | 24小时    | 机器人 → 主控编码反查索引                  |
+| `iot:room:turn-route:{masterCode}`         | String | 24小时    | 房间 TURN/信令路由缓存（含 serverIp、signalKey） |
 | `iot:room:active`                          | Set    | 永久      | 活跃房间主控编码集合                      |
-| `iot:signaling:key:{serverUrl}`            | String | 26小时    | 信令服务器访问密钥（64位Hex，每天凌晨2点轮换）  |
 
 ---
 
@@ -1040,7 +1040,7 @@ Payload: AES-256-CBC 加密（密钥由 robotCode 派生）
 | `commandId`   | String        | 唯一指令 ID（UUID），ACK 中必须原样带回                               |
 | `roomId`      | String        | 平台为本次遥操分配的房间号（雪花 ID 字符串）                                |
 | `signalUrl`   | String        | 信令服务器 IP 地址，机器人据此建立 WebSocket 连接                        |
-| `signalKey`   | String        | 信令服务器访问密钥（64 位十六进制字符串），每天凌晨 2 点轮换，TTL=26h              |
+| `signalKey`   | String        | 信令服务器访问密钥，由 turn_router 调度接口返回，随房间路由缓存（TTL=24h）              |
 | `turnServers` | Array<Object> | TURN 中继服务器列表，`url` 格式为 `turn:host:port?transport=udp`    |
 | `stunServers` | Array<String> | STUN 服务器地址列表，格式为 `stun:host:port`                        |
 | `timestamp`   | Long          | 平台下发时间，毫秒时间戳                                             |

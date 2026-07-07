@@ -12,6 +12,7 @@ import org.jeecg.modules.device.datacollect.dto.mq.OssAuthResponseMsg;
 import org.jeecg.modules.device.datacollect.dto.mqtt.CollectUrlResponseCmd;
 import org.jeecg.modules.device.constant.DeviceConstant;
 import org.jeecg.modules.device.datacollect.service.DataCollectCommandService;
+import org.jeecg.modules.device.datacollect.service.OssCredentialCacheService;
 import org.jeecg.modules.device.service.IDeviceOperationLogService;
 import org.jeecg.modules.device.util.OperationLogDetail;
 import org.slf4j.MDC;
@@ -47,6 +48,7 @@ public class OssAuthResponseConsumer implements RocketMQListener {
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
     private final IDeviceOperationLogService logService;
+    private final OssCredentialCacheService credentialCache;
 
     @Override
     public ConsumeResult consume(MessageView messageView) {
@@ -92,6 +94,8 @@ public class OssAuthResponseConsumer implements RocketMQListener {
                 return ConsumeResult.SUCCESS;
             }
 
+            credentialCache.releaseInflight(deviceCode);
+
             if (!data.isSuccess()) {
                 String errMsg = data.getErrorMsg() != null ? data.getErrorMsg()
                         : ("errorCode=" + data.getErrorCode());
@@ -107,22 +111,10 @@ public class OssAuthResponseConsumer implements RocketMQListener {
                 return ConsumeResult.SUCCESS;
             }
 
-            CollectUrlResponseCmd cmd = CollectUrlResponseCmd.builder()
-                    .requestId(requestId)
-                    .timestamp(System.currentTimeMillis())
-                    .deviceSn(deviceCode)
-                    .code(0)
-                    .message(null)
-                    .params(CollectUrlResponseCmd.StsParams.builder()
-                            .endpoint(data.getEndpoint())
-                            .bucket(data.getBucket())
-                            .bjExpiration(data.getBjExpiration())
-                            .utcExpiration(data.getUtcExpiration())
-                            .accessKeyId(data.getAccessKeyId())
-                            .accessKeySecret(data.getAccessKeySecret())
-                            .securityToken(data.getSecurityToken())
-                            .build())
-                    .build();
+            credentialCache.put(deviceCode, data);
+
+            CollectUrlResponseCmd.StsParams stsParams = OssCredentialCacheService.toStsParams(data);
+            CollectUrlResponseCmd cmd = credentialCache.buildSuccessResponse(deviceCode, requestId, stsParams);
 
             if (commandService != null) {
                 commandService.sendCollectUrlResponse(deviceCode, cmd);

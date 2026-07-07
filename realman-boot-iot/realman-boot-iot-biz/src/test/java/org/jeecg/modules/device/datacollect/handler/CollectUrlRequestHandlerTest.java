@@ -2,8 +2,11 @@ package org.jeecg.modules.device.datacollect.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.jeecg.modules.device.datacollect.constant.DataCollectConstant;
+import org.jeecg.modules.device.datacollect.dto.mqtt.CollectUrlResponseCmd;
 import org.jeecg.modules.device.datacollect.producer.OssAuthRequestProducer;
+import org.jeecg.modules.device.datacollect.service.DataCollectCommandService;
 import org.jeecg.modules.device.datacollect.service.DeviceTenantResolver;
+import org.jeecg.modules.device.datacollect.service.OssCredentialCacheService;
 import org.jeecg.modules.device.service.IDeviceOperationLogService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -13,6 +16,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
 import java.lang.reflect.Field;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -25,6 +29,8 @@ import static org.mockito.Mockito.when;
 class CollectUrlRequestHandlerTest {
 
     private OssAuthRequestProducer producer;
+    private OssCredentialCacheService credentialCache;
+    private DataCollectCommandService commandService;
     private DeviceTenantResolver tenantResolver;
     private StringRedisTemplate redisTemplate;
     private ValueOperations<String, String> valueOps;
@@ -33,22 +39,22 @@ class CollectUrlRequestHandlerTest {
     @BeforeEach
     void setUp() throws Exception {
         producer = Mockito.mock(OssAuthRequestProducer.class);
+        credentialCache = Mockito.mock(OssCredentialCacheService.class);
+        commandService = Mockito.mock(DataCollectCommandService.class);
         tenantResolver = Mockito.mock(DeviceTenantResolver.class);
         redisTemplate = Mockito.mock(StringRedisTemplate.class);
         valueOps = Mockito.mock(ValueOperations.class);
         when(redisTemplate.opsForValue()).thenReturn(valueOps);
-        handler = new CollectUrlRequestHandler(producer, tenantResolver, redisTemplate,
-                new ObjectMapper(), Mockito.mock(IDeviceOperationLogService.class));
+        when(credentialCache.getIfValid(any())).thenReturn(Optional.empty());
+        when(credentialCache.tryAcquireInflight(any(), any())).thenReturn(true);
+        handler = new CollectUrlRequestHandler(producer, credentialCache, commandService, tenantResolver,
+                redisTemplate, new ObjectMapper(), Mockito.mock(IDeviceOperationLogService.class));
         Field dedup = CollectUrlRequestHandler.class.getDeclaredField("requestDedupMs");
         dedup.setAccessible(true);
         dedup.set(handler, 60_000L);
         Field throttle = CollectUrlRequestHandler.class.getDeclaredField("deviceThrottleMs");
         throttle.setAccessible(true);
         throttle.set(handler, 45_000L);
-    }
-
-    private void mockDedupAndThrottleAllow() {
-        when(valueOps.setIfAbsent(any(), eq("1"), any(Long.class), eq(TimeUnit.MILLISECONDS))).thenReturn(true);
     }
 
     @Test
@@ -122,5 +128,51 @@ class CollectUrlRequestHandlerTest {
         verify(producer, never()).sendAndStore(any(), any(), any(), any(), any());
         verify(tenantResolver, never()).resolveTenantId(any());
         verify(valueOps, never()).setIfAbsent(any(), any(), any(Long.class), any(TimeUnit.class));
+    }
+
+    @Test
+    @DisplayName("缓存命中：直接 MQTT 下发，不转发数采平台")
+    void cacheHitRespondsWithoutForwarding() throws Exception {
+        CollectUrlResponseCmd.StsParams params = CollectUrlResponseCmd.StsParams.builder()
+                .endpoint("oss-cn-beijing.aliyuncs.com")
+                .bucket("embodied-data")
+                .accessKeyId("STS.test")
+                .utcExpiration("2099-01-01T00:00:00Z")
+                .build();
+        CollectUrlResponseCmd cmd = CollectUrlResponseCmd.builder()
+                .requestId("req-cache")
+                .deviceSn("DEV005")
+                .code(0)
+                .params(params)
+                .build();
+        when(credentialCache.getIfValid("DEV005")).thenReturn(Optional.of(params));
+        when(credentialCache.buildSuccessResponse("DEV005", "req-cache", params)).thenReturn(cmd);
+        when(valueOps.setIfAbsent(
+                eq(DataCollectConstant.REDIS_COLLECT_URL_REQ_DEDUP_PREFIX + "req-cache"), eq("1"), eq(60_000L), eq(TimeUnit.MILLISECONDS)))
+                .thenReturn(true);
+
+        handler.handle("DEV005", "{\"requestId\":\"req-cache\",\"timestamp\":1}");
+
+        verify(commandService, times(1)).sendCollectUrlResponse("DEV005", cmd);
+        verify(producer, never()).sendAndStore(any(), any(), any(), any(), any());
+        verify(credentialCache, never()).tryAcquireInflight(any(), any());
+        verify(tenantResolver, never()).resolveTenantId(any());
+    }
+
+    @Test
+    @DisplayName("inflight 进行中：跳过重复转发")
+    void inflightSkipsDuplicateForward() throws Exception {
+        when(credentialCache.tryAcquireInflight("DEV006", "req-inflight")).thenReturn(false);
+        when(valueOps.setIfAbsent(
+                eq(DataCollectConstant.REDIS_COLLECT_URL_REQ_DEDUP_PREFIX + "req-inflight"), eq("1"), eq(60_000L), eq(TimeUnit.MILLISECONDS)))
+                .thenReturn(true);
+        when(valueOps.setIfAbsent(
+                eq(DataCollectConstant.REDIS_COLLECT_URL_DEVICE_THROTTLE_PREFIX + "DEV006"), eq("1"), eq(45_000L), eq(TimeUnit.MILLISECONDS)))
+                .thenReturn(true);
+
+        handler.handle("DEV006", "{\"requestId\":\"req-inflight\",\"timestamp\":1}");
+
+        verify(producer, never()).sendAndStore(any(), any(), any(), any(), any());
+        verify(tenantResolver, never()).resolveTenantId(any());
     }
 }

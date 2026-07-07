@@ -115,8 +115,8 @@ public interface IIotDeviceService extends IService<IotDevice> {
      * <p>校验设备编码对应的设备存在且为主控类型（device_type=2），否则抛出异常。
      *
      * @param masterCode 主控设备编码
+     * @param robotCode  机器人设备编码
      * @return WebRTC 房间信息（信令地址、密钥、roomId、TURN/STUN 服务器列表）
-     * @throws RuntimeException masterCode 对应设备不存在或非主控类型时
      */
-    MqttMessageModel.WebRtcCommand queryOrCreateRoom(String masterCode);
+    MqttMessageModel.WebRtcCommand queryOrCreateRoom(String masterCode, String robotCode);
 }

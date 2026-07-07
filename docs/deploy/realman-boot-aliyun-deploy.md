@@ -146,7 +146,7 @@ Zipkin（链路详情）
   - `jeecg.firewall.lowCodeMode: prod`（关闭在线开发功能）
   - `server.error.include-stacktrace: NEVER`
   - `jeecg.signatureSecret` 已替换为生产专用密钥
-- **IoT 设备通信**：宿主机 `/opt/realman/app/.env` 中已准备 `DEVICE_ENCRYPT_MASTER_KEY`（32 字节随机串，用于一机一密；丢失将导致已注册设备无法鉴权）；按需配置 `DEVICE_STREAM_SECRET`（流媒体相关）
+- **IoT 设备通信**：MQTT 连接鉴权靠 DB `device_secret` + EMQX HTTP Auth（见 9.8.1）；消息体加密由 Nacos `realman-iot.yaml` 中 `device.encrypt.enabled` 控制（密钥 `SHA256(deviceCode)` 派生，无需 `.env` 主密钥）
 
 ### 3.2 数据库
 
@@ -440,13 +440,10 @@ LOKI_URL=http://realman-loki:3100/loki/api/v1/push
 # ——— Spring 激活 Profile ———
 SPRING_PROFILES_ACTIVE=prod
 
-# ——— IoT：设备通信加密（一机一密），须与 Nacos/业务约定一致 ———
-# 示例：openssl rand -base64 32
-DEVICE_ENCRYPT_MASTER_KEY=your-32-bytes-secure-random-string 
 EOF
 ```
 
-> `env` IoT：设备通信加密 DEVICE_ENCRYPT_MASTER_KEY：按需配置
+> IoT 加密与 MQTT 一机一密均在 Nacos `realman-iot.yaml` 与 EMQX HTTP Auth 中配置，`.env` 无需额外加密主密钥。
 
 ---
 
@@ -1196,10 +1193,16 @@ xxl:
     accessToken:
 
 webrtc:
+  turn-server:
+    username: "realman"
+    password: "TBdWj0HhwTK56AzK"
   signaling:
     server:
-      auto-push:
-        enabled: true   # 生产开启，启动时自动推送信令密钥
+      port: 8091
+  turn-router:
+    base-url: "http://turn-router:8081"
+    connect-timeout-ms: 5000
+    read-timeout-ms: 5000
 ```
 
 ### 9.11 启动应用服务
@@ -1516,7 +1519,8 @@ crontab -e
 [ ] Redis redis.conf 已写入（requirepass 已设置）
 [ ] Loki loki-config.yml 已写入
 [ ] Grafana provisioning/datasources.yml 已写入
-[ ] .env 文件已创建（LOKI_URL / ZIPKIN_ENDPOINT / DEVICE_ENCRYPT_MASTER_KEY 已填写）
+[ ] .env 文件已创建（LOKI_URL / ZIPKIN_ENDPOINT 已填写）
+[ ] Nacos realman-iot.yaml 含 device.encrypt.enabled（生产建议 true）
 
 中间件
 [ ] MySQL / Redis 已 healthy

@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.jeecg.modules.device.mapper.IotLogArchiveMapper">
+
+  <sql id="idListFilter">
+    <foreach collection="ids" item="id" open="(" separator="," close=")">
+      #{id}
+    </foreach>
+  </sql>
+
+  <!-- iot_device_command_record -->
+  <select id="selectCommandRecordIdsBefore" resultType="java.lang.String">
+    SELECT id
+    FROM iot_device_command_record
+    WHERE create_time &lt; #{beforeTime}
+    ORDER BY create_time ASC
+    LIMIT #{limit}
+  </select>
+
+  <insert id="insertCommandRecordHistory">
+    INSERT INTO iot_device_command_record_history (
+      id, command_id, device_id, device_code, command_type, device_type, status,
+      fail_reason, operator, params_json, ack_data_json, send_time, ack_time,
+      create_time, update_time, backup_time
+    )
+    SELECT
+      id, command_id, device_id, device_code, command_type, device_type, status,
+      fail_reason, operator, params_json, ack_data_json, send_time, ack_time,
+      create_time, update_time, NOW()
+    FROM iot_device_command_record
+    WHERE id IN <include refid="idListFilter"/>
+  </insert>
+
+  <delete id="deleteCommandRecordsByIds">
+    DELETE FROM iot_device_command_record
+    WHERE id IN <include refid="idListFilter"/>
+  </delete>
+
+  <delete id="deleteCommandRecordHistoryBefore">
+    DELETE FROM iot_device_command_record_history
+    WHERE backup_time &lt; #{beforeTime}
+    LIMIT #{limit}
+  </delete>
+
+  <!-- iot_device_operation_log -->
+  <select id="selectOperationLogIdsBefore" resultType="java.lang.String">
+    SELECT id
+    FROM iot_device_operation_log
+    WHERE operation_time &lt; #{beforeTime}
+    ORDER BY operation_time ASC
+    LIMIT #{limit}
+  </select>
+
+  <insert id="insertOperationLogHistory">
+    INSERT INTO iot_device_operation_log_history (
+      id, device_id, device_code, operation_type, operation_desc, operation_detail,
+      operation_source, operation_result, fail_reason, operator, client_ip,
+      create_time, operation_time, backup_time
+    )
+    SELECT
+      id, device_id, device_code, operation_type, operation_desc, operation_detail,
+      operation_source, operation_result, fail_reason, operator, client_ip,
+      create_time, operation_time, NOW()
+    FROM iot_device_operation_log
+    WHERE id IN <include refid="idListFilter"/>
+  </insert>
+
+  <delete id="deleteOperationLogsByIds">
+    DELETE FROM iot_device_operation_log
+    WHERE id IN <include refid="idListFilter"/>
+  </delete>
+
+  <delete id="deleteOperationLogHistoryBefore">
+    DELETE FROM iot_device_operation_log_history
+    WHERE backup_time &lt; #{beforeTime}
+    LIMIT #{limit}
+  </delete>
+
+  <!-- iot_mq_message_log -->
+  <select id="selectMqMessageLogIdsBefore" resultType="java.lang.String">
+    SELECT id
+    FROM iot_mq_message_log
+    WHERE create_time &lt; #{beforeTime}
+    ORDER BY create_time ASC
+    LIMIT #{limit}
+  </select>
+
+  <insert id="insertMqMessageLogHistory">
+    INSERT INTO iot_mq_message_log_history (
+      id, direction, topic, tag, consumer_group, message_id, message_body,
+      caller_class, status, fail_reason, cost_time, trace_id, create_time, backup_time
+    )
+    SELECT
+      id, direction, topic, tag, consumer_group, message_id, message_body,
+      caller_class, status, fail_reason, cost_time, trace_id, create_time, NOW()
+    FROM iot_mq_message_log
+    WHERE id IN <include refid="idListFilter"/>
+  </insert>
+
+  <delete id="deleteMqMessageLogsByIds">
+    DELETE FROM iot_mq_message_log
+    WHERE id IN <include refid="idListFilter"/>
+  </delete>
+
+  <delete id="deleteMqMessageLogHistoryBefore">
+    DELETE FROM iot_mq_message_log_history
+    WHERE backup_time &lt; #{beforeTime}
+    LIMIT #{limit}
+  </delete>
+</mapper>

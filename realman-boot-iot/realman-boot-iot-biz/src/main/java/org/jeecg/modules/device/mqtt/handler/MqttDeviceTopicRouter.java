@@ -34,12 +34,14 @@ public class MqttDeviceTopicRouter {
     private final ExtParamsRequestHandler extParamsRequestHandler;
     private final WebRtcAckHandler webRtcAckHandler;
     private final WebRtcRestartHandler webRtcRestartHandler;
-    private final OssAddressReportHandler ossAddressReportHandler;
     private final DeviceOnlineReportHandler deviceOnlineReportHandler;
     private final MasterCommandHandler masterCommandHandler;
 
     @Autowired(required = false)
     private CollectUrlRequestHandler collectUrlRequestHandler;
+
+    @Autowired(required = false)
+    private OssAddressReportHandler ossAddressReportHandler;
 
     /**
      * 路由 device/{deviceCode}/{path}
@@ -74,7 +76,13 @@ public class MqttDeviceTopicRouter {
                     log.warn("[TopicRouter] Darwin 集成未启用，忽略 collectUrlRequest deviceCode={}", deviceCode);
                 }
             }
-            case DataCollectConstant.MQTT_UP_OSS_ADDRESS_REPORT -> ossAddressReportHandler.handle(deviceCode, payload);
+            case DataCollectConstant.MQTT_UP_OSS_ADDRESS_REPORT -> {
+                if (ossAddressReportHandler != null) {
+                    ossAddressReportHandler.handle(deviceCode, payload);
+                } else {
+                    log.warn("[TopicRouter] Darwin 集成未启用，忽略 ossAddressReport deviceCode={}", deviceCode);
+                }
+            }
             case DataCollectConstant.MQTT_UP_DEVICE_ONLINE -> deviceOnlineReportHandler.handle(deviceCode, payload);
             default -> log.warn("[TopicRouter] 未知路径: {}", topic);
         }

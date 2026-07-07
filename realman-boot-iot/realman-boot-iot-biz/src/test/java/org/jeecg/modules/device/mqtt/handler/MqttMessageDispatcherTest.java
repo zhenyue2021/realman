@@ -80,13 +80,15 @@ public class MqttMessageDispatcherTest {
                 extParamsRequestHandler,
                 webRtcAckHandler,
                 webRtcRestartHandler,
-                ossAddressReportHandler,
                 deviceOnlineReportHandler,
                 masterCommandHandler
         );
         Field routerCollect = MqttDeviceTopicRouter.class.getDeclaredField("collectUrlRequestHandler");
         routerCollect.setAccessible(true);
         routerCollect.set(deviceTopicRouter, collectUrlRequestHandler);
+        Field routerOss = MqttDeviceTopicRouter.class.getDeclaredField("ossAddressReportHandler");
+        routerOss.setAccessible(true);
+        routerOss.set(deviceTopicRouter, ossAddressReportHandler);
 
         dispatcher = new MqttMessageDispatcher(
                 statusHandler,

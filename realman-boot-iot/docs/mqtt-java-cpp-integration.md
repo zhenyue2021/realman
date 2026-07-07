@@ -516,7 +516,7 @@ start 与 stop 合并为同一下行 Topic，通过 payload 中 `command` 字段
 | `commandId`   | 唯一指令 ID（UUID），ACK 中原样返回                                           |
 | `roomId`      | 平台为本次遥操分配的房间号                                                     |
 | `signalUrl`   | 信令服务器 IP 地址                                                        |
-| `signalKey`   | 信令服务器访问密钥                                                          |
+| `signalKey`   | 信令服务器访问密钥（由 turn_router 调度接口返回）                          |
 | `turnServers` | TURN 中继服务器列表，`url` 格式为 `turn:host:port?transport=udp`             |
 | `stunServers` | STUN 服务器地址列表，格式为 `stun:host:port`                                  |
 | `timestamp`   | 平台下发时间（毫秒）                                                         |
