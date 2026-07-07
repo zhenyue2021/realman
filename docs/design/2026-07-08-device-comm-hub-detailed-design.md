@@ -5,7 +5,7 @@
 | **文档版本** | v1.0 |
 | **日期** | 2026-07-08 |
 | **状态** | 提议 / 待评审 |
-| **上级文档** | [睿尔曼达尔文软件平台 V2 架构升级设计](./2026-07-07-darwin-platform-v2-capability-bus-and-comm-hub.md) 第五章（本文档是该章的详细展开，并修正了初版把"新增 HTTP"误解为"设备协议双模"的表述）|
+| **上级文档** | [睿尔曼达尔文软件平台 V2 架构升级设计](./2026-07-07-darwin-platform-v2-capability-bus-and-comm-hub.md) 第五章（本文档是该章的详细展开）|
 | **姊妹文档** | [设备基座详细设计](./2026-07-08-device-foundation-detailed-design.md) |
 
 ## 先决说明
@@ -24,7 +24,7 @@
 
 ```mermaid
 flowchart TB
-  subgraph south["设备端向：设备侧（协议不变，沿用 EMQX）"]
+  subgraph south["设备端向：设备侧（沿用 EMQX）"]
     DEV_MS["master / slave（现有 MQTT SDK）"]
     DEV_3RD["存量第三方设备（MQTT）"]
   end
@@ -63,7 +63,6 @@ flowchart TB
   DEV_MS -->|一次性| PROVISION
   DEV_3RD <-->|MQTT| AUTH
   ADMIN -->|HTTP| GW
-  SMARTARM -.可选 HTTP.-> GW
 
   DEV_MS <-.下行.-> PUB
   ROUTE --> OTAP & DEVMGMT & DP & IOT & MON
