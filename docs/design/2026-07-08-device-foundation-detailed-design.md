@@ -30,6 +30,7 @@ flowchart TB
     MGMT["设备管理业务平台\n（注册/授权/四态操作/密钥Token/审计）"]
     COMM["设备通信中台\n（在线态、四态中的占用细分实时同步）"]
     OTAP["OTA 平台\n（固件版本回写）"]
+    SMART["第三方业务平台\n（注册/授权/四态操作/密钥Token/审计）"]
   end
 
   subgraph ssot["设备信息基础服务 realman-device-info（SSOT）"]
@@ -42,12 +43,13 @@ flowchart TB
     DP["数据处理"]
     OTAR["OTA（前置校验读取）"]
     MON["状态监控"]
-    THIRD["第三方项目（如大洋电机，仅需基础信息）"]
+    THIRD["第三方项目（如SmartArm，仅需基础信息）"]
   end
 
   MGMT -->|注册写入/密钥版本同步| DB
   COMM -->|online-event / 四态占用同步| DB
   OTAP -->|firmware-version 回写| DB
+  SMART -->|注册写入/密钥版本同步| DB
   DB --> PLAN & GLN & DP & OTAR & MON & THIRD
 ```
 
@@ -63,8 +65,7 @@ flowchart TB
 | --- | --- | --- |
 | `device_id` | varchar(36), PK | 内部唯一标识（UUID），注册时生成，终身不变 |
 | `tenant_id` | varchar(32) | 所属租户，创建后不可变（对齐 OTA PRD 租户约束）|
-| `device_sn` | varchar(64), unique | 设备序列号，产线生成，全局唯一 |
-| `device_code` | varchar(64), unique | 通信层标识（MQTT clientId），与 `device_id` 一一对应 |
+| `device_code` | varchar(64), unique | 设备序列号，产线生成，全局唯一 |
 | `device_type` | varchar(20) | `MASTER` / `SLAVE`（机器人）/ `SMART_ARM` / 其他后续类型，与 OTA PRD 设备角色对齐 |
 | `device_model` | varchar(64) | 型号（如 `RealBot-S2`、`GLN-RX75`、`ECO63-标准版`）|
 | `device_name` | varchar(128) | 展示名称 |
@@ -86,7 +87,7 @@ flowchart TB
 | `data_version` | bigint | 乐观锁 / 变更版本号，供下游做增量同步判断 |
 | `created_at` / `updated_at` | datetime | — |
 
-**索引**：`device_sn`、`device_code` 唯一索引；`(tenant_id, device_type, device_model)` 复合索引（支撑按机型/租户批量查询，服务 OTA 批量升级与版本矩阵）。
+**索引**：`device_id`、`device_code` 唯一索引；`(tenant_id, device_type, device_model)` 复合索引（支撑按机型/租户批量查询，服务 OTA 批量升级与版本矩阵）。
 
 ### 2.2 对内 API（Feign 契约，`realman-device-info-contract`）
 
@@ -95,10 +96,10 @@ flowchart TB
 | 接口 | 方法 | 说明 | 调用方 |
 | --- | --- | --- | --- |
 | `GET /internal/device-info/{deviceId}` | 查询 | 单设备完整信息 | GLN / 数据处理 / OTA / 状态监控 / 任务规划 |
-| `GET /internal/device-info/by-sn/{deviceSn}` | 查询 | 按 SN 查询（OTA `by_sn` 升级场景）| OTA |
-| `POST /internal/device-info/batch-query` | 查询 | 请求体：`{deviceIds?, deviceSns?, tenantId?, deviceType?, deviceModel?, onlyOnline?}`；用于批量升级选型、版本矩阵 | OTA / 任务规划 |
+| `GET /internal/device-info/by-code/{deviceCode}` | 查询 | 按 SN 查询（OTA `by_code` 升级场景）| OTA |
+| `POST /internal/device-info/batch-query` | 查询 | 请求体：`{deviceIds?, deviceCodes?, tenantId?, deviceType?, deviceModel?, onlyOnline?}`；用于批量升级选型、版本矩阵 | OTA / 任务规划 |
 | `GET /internal/device-info/list` | 分页查询 | 支持按 `tenantId`/`deviceType`/`deviceModel`/`onlineStatus`/`occupancyState`/`isTestDevice` 过滤，供设备管理业务平台台账 UI 代理调用 | 设备管理业务平台（台账页面的数据来源）|
-| `POST /internal/device-info/register`（写）| 注册 | 由设备管理业务平台在注册成功后调用，写入 `device_id`/`device_sn`/`device_code`/`device_type`/`tenant_id` 等静态字段，`lifecycle_stage` 置为 `ACTIVATED` | 设备管理业务平台 |
+| `POST /internal/device-info/register`（写）| 注册 | 由设备管理业务平台在注册成功后调用，写入 `device_id`/`device_code`/`device_type`/`tenant_id` 等静态字段，`lifecycle_stage` 置为 `ACTIVATED` | 设备管理业务平台 |
 | `POST /internal/device-info/online-event`（写）| 状态同步 | 请求体：`{deviceId, eventType: ONLINE|OFFLINE, occurredAt, offlineReason?}`；更新 `online_status`/`last_online_at`/`last_offline_at`/`offline_reason`，`OFFLINE` 时联动 `occupancy_state=OFFLINE` | 设备通信中台 |
 | `POST /internal/device-info/occupancy-event`（写）| 四态同步 | 请求体：`{deviceId, occupancyState, occupancyDetail?, occurredAt}` | 设备通信中台（遥操/自主控制状态变化时触发）|
 | `POST /internal/device-info/heartbeat-snapshot`（写）| 心跳快照 | 请求体：`{deviceId, ipAddress, heartbeatAt, resourceSnapshot?}`；更新 `ip_address`/`last_heartbeat_at`，`resourceSnapshot` 透传给 OTA 前置资源校验使用（见通信中台文档） | 设备通信中台 |
@@ -141,7 +142,7 @@ flowchart TB
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `id` | bigint, PK | — |
-| `device_sn` | varchar(64) | 目标设备 SN |
+| `device_code` | varchar(64) | 目标设备 SN |
 | `tenant_id` | varchar(32) | 所属租户 |
 | `secret_hash` | varchar(128) | 凭证哈希存储，不存明文 |
 | `status` | varchar(16) | `UNUSED` / `USED` / `EXPIRED` |
@@ -206,20 +207,20 @@ flowchart TB
 | 轨道 | 载体 | 用途 | 传输方式 |
 | --- | --- | --- | --- |
 | **连接层凭证**`deviceSecret` | 密码字符串，哈希存储 | 建立 MQTT 连接（EMQX Auth/ACL）；这是现状 `DeviceSecretService` 的既有机制，**不变** | 仅用于 MQTT CONNECT 报文 |
-| **业务身份 Token**`Device Token`（JWT） | Bearer JWT，含 `device_id`/`device_type`/`tenant_id`/`issued_at`/`expires_at` | 标识"这次业务请求确实来自这台已注册设备"，用于心跳、进度上报等业务语义的身份校验；对齐 OTA PRD 9.7.5-9.7.7 | 对 MQTT 设备：作为 payload 内的 `device_token` 字段随业务报文携带，由通信中台在归一化时校验；对 HTTP 设备（北向网关接入）：作为 `Authorization: Bearer` 请求头携带 |
+| **业务身份 Token**`Device Token` | Bearer JWT，含 `device_id`/`device_type`/`tenant_id`/`issued_at`/`expires_at` | 标识"这次业务请求确实来自这台已注册设备"，用于心跳、进度上报等业务语义的身份校验；对齐 OTA PRD 9.7.5-9.7.7 | 对 MQTT 设备：作为 payload 内的 `device_token` 字段随业务报文携带，由通信中台在归一化时校验；对 HTTP 设备（WEB向网关接入）：作为 `Authorization: Bearer` 请求头携带 |
 
 两条轨道解决不同层面的问题：`deviceSecret` 只管"能不能连上"，`Device Token` 管"这条业务消息的发送者身份是否仍然合法（未吊销、未过期）"。**现有 MQTT 设备两者都需要**——先用 `deviceSecret` 连上 MQTT，再在业务报文里带 `device_token` 供上层做身份校验；这不是新增负担，而是把 OTA PRD 里"Token 吊销后设备须重新走注册流程"这类安全语义落到现有 MQTT 报文体里，无需改动连接层。
 
-### 3.4 对外 API（经设备通信中台北向网关统一路由，见通信中台详细设计第四章）
+### 3.4 对外 API（经设备通信中台WEB 端向网关统一路由，见通信中台详细设计第四章）
 
-以下接口是"设备管理业务平台"的服务端点，物理上由通信中台的北向网关做统一入口/鉴权/限流后反向代理过来；也包括纯粹面向运维人员的管理端 API（不经过设备协议适配，直接是管理端调用的常规 REST）。
+以下接口是"设备管理业务平台"的服务端点，物理上由通信中台的 WEB 端向网关做统一入口/鉴权/限流后反向代理过来；也包括纯粹面向运维人员的管理端 API（不经过设备协议适配，直接是管理端调用的常规 REST）。
 
 **设备注册与凭证（对齐 OTA PRD 9.8.4-9.8.6，扩展至全部设备类型）**
 
 | 方法 | 路径 | 调用方 | 说明 |
 | --- | --- | --- | --- |
-| POST | `/api/v1/devices/register` | 设备（经通信中台 HTTP 自注册，或离线注册工具）| 请求体：`device_sn`/`device_type`/`tenant_id`/`device_registration_secret`；校验通过后创建 `device_id`、写入 SSOT、签发 `deviceSecret`（MQTT 设备）或 Device Token（HTTP 设备），返回对应凭证 |
-| POST | `/api/v1/admin/devices/registration-secret` | 超管 | 生成一次性注册凭证，`device_sn`+`tenant_id`，返回明文凭证（仅此一次）|
+| POST | `/api/v1/devices/register` | 设备（经通信中台 HTTP 自注册，或离线注册工具）| 请求体：`device_code`/`device_type`/`tenant_id`/`device_registration_secret`；校验通过后创建 `device_id`、写入 SSOT、签发 `deviceSecret`（MQTT 设备）或 Device Token（HTTP 设备），返回对应凭证 |
+| POST | `/api/v1/admin/devices/registration-secret` | 超管 | 生成一次性注册凭证，`device_code`+`tenant_id`，返回明文凭证（仅此一次）|
 | GET | `/api/v1/admin/devices/{deviceSn}/registration-secret/status` | 超管 | 查询凭证状态（unused/used/expired）|
 | POST | `/api/v1/admin/devices/offline-register/batch` | 超管（训练场批量离线注册）| 请求体：`[{deviceSn, deviceType, deviceModel, tenantId}]`，批量创建待激活设备记录，设备上线时凭 SN 完成激活 |
 
@@ -265,7 +266,7 @@ flowchart TB
 sequenceDiagram
   participant Admin as 超管
   participant DEV as 设备
-  participant CH as 通信中台（北向网关，HTTP 自注册例外通道）
+  participant CH as 通信中台（WEB向网关，HTTP 自注册例外通道）
   participant MGMT as 设备管理业务平台
   participant SSOT as 设备信息基础服务
 
@@ -273,7 +274,7 @@ sequenceDiagram
   MGMT-->>Admin: 返回明文 device_registration_secret（仅此一次）
   Note over Admin,DEV: 通过安全信道（烧录工具）写入设备端
 
-  DEV->>CH: POST /internal/device/provision（device_sn, secret, ...）
+  DEV->>CH: POST /internal/device/provision（device_code, secret, ...）
   CH->>MGMT: 转发注册请求
   MGMT->>MGMT: 校验 secret 未使用且未过期、SN 已授权 tenant_id
   MGMT->>SSOT: POST /internal/device-info/register（写入静态信息）
@@ -348,7 +349,7 @@ sequenceDiagram
 | OTA | SSOT（只读，批量查询/版本回写）+ 设备管理业务平台（只读 `is_test_device`，仅用于 high_risk 前置校验，不做写操作）| 批量升级选型、版本矩阵、固件版本回写、高风险包前置校验 |
 | 状态监控 | SSOT（只读）+ 设备管理业务平台（异常检测结果同步接口，见待建事项）| 全链路事件采集 |
 | 设备通信中台 | SSOT（写：online-event/occupancy-event/heartbeat-snapshot）+ 设备管理业务平台（南向 HTTP 自注册例外通道的转发目标；MQTT 设备的 Token 续签/吊销语义转发目标）| 实时状态同步、设备注册与凭证生命周期的转发 |
-| Web 管理端 | 设备管理业务平台对外 REST（经通信中台北向网关或直接经 `realman-gateway`，见通信中台详细设计 4.2 节的边界划分）| 台账、审计、注册凭证生成、密钥/Token 管理、绑定管理 UI |
+| Web 管理端 | 设备管理业务平台对外 REST（经通信中台WEB 端向网关或直接经 `realman-gateway`，见通信中台详细设计 4.2 节的边界划分）| 台账、审计、注册凭证生成、密钥/Token 管理、绑定管理 UI |
 
 ---
 
