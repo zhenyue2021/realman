@@ -348,12 +348,12 @@ sequenceDiagram
 | 数据处理 | SSOT（只读）| 数据入库时核对设备来源、型号、采集能力 |
 | OTA | SSOT（只读，批量查询/版本回写）+ 设备管理业务平台（只读 `is_test_device`，仅用于 high_risk 前置校验，不做写操作）| 批量升级选型、版本矩阵、固件版本回写、高风险包前置校验 |
 | 状态监控 | SSOT（只读）+ 设备管理业务平台（异常检测结果同步接口，见待建事项）| 全链路事件采集 |
-| 设备通信中台 | SSOT（写：online-event/occupancy-event/heartbeat-snapshot）+ 设备管理业务平台（南向 HTTP 自注册例外通道的转发目标；MQTT 设备的 Token 续签/吊销语义转发目标）| 实时状态同步、设备注册与凭证生命周期的转发 |
+| 设备通信中台 | SSOT（写：online-event/occupancy-event/heartbeat-snapshot）+ 设备管理业务平台（设备端向 HTTP 自注册例外通道的转发目标；MQTT 设备的 Token 续签/吊销语义转发目标）| 实时状态同步、设备注册与凭证生命周期的转发 |
 | Web 管理端 | 设备管理业务平台对外 REST（经通信中台WEB 端向网关或直接经 `realman-gateway`，见通信中台详细设计 4.2 节的边界划分）| 台账、审计、注册凭证生成、密钥/Token 管理、绑定管理 UI |
 
 ---
 
-## 五、迁移落地计划（细化 V2 主设计文档 Phase 3）
+## 五、迁移落地计划（细化 V2 主设计文档 Phase 2）
 
 | 步骤 | 内容 | 依赖 |
 | --- | --- | --- |

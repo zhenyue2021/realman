@@ -2,18 +2,21 @@
 
 | 项 | 内容 |
 | --- | --- |
-| **文档版本** | v2.0 |
-| **日期** | 2026-07-07 |
+| **文档版本** | v2.2 |
+| **日期** | 2026-07-07（2026-07-08 修订）|
 | **状态** | 提议 / 待评审 |
 | **依据输入** | 《睿尔曼达尔文软件平台·业务架构 v1.2》（产品）、《达尔文设备升级平台 PRD V1.0.0》（OTA）|
 | **关联 ADR** | [ADR-0001](../adr/0001-iot-platform-split-device-mqtt-ota.md)（历史决策）、[ADR-0002](../adr/0002-device-foundation-comm-hub-capability-bus.md)（本次决策，修订/扩展 ADR-0001）|
 | **前序文档** | [IoT 平台架构升级设计 v1.0](./2026-06-30-iot-platform-architecture-upgrade.md)（2026-06-30，仅设备中台/MQTT 平台/OTA 平台三分）|
 | **详细设计（配套）** | [设备基座详细设计](./2026-07-08-device-foundation-detailed-design.md)、[设备通信中台详细设计](./2026-07-08-device-comm-hub-detailed-design.md) |
 
+> 本文档为**总览**：背景、能力盘点、目标架构、迁移路线与关键决策。设备基座与设备通信中台的完整数据模型、接口清单、时序图统一收在配套的两份详细设计文档中，本文档第四、五章只保留结论性内容并指向对应章节，避免同一内容维护两份。
+
 ---
 
 ## 一、背景
 
+2026-06-30 的 ADR-0001 / 设计 v1.0 已提出把单体 `realman-iot` 拆为「设备管理中台 / MQTT 集成平台 / OTA 平台 / 瘦身 IoT」。此后产品侧输出了两份更完整的输入：
 
 1. **业务架构 v1.2**（`睿尔曼达尔文软件平台·业务架构.html`）：明确了六大业务模块（任务规划、GLN、**数据处理**、设备管理、OTA、状态监控）+ **平台能力总线** + **共享底座**（**设备通信中台** + **设备信息基础服务**）的分层视角，并指出设备管理应"分两层"——底层 SSOT 与前端业务操作分离。
 2. **《达尔文设备升级平台 PRD V1.0.0》**：把 OTA 需求做到了可实施粒度（15 状态机、Ed25519 签名/密钥生命周期、master/slave 双通道、以及一套心跳/Token 签发续签吊销/进度推送/状态补传的接口契约）。
@@ -21,12 +24,12 @@
 这两份输入与 v1.0 设计存在三处需要修订的落差，也是本次升级的触发点：
 
 - v1.0 把"设备管理"当作一个中台；业务架构 v1.2 要求进一步拆成 **设备基座（SSOT）** 与 **设备管理业务平台**（注册/授权/四态/密钥/审计）两层。
-- v1.0 只规划了 MQTT 一种协议；产品明确**系统与设备之间的通信协议维持 MQTT 不变**（设备上电自动注册接口除外），但需要新增一层**对外统一输出的 HTTP 接口协议**——服务把各自的能力经由通信中台统一以 REST 形式对外提供，同时为 SmartArm 等后续项目预留"设备直接走 HTTP 接入"的可选协议扩展点。OTA PRD 第九章定义的心跳/Token/进度推送接口契约，正是这层 HTTP 协议要承接的逻辑契约——现有 MQTT 设备通过协议适配在设备端向仍走 MQTT 报文，语义上对齐同一套契约。
+- v1.0 只规划了 MQTT 一种协议；产品明确**系统与设备之间的通信协议维持 MQTT 不变**（设备上电自动注册接口除外），但需要新增一层**对外统一输出的 HTTP 接口协议**——服务把各自的能力经由通信中台统一以 REST 形式对外提供，同时为 SmartArm 等后续第三方业务平台预留 HTTP 直连协议入口。OTA PRD 第九章定义的心跳/Token/进度推送接口契约，正是这层 HTTP 协议要承接的逻辑契约——现有 MQTT 设备通过协议适配在设备端向仍走 MQTT 报文，语义上对齐同一套契约。
 - v1.0 没有"平台能力总线"这一层；业务架构 v1.2 把它列为业务应用层与共享底座之间的显式分层，是"能力解耦可组合"（即可按客户/项目拆包售卖）的关键。
 
 另外，用户侧提出一个明确的简化点：**数据处理模块（Darwin）是已有能力，在 SaaS 平台化之后不再是需要跨网络域桥接的外部系统，原来为此搭建的 RocketMQ 桥接可以去掉，直接用 HTTP 调用**。本文档第六章给出具体的退役方案。
 
-本文档在 v1.0 基础上补齐这三处，形成 V2 目标架构，并给出能力盘点、深度设计与迁移路线。
+本文档在 v1.0 基础上补齐这三处，形成 V2 目标架构，并给出能力盘点、目标架构与迁移路线；设备基座与设备通信中台的详细设计见配套文档。
 
 ---
 
@@ -34,7 +37,7 @@
 
 对照口径：业务架构 v1.2（六大模块 + 能力总线 + 共享底座）与 OTA V1.0.0 PRD。代码依据：`realman-boot-iot` 现状（单体，`org.jeecg.modules.device` 包）。
 
-### 2.1 总体対照
+### 2.1 总体对照
 
 | 业务架构 v1.2 中的模块 | 当前代码落点 | 状态 |
 | --- | --- | --- |
@@ -44,11 +47,11 @@
 | 设备管理 | `realman-iot` 内 `RobotDeviceController` / `MasterDeviceController` / `DeviceProvisionController` / `DeviceSecretService` | **未分层**，SSOT 与业务操作混在一起，且未启用租户隔离（`软件架构设计.md` 8.2 节：IoT 模块当前排除 `MybatisPlusSaasConfig`）|
 | OTA | `realman-iot` 内 `OtaController` / `IotOtaServiceImpl` / `OtaProgressHandler` | **MVP 级实现**，与 V1.0.0 PRD 差距很大（见 2.3）|
 | 状态监控 | 无独立模块，散落在各业务日志里 | 未建设 |
-| 平台能力总线 | 不存在 | 需新建（治理层，非新中间件，见第五章）|
-| 设备通信中台 | MQTT 部分能力已存在（`MqttAuthController`、`MqttMessageDispatcher`、各 Handler），但内嵌在 `realman-iot`，且只有 MQTT 一种协议 | **未独立**，且缺 HTTP 设备接入通道 |
-| 设备信息基础服务 | 不存在独立分层；设备基础信息与 `IotDevice` 实体混在设备管理业务表里 | 需从设备管理中拆出 |
+| 平台能力总线 | 不存在 | 需新建（治理层，非新中间件，见第七章）|
+| 设备通信中台 | MQTT 部分能力已存在（`MqttAuthController`、`MqttMessageDispatcher`、各 Handler），但内嵌在 `realman-iot`，且只有 MQTT 一种协议 | **未独立**，且缺 HTTP 对外网关（见第五章、[通信中台详细设计](./2026-07-08-device-comm-hub-detailed-design.md)）|
+| 设备信息基础服务 | 不存在独立分层；设备基础信息与 `IotDevice` 实体混在设备管理业务表里 | 需从设备管理中拆出（见第四章、[设备基座详细设计](./2026-07-08-device-foundation-detailed-design.md)）|
 
-**结论**：ADR-0001 v1.0 的 Phase 0-4 尚未实际执行（代码库仍是 `realman-boot-iot` 单体 + `realman-boot-system` + Gateway/Nacos 三个可运行单元），只完成了设计文档与一小部分"提前量"——设备 HTTP 自注册（`DeviceProvisionController`，MD5 签名版）。这部分提前量与 OTA 新 PRD 的注册协议（`device_registration_secret` + 租户校验 + Bearer JWT）字段不一致，需要在 Phase 3 收敛时对齐，不能直接复用。
+**结论**：ADR-0001 v1.0 的 Phase 0-4 尚未实际执行（代码库仍是 `realman-boot-iot` 单体 + `realman-boot-system` + Gateway/Nacos 三个可运行单元），只完成了设计文档与一小部分"提前量"——设备 HTTP 自注册（`DeviceProvisionController`，MD5 签名版）。这部分提前量与 OTA 新 PRD 的注册协议（`device_registration_secret` + 租户校验 + Bearer JWT）字段不一致，需要在设备基座落地时对齐，不能直接复用。
 
 ### 2.2 设备管理能力盘点
 
@@ -71,14 +74,14 @@
 | 升级方式 | 仅"指定 deviceIds 列表" | 缺 `by_sn`/`by_model`/`all`/`by_tenant_model` 四种模式 |
 | 前置校验 | 无 | 缺状态检查、资源检查、版本兼容性（双重校验）、签名吊销校验（双重校验）|
 | 状态机 | 8 态：`NOTIFIED→CONFIRMED→DOWNLOADING→DOWNLOADED→INSTALLING→SUCCESS/FAILED/TIMEOUT` | PRD 要求 15 态（含 `PENDING_ONLINE`/`EXECUTING` 三子阶段/`ROLLING_BACK`/`PAUSED`/`CANCELLED` 等），**需要重新建模** |
-| 设备通信协议 | 下发走 MQTT publish（`device/{code}/ota/notify`）；进度经 `OtaProgressHandler` 订阅 MQTT 得到 | 现有 master/slave 设备协议维持 MQTT，需要把 PRD 第九章的心跳/Token/进度推送/状态补传语义映射为对应 MQTT Topic；同时通信中台 WEB 端向网关按同一套契约暴露 HTTP 版本，供未来 HTTP 原生设备（如 SmartArm）与外部系统使用 | 需要做**协议等价映射**（MQTT Topic ↔ HTTP Path），而不是把现有 MQTT 设备直接切到 HTTP（见第五章、[通信中台详细设计](./2026-07-08-device-comm-hub-detailed-design.md)）|
+| 设备通信协议 | 下发走 MQTT publish（`device/{code}/ota/notify`）；进度经 `OtaProgressHandler` 订阅 MQTT 得到 | 现有 master/slave 设备协议维持 MQTT，需要把 PRD 第九章的心跳/Token/进度推送/状态补传语义映射为对应 MQTT Topic；同时通信中台 WEB 端向网关按同一套契约暴露 HTTP 版本，供未来 HTTP 原生设备/第三方业务平台（如 SmartArm）使用 | 需要做**协议等价映射**（MQTT Topic ↔ HTTP Path），而不是把现有 MQTT 设备直接切到 HTTP（见[通信中台详细设计](./2026-07-08-device-comm-hub-detailed-design.md)第五章）|
 | 断点续传 | 仅服务端"固件分片上传"支持断点续传（MinIO 侧） | 缺设备侧 HTTP Range 下载续传、OSS 预签名 URL 自动刷新 |
 | 批量策略 | 无 | 缺 `fail_threshold`/`pause`/`stop_all`/`continue` |
 | 错误码体系 | 无细粒度错误码，仅通用成功/失败 | 缺 PRD 定义的 40+ 错误码 |
 | 版本矩阵/版本落后判定 | 无 | 缺失 |
 | 系统设置（17 项可配置联动校验）| 无配置中心 | 缺失 |
 
-**结论**：当前 OTA 只覆盖了 PRD 里"固件存储 + 极简任务下发"的一角，且下发/回传通道（MQTT）与 PRD 选型（HTTP）不一致。这是拆分 OTA 平台时必须一并解决的问题，不能只做"代码搬家"。
+**结论**：当前 OTA 只覆盖了 PRD 里"固件存储 + 极简任务下发"的一角，且下发/回传通道（MQTT）与 PRD 字面选型（HTTP）需要做协议等价映射才能对齐。这是拆分 OTA 平台时必须一并解决的问题，不能只做"代码搬家"。
 
 ### 2.4 数据处理（Darwin）桥接盘点
 
@@ -114,17 +117,17 @@ flowchart TB
 
   subgraph base["L2 共享底座"]
     DF["设备基座\n设备信息基础服务（SSOT）"]
-    CH["设备通信中台\n设备端向：MQTT（唯一协议，注册除外）\n WEB 端向：HTTP 统一对外网关\n路由 · 大文件/视频通道 · 配置中心"]
+    CH["设备通信中台\n设备端向：MQTT（唯一协议，注册除外）\nWEB 端向：HTTP 统一对外网关\n路由 · 大文件/视频通道 · 配置中心"]
   end
 
-  subgraph devices["L3 设备层"]
+  subgraph devices["L3 设备层 / 第三方接入"]
     MASTER["遥操设备 master\n（MQTT，注册用 HTTP）"]
     SLAVE["机器人 slave\n（MQTT，注册用 HTTP）"]
-    SMARTARM["SmartArm 等后续项目\n（可选 HTTP 直连协议）"]
+    SMARTARM["SmartArm 等第三方业务平台\n（HTTP 直连协议）"]
   end
 
-  subgraph north[" WEB 端向消费方"]
-    WEBADMIN["Web 管理端 / 第三方系统\n（大洋电机等）"]
+  subgraph north["WEB 端向消费方"]
+    WEBADMIN["Web 管理端 / 第三方系统"]
   end
 
   SSO --> PLAN & GLN & DP & OTA & DM
@@ -135,7 +138,7 @@ flowchart TB
 
   CH <-->|MQTT，注册用 HTTP| MASTER
   CH <-->|MQTT，注册用 HTTP| SLAVE
-  CH <-->|可选 HTTP| SMARTARM
+  CH <-->|HTTP| SMARTARM
   WEBADMIN -->|HTTP，通信中台统一对外网关| CH
 
   DP <-->|直连 HTTP，替代 RocketMQ| CH
@@ -147,128 +150,63 @@ flowchart TB
 | --- | --- | --- |
 | 设备管理 | 单一"设备管理中台" | 拆两层：**设备基座**（SSOT，只读基础信息）+ **设备管理业务平台**（注册/授权/四态/密钥/审计，写操作）|
 | 能力总线 | 无显式分层，靠 Feign + Gateway 隐式串联 | 显式新增"平台能力总线"治理层：能力注册目录、契约版本治理、租户上下文统一透传 |
-| 设备通信 | 只有 MQTT 集成平台 | **设备通信中台**：设备端向仍是 MQTT 单协议（注册除外）；新增** WEB 端向 HTTP 统一对外网关**，服务对外 API 输出 + 未来 SmartArm 等 HTTP 原生设备接入 |
-| OTA 与通信层关系 | OTA 进度经 MQTT 平台转发 MQ 事件 | 现有 master/slave 设备的 OTA 心跳/进度仍经 MQTT 上行，由通信中台归一化后转发给 OTA 平台；OTA PRD 第九章的 HTTP 契约作为 WEB 端向网关的等价协议对外暴露（见 5.3 协议等价映射表）|
+| 设备通信 | 只有 MQTT 集成平台 | **设备通信中台**：设备端向仍是 MQTT 单协议（注册除外）；新增 **WEB 端向 HTTP 统一对外网关**，服务对外 API 输出 + SmartArm 等第三方业务平台接入 |
+| OTA 与通信层关系 | OTA 进度经 MQTT 平台转发 MQ 事件 | 现有 master/slave 设备的 OTA 心跳/进度仍经 MQTT 上行，由通信中台归一化后转发给 OTA 平台；OTA PRD 第九章的 HTTP 契约作为 WEB 端向网关的等价协议对外暴露（详见[通信中台详细设计](./2026-07-08-device-comm-hub-detailed-design.md)协议等价映射表）|
 | 数据处理对接 | 未提及（仍隐含走现状 RocketMQ）| **明确退役 RocketMQ 桥接，改为通信中台直连 HTTP**（第六章）|
-| 迁移阶段 | 4 个 Phase | 在 4 个 Phase 基础上插入 Phase 1.5（数据处理 HTTP 化）与设备管理二次拆分（见第七章）|
+| 迁移阶段 | 4 个 Phase | 拆为 6 个 Phase，且顺序调整为**先立底座（通信中台 + 设备基座）、再建 OTA**（见第九章）|
 
 ---
 
-## 四、设备基座深度设计（设备信息基础服务 + 设备管理业务平台）
+## 四、设备基座概览（设备信息基础服务 + 设备管理业务平台）
+
+> 本章为概览，**完整的数据模型、内外部接口清单、双凭证体系、业务流程时序图见 [设备基座详细设计](./2026-07-08-device-foundation-detailed-design.md)**，本章不重复列出接口细节，只给出结论性的分层原则与现状映射。
 
 ### 4.1 分层原则
 
 业务架构 v1.2 明确要求"设备管理拆两层"，理由是：**基础信息查询**（高频、只读、被 GLN/数据处理/OTA/状态监控共同依赖）与**业务操作**（低频、有权限校验、有审计要求）的变更节奏和读写特征完全不同，合并在一起会导致"改审计逻辑要重新部署一个所有人都在查的只读接口"的耦合问题。
 
-| 子层 | 定位 | 读写特征 | 内容 |
-| --- | --- | --- | --- |
-| **设备信息基础服务**（`realman-device-info`）| 唯一设备数据源（SSOT）| 读多写少，强调低延迟、高可用 | 设备静态元数据（SN、MAC、型号、名称）+ 由通信中台同步的准实时状态（在线/离线、固件版本）；只读 API + 内部事件消费（接收中台的 online-event）|
-| **设备管理业务平台**（`realman-device-mgmt`）| 面向运维/租户的业务操作 | 写少但需强一致 + 审计 | 注册（含 PRD 的 `device_registration_secret` 生命周期）、Token 签发/续签/吊销、租户授权与隔离、四态测试标记、操作审计 |
+| 子层 | 定位 | 读写特征 |
+| --- | --- | --- |
+| **设备信息基础服务**（`realman-device-info`）| 唯一设备数据源（SSOT），只读为主 | 读多写少，强调低延迟、高可用 |
+| **设备管理业务平台**（`realman-device-mgmt`）| 面向运维/租户的业务操作 + 对外 REST + 台账 UI | 写少但需强一致 + 审计 |
 
-两者的调用关系：**设备管理业务平台是设备信息基础服务的一个写入方**（注册成功后把静态元数据写入 SSOT），**其余业务应用（GLN/数据处理/OTA/状态监控）只读 SSOT，不经过设备管理业务平台**。这样第三方项目（如大洋电机）如果只需要"查设备基础信息"，可以只对接设备信息基础服务，不必接入完整的设备管理业务平台。
+两者的调用关系：**设备管理业务平台是 SSOT 的写入方之一**（注册成功后把静态元数据写入 SSOT，密钥/Token/四态/绑定变更后同步投影），此外通信中台（在线态/四态同步）、OTA（固件版本回写）、SmartArm 等第三方业务平台（自有设备的注册写入）也是 SSOT 的独立写入方；**其余业务应用只读 SSOT，不必接入设备管理业务平台**。这是"设备基础信息可以单独对第三方项目输出"的关键设计。
 
-### 4.2 对外能力清单
-
-**设备信息基础服务（只读为主）**
-
-| 能力 | 说明 |
-| --- | --- |
-| `GET /internal/device-info/{device_id}` | 基础信息 + 最新在线状态/固件版本 |
-| `POST /internal/device-info/batch` | 批量查询（供 OTA 批量升级、版本矩阵使用）|
-| `POST /internal/device-info/online-event`（消费）| 由设备通信中台推送在线/离线事件，更新状态字段 |
-| `PUT /internal/device-info/{device_id}/firmware-version`（消费）| 由 OTA 平台在升级成功后回调，更新固件版本，作为版本矩阵的数据来源 |
-
-**设备管理业务平台（写操作 + 审计）**
-
-对齐 OTA PRD 9.7.5-9.8.6 与 9.0 鉴权规范，直接把新 PRD 的这几组接口的归属定为设备管理业务平台（而不是 OTA 平台自身），因为它们本质是"设备身份与租户授权"问题，OTA 只是消费方之一（GLN、数据处理未来也需要同一套设备身份体系）：
-
-- `POST /api/v1/devices/register`、`POST /api/v1/admin/devices/registration-secret`、`GET .../registration-secret/status`
-- `POST /api/v1/devices/token/issue`、`/token/refresh`、`PUT /{device_id}/token/revoke`
-- `PUT /api/v1/devices/{device_id}/test-flag`、`POST /test-flag/batch`
-- 租户隔离与超管跨租户审计（`X-Operator-Tenant-Id`，双 `tenant_id` 审计字段）落在这一层统一实现，OTA/GLN/数据处理都复用，不用各自重复造轮子。
-
-### 4.3 与现状代码的映射
+### 4.2 与现状代码的映射
 
 | 现状 | 迁移去向 |
 | --- | --- |
 | `RobotDeviceController`/`MasterDeviceController` CRUD | 拆分：只读列表/详情 → 设备信息基础服务；启停/授权等写操作 → 设备管理业务平台 |
-| `DeviceProvisionController`（MD5 签名自注册）| 重做为符合 PRD 的 `POST /api/v1/devices/register`（`device_registration_secret` + 租户校验 + Token 签发），MD5 方案降级为"存量 MQTT 设备"的兼容分支，不再是主路径 |
-| `DeviceSecretService`（MQTT 密钥）| 保留，供设备通信中台的 MQTT 接入子模块调用（EMQX Auth 校验），与新 Token 体系并存，按设备类型路由 |
+| `DeviceProvisionController`（MD5 签名自注册）| 重做为符合 PRD 的 `POST /api/v1/devices/register`（`device_registration_secret` + 租户校验 + 双凭证签发），MD5 方案降级为兼容分支，不再是主路径 |
+| `DeviceSecretService`（MQTT 密钥）| 保留，供设备通信中台的 MQTT 接入子模块调用（EMQX Auth 校验），与新增的 Device Token 并存，构成双凭证体系（见详细设计 3.3）|
 | `IDeviceOperationLogService` | 扩展字段后原样保留在设备管理业务平台 |
 | `DeviceOnlineOfflineHandler` 直接写 DB | 改为发布 `online-event` 给设备信息基础服务消费，服务本身移交设备通信中台 |
 
 ---
 
-## 五、设备通信中台 + 通信总线设计
+## 五、设备通信中台概览
 
-> 本章为概览，**完整的系统设计、数据模型、接口清单、协议等价映射表见 [设备通信中台详细设计](./2026-07-08-device-comm-hub-detailed-design.md)**。
+> 本章为概览，**完整的设备端向/WEB 端向系统设计、Topic/Path 规范、协议等价映射表、部署方案见 [设备通信中台详细设计](./2026-07-08-device-comm-hub-detailed-design.md)**，本章只给出结论性的定位边界；同步/异步选型矩阵作为跨模块的通用决策原则保留于此。
 
-### 5.1 定位与边界（已修正）
+### 5.1 定位与边界
 
-设备通信中台是**设备层（或第三方接入层）与云端所有通信的唯一通道**，但"通道"要分设备端向、 WEB 端向两侧看，不能笼统说"MQTT+HTTP 双协议对设备"：
+设备通信中台是**设备层与云端所有通信的唯一通道**，分设备端向、WEB 端向两侧看：
 
-- **设备端向（对设备）**：协议维持 **MQTT 一种**，与现状一致，不改变现有设备 SDK。唯一例外是**设备上电后、建立 MQTT 连接前的一次性 HTTP 自注册**（现状 `DeviceProvisionController` 的定位，V2 里完善为对齐设备基座的注册协议）。
-- ** WEB 端向（对外/服务间）**：新增 **HTTP 统一对外网关**，职责有两个，且互不冲突：
-  1. 各业务服务（OTA、设备管理业务平台、数据处理、GLN）的对外 REST API，经由通信中台统一路由输出（而不是各自裸露端口对外），便于统一鉴权、限流、审计、第三方接入管理；
-  2. 为 SmartArm 等**后续**第三方业务平台，预留 HTTP 直连协议入口——包括但不限于设备注册，设备信息查询及管理等操作。
+- **设备端向（对设备）**：协议维持 **MQTT 一种**，与现状一致，不改变现有设备 SDK。唯一例外是**设备上电后、建立 MQTT 连接前的一次性 HTTP 自注册**（现状 `DeviceProvisionController` 的定位，V2 里完善为对齐设备基座的注册协议；新版本 SDK 需支持此 HTTP 自注册流程，存量设备可由设备管理平台走手动注册兼容）。
+- **WEB 端向（对外/服务间）**：新增 **HTTP 统一对外网关**，职责有两个，且互不冲突：① 各业务服务（OTA、设备管理业务平台等）的对外 REST API 经此统一路由输出（而不是各自裸露端口）；② 为 SmartArm 等**后续**第三方业务平台预留 HTTP 直连协议入口，涵盖设备注册、设备信息查询及管理等操作。
 
-OTA PRD 第九章定义的心跳/Token/进度推送/状态补传接口契约，在这个修正后的模型里理解为：**现有 MQTT 设备通过 MQTT Topic 传递同样语义的数据，由通信中台在内部归一化后，按同一套逻辑契约转发给 OTA 平台；这套契约同时以 HTTP 形式在 WEB 端向网关对外暴露，供 SmartArm 或外部系统直接调用**。两侧共用同一套内部事件模型和业务处理逻辑，只是设备端向的传输介质不同。详见详细设计文档的"协议等价映射表"。
+OTA PRD 第九章定义的心跳/Token/进度推送/状态补传接口契约，理解为：**现有 MQTT 设备通过设备端向 MQTT Topic 传递同样语义的数据，由通信中台归一化为统一的 `DeviceUplinkEvent` 后转发给 OTA 平台；这套契约同时以 HTTP 形式在 WEB 端向网关对外暴露**，两侧共用同一套内部处理逻辑，只是传输介质不同。完整的 Topic ↔ Path 协议等价映射表见详细设计文档第五章。
 
-### 5.2 双侧接入层（示意）
-
-```mermaid
-flowchart LR
-  subgraph south["设备端向：设备侧（协议不变）"]
-    MQTTIN["MQTT 接入子模块\nEMQX Auth/ACL · Dispatcher · Publisher\n（心跳/OTA/SLAM/数采，均走 MQTT）"]
-    PROVISION["HTTP 自注册（唯一例外）\n设备上电、MQTT 连接前"]
-  end
-  subgraph north[" WEB 端向：对外网关（新增）"]
-    HTTPGW["HTTP 统一对外网关\n服务外部 API 输出 + SmartArm 等\n后续 HTTP 原生设备的可选接入口"]
-  end
-  NORM["统一上行事件模型 DeviceUplinkEvent"]
-  ROUTE["Topic/Path 路由注册表"]
-
-  MQTTIN --> NORM
-  PROVISION --> NORM
-  HTTPGW --> NORM
-  NORM --> ROUTE
-  ROUTE --> OTA["OTA 平台"]
-  ROUTE --> DEVMGMT["设备基座"]
-  ROUTE --> DP["数据处理（HTTP 直连，见第六章）"]
-  ROUTE --> IOT["IoT 业务服务（SLAM/WebRTC）"]
-  ROUTE --> MON["状态监控"]
-```
-
-- **MQTT 接入子模块**：原样承接 v1.0 已规划的 `MqttAuthController`/`MqttMessageDispatcher`/`MqttPublisher`/`RedisPendingListenerConfig`（集群 ACK 协调），是现有 master/slave 及 SLAM/WebRTC/数采指令的唯一设备端向通道，架构上不改变。
-- **HTTP 统一对外网关（新增）**：不是设备协议的替代品，而是（a）各业务服务对外 API 的统一出口，（b）未来 HTTP 原生设备（SmartArm）的可选接入协议适配层。与面向 Web 管理端的通用 `realman-gateway`（Spring Cloud Gateway）职责不同——后者服务前端管理台的通用业务 API，通信中台 WEB 端向网关专注"设备域"相关能力的对外输出，两者边界见详细设计文档。
-- **统一上行事件模型**：无论数据来自 MQTT 报文体、HTTP 自注册请求，还是 WEB 端向网关收到的 HTTP 请求，接入层都归一化为同一个 `DeviceUplinkEvent`，下游路由规则、审计埋点、状态监控埋点只写一套逻辑。
-
-### 5.3 路由注册表（更新，南 WEB 端向分列）
-
-| 来源 | 匹配规则 | 目标 | 传输方式 |
-| --- | --- | --- | --- |
-| 设备端向 MQTT `device/{code}/ota/*` | 现有 master/slave 的 OTA 心跳/进度/状态补传 | OTA 平台 | 内部事件归一化后 Feign 转发 |
-| 设备端向 HTTP（唯一例外）`POST /internal/device/provision` | 设备上电自注册 | 设备基座（设备管理业务平台）| 直接处理 |
-| 设备端向 MQTT `device/{code}/slam/*` | GLN 遥操 | IoT 业务服务 | 内部事件 |
-| 设备端向 MQTT `device/{code}/datacollect/*` | 数采指令/OSS 回传 | 数据处理模块 | **HTTP 直连（见第六章，替代原 RocketMQ）** |
-| 设备端向 MQTT `$SYS/.../connected|disconnected` | 设备上下线 | 设备基座（online-event）| 内部事件 |
-|  WEB 端向 HTTP `/api/v1/ota/**`、`/api/v1/devices/**` 等 | 外部系统 / 未来 HTTP 原生设备（SmartArm）调用同一套逻辑契约 | 对应后端服务（OTA/设备基座）| 网关反向代理 |
-| 其他业务 Topic/Path | 按能力总线注册表动态匹配 | 对应消费方 | 可插拔 |
-
-### 5.4 同步 / 异步选型矩阵（沿用 ADR-0001 原则）
+### 5.2 同步 / 异步选型矩阵（沿用 ADR-0001 原则，跨模块通用决策，故保留在主文档）
 
 | 场景 | 方式 | 理由 |
 | --- | --- | --- |
 | 设备信息查询、密钥/Token 校验 | 同步 Feign/HTTP | 低延迟、强一致，且现在都在同一信任域内 |
 | 设备端向 MQTT 上行 → 业务处理（心跳/OTA/SLAM/WebRTC）| 内部归一化后同步转发 | 状态机需要立刻可查，不适合异步排队 |
-| WEB 端向 HTTP 请求（外部系统 / 未来 HTTP 设备）| 同步处理并即时响应 | 与设备端向共用同一套内部处理逻辑，只是入口协议不同 |
+| WEB 端向 HTTP 请求（外部系统 / 第三方业务平台）| 同步处理并即时响应 | 与设备端向共用同一套内部处理逻辑，只是入口协议不同 |
 | 通信中台 ↔ 数据处理（Darwin）| **同步 HTTP（不再用 RocketMQ）** | 已同域，无需跨系统解耦，见第六章 |
 | 跨 Pod MQTT ACK 等待 | Redis Pub/Sub | 沿用 v1.0 方案，未变 |
 | 前端实时进度展示 | WebSocket / SSE，由业务平台自行订阅内部事件 | 沿用 v1.0 方案 |
-
-### 5.5 大文件与视频通道
-
-沿用业务架构 v1.2 对通信中台的定位——大文件传输、实时操控与视频通道也归口在这里（WebRTC 信令、断点续传的底层能力），均走设备端向 MQTT/专用通道，不受本次 WEB 端向 HTTP 网关新增影响。
 
 ---
 
@@ -318,7 +256,7 @@ flowchart LR
 
 ### 7.1 它解决什么问题
 
-业务架构 v1.2 的原话："应用 → 能力总线 → 共享底座，五个业务模块按需调用底座，能力解耦可组合"。这句话背后的真实需求是**产品化/可拆包**：像大洋电机这样的项目只需要设备管理 + 设备通信能力，不需要 GLN/数据处理；私有化客户只需要部分模块随包部署。要做到"按需组合"，业务应用与共享底座之间就不能有隐式的、写死的调用关系，必须有一层显式的契约与治理。
+业务架构 v1.2 的原话："应用 → 能力总线 → 共享底座，五个业务模块按需调用底座，能力解耦可组合"。这句话背后的真实需求是**产品化/可拆包**：第三方项目只需要设备管理 + 设备通信能力，不需要 GLN/数据处理；私有化客户只需要部分模块随包部署。要做到"按需组合"，业务应用与共享底座之间就不能有隐式的、写死的调用关系，必须有一层显式的契约与治理。
 
 ### 7.2 落地方式（治理规范 + 现有设施组合，而非新中间件）
 
@@ -337,7 +275,7 @@ flowchart LR
 
 ---
 
-## 十、其他模块的调整说明（基于设备基座 + 通信中台基线的修订）
+## 八、其他模块的调整说明（基于设备基座 + 通信中台基线的修订）
 
 设备基座与通信中台的详细设计确定后，其余模块的设计需要按以下几点收敛，避免各自再对"设备怎么连、数据怎么来"做重复假设：
 
@@ -351,34 +289,35 @@ flowchart LR
 
 ---
 
-## 八、迁移路线图（在 ADR-0001 五阶段基础上修订）
+## 九、迁移路线图（在 ADR-0001 五阶段基础上修订，顺序调整为先立底座再建 OTA）
 
-| 阶段 | 目标 | 关键动作 | 周期（估算）|
+| 阶段 | 目标 | 关键动作 | 周期 |
 | --- | --- | --- | --- |
 | Phase 0 契约先行 | 定规矩 | 新建 `*-contract` 模块；产出能力清单文档；Gateway 路由与 Nacos 配置模板预留 | 1 周 |
-| Phase 1 设备通信中台独立（设备端向 MQTT 不变 + 新增 WEB 端向 HTTP 网关） | 通信层独立，新增对外统一 HTTP 网关 | 迁移 MQTT 相关代码（设备端向不变）；新增 WEB 端向 HTTP 网关子模块（服务对外 API 输出 + 为 SmartArm 预留协议扩展点）；建协议等价映射表与路由注册表 | 2 周|
-| Phase 1 设备基座二次拆分 | 设备管理拆两层 | 先落设备信息基础服务（只读 SSOT），再迁移设备管理业务平台（注册/Token/租户/四态/审计）；补齐租户隔离（IoT 模块当前缺失）| 2 周 |
-| Phase 2 OTA 平台独立 + 能力对齐 | OTA 成为独立平台，**设备侧协议维持 MQTT**，按 PRD 补齐能力 | 迁移固件/任务/状态机代码到新服务；**重建 15 态状态机、密钥生命周期、批量升级策略、错误码体系**（对齐 PRD，而不是照搬现有 8 态）；心跳/进度/Token 等语义映射为 MQTT Topic | 2 周|
-| Phase 2（新增）数据处理 HTTP 化 | 退役 RocketMQ 桥接 | 按第六章方案双写过渡、灰度、下线 | 2 周|
-| Phase 3 能力总线治理落地 + IoT 瘦身 | 收尾 | 发布能力清单文档、契约版本策略；删除已迁移旧代码；统一 traceId 跨平台传播 | 2 周 |
+| Phase 1 设备通信中台独立 | 通信层独立，设备端向 MQTT 不变 + 新增 WEB 端向 HTTP 网关 | 迁移 MQTT 相关代码（设备端向不变）；新增 WEB 端向 HTTP 网关子模块（服务对外 API 输出 + 为 SmartArm 等第三方业务平台预留协议扩展点）；建协议等价映射表与路由注册表 | 2 周 |
+| Phase 2 设备基座二次拆分 | 设备管理拆两层 | 先落设备信息基础服务（只读 SSOT），再迁移设备管理业务平台（注册/Token/租户/四态/审计）；补齐租户隔离（IoT 模块当前缺失）| 2 周 |
+| Phase 3 OTA 平台独立 + 能力对齐 | OTA 成为独立平台，**设备侧协议维持 MQTT**，按 PRD 补齐能力 | 迁移固件/任务/状态机代码到新服务；**重建 15 态状态机、密钥生命周期、批量升级策略、错误码体系**（对齐 PRD，而不是照搬现有 8 态）；心跳/进度/Token 等语义映射为 MQTT Topic | 2 周 |
+| Phase 4 数据处理 HTTP 化 | 退役 RocketMQ 桥接 | 按第六章方案双写过渡、灰度、下线 | 2 周 |
+| Phase 5 能力总线治理落地 + IoT 瘦身 | 收尾 | 发布能力清单文档、契约版本策略；删除已迁移旧代码；统一 traceId 跨平台传播 | 2 周 |
 
-**总周期预估 11 周 / 4人** 迁移原则不变：旧入口保留兼容代理，全部验证通过后再删除旧代码，客户无感知。
+**总周期预估 11 周 / 4 人**。相比 v1.0 把 OTA 排在最先，V2 把设备通信中台与设备基座提到前两个 Phase——这两块是整个架构的基线，业务应用（尤其是 OTA）依赖它们提供的设备身份、在线状态、协议路由能力，先立底座能让 OTA 少返工一次。迁移原则不变：旧入口保留兼容代理，全部验证通过后再删除旧代码，客户无感知。
 
 ---
 
-## 九、关键决策与风险
+## 十、关键决策与风险
 
 | 决策点 | 结论 | 理由 |
 | --- | --- | --- |
-| 现有设备（master/slave）是否需要支持 HTTP 协议 | **是**，维持 MQTT同时，要支持设备上电自注册掉用 HTTP 协议 | 设备上电自动注册为新增能力，原有设备 SDK 可不支持（设备管理平台支持手动注册），新版本SDK 需支持 |
+| 现有设备（master/slave）是否需要支持 HTTP 协议 | **是**，维持 MQTT 的同时，要支持设备上电自注册调用 HTTP 协议 | 设备上电自动注册为新增能力，存量设备 SDK 可不支持（设备管理平台支持手动注册兼容），新版本 SDK 需支持 |
 | OTA PRD 第九章的 HTTP 接口契约放在哪里 | 作为通信中台 WEB 端向网关对外暴露的逻辑契约；现有 MQTT 设备通过协议等价映射复用同一套内部处理逻辑 | 一套契约、两种传输介质，避免 OTA 平台自己再维护一套"MQTT 版"和"HTTP 版"两份业务逻辑 |
-| OTA 状态机是否照搬现有 8 态 | 否，按 PRD 重建 15 态 | 现有 8 态缺失 `PENDING_ONLINE`/`EXECUTING` 子阶段/回滚/暂停等关键语义，照搬会导致 Phase 1 交付后仍需二次返工 |
+| OTA 状态机是否照搬现有 8 态 | 否，按 PRD 重建 15 态 | 现有 8 态缺失 `PENDING_ONLINE`/`EXECUTING` 子阶段/回滚/暂停等关键语义，照搬会导致交付后仍需二次返工 |
 | 数据处理桥接是否保留任何异步能力 | 平台内部可保留事件总线，但不跨越到数据处理这条边界 | 明确"同域内用同步契约、跨域/削峰才用异步"的选型原则，避免退化回过度设计 |
-| 设备管理租户隔离缺失 | 必须在 Phase 3 前补齐 | OTA 的 `by_tenant_model` 批量升级、超管跨租户审计均依赖此能力，是阻塞项而非可选项 |
+| 设备管理租户隔离缺失 | 必须在设备基座落地时补齐 | OTA 的 `by_tenant_model` 批量升级、超管跨租户审计均依赖此能力，是阻塞项而非可选项 |
+| 迁移顺序：OTA 先行还是底座先行 | **底座（通信中台 + 设备基座）先行**，OTA 排在其后 | OTA 依赖底座提供的设备身份/在线状态/协议路由能力；底座先行可避免 OTA 交付后因底座接口变化而返工 |
 
 **主要风险**：
 
-- OTA 能力差距被低估会导致 Phase 1 排期严重超期——建议 Phase 1 启动前先做一次独立的 OTA 详细设计评审（状态机、密钥管理、错误码），单独排期，不与"搬家"混在一起估算。
+- OTA 能力差距被低估会导致 Phase 3 排期超期——建议 Phase 3 启动前先做一次独立的 OTA 详细设计评审（状态机、密钥管理、错误码），单独排期，不与"搬家"混在一起估算。
 - 数据处理 HTTP 化涉及对端（Darwin 团队）配合改造调用方式，需要提前对齐排期，避免单方面切换导致联调阻塞。
 - 设备管理引入租户隔离是存量数据的一次结构性变更，需要评估现有 `iot_device` 等表的数据迁移/回填方案（不在本文档范围，需单独出数据迁移方案）。
 
