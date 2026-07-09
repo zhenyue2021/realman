@@ -43,3 +43,14 @@ device:
     secret: ${DEVICE_TOKEN_SECRET:change-me-in-production}
     issuer: realman-device-mgmt
     expiry-days: 365
+
+# 存量设备一次性迁移（iot_device -> device_info/device_credential），见
+# org.jeecg.modules.devicemgmt.migration.LegacyIotDataSourceConfig。
+# 默认关闭；仅在执行迁移的窗口期临时开启，跑完后应重新改回 false 并清除连接信息。
+realman:
+  migration:
+    legacy-iot:
+      enabled: ${LEGACY_IOT_MIGRATION_ENABLED:false}
+      jdbc-url: ${LEGACY_IOT_DB_URL:}
+      username: ${LEGACY_IOT_DB_USERNAME:}
+      password: ${LEGACY_IOT_DB_PASSWORD:}
