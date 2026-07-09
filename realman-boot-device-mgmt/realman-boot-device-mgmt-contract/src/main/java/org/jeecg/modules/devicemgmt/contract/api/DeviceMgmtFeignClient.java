@@ -9,6 +9,8 @@ import org.jeecg.modules.devicemgmt.contract.dto.DeviceProvisionRequest;
 import org.jeecg.modules.devicemgmt.contract.dto.DeviceProvisionResult;
 import org.jeecg.modules.devicemgmt.contract.dto.DeviceSecretValidationRequest;
 import org.jeecg.modules.devicemgmt.contract.dto.DeviceSecretValidationResult;
+import org.jeecg.modules.devicemgmt.contract.dto.DeviceTokenRefreshRequest;
+import org.jeecg.modules.devicemgmt.contract.dto.DeviceTokenRefreshResult;
 import org.jeecg.modules.devicemgmt.contract.dto.DeviceTokenValidationRequest;
 import org.jeecg.modules.devicemgmt.contract.dto.DeviceTokenValidationResult;
 import org.springframework.cloud.openfeign.FeignClient;
@@ -49,4 +51,11 @@ public interface DeviceMgmtFeignClient {
     /** 业务身份 Token 校验。调用方：设备通信中台（归一化 MQTT/HTTP 业务报文时）。 */
     @PostMapping("/internal/device/validate-token")
     Result<DeviceTokenValidationResult> validateToken(@RequestBody @Valid DeviceTokenValidationRequest request);
+
+    /**
+     * Device Token 续签。调用方：设备通信中台，上行 {@code ota/token-refresh} 时触发，
+     * 续签结果由通信中台下行回传给设备（见 OTA 平台详细设计第二章协议映射表）。
+     */
+    @PostMapping("/internal/device/refresh-token")
+    Result<DeviceTokenRefreshResult> refreshToken(@RequestBody @Valid DeviceTokenRefreshRequest request);
 }

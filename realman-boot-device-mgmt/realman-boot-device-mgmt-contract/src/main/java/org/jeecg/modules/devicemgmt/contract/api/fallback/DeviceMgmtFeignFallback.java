@@ -9,6 +9,8 @@ import org.jeecg.modules.devicemgmt.contract.dto.DeviceProvisionRequest;
 import org.jeecg.modules.devicemgmt.contract.dto.DeviceProvisionResult;
 import org.jeecg.modules.devicemgmt.contract.dto.DeviceSecretValidationRequest;
 import org.jeecg.modules.devicemgmt.contract.dto.DeviceSecretValidationResult;
+import org.jeecg.modules.devicemgmt.contract.dto.DeviceTokenRefreshRequest;
+import org.jeecg.modules.devicemgmt.contract.dto.DeviceTokenRefreshResult;
 import org.jeecg.modules.devicemgmt.contract.dto.DeviceTokenValidationRequest;
 import org.jeecg.modules.devicemgmt.contract.dto.DeviceTokenValidationResult;
 
@@ -54,5 +56,11 @@ public class DeviceMgmtFeignFallback implements DeviceMgmtFeignClient {
         result.setValid(false);
         result.setReason("ERR_DEVICE_MGMT_UNAVAILABLE");
         return Result.ok(result);
+    }
+
+    @Override
+    public Result<DeviceTokenRefreshResult> refreshToken(DeviceTokenRefreshRequest request) {
+        log.error("[device-mgmt] refreshToken 调用失败，服务不可用", cause);
+        return Result.error("设备管理业务平台暂不可用：refreshToken");
     }
 }

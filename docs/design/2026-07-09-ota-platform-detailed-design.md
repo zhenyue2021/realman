@@ -379,12 +379,12 @@ PRD 第九章大量篇幅（9.7.5-9.7.7、9.8.2-9.8.6）定义的设备注册、
 
 | 步骤 | 内容 | 依赖 |
 | --- | --- | --- |
-| 1 | 建 `realman-ota-contract`：固件/密钥/任务 DTO、15 态枚举、30 个错误码常量、Feign 契约 | 无前置，可先行 |
-| 2 | 建 `realman-ota-biz`：数据模型（3.2/4.1/8 章）+ 前置校验（六）+ 状态机（八）| 依赖设备基座（读设备信息/is_test_device）、通信中台（`ota/resource-probe` 新增 Topic、下行发布）|
-| 3 | 补齐设备基座频率限制（`ERR_REGISTER_RATE_LIMIT`/`ERR_SECRET_GENERATE_RATE_LIMIT`）+ 高风险任务查询回调对接 | 见第七章，属于设备基座的补丁而非 OTA 新建 |
-| 4 | 建 `realman-ota-api`：管理端 REST（十一章）+ 系统设置校验接口 | 依赖步骤 2 |
-| 5 | 通信中台侧补齐 `ota/token-refresh` 完整闭环（当前只做事件归一化，未转发 device-mgmt 续签+下行回传新 Token，是 Phase 1 提交时的已知限制）| 依赖通信中台 |
-| 6 | 迁移现状 `OtaController`/`IotOtaServiceImpl`/`OtaProgressHandler` 数据到新状态机，旧 8 态到新 15 态的存量任务数据迁移脚本 | 依赖步骤 2-4 |
+| 1 | 建 `realman-ota-contract`：固件/密钥/任务 DTO、15 态枚举、30 个错误码常量、Feign 契约 | **已完成** |
+| 2 | 建 `realman-ota-biz`：数据模型（3.2/4.1/8 章）+ 前置校验（六）+ 状态机（八）| **已完成**，依赖设备基座（读设备信息/is_test_device）、通信中台（`ota/resource-probe` 新增 Topic、下行发布）|
+| 3 | 补齐设备基座频率限制（`ERR_REGISTER_RATE_LIMIT`/`ERR_SECRET_GENERATE_RATE_LIMIT`）+ 高风险任务查询回调对接 | **已完成**，见第七章 |
+| 4 | 建 `realman-ota-api`：管理端 REST（十一章）+ 系统设置校验接口 | **已完成**，依赖步骤 2 |
+| 5 | 通信中台侧补齐 `ota/token-refresh` 完整闭环 | **已完成**：`MqttMessageDispatcher#handleTokenRefresh` 归一化 DeviceUplinkEvent 之外，实际调用新增的 `DeviceMgmtFeignClient#refreshToken`（内部端点 `POST /internal/device/refresh-token`，复用 `DeviceAdminServiceImpl#refreshToken`）完成续签，再通过 `MqttPublisher` 把新 Token 下行回传到同一 `ota/token-refresh` Topic |
+| 6 | 迁移现状 `OtaController`/`IotOtaServiceImpl`/`OtaProgressHandler` 数据到新状态机，旧 8 态到新 15 态的存量任务数据迁移脚本 | 依赖步骤 2-4，**尚未开始** |
 
 ---
 

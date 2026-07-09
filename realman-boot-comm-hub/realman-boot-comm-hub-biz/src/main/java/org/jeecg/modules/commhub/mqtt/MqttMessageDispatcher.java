@@ -3,12 +3,19 @@ package org.jeecg.modules.commhub.mqtt;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.jeecg.common.api.vo.Result;
+import org.jeecg.modules.commhub.contract.constant.CommHubTopicConstants;
+import org.jeecg.modules.commhub.contract.dto.MqttPublishRequest;
 import org.jeecg.modules.commhub.contract.event.DeviceUplinkEvent;
 import org.jeecg.modules.commhub.contract.event.EventKind;
 import org.jeecg.modules.commhub.contract.event.Transport;
+import org.jeecg.modules.commhub.mqtt.publisher.MqttPublisher;
 import org.jeecg.modules.commhub.service.DeviceStateSyncService;
 import org.jeecg.modules.commhub.service.IUplinkEventService;
 import org.jeecg.modules.deviceinfo.contract.dto.DeviceInfoDTO;
+import org.jeecg.modules.devicemgmt.contract.api.DeviceMgmtFeignClient;
+import org.jeecg.modules.devicemgmt.contract.dto.DeviceTokenRefreshRequest;
+import org.jeecg.modules.devicemgmt.contract.dto.DeviceTokenRefreshResult;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
@@ -29,6 +36,11 @@ import java.util.regex.Pattern;
  * DeviceUplinkEvent 供 Webhook 转发，不做 OTA 业务解析——OTA 平台契约尚未落地）、
  * {@code bridge-ack}（HTTP-MQTT 桥接的 ACK 回执）、{@code $SYS} 上下线事件。
  * SLAM/WebRTC/数采等 Topic 见 {@code CommHubTopicConstants} 预留但本轮不处理。
+ *
+ * <p>{@code ota/token-refresh} 是唯一需要闭环处理的上行 Topic：归一化为
+ * DeviceUplinkEvent 之外，还要实际转发 device-mgmt 完成续签，并把新 Token 下行
+ * 回传给设备（同一 Topic 双向复用，见 {@code CommHubTopicConstants#TOPIC_OTA_TOKEN_REFRESH}
+ * 注释），这里补齐了 Phase 1 提交时"只做事件归一化"的已知限制。
  */
 @Slf4j
 @Component
@@ -36,22 +48,30 @@ public class MqttMessageDispatcher {
 
     private static final Pattern DEVICE_TOPIC = Pattern.compile("^device/([^/]+)/(.+)$");
     private static final Pattern SYS_CLIENT_EVENT = Pattern.compile("^\\$SYS/brokers/[^/]+/clients/([^/]+)/(connected|disconnected)$");
+    private static final String FIELD_DEVICE_TOKEN = "deviceToken";
+    private static final String FIELD_TOKEN_EXPIRES_AT = "tokenExpiresAt";
 
     public static final AtomicLong LAST_RECEIVED_TS = new AtomicLong(System.currentTimeMillis());
 
     private final DeviceStateSyncService deviceStateSyncService;
     private final IUplinkEventService uplinkEventService;
     private final MqttAckPendingService ackPendingService;
+    private final MqttPublisher mqttPublisher;
+    private final DeviceMgmtFeignClient deviceMgmtFeignClient;
     private final Executor mqttMessageExecutor;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public MqttMessageDispatcher(DeviceStateSyncService deviceStateSyncService,
                                   IUplinkEventService uplinkEventService,
                                   MqttAckPendingService ackPendingService,
+                                  MqttPublisher mqttPublisher,
+                                  DeviceMgmtFeignClient deviceMgmtFeignClient,
                                   @Qualifier("mqttMessageExecutor") Executor mqttMessageExecutor) {
         this.deviceStateSyncService = deviceStateSyncService;
         this.uplinkEventService = uplinkEventService;
         this.ackPendingService = ackPendingService;
+        this.mqttPublisher = mqttPublisher;
+        this.deviceMgmtFeignClient = deviceMgmtFeignClient;
         this.mqttMessageExecutor = mqttMessageExecutor;
     }
 
@@ -104,9 +124,55 @@ public class MqttMessageDispatcher {
             case "status/report" -> deviceStateSyncService.handleStatusReport(deviceCode, parsed);
             case "ota/progress" -> publishUplinkEvent(deviceCode, EventKind.OTA_PROGRESS, Transport.MQTT, parsed);
             case "ota/status-report" -> publishUplinkEvent(deviceCode, EventKind.OTA_STATUS_REPORT, Transport.MQTT, parsed);
-            case "ota/token-refresh" -> publishUplinkEvent(deviceCode, EventKind.TOKEN_REFRESH, Transport.MQTT, parsed);
+            case "ota/token-refresh" -> handleTokenRefresh(deviceCode, parsed);
             case "bridge-ack" -> handleBridgeAck(parsed, payload);
             default -> log.debug("[comm-hub] 未处理的设备端向 Topic 后缀，忽略 deviceCode={} path={}", deviceCode, path);
+        }
+    }
+
+    /**
+     * {@code ota/token-refresh} 双闭环：先按既有约定归一化为 DeviceUplinkEvent（供 Webhook
+     * 订阅方观测），再实际转发 device-mgmt 完成续签，成功后把新 Token 下行回传给设备
+     * （同一 Topic 双向复用）。device-mgmt 不可达或旧 Token 已失效时只记录告警，不重试——
+     * 设备会在下一次心跳/上行时用同一旧 Token 再次触发续签。
+     */
+    private void handleTokenRefresh(String deviceCode, Map<String, Object> parsed) {
+        publishUplinkEvent(deviceCode, EventKind.TOKEN_REFRESH, Transport.MQTT, parsed);
+
+        Object oldTokenValue = parsed.get(FIELD_DEVICE_TOKEN);
+        String oldToken = oldTokenValue != null ? oldTokenValue.toString() : null;
+        if (oldToken == null || oldToken.isBlank()) {
+            log.warn("[comm-hub] ota/token-refresh 缺少 {} 字段，跳过续签 deviceCode={}", FIELD_DEVICE_TOKEN, deviceCode);
+            return;
+        }
+
+        DeviceTokenRefreshRequest request = new DeviceTokenRefreshRequest();
+        request.setOldToken(oldToken);
+        Result<DeviceTokenRefreshResult> result;
+        try {
+            result = deviceMgmtFeignClient.refreshToken(request);
+        } catch (Exception e) {
+            log.warn("[comm-hub] Device Token 续签调用异常 deviceCode={}: {}", deviceCode, e.getMessage());
+            return;
+        }
+        if (result == null || !result.isSuccess() || result.getResult() == null) {
+            log.warn("[comm-hub] Device Token 续签失败 deviceCode={}: {}", deviceCode,
+                    result == null ? "无响应" : result.getMessage());
+            return;
+        }
+
+        DeviceTokenRefreshResult refreshed = result.getResult();
+        MqttPublishRequest publishRequest = new MqttPublishRequest();
+        publishRequest.setDeviceId(deviceCode);
+        publishRequest.setTopicSuffix(CommHubTopicConstants.TOPIC_OTA_TOKEN_REFRESH);
+        publishRequest.setPayload(Map.of(
+                FIELD_DEVICE_TOKEN, refreshed.getDeviceToken(),
+                FIELD_TOKEN_EXPIRES_AT, refreshed.getTokenExpiresAt().toString()
+        ));
+        try {
+            mqttPublisher.publish(publishRequest);
+        } catch (Exception e) {
+            log.warn("[comm-hub] Device Token 续签结果下行发布失败 deviceCode={}: {}", deviceCode, e.getMessage());
         }
     }
 

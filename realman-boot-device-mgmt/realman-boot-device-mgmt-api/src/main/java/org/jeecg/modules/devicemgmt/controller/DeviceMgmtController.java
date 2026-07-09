@@ -10,9 +10,13 @@ import org.jeecg.modules.devicemgmt.contract.dto.DeviceProvisionRequest;
 import org.jeecg.modules.devicemgmt.contract.dto.DeviceProvisionResult;
 import org.jeecg.modules.devicemgmt.contract.dto.DeviceSecretValidationRequest;
 import org.jeecg.modules.devicemgmt.contract.dto.DeviceSecretValidationResult;
+import org.jeecg.modules.devicemgmt.contract.dto.DeviceTokenRefreshRequest;
+import org.jeecg.modules.devicemgmt.contract.dto.DeviceTokenRefreshResult;
 import org.jeecg.modules.devicemgmt.contract.dto.DeviceTokenValidationRequest;
 import org.jeecg.modules.devicemgmt.contract.dto.DeviceTokenValidationResult;
+import org.jeecg.modules.devicemgmt.service.IDeviceAdminService;
 import org.jeecg.modules.devicemgmt.service.IDeviceMgmtService;
+import org.jeecg.modules.devicemgmt.vo.TokenRefreshResult;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -32,6 +36,7 @@ import java.util.List;
 public class DeviceMgmtController {
 
     private final IDeviceMgmtService deviceMgmtService;
+    private final IDeviceAdminService deviceAdminService;
 
     @PostMapping("/internal/device/validate-secret")
     @Operation(summary = "MQTT 连接层密钥校验")
@@ -55,5 +60,15 @@ public class DeviceMgmtController {
     @Operation(summary = "业务身份 Token 校验")
     public Result<DeviceTokenValidationResult> validateToken(@RequestBody @Valid DeviceTokenValidationRequest request) {
         return Result.ok(deviceMgmtService.validateToken(request.getDeviceToken()));
+    }
+
+    @PostMapping("/internal/device/refresh-token")
+    @Operation(summary = "Device Token 续签（供设备通信中台 ota/token-refresh 上行触发）")
+    public Result<DeviceTokenRefreshResult> refreshToken(@RequestBody @Valid DeviceTokenRefreshRequest request) {
+        TokenRefreshResult refreshed = deviceAdminService.refreshToken(request.getOldToken());
+        DeviceTokenRefreshResult dto = new DeviceTokenRefreshResult();
+        dto.setDeviceToken(refreshed.getDeviceToken());
+        dto.setTokenExpiresAt(refreshed.getTokenExpiresAt());
+        return Result.ok(dto);
     }
 }
