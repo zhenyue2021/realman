@@ -122,12 +122,25 @@ public class MqttMessageDispatcher {
         Map<String, Object> parsed = parsePayload(payload);
         switch (path) {
             case "status/report" -> deviceStateSyncService.handleStatusReport(deviceCode, parsed);
+            case "ota/heartbeat" -> handleHeartbeat(deviceCode, parsed);
             case "ota/progress" -> publishUplinkEvent(deviceCode, EventKind.OTA_PROGRESS, Transport.MQTT, parsed);
             case "ota/status-report" -> publishUplinkEvent(deviceCode, EventKind.OTA_STATUS_REPORT, Transport.MQTT, parsed);
             case "ota/token-refresh" -> handleTokenRefresh(deviceCode, parsed);
             case "bridge-ack" -> handleBridgeAck(parsed, payload);
             default -> log.debug("[comm-hub] 未处理的设备端向 Topic 后缀，忽略 deviceCode={} path={}", deviceCode, path);
         }
+    }
+
+    /**
+     * {@code ota/heartbeat}（PRD 心跳接口对齐 Topic，见设备通信中台详细设计 2.2/5.2）：
+     * 与 {@code status/report} 共用同一套 SSOT 同步逻辑（资源快照/占用态），额外把
+     * 心跳归一化为 {@code DeviceUplinkEvent(HEARTBEAT)}，使其可经 4.3.2 的 Webhook/
+     * 轮询转发给已订阅的第三方——这是 {@code status/report} 不做的（{@code status/report}
+     * 是仅供设备基座内部同步的既有 Topic，未在 5.2 映射表里承诺对外可观测）。
+     */
+    private void handleHeartbeat(String deviceCode, Map<String, Object> parsed) {
+        deviceStateSyncService.handleStatusReport(deviceCode, parsed);
+        publishUplinkEvent(deviceCode, EventKind.HEARTBEAT, Transport.MQTT, parsed);
     }
 
     /**

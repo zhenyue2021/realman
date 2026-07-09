@@ -120,6 +120,7 @@ public class MqttConfig implements ApplicationListener<ApplicationReadyEvent>, D
         String shared = "$share/" + properties.getSharedSubscriptionGroup() + "/";
         List<String> topics = new ArrayList<>();
         topics.add(shared + "device/+/" + CommHubTopicConstants.TOPIC_STATUS_REPORT);
+        topics.add(shared + "device/+/" + CommHubTopicConstants.TOPIC_OTA_HEARTBEAT);
         topics.add(shared + "device/+/" + CommHubTopicConstants.TOPIC_OTA_PROGRESS);
         topics.add(shared + "device/+/" + CommHubTopicConstants.TOPIC_OTA_STATUS_REPORT);
         topics.add(shared + "device/+/" + CommHubTopicConstants.TOPIC_OTA_TOKEN_REFRESH);

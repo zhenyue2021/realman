@@ -8,8 +8,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
-@Schema(description = "Webhook 订阅")
-public class WebhookSubscriptionDTO implements Serializable {
+@Schema(description = "API Key 台账")
+public class ApiKeyDTO implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
@@ -17,15 +17,14 @@ public class WebhookSubscriptionDTO implements Serializable {
 
     private String tenantId;
 
-    private String callbackUrl;
+    @Schema(description = "原始 Key 前 8 位，仅供辨识")
+    private String keyPrefix;
 
-    private List<String> eventKinds;
+    private List<String> deviceScope;
 
-    private List<String> deviceIdFilter;
+    private List<String> topicSuffixScope;
 
-    private Integer consecutiveFailureCount;
-
-    /** ACTIVE / PAUSED / DISABLED */
+    /** ACTIVE / REVOKED */
     private String status;
 
     private String createdBy;

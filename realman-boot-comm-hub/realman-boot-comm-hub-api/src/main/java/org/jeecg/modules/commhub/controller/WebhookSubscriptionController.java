@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -47,9 +48,16 @@ public class WebhookSubscriptionController {
 
     @DeleteMapping("/api/v1/webhook-subscriptions/{id}")
     @RequiresPermissions("commHub:webhookSubscription:delete")
-    @Operation(summary = "停用 Webhook 订阅")
+    @Operation(summary = "停用 Webhook 订阅（手动停用，与自动暂停是两回事，不能靠 resume 恢复）")
     public Result<Void> disable(@PathVariable String id) {
         webhookSubscriptionService.disable(id);
+        return Result.ok();
+    }
+
+    @PutMapping("/api/v1/webhook-subscriptions/{id}/resume")
+    @Operation(summary = "恢复因连续投递失败被自动暂停（PAUSED）的订阅")
+    public Result<Void> resume(@PathVariable String id) {
+        webhookSubscriptionService.resume(id);
         return Result.ok();
     }
 }

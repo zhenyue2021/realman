@@ -13,18 +13,25 @@ import org.springframework.web.client.RestTemplate;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.concurrent.CompletableFuture;
 
 /**
- * Webhook 出站 HTTP 推送：HMAC-SHA256 签名 + 最多 3 次尽力而为重试。
+ * Webhook 出站 HTTP 推送：HMAC-SHA256 签名 + 尽力而为重试，退避间隔 1s/2s/5s/10s
+ * （5 次尝试、4 次等待），对齐设备通信中台详细设计 4.3.2 的建议退避策略。
  * 签名请求头 {@code X-Webhook-Signature}，值为 {@code hex(HMAC-SHA256(secret, body))}，
- * 供订阅方按同样算法校验来源合法性，对齐设备通信中台详细设计 4.3.2。
+ * 供订阅方按同样算法校验来源合法性。
+ *
+ * <p>返回 {@code CompletableFuture<Boolean>}（最终是否投递成功），供调用方据此更新
+ * 订阅的连续失败计数并在达到阈值时自动暂停（见 {@code IWebhookSubscriptionService
+ * #recordDispatchResult}），不在本类内直接依赖订阅服务，保持职责单一。
  */
 @Slf4j
 @Component
 public class WebhookDispatchClient {
 
     private static final String SIGNATURE_HEADER = "X-Webhook-Signature";
-    private static final int MAX_ATTEMPTS = 3;
+    /** 尝试之间的等待间隔（毫秒），长度 = 最大尝试次数 - 1。 */
+    private static final long[] BACKOFF_MILLIS = {1000L, 2000L, 5000L, 10000L};
 
     private final RestTemplate restTemplate;
 
@@ -36,7 +43,7 @@ public class WebhookDispatchClient {
     }
 
     @Async("webhookDispatchExecutor")
-    public void dispatchAsync(String callbackUrl, String hmacSecret, String bodyJson) {
+    public CompletableFuture<Boolean> dispatchAsync(String callbackUrl, String hmacSecret, String bodyJson) {
         String signature = new HMac(HmacAlgorithm.HmacSHA256, hmacSecret.getBytes(StandardCharsets.UTF_8)).digestHex(bodyJson);
 
         HttpHeaders headers = new HttpHeaders();
@@ -44,18 +51,20 @@ public class WebhookDispatchClient {
         headers.set(SIGNATURE_HEADER, signature);
         HttpEntity<String> entity = new HttpEntity<>(bodyJson, headers);
 
-        for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        int maxAttempts = BACKOFF_MILLIS.length + 1;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
                 restTemplate.postForEntity(callbackUrl, entity, Void.class);
-                return;
+                return CompletableFuture.completedFuture(true);
             } catch (Exception e) {
-                log.warn("[comm-hub] Webhook 推送失败 url={} attempt={}/{}: {}", callbackUrl, attempt, MAX_ATTEMPTS, e.getMessage());
-                if (attempt < MAX_ATTEMPTS) {
-                    sleep(200L * attempt);
+                log.warn("[comm-hub] Webhook 推送失败 url={} attempt={}/{}: {}", callbackUrl, attempt, maxAttempts, e.getMessage());
+                if (attempt < maxAttempts) {
+                    sleep(BACKOFF_MILLIS[attempt - 1]);
                 }
             }
         }
         log.error("[comm-hub] Webhook 推送最终失败（已达最大重试次数）url={}", callbackUrl);
+        return CompletableFuture.completedFuture(false);
     }
 
     private static void sleep(long millis) {

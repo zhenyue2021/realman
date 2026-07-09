@@ -43,7 +43,15 @@ public class WebhookSubscription implements Serializable {
     @TableField("event_kinds")
     private String eventKinds;
 
-    /** ACTIVE / DISABLED */
+    /** 逗号分隔的 deviceId 列表，空表示不按设备过滤（订阅该租户全部设备） */
+    @TableField("device_id_filter")
+    private String deviceIdFilter;
+
+    /** 连续投递失败次数，达到阈值自动置为 PAUSED，见 {@code WebhookDispatchClient} */
+    @TableField("consecutive_failure_count")
+    private Integer consecutiveFailureCount;
+
+    /** ACTIVE / PAUSED（连续失败自动暂停）/ DISABLED（手动停用） */
     @TableField("status")
     private String status;
 

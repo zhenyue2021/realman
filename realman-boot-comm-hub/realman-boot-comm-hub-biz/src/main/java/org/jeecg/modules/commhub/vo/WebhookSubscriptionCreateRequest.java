@@ -21,4 +21,7 @@ public class WebhookSubscriptionCreateRequest implements Serializable {
 
     @Schema(description = "订阅的事件种类，缺省表示订阅全部")
     private List<String> eventKinds;
+
+    @Schema(description = "只订阅这些 deviceId 的事件，缺省表示订阅该租户全部设备")
+    private List<String> deviceIdFilter;
 }

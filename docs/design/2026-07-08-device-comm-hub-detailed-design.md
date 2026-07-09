@@ -188,8 +188,8 @@ HTTP 没有持久连接，设备主动上报的数据不能像 MQTT 订阅那样
 
 | 机制 | 说明 | 适用场景 |
 | --- | --- | --- |
-| **Webhook 订阅（推荐）** | `POST /api/v1/webhooks/subscriptions`：第三方注册 `{callbackUrl, deviceIdFilter?, eventKindFilter?, secret}`；通信中台在归一化出匹配的 `DeviceUplinkEvent` 后，异步 `POST` 到 `callbackUrl`，请求头携带基于 `secret` 的 HMAC 签名供第三方验签；失败按指数退避重试（如 1s/2s/5s/10s，最多 N 次），连续失败则暂停该订阅并告警，第三方需调用 `PUT /api/v1/webhooks/subscriptions/{id}/resume` 恢复 | 第三方有稳定可达的后台服务，希望准实时收到设备事件（如状态变化、告警）|
-| **轮询兜底** | `GET /api/v1/devices/{deviceId}/events?since={cursor}`：返回自游标以来的 `DeviceUplinkEvent` 列表，通信中台按设备维度短期缓冲最近事件（Redis List/Stream，TTL 可配置，如 24 小时）| 第三方没有公网可达的回调地址，或只需要低频查询最新状态 |
+| **Webhook 订阅（推荐）** | **已实现**（路径与本节原文略有出入，见下）：`POST /api/v1/webhook-subscriptions`：第三方注册 `{tenantId, callbackUrl, eventKinds?, deviceIdFilter?}`；通信中台在归一化出匹配的 `DeviceUplinkEvent` 后，异步 `POST` 到 `callbackUrl`，请求头 `X-Webhook-Signature` 携带基于随机生成的 `hmacSecret` 的 HMAC-SHA256 签名供第三方验签；失败按 1s/2s/5s/10s 退避重试（共 5 次尝试），**连续失败达 5 次自动置为 `PAUSED` 并告警**，第三方需调用 `PUT /api/v1/webhook-subscriptions/{id}/resume` 恢复（与手动 `DELETE` 停用是两回事，手动停用不能靠 resume 恢复）| 第三方有稳定可达的后台服务，希望准实时收到设备事件（如状态变化、告警）|
+| **轮询兜底** | **已实现**：`GET /api/v1/devices/uplink-events`，按 `deviceId`/`eventKind`/`since` 过滤，读取 `device_uplink_event_log` 落库记录（非 Redis 短期缓冲，无 TTL 淘汰，长期可查）| 第三方没有公网可达的回调地址，或只需要低频查询最新状态 |
 
 ### 4.4 对外 API 清单（按后端服务分组，通信中台仅做路由/鉴权，不承载业务逻辑）
 
@@ -198,15 +198,16 @@ HTTP 没有持久连接，设备主动上报的数据不能像 MQTT 订阅那样
 | `/api/v1/ota/**` | OTA 平台 | 固件管理、任务管理、进度查询等（对齐 OTA PRD 9.1-9.6，业务/管理类）|
 | `/api/v1/devices`、`/api/v1/devices/{id}` (查询类) | 设备基座（只读代理 SSOT + 业务层聚合）| 台账查询（业务/管理类）|
 | `/api/v1/admin/devices/**` | 设备基座（设备管理业务平台）| 注册凭证管理、批量离线注册（业务/管理类）|
-| `/api/v1/devices/{id}/mqtt-bridge/publish` | 通信中台自身（桥接到 MQTT，不转发到后端业务服务）| HTTP-MQTT 下行桥接，见 4.3.1 |
-| `/api/v1/webhooks/subscriptions` | 通信中台自身 | Webhook 订阅管理，见 4.3.2 |
-| `/api/v1/devices/{id}/events` | 通信中台自身（读取内部事件缓冲）| 轮询兜底，见 4.3.2 |
+| `/api/v1/devices/{id}/mqtt-bridge/publish` | 通信中台自身（桥接到 MQTT，不转发到后端业务服务）| HTTP-MQTT 下行桥接，见 4.3.1；**已实现**，需 `X-Api-Key` 请求头 |
+| `/api/v1/webhook-subscriptions`（原文 `/api/v1/webhooks/subscriptions`）| 通信中台自身 | Webhook 订阅管理，见 4.3.2；**已实现** |
+| `/api/v1/devices/uplink-events`（原文 `/api/v1/devices/{id}/events`，改为不按单设备限定路径，用查询参数过滤）| 通信中台自身（读取 `device_uplink_event_log`）| 轮询兜底，见 4.3.2；**已实现** |
+| `/api/v1/api-keys` | 通信中台自身 | 桥接 API Key 管理（创建/查询/吊销）；**已实现**，见 4.5 |
 
 ### 4.5 鉴权模型
 
 - **业务/管理 API**：沿用平台能力总线的统一鉴权（JWT + 租户上下文透传），与 Web 管理端一致。
-- **第三方系统身份（桥接与 Webhook）**：API Key + 租户上下文（`X-Operator-Tenant-Id` 等，对齐平台能力总线的统一鉴权规范），每个 API Key 绑定可操作的设备范围（按租户/设备类型/具体设备列表），防止越权向不属于该第三方的设备下发指令。
-- **限流与幂等**：桥接下行接口按第三方维度做限流（防止刷指令）；Webhook 回调用 HMAC 签名防伪造；复用 OTA PRD 定义的频控规则思路（如注册 5 次/小时）应用到桥接场景。
+- **第三方系统身份（桥接与 Webhook）**：**已实现**——`comm_hub_api_key` 表，`POST /api/v1/api-keys` 创建时生成随机原始 Key（仅返回一次，落库存其 SHA-256 哈希），绑定 `tenantId` + `deviceScope`（逗号分隔 deviceId/deviceCode 列表，`*` 表示不限）+ `topicSuffixScope`（逗号分隔 Topic 后缀，支持 `xxx/*` 前缀通配，`*` 表示不限）。`MqttBridgeController` 要求 `X-Api-Key` 请求头，校验顺序：Key 有效且 ACTIVE → 目标设备存在且属于该 Key 的 `tenantId` → 设备在 `deviceScope` 内 → Topic 后缀在 `topicSuffixScope` 内，任一环节失败统一返回 `ERR_API_KEY_UNAUTHORIZED`（不区分具体原因，避免被试探）。
+- **限流与幂等**：**已实现**——桥接下行接口按 API Key 维度限流（Redis `INCR`+`EXPIRE` 固定窗口，默认 60 次/分钟，见 `BridgeRateLimitService`，超限返回 `ERR_BRIDGE_RATE_LIMIT`）；Webhook 回调用 HMAC-SHA256 签名防伪造。设备注册频率限制（5 次/小时等）属于设备基座职责，不在本模块范围，见 OTA 平台详细设计第七章。
 
 ---
 
@@ -280,11 +281,11 @@ HTTP 没有持久连接，设备主动上报的数据不能像 MQTT 订阅那样
 
 | 步骤 | 内容 |
 | --- | --- |
-| 1 | 迁移现有 MQTT 相关代码（`MqttAuthController`/`MqttMessageDispatcher`/`MqttPublisher`/`MqttClientWatchdog`/`RedisPendingListenerConfig`）到独立服务 `realman-comm-hub`，协议与逻辑不变，只是换个进程运行 |
-| 2 | 补充 `device/{code}/ota/heartbeat`、`/token-refresh` 等新增 Topic 的 Handler，落地 `DeviceUplinkEvent` 归一化模型 |
-| 3 | 新建 WEB 端向 HTTP 网关子模块，先落地"业务/管理 API 统一输出"（OTA/设备基座 API 反向代理）|
-| 4 | 落地 HTTP-MQTT 桥接：同步发布接口（复用 `MqttPublisher`/`publish-and-wait`）+ Webhook 订阅管理 + 轮询兜底接口，按第三方接入排期决定优先级 |
-| 5 | 按第六章方案，新增与数据处理模块的 HTTP 直连 Client，双写过渡后下线 RocketMQ 相关代码 |
-| 6 | 路由注册表落地为可配置项（数据库或 Nacos 配置），支持新增 Topic/Path 无需改动核心分发逻辑 |
+| 1 | **已完成**：迁移现有 MQTT 相关代码（`MqttAuthController`/`MqttMessageDispatcher`/`MqttPublisher`/`MqttClientWatchdog`/`RedisPendingListenerConfig`）到独立服务 `realman-comm-hub`（独立实现，非直接搬运 `realman-boot-iot` 代码）|
+| 2 | **已完成**：`device/{code}/ota/heartbeat`、`/token-refresh` 的 Handler 与 Topic 订阅已补齐（此前一度只声明了 Topic 常量但订阅列表/Dispatcher 均未接入，是本轮排查修复的实际缺口），`DeviceUplinkEvent` 归一化模型已落地 |
+| 3 | **不再需要独立子模块**：`realman-gateway` 已通过 `spring.cloud.gateway.discovery.locator.enabled=true` 按服务名自动路由到 `realman-ota`/`realman-device-mgmt` 等服务的 `context-path`，"业务/管理 API 统一输出"的诉求已被平台既有网关满足，未额外新建 WEB 端向反向代理层 |
+| 4 | **已完成**：HTTP-MQTT 桥接（`MqttBridgeController` + API Key 鉴权/限流）+ Webhook 订阅管理（含 `deviceIdFilter`、连续失败自动暂停/`resume`）+ 轮询兜底接口 |
+| 5 | **未开始**：与数据处理模块的 HTTP 直连 Client（第六章）尚未落地，`realman-boot-iot` 的 RocketMQ 生产者/消费者代码仍在运行 |
+| 6 | **未做**：路由注册表仍是 `MqttMessageDispatcher` 内的硬编码 `switch`，未落地为数据库/Nacos 可配置项 |
 
 

@@ -13,6 +13,7 @@ import org.jeecg.modules.commhub.entity.WebhookSubscription;
 import org.jeecg.modules.commhub.mapper.DeviceUplinkEventLogMapper;
 import org.jeecg.modules.commhub.mapper.WebhookSubscriptionMapper;
 import org.jeecg.modules.commhub.service.IUplinkEventService;
+import org.jeecg.modules.commhub.service.IWebhookSubscriptionService;
 import org.jeecg.modules.commhub.service.WebhookDispatchClient;
 import org.jeecg.modules.commhub.vo.UplinkEventDTO;
 import org.jeecg.modules.commhub.vo.UplinkEventQuery;
@@ -33,6 +34,7 @@ public class UplinkEventServiceImpl implements IUplinkEventService {
     private final DeviceUplinkEventLogMapper eventLogMapper;
     private final WebhookSubscriptionMapper subscriptionMapper;
     private final WebhookDispatchClient webhookDispatchClient;
+    private final IWebhookSubscriptionService webhookSubscriptionService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
@@ -75,8 +77,10 @@ public class UplinkEventServiceImpl implements IUplinkEventService {
             return;
         }
         for (WebhookSubscription subscription : subscriptions) {
-            if (matchesEventKind(subscription, eventKind)) {
-                webhookDispatchClient.dispatchAsync(subscription.getCallbackUrl(), subscription.getHmacSecret(), bodyJson);
+            if (matchesEventKind(subscription, eventKind) && matchesDeviceId(subscription, event.getDeviceId())) {
+                String subscriptionId = subscription.getId();
+                webhookDispatchClient.dispatchAsync(subscription.getCallbackUrl(), subscription.getHmacSecret(), bodyJson)
+                        .thenAccept(success -> webhookSubscriptionService.recordDispatchResult(subscriptionId, success));
             }
         }
     }
@@ -87,6 +91,21 @@ public class UplinkEventServiceImpl implements IUplinkEventService {
         }
         for (String kind : subscription.getEventKinds().split(",")) {
             if (kind.equals(eventKind)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean matchesDeviceId(WebhookSubscription subscription, String deviceId) {
+        if (!StringUtils.hasText(subscription.getDeviceIdFilter())) {
+            return true;
+        }
+        if (!StringUtils.hasText(deviceId)) {
+            return false;
+        }
+        for (String id : subscription.getDeviceIdFilter().split(",")) {
+            if (id.equals(deviceId)) {
                 return true;
             }
         }
