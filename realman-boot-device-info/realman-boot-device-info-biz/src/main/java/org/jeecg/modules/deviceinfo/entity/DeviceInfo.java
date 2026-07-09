@@ -80,6 +80,10 @@ public class DeviceInfo implements Serializable {
     @TableField("location")
     private String location;
 
+    /** JSON 文本：最近一次心跳携带的资源快照（磁盘/内存/电源/网络等），供 OTA 前置资源校验使用。 */
+    @TableField("resource_snapshot")
+    private String resourceSnapshot;
+
     @TableField("last_heartbeat_at")
     private LocalDateTime lastHeartbeatAt;
 

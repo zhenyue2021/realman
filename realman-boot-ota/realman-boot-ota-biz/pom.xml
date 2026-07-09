@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.realmanframework.boot</groupId>
+        <artifactId>realman-boot-ota</artifactId>
+        <version>1.0.0</version>
+    </parent>
+    <artifactId>realman-boot-ota-biz</artifactId>
+
+    <!--
+      OTA 平台业务实现层：固件/密钥管理、前置校验、15 态状态机、批量策略、
+      版本矩阵、系统设置。对齐 docs/design/2026-07-09-ota-platform-detailed-design.md。
+
+      已知限制（本轮范围之外，见提交说明）：OSS/S3 真实 SDK 集成（本轮只定义
+      清晰的存储接口，未接入具体云厂商 SDK）、带宽限速的真实网络层实施、
+      日志归档到 IA 存储的自动化任务（本轮只落库，不做冷热分层）。
+    -->
+    <dependencies>
+        <dependency>
+            <groupId>org.realmanframework.boot</groupId>
+            <artifactId>realman-boot-base-core</artifactId>
+            <version>${realman-boot.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.realmanframework.boot</groupId>
+            <artifactId>realman-boot-ota-contract</artifactId>
+            <version>${realman-boot.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.realmanframework.boot</groupId>
+            <artifactId>realman-boot-device-info-contract</artifactId>
+            <version>${realman-boot.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.realmanframework.boot</groupId>
+            <artifactId>realman-boot-device-mgmt-contract</artifactId>
+            <version>${realman-boot.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.realmanframework.boot</groupId>
+            <artifactId>realman-boot-comm-hub-contract</artifactId>
+            <version>${realman-boot.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+            <version>${mybatis-plus.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>cn.hutool</groupId>
+            <artifactId>hutool-all</artifactId>
+            <version>${hutool.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

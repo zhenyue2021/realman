@@ -18,6 +18,7 @@ CREATE TABLE `device_info` (
   `lifecycle_stage`       varchar(16)  NOT NULL DEFAULT 'MANUFACTURED' COMMENT 'MANUFACTURED / ACTIVATED / RUNNING / MAINTENANCE / RETIRED',
   `is_test_device`        tinyint(1)   NOT NULL DEFAULT 0 COMMENT '测试设备标记，由设备管理业务平台写入',
   `location`              varchar(512) DEFAULT NULL COMMENT '位置信息 JSON（国家/城市/区/街道/楼宇 + 经纬度）',
+  `resource_snapshot`     varchar(1024) DEFAULT NULL COMMENT '最近一次心跳携带的资源快照 JSON（磁盘/内存/电源/网络等），供 OTA 前置资源校验使用',
   `last_heartbeat_at`     datetime     DEFAULT NULL COMMENT '最近心跳时间',
   `last_online_at`        datetime     DEFAULT NULL COMMENT '最近上线时间',
   `last_offline_at`       datetime     DEFAULT NULL COMMENT '最近下线时间',

@@ -17,13 +17,16 @@
       对齐 docs/design/2026-07-09-ota-platform-detailed-design.md（已对照
       《达尔文设备升级平台 PRD V1.0.0》原文核对）。
 
-      当前仅包含 contract 模块（Phase 0：契约先行）。OTA 平台不重新实现设备注册/
-      Token/测试标记（已在设备基座 realman-device-mgmt 落地，详见详细设计第七章），
-      本模块只暴露"是否存在进行中高风险任务"这一个内部只读查询供设备基座回调。
-      biz / api / start 子模块待 Phase 3 启动时补充。
+      OTA 平台不重新实现设备注册/Token/测试标记（已在设备基座 realman-device-mgmt
+      落地，详见详细设计第七章），只暴露"是否存在进行中高风险任务"内部只读查询
+      供设备基座回调。设备侧协议维持 MQTT，心跳/进度/状态补传/Token续签均经
+      设备通信中台归一化的 DeviceUplinkEvent 消费，不直接暴露给设备端。
     -->
     <modules>
         <module>realman-boot-ota-contract</module>
+        <module>realman-boot-ota-biz</module>
+        <module>realman-boot-ota-api</module>
+        <module>realman-boot-ota-start</module>
     </modules>
 
 </project>

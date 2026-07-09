@@ -19,12 +19,16 @@ import java.net.UnknownHostException;
  * 双凭证体系（deviceSecret + Device Token）、ACL 规则；对外面向运维人员的台账/审计/
  * 绑定管理 REST 留给后续补充。
  *
- * <p>{@code @EnableFeignClients} 扫描设备信息基础服务契约包，用于注册成功后写入 SSOT。
+ * <p>{@code @EnableFeignClients} 扫描设备信息基础服务契约包（用于注册成功后写入 SSOT）
+ * 和 OTA 平台契约包（取消测试标记前置校验：查询设备是否存在进行中的 high_risk 任务）。
  * 与 {@code realman-boot-device-info} 服务一样不排除 {@code MybatisPlusSaasConfig}，
  * 复用其分页/乐观锁拦截器，不重复声明 {@code @MapperScan}。
  */
 @EnableDiscoveryClient
-@EnableFeignClients(basePackages = "org.jeecg.modules.deviceinfo.contract.api")
+@EnableFeignClients(basePackages = {
+        "org.jeecg.modules.deviceinfo.contract.api",
+        "org.jeecg.modules.ota.contract.api"
+})
 @SpringBootApplication(exclude = {DynamicDataSourceAutoConfiguration.class})
 @ComponentScan(basePackages = "org.jeecg")
 public class RealmanDeviceMgmtApplication {

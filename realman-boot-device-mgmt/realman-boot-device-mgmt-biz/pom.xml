@@ -33,6 +33,12 @@
             <artifactId>realman-boot-device-info-contract</artifactId>
             <version>${realman-boot.version}</version>
         </dependency>
+        <!-- 取消测试标记前置校验：查询设备是否存在进行中的 high_risk OTA 任务 -->
+        <dependency>
+            <groupId>org.realmanframework.boot</groupId>
+            <artifactId>realman-boot-ota-contract</artifactId>
+            <version>${realman-boot.version}</version>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>

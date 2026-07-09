@@ -288,6 +288,16 @@
 				<artifactId>realman-boot-ota-contract</artifactId>
 				<version>${realman-boot.version}</version>
 			</dependency>
+			<dependency>
+				<groupId>org.realmanframework.boot</groupId>
+				<artifactId>realman-boot-ota-biz</artifactId>
+				<version>${realman-boot.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.realmanframework.boot</groupId>
+				<artifactId>realman-boot-ota-api</artifactId>
+				<version>${realman-boot.version}</version>
+			</dependency>
 
 			<!-- JeecgBoot 基座依赖 -->
 			<dependency>

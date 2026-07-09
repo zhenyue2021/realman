@@ -6,9 +6,15 @@ import org.jeecg.common.constant.ServiceNameConstants;
 import org.jeecg.modules.commhub.contract.api.fallback.CommHubFeignFallbackFactory;
 import org.jeecg.modules.commhub.contract.dto.MqttPublishRequest;
 import org.jeecg.modules.commhub.contract.dto.MqttPublishResult;
+import org.jeecg.modules.commhub.contract.dto.UplinkEventPollQuery;
+import org.jeecg.modules.commhub.contract.event.DeviceUplinkEvent;
 import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.cloud.openfeign.SpringQueryMap;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+
+import java.util.List;
 
 /**
  * 设备通信中台（{@code realman-comm-hub}）对内 Feign 契约：统一下行发布 API。
@@ -33,4 +39,12 @@ public interface CommHubFeignClient {
      */
     @PostMapping("/internal/mqtt/publish")
     Result<MqttPublishResult> publish(@RequestBody @Valid MqttPublishRequest request);
+
+    /**
+     * 内部轮询消费统一上行事件，供 OTA 等业务服务消费 {@code HEARTBEAT}/
+     * {@code OTA_PROGRESS}/{@code OTA_STATUS_REPORT}/{@code TOKEN_REFRESH} 等事件，
+     * 见 OTA 平台详细设计第二章协议映射表。
+     */
+    @GetMapping("/internal/comm-hub/uplink-events")
+    Result<List<DeviceUplinkEvent>> pollUplinkEvents(@SpringQueryMap UplinkEventPollQuery query);
 }

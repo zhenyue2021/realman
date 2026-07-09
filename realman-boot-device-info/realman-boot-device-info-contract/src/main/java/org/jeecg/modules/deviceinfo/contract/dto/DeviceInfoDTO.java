@@ -73,6 +73,9 @@ public class DeviceInfoDTO implements Serializable {
     @Schema(description = "位置信息（国家/城市/区/街道/楼宇 + 经纬度），JSON 结构不做强类型建模")
     private Map<String, Object> location;
 
+    @Schema(description = "最近一次心跳携带的资源快照（磁盘/内存/电源/网络等），供 OTA 前置资源校验使用，字段结构由 OTA 平台自行解析")
+    private Map<String, Object> resourceSnapshot;
+
     @Schema(description = "最近心跳时间")
     private LocalDateTime lastHeartbeatAt;
 

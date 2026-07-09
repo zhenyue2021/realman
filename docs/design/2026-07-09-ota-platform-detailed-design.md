@@ -218,10 +218,10 @@ PRD 第九章大量篇幅（9.7.5-9.7.7、9.8.2-9.8.6）定义的设备注册、
 
 **OTA 平台不重新实现以上能力**，只做两件事：
 1. 需要设备身份/在线状态/资源信息时，走 `DeviceInfoFeignClient`/`DeviceMgmtFeignClient`（同设备基座、通信中台的一贯做法），不自建设备表。
-2. 提供一个内部只读接口 `GET /internal/ota/devices/{deviceId}/active-high-risk-task`，供 `DeviceAdminServiceImpl#updateTestFlag` 取消标记时前置校验回调——这是设备基座文档 3.5 时序图里"查 OTA"这一步真正要落地的地方，**目前设备基座那边是跳过该校验的已知限制**，OTA 平台落地时需要补上这个回调，让两边对上。
+2. 提供一个内部只读接口 `GET /internal/ota/devices/{deviceId}/active-high-risk-task`（`HighRiskTaskController`），供 `DeviceAdminServiceImpl#updateTestFlag` 取消标记时前置校验回调——这是设备基座文档 3.5 时序图里"查 OTA"这一步，**已在本轮补齐**：`device-mgmt-biz` 新增 `realman-boot-ota-contract` 依赖，`updateTestFlag` 在 `testDevice=false` 分支实际调用 `OtaFeignClient#getActiveHighRiskTask`，OTA 不可达时 Feign fallback 保守返回 `hasActiveTask=true`（拒绝取消）。
 
-**尚未实现、需要补的差距**（在设备基座而非 OTA 平台侧）：
-- `ERR_REGISTER_RATE_LIMIT`（同一 SN 每小时最多注册 5 次）、`ERR_SECRET_GENERATE_RATE_LIMIT`（同一 SN 每小时最多生成 10 次凭证）两个频率限制目前 `device-mgmt` 未实现，建议 Redis `INCR`+`EXPIRE` 简单实现，不阻塞 OTA 平台自身开发，但应在 Phase 3 启动前一并补上（否则验收标准 #47/#48 无法通过）。
+**已补齐的设备基座差距**：
+- `ERR_REGISTER_RATE_LIMIT`（同一 SN 每小时最多注册 5 次）、`ERR_SECRET_GENERATE_RATE_LIMIT`（同一 SN 每小时最多生成 10 次凭证）已在 `device-mgmt-biz` 新增 `DeviceRateLimitService`（Redis `INCR`+`EXPIRE` 固定窗口限流，Redis 不可用时保守放行）落地，分别接入 `DeviceMgmtServiceImpl#provision`、`DeviceAdminServiceImpl#generateRegistrationSecret`。
 
 ---
 

@@ -182,6 +182,7 @@ public class DeviceInfoServiceImpl extends ServiceImpl<DeviceInfoMapper, DeviceI
         update.setDeviceId(request.getDeviceId());
         update.setIpAddress(request.getIpAddress());
         update.setLastHeartbeatAt(request.getHeartbeatAt() != null ? request.getHeartbeatAt() : LocalDateTime.now());
+        update.setResourceSnapshot(writeJson(request.getResourceSnapshot()));
         updateByIdRequired(update, request.getDeviceId());
     }
 
@@ -243,6 +244,7 @@ public class DeviceInfoServiceImpl extends ServiceImpl<DeviceInfoMapper, DeviceI
         dto.setLifecycleStage(parseEnum(LifecycleStage.class, entity.getLifecycleStage()));
         dto.setTestDevice(entity.getTestDevice());
         dto.setLocation(readJsonObjectMap(entity.getLocation()));
+        dto.setResourceSnapshot(readJsonObjectMap(entity.getResourceSnapshot()));
         dto.setLastHeartbeatAt(entity.getLastHeartbeatAt());
         dto.setLastOnlineAt(entity.getLastOnlineAt());
         dto.setLastOfflineAt(entity.getLastOfflineAt());

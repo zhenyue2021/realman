@@ -1,0 +1,51 @@
+server:
+  port: 8093
+  servlet:
+    context-path: /realman-ota
+  tomcat:
+    max-swallow-size: -1
+
+spring:
+  application:
+    name: realman-ota
+  servlet:
+    multipart:
+      max-file-size: 2200MB
+      max-request-size: 2200MB
+  cloud:
+    nacos:
+      config:
+        server-addr: ${NACOS_SERVER_ADDR:realman-nacos:8848}
+        group: ${NACOS_GROUP:REALMAN_GROUP}
+        file-extension: yaml
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:nacos}
+        refresh-enabled: true
+      discovery:
+        server-addr: ${NACOS_SERVER_ADDR:realman-nacos:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${NACOS_GROUP:REALMAN_GROUP}
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:nacos}
+  config:
+    import:
+      - optional:nacos:${spring.application.name}.yaml?refreshEnabled=true
+  profiles:
+    active: '@profile.name@'
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: GMT+8
+
+mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml
+  configuration:
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+    map-underscore-to-camel-case: true
+
+# 17 项系统设置的初始默认值，实际生效值以 ota_system_setting 表为准（见
+# OtaSystemSettingService），本节仅在表内该键不存在时兜底
+ota:
+  firmware:
+    local-scan-paths: /tmp,/media/realman
+  uplink-poll:
+    interval-ms: 5000

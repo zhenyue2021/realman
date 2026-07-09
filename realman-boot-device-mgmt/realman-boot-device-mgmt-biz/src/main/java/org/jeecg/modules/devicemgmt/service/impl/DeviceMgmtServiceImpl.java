@@ -21,6 +21,7 @@ import org.jeecg.modules.devicemgmt.entity.DeviceCredential;
 import org.jeecg.modules.devicemgmt.entity.DeviceRegistrationSecret;
 import org.jeecg.modules.devicemgmt.mapper.DeviceCredentialMapper;
 import org.jeecg.modules.devicemgmt.mapper.DeviceRegistrationSecretMapper;
+import org.jeecg.modules.devicemgmt.service.DeviceRateLimitService;
 import org.jeecg.modules.devicemgmt.service.DeviceSecretCacheService;
 import org.jeecg.modules.devicemgmt.service.IDeviceMgmtService;
 import org.jeecg.modules.devicemgmt.vo.CachedDeviceSecret;
@@ -51,6 +52,9 @@ public class DeviceMgmtServiceImpl implements IDeviceMgmtService {
     private static final String ERR_TOKEN_REVOKED = "ERR_TOKEN_REVOKED";
     private static final String ERR_TOKEN_EXPIRED = "ERR_TOKEN_EXPIRED";
     private static final String ERR_TOKEN_INVALID = "ERR_TOKEN_INVALID";
+    private static final String ERR_REGISTER_RATE_LIMIT = "ERR_REGISTER_RATE_LIMIT";
+    private static final String RATE_LIMIT_SCOPE_REGISTER = "register";
+    private static final int RATE_LIMIT_REGISTER_PER_HOUR = 5;
 
     private static final String CLAIM_DEVICE_ID = "device_id";
     private static final String CLAIM_DEVICE_TYPE = "device_type";
@@ -61,6 +65,7 @@ public class DeviceMgmtServiceImpl implements IDeviceMgmtService {
     private final DeviceInfoFeignClient deviceInfoFeignClient;
     private final DeviceTokenProperties tokenProperties;
     private final DeviceSecretCacheService secretCacheService;
+    private final DeviceRateLimitService rateLimitService;
 
     @Override
     public DeviceSecretValidationResult validateSecret(String deviceCode, String deviceSecret) {
@@ -116,6 +121,9 @@ public class DeviceMgmtServiceImpl implements IDeviceMgmtService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public DeviceProvisionResult provision(DeviceProvisionRequest request) {
+        if (rateLimitService.isExceeded(RATE_LIMIT_SCOPE_REGISTER, request.getDeviceCode(), RATE_LIMIT_REGISTER_PER_HOUR)) {
+            throw new JeecgBootBizTipException(ERR_REGISTER_RATE_LIMIT);
+        }
         DeviceRegistrationSecret secret = consumeRegistrationSecret(request);
 
         DeviceInfoDTO existing = getDeviceByCodeSafely(request.getDeviceCode());

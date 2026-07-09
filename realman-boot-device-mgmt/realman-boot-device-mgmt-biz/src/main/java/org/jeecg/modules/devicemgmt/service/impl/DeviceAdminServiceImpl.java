@@ -32,6 +32,7 @@ import org.jeecg.modules.devicemgmt.mapper.DeviceCredentialMapper;
 import org.jeecg.modules.devicemgmt.mapper.DeviceOperationAuditLogMapper;
 import org.jeecg.modules.devicemgmt.mapper.DeviceRegistrationSecretMapper;
 import org.jeecg.modules.devicemgmt.mapper.DeviceTenantAuthMapper;
+import org.jeecg.modules.devicemgmt.service.DeviceRateLimitService;
 import org.jeecg.modules.devicemgmt.service.DeviceSecretCacheService;
 import org.jeecg.modules.devicemgmt.service.IDeviceAdminService;
 import org.jeecg.modules.devicemgmt.service.IDeviceMgmtService;
@@ -51,6 +52,8 @@ import org.jeecg.modules.devicemgmt.vo.RegistrationSecretStatusResult;
 import org.jeecg.modules.devicemgmt.vo.SecretResetResult;
 import org.jeecg.modules.devicemgmt.vo.TenantAuthRequest;
 import org.jeecg.modules.devicemgmt.vo.TokenRefreshResult;
+import org.jeecg.modules.ota.contract.api.OtaFeignClient;
+import org.jeecg.modules.ota.contract.dto.ActiveHighRiskTaskResult;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -65,10 +68,10 @@ import java.util.stream.Collectors;
 /**
  * 设备管理业务平台对外 REST 的业务实现，对应设备基座详细设计 3.4/3.5 节。
  *
- * <p>已知范围限制：测试设备取消标记的"是否存在进行中 high_risk 任务"前置校验依赖 OTA
- * 平台（本仓库尚未落地 OTA 服务/契约），本实现按文档 3.5 节时序图跳过该外部校验，
- * 只保留二次确认（{@code confirmText}）与审计留痕；OTA 契约就绪后需在
- * {@link #updateTestFlag} 中补上该调用。
+ * <p>测试设备取消标记的"是否存在进行中 high_risk 任务"前置校验通过
+ * {@link org.jeecg.modules.ota.contract.api.OtaFeignClient#getActiveHighRiskTask}
+ * 回调 OTA 平台（见设备基座详细设计 3.5 时序图、OTA 平台详细设计第七章）；OTA 平台不可用时
+ * Feign fallback 保守返回 {@code hasActiveTask=true}，即拒绝本次取消操作。
  */
 @Slf4j
 @Service
@@ -80,8 +83,12 @@ public class DeviceAdminServiceImpl implements IDeviceAdminService {
     private static final String ERR_BINDING_NOT_FOUND = "ERR_BINDING_NOT_FOUND";
     private static final String ERR_ALREADY_BOUND = "ERR_ALREADY_BOUND";
     private static final String ERR_DEVICE_ALREADY_REGISTERED = "ERR_DEVICE_ALREADY_REGISTERED";
+    private static final String ERR_SECRET_GENERATE_RATE_LIMIT = "ERR_SECRET_GENERATE_RATE_LIMIT";
+    private static final String ERR_HIGH_RISK_TASK_ACTIVE = "ERR_HIGH_RISK_TASK_ACTIVE";
     private static final String CONFIRM_REVOKE_TOKEN = "REVOKE_TOKEN";
     private static final String CONFIRM_UNSET_TEST_FLAG = "UNSET_TEST_FLAG";
+    private static final String RATE_LIMIT_SCOPE_SECRET_GENERATE = "secret-generate";
+    private static final int RATE_LIMIT_SECRET_GENERATE_PER_HOUR = 10;
 
     private static final String AUDIT_NORMAL = "normal";
     private static final String AUDIT_HIGH = "high";
@@ -95,11 +102,16 @@ public class DeviceAdminServiceImpl implements IDeviceAdminService {
     private final IDeviceMgmtService deviceMgmtService;
     private final DeviceRegistrationProperties registrationProperties;
     private final DeviceSecretCacheService secretCacheService;
+    private final DeviceRateLimitService rateLimitService;
+    private final OtaFeignClient otaFeignClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public RegistrationSecretGenerateResult generateRegistrationSecret(RegistrationSecretGenerateRequest request, String operator) {
+        if (rateLimitService.isExceeded(RATE_LIMIT_SCOPE_SECRET_GENERATE, request.getDeviceCode(), RATE_LIMIT_SECRET_GENERATE_PER_HOUR)) {
+            throw new JeecgBootBizTipException(ERR_SECRET_GENERATE_RATE_LIMIT);
+        }
         String plainSecret = IdUtil.fastSimpleUUID();
         LocalDateTime expiresAt = LocalDateTime.now().plusDays(registrationProperties.getSecretExpiryDays());
 
@@ -356,7 +368,12 @@ public class DeviceAdminServiceImpl implements IDeviceAdminService {
             if (!CONFIRM_UNSET_TEST_FLAG.equals(confirmText)) {
                 throw new JeecgBootBizTipException("ERR_CONFIRM_TEXT_MISMATCH");
             }
-            // 已知限制：OTA 契约未落地，跳过"是否存在进行中 high_risk 任务"前置校验，见类注释
+            Result<ActiveHighRiskTaskResult> highRiskResult = otaFeignClient.getActiveHighRiskTask(deviceId);
+            ActiveHighRiskTaskResult highRiskTask = highRiskResult != null && highRiskResult.isSuccess()
+                    ? highRiskResult.getResult() : null;
+            if (highRiskTask == null || highRiskTask.isHasActiveTask()) {
+                throw new JeecgBootBizTipException(ERR_HIGH_RISK_TASK_ACTIVE);
+            }
             auditLevel = AUDIT_HIGH;
         }
         TestFlagUpdateRequest request = new TestFlagUpdateRequest();
