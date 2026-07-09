@@ -47,6 +47,10 @@ public interface ServiceNameConstants {
 	 */
 	String SERVICE_COMM_HUB = "realman-comm-hub";
 	/**
+	 * 微服务名：OTA 平台，见 docs/design/2026-07-09-ota-platform-detailed-design.md
+	 */
+	String SERVICE_OTA = "realman-ota";
+	/**
 	 * 微服务名： demo模块
 	 */
 	String SERVICE_DEMO = "jeecg-demo";

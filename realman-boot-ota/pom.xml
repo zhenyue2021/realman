@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.realmanframework.boot</groupId>
+        <artifactId>realman-boot-parent</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>realman-boot-ota</artifactId>
+    <packaging>pom</packaging>
+
+    <!--
+      OTA 平台：master/slave 固件升级全生命周期管理（固件/密钥/任务/15 态状态机），
+      对齐 docs/design/2026-07-09-ota-platform-detailed-design.md（已对照
+      《达尔文设备升级平台 PRD V1.0.0》原文核对）。
+
+      当前仅包含 contract 模块（Phase 0：契约先行）。OTA 平台不重新实现设备注册/
+      Token/测试标记（已在设备基座 realman-device-mgmt 落地，详见详细设计第七章），
+      本模块只暴露"是否存在进行中高风险任务"这一个内部只读查询供设备基座回调。
+      biz / api / start 子模块待 Phase 3 启动时补充。
+    -->
+    <modules>
+        <module>realman-boot-ota-contract</module>
+    </modules>
+
+</project>

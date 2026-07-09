@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.realmanframework.boot</groupId>
+        <artifactId>realman-boot-ota</artifactId>
+        <version>1.0.0</version>
+    </parent>
+    <artifactId>realman-boot-ota-contract</artifactId>
+
+    <!--
+      OTA 平台对内契约：15 态状态机/风险等级/升级方式等共享枚举 + "是否存在进行中
+      高风险任务"内部只读查询 API，见设计文档 2026-07-09-ota-platform-detailed-design.md
+      第七、八章。设备注册/Token/测试标记不在本契约里——那是设备基座
+      realman-device-mgmt-contract 已经发布的能力，OTA 平台直接消费，不重复定义。
+    -->
+    <dependencies>
+        <dependency>
+            <groupId>org.realmanframework.boot</groupId>
+            <artifactId>realman-boot-base-core</artifactId>
+            <version>${realman-boot.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-openfeign</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.swagger.core.v3</groupId>
+            <artifactId>swagger-annotations-jakarta</artifactId>
+            <version>2.2.25</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.validation</groupId>
+            <artifactId>jakarta.validation-api</artifactId>
+        </dependency>
+    </dependencies>
+</project>

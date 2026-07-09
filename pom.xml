@@ -104,6 +104,7 @@
         <module>realman-boot-device-info</module>
         <module>realman-boot-device-mgmt</module>
         <module>realman-boot-comm-hub</module>
+        <module>realman-boot-ota</module>
     </modules>
 
 	<repositories>
@@ -280,6 +281,11 @@
 			<dependency>
 				<groupId>org.realmanframework.boot</groupId>
 				<artifactId>realman-boot-comm-hub-api</artifactId>
+				<version>${realman-boot.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.realmanframework.boot</groupId>
+				<artifactId>realman-boot-ota-contract</artifactId>
 				<version>${realman-boot.version}</version>
 			</dependency>
 
