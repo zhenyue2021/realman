@@ -31,6 +31,13 @@ public final class CommHubTopicConstants {
     /** Device Token 续签（上行携带旧 Token，下行返回新 Token）。 */
     public static final String TOPIC_OTA_TOKEN_REFRESH = "ota/token-refresh";
 
+    /**
+     * OTA 资源探测（下行发起 + 上行回执），对应 OTA PRD 9.7.4 operate=5：OTA 平台在
+     * 创建升级任务前主动探测目标设备磁盘/网络等资源状态，走统一下行发布
+     * {@code waitAck=true}，不产生 {@code DeviceUplinkEvent}。见 OTA 平台详细设计 2.1。
+     */
+    public static final String TOPIC_OTA_RESOURCE_PROBE = "ota/resource-probe";
+
     /** SLAM 建图/定位/导航（上行/下行），前缀，实际 Topic 为 {@code slam/*}。 */
     public static final String TOPIC_SLAM_PREFIX = "slam/";
 
