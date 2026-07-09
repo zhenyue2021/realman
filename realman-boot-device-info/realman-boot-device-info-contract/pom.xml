@@ -1,0 +1,38 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.realmanframework.boot</groupId>
+        <artifactId>realman-boot-device-info</artifactId>
+        <version>1.0.0</version>
+    </parent>
+    <artifactId>realman-boot-device-info-contract</artifactId>
+
+    <!--
+      设备信息基础服务对外契约：DTO + Feign 接口 + 枚举常量，不含 Spring 实现类。
+      被调用方（GLN / 数据处理 / OTA / 状态监控 / 任务规划 / 设备管理业务平台 / 设备通信中台）
+      依赖本模块即可拿到强类型的调用契约，无需等待 biz 实现落地。
+    -->
+    <dependencies>
+        <dependency>
+            <groupId>org.realmanframework.boot</groupId>
+            <artifactId>realman-boot-base-core</artifactId>
+            <version>${realman-boot.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-openfeign</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.swagger.core.v3</groupId>
+            <artifactId>swagger-annotations-jakarta</artifactId>
+            <version>2.2.25</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.validation</groupId>
+            <artifactId>jakarta.validation-api</artifactId>
+        </dependency>
+    </dependencies>
+</project>

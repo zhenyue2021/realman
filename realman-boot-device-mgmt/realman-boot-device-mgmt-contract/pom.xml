@@ -1,0 +1,46 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.realmanframework.boot</groupId>
+        <artifactId>realman-boot-device-mgmt</artifactId>
+        <version>1.0.0</version>
+    </parent>
+    <artifactId>realman-boot-device-mgmt-contract</artifactId>
+
+    <!--
+      设备管理业务平台对内契约：目前只覆盖设备通信中台需要同步调用的内部能力
+      （连接层密钥校验、ACL 规则、上电自注册转发、业务身份 Token 校验，见设备通信
+      中台详细设计 2.3/3.1、设备基座详细设计 3.3）。其余以运维/管理员为使用者的
+      对外 REST（注册凭证管理、Token 生命周期、绑定、审计等）走 WEB 端向网关反向
+      代理，不属于跨服务 Feign 契约，留给 Phase 2 的 api 子模块直接定义 Controller。
+    -->
+    <dependencies>
+        <dependency>
+            <groupId>org.realmanframework.boot</groupId>
+            <artifactId>realman-boot-base-core</artifactId>
+            <version>${realman-boot.version}</version>
+        </dependency>
+        <!-- 复用 DeviceType 等共享领域枚举，避免两份契约各自重复定义 -->
+        <dependency>
+            <groupId>org.realmanframework.boot</groupId>
+            <artifactId>realman-boot-device-info-contract</artifactId>
+            <version>${realman-boot.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-openfeign</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.swagger.core.v3</groupId>
+            <artifactId>swagger-annotations-jakarta</artifactId>
+            <version>2.2.25</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.validation</groupId>
+            <artifactId>jakarta.validation-api</artifactId>
+        </dependency>
+    </dependencies>
+</project>

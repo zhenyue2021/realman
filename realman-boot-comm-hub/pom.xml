@@ -1,0 +1,27 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.realmanframework.boot</groupId>
+        <artifactId>realman-boot-parent</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>realman-boot-comm-hub</artifactId>
+    <packaging>pom</packaging>
+
+    <!--
+      设备通信中台：设备端向 MQTT（唯一协议，注册除外）+ WEB 端向 HTTP 统一对外网关
+      （业务/管理 API + HTTP-MQTT 桥接）。
+
+      当前仅包含 contract 模块（Phase 0：契约先行），对齐
+      docs/design/2026-07-08-device-comm-hub-detailed-design.md。
+      biz / api / start 子模块在 Phase 1（设备通信中台独立）落地时补充。
+    -->
+    <modules>
+        <module>realman-boot-comm-hub-contract</module>
+    </modules>
+
+</project>

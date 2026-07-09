@@ -35,6 +35,18 @@ public interface ServiceNameConstants {
 	 */
 	String SERVICE_IOT = "realman-iot";
 	/**
+	 * 微服务名：设备信息基础服务（SSOT），见 docs/design/2026-07-08-device-foundation-detailed-design.md
+	 */
+	String SERVICE_DEVICE_INFO = "realman-device-info";
+	/**
+	 * 微服务名：设备管理业务平台，见 docs/design/2026-07-08-device-foundation-detailed-design.md
+	 */
+	String SERVICE_DEVICE_MGMT = "realman-device-mgmt";
+	/**
+	 * 微服务名：设备通信中台，见 docs/design/2026-07-08-device-comm-hub-detailed-design.md
+	 */
+	String SERVICE_COMM_HUB = "realman-comm-hub";
+	/**
 	 * 微服务名： demo模块
 	 */
 	String SERVICE_DEMO = "jeecg-demo";

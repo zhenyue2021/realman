@@ -100,6 +100,10 @@
         <module>realman-boot-base-core</module>
         <module>realman-boot-system</module>
         <module>realman-boot-iot</module>
+        <!-- V2 架构升级 Phase 0（契约先行），详见 docs/design/2026-07-07-darwin-platform-v2-capability-bus-and-comm-hub.md 第九章 -->
+        <module>realman-boot-device-info</module>
+        <module>realman-boot-device-mgmt</module>
+        <module>realman-boot-comm-hub</module>
     </modules>
 
 	<repositories>

@@ -1,0 +1,27 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.realmanframework.boot</groupId>
+        <artifactId>realman-boot-parent</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>realman-boot-device-info</artifactId>
+    <packaging>pom</packaging>
+
+    <!--
+      设备信息基础服务（SSOT）。
+
+      当前仅包含 contract 模块（Phase 0：契约先行），对齐
+      docs/design/2026-07-08-device-foundation-detailed-design.md 第二章。
+      biz / start 子模块在 Phase 2（设备基座二次拆分）落地时补充，详见
+      docs/design/2026-07-07-darwin-platform-v2-capability-bus-and-comm-hub.md 第九章迁移路线图。
+    -->
+    <modules>
+        <module>realman-boot-device-info-contract</module>
+    </modules>
+
+</project>

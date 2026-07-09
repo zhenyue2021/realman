@@ -1,0 +1,26 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.realmanframework.boot</groupId>
+        <artifactId>realman-boot-parent</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>realman-boot-device-mgmt</artifactId>
+    <packaging>pom</packaging>
+
+    <!--
+      设备管理业务平台：注册/授权/四态操作/密钥Token/审计 + 对外 REST + 台账 UI。
+
+      当前仅包含 contract 模块（Phase 0：契约先行），对齐
+      docs/design/2026-07-08-device-foundation-detailed-design.md 第三章。
+      biz / api / start 子模块在 Phase 2（设备基座二次拆分）落地时补充。
+    -->
+    <modules>
+        <module>realman-boot-device-mgmt-contract</module>
+    </modules>
+
+</project>
