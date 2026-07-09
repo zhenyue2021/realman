@@ -113,8 +113,6 @@ flowchart TB
     MON["状态监控（横切）"]
   end
 
-  BUS["平台能力总线（API + 事件）\n能力注册 · 契约治理 · 租户上下文透传 · 统一鉴权"]
-
   subgraph base["L2 共享底座"]
     DF["设备基座\n设备信息基础服务（SSOT）"]
     CH["设备通信中台\n设备端向：MQTT（唯一协议，注册除外）\nWEB 端向：HTTP 统一对外网关\n路由 · 大文件/视频通道 · 配置中心"]
@@ -132,9 +130,7 @@ flowchart TB
   end
 
   SSO --> PLAN & GLN & DP & OTA & DM
-  PLAN & GLN & DP & OTA & DM -->|API/事件，按需调用| BUS
-  BUS --> DF
-  BUS --> CH
+  biz -->|API/事件，按需调用\n经平台能力总线治理：能力注册 · 契约治理 · 租户上下文透传 · 统一鉴权| base
   CH -.同步事件.-> DF
 
   CH <-->|MQTT，注册用 HTTP| MASTER
