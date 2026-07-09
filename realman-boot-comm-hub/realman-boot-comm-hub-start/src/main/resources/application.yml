@@ -1,0 +1,55 @@
+server:
+  port: 8092
+  servlet:
+    context-path: /realman-comm-hub
+
+spring:
+  application:
+    name: realman-comm-hub
+  cloud:
+    nacos:
+      config:
+        server-addr: ${NACOS_SERVER_ADDR:realman-nacos:8848}
+        group: ${NACOS_GROUP:REALMAN_GROUP}
+        file-extension: yaml
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:nacos}
+        refresh-enabled: true
+      discovery:
+        server-addr: ${NACOS_SERVER_ADDR:realman-nacos:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${NACOS_GROUP:REALMAN_GROUP}
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:nacos}
+  config:
+    import:
+      - optional:nacos:${spring.application.name}.yaml?refreshEnabled=true
+  profiles:
+    active: '@profile.name@'
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: GMT+8
+
+mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml
+  configuration:
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+    map-underscore-to-camel-case: true
+
+# 设备通信中台独立 MQTT 客户端，见 org.jeecg.modules.commhub.config.MqttClientProperties
+# 生产环境务必通过 Nacos/环境变量覆盖 username/password，不可使用默认值
+comm-hub:
+  mqtt:
+    broker-url: ${MQTT_BROKER_URL:tcp://localhost:1883}
+    client-id-prefix: comm-hub
+    username: ${MQTT_SERVICE_USERNAME:comm-hub-service}
+    password: ${MQTT_SERVICE_PASSWORD:change-me-in-production}
+    keep-alive-seconds: 60
+    connection-timeout-seconds: 10
+    shared-subscription-group: comm-hub-cluster
+    default-qos: 1
+    idle-timeout-seconds: 90
+    restart-debounce-ms: 30000
+    heartbeat-interval-seconds: 45
+    watchdog-check-interval-seconds: 30
+    default-ack-timeout-ms: 10000

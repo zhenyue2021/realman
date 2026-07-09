@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.realmanframework.boot</groupId>
+        <artifactId>realman-boot-comm-hub</artifactId>
+        <version>1.0.0</version>
+    </parent>
+    <artifactId>realman-boot-comm-hub-biz</artifactId>
+
+    <!--
+      设备通信中台业务实现层：独立的 MQTT 客户端（连接 EMQX，南向唯一协议）+
+      EMQX HTTP 鉴权/ACL 回调 + 统一下行发布（含 publish-and-wait）+ 上行事件归一化/
+      Webhook 转发 + 南向唯一 HTTP 例外（自注册转发）。对齐
+      docs/design/2026-07-08-device-comm-hub-detailed-design.md。
+
+      本轮范围：MQTT 客户端/发布/订阅路由、EMQX 鉴权回调、在线/离线/心跳事件转发到
+      设备信息基础服务、统一上行事件 Webhook 订阅与轮询兜底、自注册转发。
+      OTA 相关 Topic 的具体业务处理（ota/progress 等）留待 OTA 契约落地后补充，
+      本轮只做 Topic 常量预留与事件归一化，不做业务解析。
+    -->
+    <dependencies>
+        <dependency>
+            <groupId>org.realmanframework.boot</groupId>
+            <artifactId>realman-boot-base-core</artifactId>
+            <version>${realman-boot.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.realmanframework.boot</groupId>
+            <artifactId>realman-boot-comm-hub-contract</artifactId>
+            <version>${realman-boot.version}</version>
+        </dependency>
+        <!-- 自注册转发目标、在线/离线/心跳事件同步目标 -->
+        <dependency>
+            <groupId>org.realmanframework.boot</groupId>
+            <artifactId>realman-boot-device-mgmt-contract</artifactId>
+            <version>${realman-boot.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.realmanframework.boot</groupId>
+            <artifactId>realman-boot-device-info-contract</artifactId>
+            <version>${realman-boot.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+            <version>${mybatis-plus.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+        </dependency>
+        <!-- 独立 MQTT 客户端，连接 EMQX，不复用 realman-boot-iot 的连接 -->
+        <dependency>
+            <groupId>org.eclipse.paho</groupId>
+            <artifactId>org.eclipse.paho.mqttv5.client</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>cn.hutool</groupId>
+            <artifactId>hutool-all</artifactId>
+            <version>${hutool.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

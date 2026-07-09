@@ -37,6 +37,14 @@ public final class CommHubTopicConstants {
     /** 数采指令与 OSS 回传（上行/下行）前缀，实际 Topic 为 {@code datacollect/*}。 */
     public static final String TOPIC_DATACOLLECT_PREFIX = "datacollect/";
 
+    /**
+     * HTTP-MQTT 桥接统一 ACK 回执 Topic 后缀（上行）。无论下行通过哪个
+     * {@code topicSuffix} 发布，设备统一在此 Topic 回 ACK，payload 内的
+     * {@code commandId} 字段与下行请求一一对应，供 publish-and-wait 关联。
+     * 见设备通信中台详细设计 4.3.1。
+     */
+    public static final String TOPIC_BRIDGE_ACK = "bridge-ack";
+
     /** 拼出完整 Topic：{@code device/{deviceCode}/{topicSuffix}}。 */
     public static String fullTopic(String deviceCode, String topicSuffix) {
         return "device/" + deviceCode + "/" + topicSuffix;

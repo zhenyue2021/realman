@@ -14,14 +14,18 @@
 
     <!--
       设备通信中台：设备端向 MQTT（唯一协议，注册除外）+ WEB 端向 HTTP 统一对外网关
-      （业务/管理 API + HTTP-MQTT 桥接）。
-
-      当前仅包含 contract 模块（Phase 0：契约先行），对齐
+      （业务/管理 API + HTTP-MQTT 桥接）。对齐
       docs/design/2026-07-08-device-comm-hub-detailed-design.md。
-      biz / api / start 子模块在 Phase 1（设备通信中台独立）落地时补充。
+
+      Phase 1（设备通信中台独立）：本服务独立搭建一套 MQTT 客户端连接 EMQX，
+      不复用 realman-boot-iot 的既有连接（那是另一个独立部署的服务，两者互不
+      引用）；OTA 平台契约尚未落地，OTA 相关 Topic/事件先按设计文档预留。
     -->
     <modules>
         <module>realman-boot-comm-hub-contract</module>
+        <module>realman-boot-comm-hub-biz</module>
+        <module>realman-boot-comm-hub-api</module>
+        <module>realman-boot-comm-hub-start</module>
     </modules>
 
 </project>

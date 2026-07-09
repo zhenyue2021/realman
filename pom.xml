@@ -272,6 +272,16 @@
 				<artifactId>realman-boot-comm-hub-contract</artifactId>
 				<version>${realman-boot.version}</version>
 			</dependency>
+			<dependency>
+				<groupId>org.realmanframework.boot</groupId>
+				<artifactId>realman-boot-comm-hub-biz</artifactId>
+				<version>${realman-boot.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.realmanframework.boot</groupId>
+				<artifactId>realman-boot-comm-hub-api</artifactId>
+				<version>${realman-boot.version}</version>
+			</dependency>
 
 			<!-- JeecgBoot 基座依赖 -->
 			<dependency>
