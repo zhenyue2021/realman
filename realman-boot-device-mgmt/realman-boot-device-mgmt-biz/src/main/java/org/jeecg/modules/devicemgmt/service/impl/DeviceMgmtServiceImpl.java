@@ -21,7 +21,9 @@ import org.jeecg.modules.devicemgmt.entity.DeviceCredential;
 import org.jeecg.modules.devicemgmt.entity.DeviceRegistrationSecret;
 import org.jeecg.modules.devicemgmt.mapper.DeviceCredentialMapper;
 import org.jeecg.modules.devicemgmt.mapper.DeviceRegistrationSecretMapper;
+import org.jeecg.modules.devicemgmt.service.DeviceSecretCacheService;
 import org.jeecg.modules.devicemgmt.service.IDeviceMgmtService;
+import org.jeecg.modules.devicemgmt.vo.CachedDeviceSecret;
 import org.jeecg.modules.deviceinfo.contract.api.DeviceInfoFeignClient;
 import org.jeecg.modules.deviceinfo.contract.dto.DeviceInfoDTO;
 import org.jeecg.modules.deviceinfo.contract.dto.DeviceRegisterWriteRequest;
@@ -58,28 +60,46 @@ public class DeviceMgmtServiceImpl implements IDeviceMgmtService {
     private final DeviceRegistrationSecretMapper registrationSecretMapper;
     private final DeviceInfoFeignClient deviceInfoFeignClient;
     private final DeviceTokenProperties tokenProperties;
+    private final DeviceSecretCacheService secretCacheService;
 
     @Override
     public DeviceSecretValidationResult validateSecret(String deviceCode, String deviceSecret) {
         DeviceSecretValidationResult result = new DeviceSecretValidationResult();
-        DeviceInfoDTO device = getDeviceByCodeSafely(deviceCode);
-        if (device == null) {
-            result.setAllow(false);
-            result.setReason(ERR_DEVICE_NOT_AUTHORIZED);
-            return result;
+
+        CachedDeviceSecret cached = secretCacheService.get(deviceCode).orElse(null);
+        String deviceId;
+        String deviceSecretHash;
+        if (cached != null) {
+            deviceId = cached.getDeviceId();
+            deviceSecretHash = cached.getDeviceSecretHash();
+        } else {
+            DeviceInfoDTO device = getDeviceByCodeSafely(deviceCode);
+            if (device == null) {
+                result.setAllow(false);
+                result.setReason(ERR_DEVICE_NOT_AUTHORIZED);
+                return result;
+            }
+            DeviceCredential credential = credentialMapper.selectById(device.getDeviceId());
+            if (credential == null || !StringUtils.hasText(credential.getDeviceSecretHash())) {
+                log.warn("[device-mgmt] validateSecret 设备无凭证记录 deviceCode={}", deviceCode);
+                result.setAllow(false);
+                result.setReason(ERR_DEVICE_NOT_AUTHORIZED);
+                return result;
+            }
+            deviceId = device.getDeviceId();
+            deviceSecretHash = credential.getDeviceSecretHash();
+            secretCacheService.put(deviceCode, new CachedDeviceSecret(deviceId, deviceSecretHash));
         }
-        DeviceCredential credential = credentialMapper.selectById(device.getDeviceId());
-        if (credential == null || !StringUtils.hasText(credential.getDeviceSecretHash())) {
-            log.warn("[device-mgmt] validateSecret 设备无凭证记录 deviceCode={}", deviceCode);
-            result.setAllow(false);
-            result.setReason(ERR_DEVICE_NOT_AUTHORIZED);
-            return result;
-        }
-        boolean match = DigestUtil.sha256Hex(deviceSecret).equals(credential.getDeviceSecretHash());
+
+        boolean match = DigestUtil.sha256Hex(deviceSecret).equals(deviceSecretHash);
         result.setAllow(match);
-        result.setDeviceId(device.getDeviceId());
+        result.setDeviceId(deviceId);
         if (!match) {
             result.setReason(ERR_DEVICE_NOT_AUTHORIZED);
+            // 密钥已变更但缓存未及时失效时，命中的旧缓存会导致误拒绝；清掉后下次回源重建
+            if (cached != null) {
+                secretCacheService.evict(deviceCode);
+            }
         }
         return result;
     }
@@ -140,6 +160,7 @@ public class DeviceMgmtServiceImpl implements IDeviceMgmtService {
         } else {
             credentialMapper.updateById(credential);
         }
+        secretCacheService.evict(request.getDeviceCode());
 
         log.info("[device-mgmt] provision 完成 deviceCode={} deviceId={} reRegistration={} secretId={}",
                 request.getDeviceCode(), deviceId, reRegistration, secret.getId());
@@ -186,7 +207,8 @@ public class DeviceMgmtServiceImpl implements IDeviceMgmtService {
         return result;
     }
 
-    private String issueToken(String deviceId, DeviceType deviceType, String tenantId) {
+    @Override
+    public String issueToken(String deviceId, DeviceType deviceType, String tenantId) {
         Algorithm algorithm = Algorithm.HMAC256(tokenProperties.getSecret());
         Instant now = Instant.now();
         Instant expiresAt = now.plus(tokenProperties.getExpiryDays(), ChronoUnit.DAYS);
