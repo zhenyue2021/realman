@@ -13,14 +13,19 @@
     <packaging>pom</packaging>
 
     <!--
-      设备管理业务平台：注册/授权/四态操作/密钥Token/审计 + 对外 REST + 台账 UI。
-
-      当前仅包含 contract 模块（Phase 0：契约先行），对齐
+      设备管理业务平台：注册/授权/四态操作/密钥Token/审计 + 对外 REST + 台账 UI，对齐
       docs/design/2026-07-08-device-foundation-detailed-design.md 第三章。
-      biz / api / start 子模块在 Phase 2（设备基座二次拆分）落地时补充。
+
+      biz/api 目前只实现 DeviceMgmtFeignClient 契约覆盖的四个内部能力（注册转发、
+      连接层密钥校验、ACL、业务身份 Token 校验）；面向运维人员的对外 REST（注册凭证
+      生成、Token 生命周期管理端点、绑定、审计、台账查询）留待后续补充，见
+      realman-boot-device-mgmt-biz/pom.xml 说明。
     -->
     <modules>
         <module>realman-boot-device-mgmt-contract</module>
+        <module>realman-boot-device-mgmt-biz</module>
+        <module>realman-boot-device-mgmt-api</module>
+        <module>realman-boot-device-mgmt-start</module>
     </modules>
 
 </project>

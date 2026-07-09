@@ -1,0 +1,45 @@
+server:
+  port: 8091
+  servlet:
+    context-path: /realman-device-mgmt
+
+spring:
+  application:
+    name: realman-device-mgmt
+  cloud:
+    nacos:
+      config:
+        server-addr: ${NACOS_SERVER_ADDR:realman-nacos:8848}
+        group: ${NACOS_GROUP:REALMAN_GROUP}
+        file-extension: yaml
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:nacos}
+        refresh-enabled: true
+      discovery:
+        server-addr: ${NACOS_SERVER_ADDR:realman-nacos:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${NACOS_GROUP:REALMAN_GROUP}
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:nacos}
+  config:
+    import:
+      - optional:nacos:${spring.application.name}.yaml?refreshEnabled=true
+  profiles:
+    active: '@profile.name@'
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: GMT+8
+
+mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml
+  configuration:
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+    map-underscore-to-camel-case: true
+
+# 设备业务身份 Token（JWT），见 org.jeecg.modules.devicemgmt.config.DeviceTokenProperties
+# 生产环境务必通过 Nacos/环境变量覆盖 secret，不可使用默认值
+device:
+  token:
+    secret: ${DEVICE_TOKEN_SECRET:change-me-in-production}
+    issuer: realman-device-mgmt
+    expiry-days: 365

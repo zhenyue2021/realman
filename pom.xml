@@ -236,6 +236,42 @@
 				<artifactId>realman-boot-iot-biz</artifactId>
 				<version>${realman-boot.version}</version>
 			</dependency>
+			<!-- V2 架构升级：设备基座 / 设备通信中台，详见 docs/design/2026-07-07-darwin-platform-v2-capability-bus-and-comm-hub.md 第九章 -->
+			<dependency>
+				<groupId>org.realmanframework.boot</groupId>
+				<artifactId>realman-boot-device-info-contract</artifactId>
+				<version>${realman-boot.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.realmanframework.boot</groupId>
+				<artifactId>realman-boot-device-info-biz</artifactId>
+				<version>${realman-boot.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.realmanframework.boot</groupId>
+				<artifactId>realman-boot-device-info-api</artifactId>
+				<version>${realman-boot.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.realmanframework.boot</groupId>
+				<artifactId>realman-boot-device-mgmt-contract</artifactId>
+				<version>${realman-boot.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.realmanframework.boot</groupId>
+				<artifactId>realman-boot-device-mgmt-biz</artifactId>
+				<version>${realman-boot.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.realmanframework.boot</groupId>
+				<artifactId>realman-boot-device-mgmt-api</artifactId>
+				<version>${realman-boot.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.realmanframework.boot</groupId>
+				<artifactId>realman-boot-comm-hub-contract</artifactId>
+				<version>${realman-boot.version}</version>
+			</dependency>
 
 			<!-- JeecgBoot 基座依赖 -->
 			<dependency>
