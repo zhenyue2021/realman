@@ -285,7 +285,7 @@ HTTP 没有持久连接，设备主动上报的数据不能像 MQTT 订阅那样
 | 2 | **已完成**：`device/{code}/ota/heartbeat`、`/token-refresh` 的 Handler 与 Topic 订阅已补齐（此前一度只声明了 Topic 常量但订阅列表/Dispatcher 均未接入，是本轮排查修复的实际缺口），`DeviceUplinkEvent` 归一化模型已落地 |
 | 3 | **不再需要独立子模块**：`realman-gateway` 已通过 `spring.cloud.gateway.discovery.locator.enabled=true` 按服务名自动路由到 `realman-ota`/`realman-device-mgmt` 等服务的 `context-path`，"业务/管理 API 统一输出"的诉求已被平台既有网关满足，未额外新建 WEB 端向反向代理层 |
 | 4 | **已完成**：HTTP-MQTT 桥接（`MqttBridgeController` + API Key 鉴权/限流）+ Webhook 订阅管理（含 `deviceIdFilter`、连续失败自动暂停/`resume`）+ 轮询兜底接口 |
-| 5 | **未开始**：与数据处理模块的 HTTP 直连 Client（第六章）尚未落地，`realman-boot-iot` 的 RocketMQ 生产者/消费者代码仍在运行 |
+| 5 | **已实现（双写过渡，默认关闭）**：`realman-boot-iot` 内 `DarwinHttpClient`/`DarwinIntegrationController` 已按假设契约实现 HTTP 直连路径，经 `darwin.integration.http-enabled`（默认 `false`）在每个 Producer 内部切换新旧路径，RocketMQ 路径保持不变仍是默认生产路径；未做的是"迁移到通信中台"这个更大前置动作（`datacollect/*` Topic 仍在 `realman-boot-iot` 独立 MQTT 客户端处理，未纳入 `realman-comm-hub`），以及与达尔文平台侧的真实契约联调核实——正式启用 `http-enabled` 前必须先完成，见《达尔文平台 V2：能力总线与设备通信中台》第六章 |
 | 6 | **已完成**：Topic 后缀 -&gt; 处理类别（routeType）的映射已落库 `comm_hub_topic_route`（`CommHubTopicRouteRegistry` 内存缓存 + 定时/手动刷新），经 `/api/v1/topic-routes` 管理；各 routeType 对应的实际处理逻辑仍是 `MqttMessageDispatcher` 内固定 Java 方法，不是脚本/规则引擎——这是本轮"可配置"的明确边界，不等同于免代码新增任意处理逻辑 |
 
 

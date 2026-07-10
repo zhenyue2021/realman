@@ -42,7 +42,7 @@ public final class OtaErrorCode {
     public static final String ERR_TOKEN_REVOKED = "ERR_TOKEN_REVOKED";
     public static final String ERR_DEVICE_NOT_AUTHORIZED = "ERR_DEVICE_NOT_AUTHORIZED";
 
-    /** 设备基座待实现的频率限制错误码，见 OTA 平台详细设计第七章"尚未实现、需要补的差距"。 */
+    /** 设备基座频率限制错误码，已在 device-mgmt 落地（DeviceMgmtServiceImpl#provision / DeviceAdminServiceImpl#generateRegistrationSecret + DeviceRateLimitService）。 */
     public static final String ERR_REGISTER_RATE_LIMIT = "ERR_REGISTER_RATE_LIMIT";
     public static final String ERR_SECRET_GENERATE_RATE_LIMIT = "ERR_SECRET_GENERATE_RATE_LIMIT";
 }

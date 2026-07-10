@@ -15,7 +15,7 @@
 
 v0.1 草案在无法访问 PRD 原文的情况下，只能依据主设计文档 2.3 节的差距分析做二次推导，很多关键细节（15 态迁移矩阵、错误码枚举、17 项系统设置）只能标记为开放问题。**本版已通读 PRD 原文**，替换全部推导性内容为 PRD 原文的准确转译，同时保留本次架构升级已经确立的关键决策：**设备侧协议统一为 MQTT（自注册除外），PRD 里"设备直连 OTA 后台 HTTP 接口"的部分，一律通过设备通信中台归一化/桥接落地，不改变设备侧协议**（见第二章，这是本文档与 PRD 原文最大的一处主动偏离，其余内容均忠实转译）。
 
-**本次核对最重要的发现**：PRD 第九章定义的"设备注册（9.8.4）/ 注册凭证生成（9.8.5-9.8.6）/ Token 签发续签吊销（9.7.5-9.7.7）/ 测试标记（9.8.2-9.8.3）"这一整套能力，**已经在设备基座 `realman-device-mgmt` 落地**，字段设计高度吻合（Device Token 365 天默认有效期、到期前 30 天续签、旧 Token 1 小时宽限期、注册凭证 365 天有效期、超管跨租户 `X-Operator-Tenant-Id`、is_test_device 二次确认防绕过）。**OTA 平台不重新实现这套能力，直接复用设备基座**——这是本文档相对 PRD 原文最大的架构简化，第七章详细说明复用边界与需要补齐的差距（主要是频率限制两个错误码尚未实现）。
+**本次核对最重要的发现**：PRD 第九章定义的"设备注册（9.8.4）/ 注册凭证生成（9.8.5-9.8.6）/ Token 签发续签吊销（9.7.5-9.7.7）/ 测试标记（9.8.2-9.8.3）"这一整套能力，**已经在设备基座 `realman-device-mgmt` 落地**，字段设计高度吻合（Device Token 365 天默认有效期、到期前 30 天续签、旧 Token 1 小时宽限期、注册凭证 365 天有效期、超管跨租户 `X-Operator-Tenant-Id`、is_test_device 二次确认防绕过）。**OTA 平台不重新实现这套能力，直接复用设备基座**——这是本文档相对 PRD 原文最大的架构简化，第七章详细说明复用边界（频率限制两个错误码已在 device-mgmt 补齐，见下）。
 
 ---
 
@@ -217,7 +217,7 @@ PRD 第九章大量篇幅（9.7.5-9.7.7、9.8.2-9.8.6）定义的设备注册、
 | 设备注册（9.8.4，含一次性 `device_registration_secret`）| `DeviceMgmtServiceImpl#provision` | 字段一致：`deviceCode`/`deviceType`/`tenantId`/`deviceRegistrationSecret` |
 | 注册凭证生成/查询（9.8.5-9.8.6，默认 365 天有效期）| `DeviceAdminServiceImpl#generateRegistrationSecret`/`getRegistrationSecretStatus` | 完全一致，含"仅返回一次明文" |
 | Device Token 签发/续签/吊销（9.7.5-9.7.7，365 天默认、到期前 30 天续签、旧 Token 1 小时宽限期）| `DeviceMgmtServiceImpl#issueToken`/`DeviceAdminServiceImpl#refreshToken`/`revokeToken` | 完全一致（宽限期通过"不比对 jti"的设计隐式实现，见 device-mgmt 提交说明）|
-| 测试标记 + 二次确认防绕过（4.1.1/9.8.2-9.8.3）| `DeviceAdminServiceImpl#updateTestFlag`/`batchUpdateTestFlag` | 一致；**高风险任务前置校验目前是已知缺口**（见下）|
+| 测试标记 + 二次确认防绕过（4.1.1/9.8.2-9.8.3）| `DeviceAdminServiceImpl#updateTestFlag`/`batchUpdateTestFlag` | 一致；高风险任务前置校验**已实现**（`OtaTaskServiceImpl#create` 校验 `high_risk` 固件包强制 `BY_SN` 下发且目标须为 `is_test_device=true`，此条目此前文档滞后未同步更新，非真实缺口）|
 | 超管跨租户 `X-Operator-Tenant-Id` + 双 `tenant_id` 审计 | `RequestUtil#operatorTenantId` + `writeAudit` | 一致 |
 
 **OTA 平台不重新实现以上能力**，只做两件事：
@@ -304,8 +304,8 @@ PRD 第九章大量篇幅（9.7.5-9.7.7、9.8.2-9.8.6）定义的设备注册、
 | `ERR_INVALID_STATE` | retry/cancel/rollback 等操作时任务状态不允许（409）|
 | `ERR_TOKEN_REVOKED` | Device Token 已吊销（401，复用设备基座）|
 | `ERR_DEVICE_NOT_AUTHORIZED` | 注册凭证校验失败或 SN 未授权（400，复用设备基座）|
-| `ERR_REGISTER_RATE_LIMIT` | 注册频率超限（429，5 次/小时，**设备基座待实现**）|
-| `ERR_SECRET_GENERATE_RATE_LIMIT` | 凭证生成频率超限（429，10 次/小时，**设备基座待实现**）|
+| `ERR_REGISTER_RATE_LIMIT` | 注册频率超限（429，5 次/小时，**已实现**：`DeviceMgmtServiceImpl#provision` + `DeviceRateLimitService`，Redis 故障时保守放行不阻塞注册）|
+| `ERR_SECRET_GENERATE_RATE_LIMIT` | 凭证生成频率超限（429，10 次/小时，**已实现**：`DeviceAdminServiceImpl#generateRegistrationSecret` + `DeviceRateLimitService`）|
 
 `upgrade_error_code` + `upgrade_error_msg` 必须同时上报，禁止只返回通用"升级失败"。
 
@@ -388,7 +388,7 @@ PRD 第九章大量篇幅（9.7.5-9.7.7、9.8.2-9.8.6）定义的设备注册、
 | 3 | 补齐设备基座频率限制（`ERR_REGISTER_RATE_LIMIT`/`ERR_SECRET_GENERATE_RATE_LIMIT`）+ 高风险任务查询回调对接 | **已完成**，见第七章 |
 | 4 | 建 `realman-ota-api`：管理端 REST（十一章）+ 系统设置校验接口 | **已完成**，依赖步骤 2 |
 | 5 | 通信中台侧补齐 `ota/token-refresh` 完整闭环 | **已完成**：`MqttMessageDispatcher#handleTokenRefresh` 归一化 DeviceUplinkEvent 之外，实际调用新增的 `DeviceMgmtFeignClient#refreshToken`（内部端点 `POST /internal/device/refresh-token`，复用 `DeviceAdminServiceImpl#refreshToken`）完成续签，再通过 `MqttPublisher` 把新 Token 下行回传到同一 `ota/token-refresh` Topic |
-| 6 | 迁移现状 `OtaController`/`IotOtaServiceImpl`/`OtaProgressHandler` 数据到新状态机，旧 8 态到新 15 态的存量任务数据迁移脚本 | 依赖步骤 2-4，**尚未开始** |
+| 6 | 迁移现状 `OtaController`/`IotOtaServiceImpl`/`OtaProgressHandler` 数据到新状态机，旧 8 态到新 15 态的存量任务数据迁移脚本 | **不需要**：经用户确认，`realman-boot-iot` 现有 OTA 升级功能从未在生产环境实际使用，无存量任务数据可迁移；`IotOtaServiceImpl` 等旧代码可保留但无需数据迁移动作 |
 
 ---
 
