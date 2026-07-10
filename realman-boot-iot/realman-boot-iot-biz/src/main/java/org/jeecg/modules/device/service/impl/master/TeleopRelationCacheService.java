@@ -52,6 +52,14 @@ public class TeleopRelationCacheService {
         log.info("[TeleopCache] 清除主控遥操缓存: master={} robot={}", masterCode, robotCode);
     }
 
+    /** 按机器人编码查询当前绑定的主控编码，未绑定返回 null。 */
+    public String getMasterByRobot(String robotCode) {
+        if (isBlank(robotCode)) {
+            return null;
+        }
+        return redisTemplate.opsForValue().get(DeviceConstant.RedisKey.TELEOP_ROBOT_TO_MASTER + robotCode);
+    }
+
     /** 机器人离线或结束遥操时清理。 */
     public void clearByRobot(String robotCode) {
         if (isBlank(robotCode)) {
