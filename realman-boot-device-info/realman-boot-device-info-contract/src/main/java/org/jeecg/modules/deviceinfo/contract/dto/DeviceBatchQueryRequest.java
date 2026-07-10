@@ -10,8 +10,9 @@ import java.util.List;
 /**
  * 批量查询请求。对应 {@code POST /internal/device-info/batch-query}。
  *
- * <p>批量升级选型、版本矩阵等场景使用；上限见设备基座详细设计 2.3（单次 500 条），
- * 由实现方在 biz 层校验，本契约不做数量限制的强类型约束。
+ * <p>批量升级选型、版本矩阵等场景使用。默认单次 500 条（见设备基座详细设计 2.3），
+ * 调用方可通过 {@link #limit} 显式提高（受 SSOT 侧硬上限保护，见实现类），避免调用方
+ * 自身有更高批量上限（如 OTA {@code max_batch_devices}）时被 SSOT 默认值静默截断。
  */
 @Data
 @Schema(description = "设备批量查询请求")
@@ -36,4 +37,7 @@ public class DeviceBatchQueryRequest implements Serializable {
 
     @Schema(description = "仅返回在线设备")
     private Boolean onlyOnline;
+
+    @Schema(description = "单次返回条数上限，缺省时 SSOT 侧默认 500；显式传入时仍受 SSOT 侧硬上限保护")
+    private Integer limit;
 }

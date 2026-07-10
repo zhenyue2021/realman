@@ -47,5 +47,13 @@ mybatis-plus:
 ota:
   firmware:
     local-scan-paths: /tmp,/media/realman
+    oss:
+      # OSS（MinIO）固件存储默认关闭，本地磁盘为默认存储方式；置 true 前需先配置好 endpoint/access-key/secret-key
+      enabled: false
+      endpoint: http://localhost:9000
+      access-key: minioadmin
+      secret-key: minioadmin
+      bucket: ota-firmware
+      scan-prefix: inbox/
   uplink-poll:
     interval-ms: 5000

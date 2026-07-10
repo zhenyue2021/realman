@@ -12,6 +12,7 @@ import org.jeecg.modules.deviceinfo.contract.enums.DeviceType;
 import org.jeecg.modules.deviceinfo.contract.enums.OnlineStatus;
 import org.jeecg.modules.ota.entity.OtaFirmware;
 import org.jeecg.modules.ota.mapper.OtaFirmwareMapper;
+import org.jeecg.modules.ota.service.IOtaSystemSettingService;
 import org.jeecg.modules.ota.service.IOtaVersionMatrixService;
 import org.jeecg.modules.ota.util.SemVerComparator;
 import org.jeecg.modules.ota.vo.DeviceVersionRow;
@@ -20,19 +21,22 @@ import org.jeecg.modules.ota.vo.VersionMatrixResult;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 
+import static org.jeecg.modules.ota.config.OtaSystemSettingDefaults.VERSION_LAG_CRITICAL_MINOR_DIFF;
+import static org.jeecg.modules.ota.config.OtaSystemSettingDefaults.VERSION_LAG_WARN_MINOR_DIFF;
+
 /**
  * 版本矩阵实现，对齐 OTA 平台详细设计十二章（PRD 4.3、9.4.4）。
  *
- * <p>已知限制：版本落后 warn/critical 阈值本轮按 PRD 默认值硬编码（小版本差异 &gt;2
- * 为 warn，大版本差异 &gt;=1 或小版本差异 &gt;5 为 critical），未纳入
- * {@code ota_system_setting}（PRD 9.9 的 17 项交叉校验清单未包含此项，仅正文提及
- * "可在系统设置中配置"），如需可配置化可后续追加设置项。
+ * <p>版本落后 warn/critical 阈值可经 {@code ota_system_setting} 配置
+ * （{@code version_lag_warn_minor_diff}/{@code version_lag_critical_minor_diff}，
+ * 默认 2/5，对齐 PRD 默认值）；大版本号落后 &gt;=1 恒判定为 critical，
+ * 视为结构性规则不纳入配置（PRD 9.9 的 17 项交叉校验清单未包含此项，仅正文提及
+ * "可在系统设置中配置"，此前本轮曾硬编码，现已按此补齐）。
  */
 @Service
 @RequiredArgsConstructor
@@ -40,6 +44,7 @@ public class OtaVersionMatrixServiceImpl implements IOtaVersionMatrixService {
 
     private final DeviceInfoFeignClient deviceInfoFeignClient;
     private final OtaFirmwareMapper firmwareMapper;
+    private final IOtaSystemSettingService systemSettingService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
@@ -84,9 +89,13 @@ public class OtaVersionMatrixServiceImpl implements IOtaVersionMatrixService {
         row.setCurrentVersion(device.getFirmwareVersion());
         row.setOnline(device.getOnlineStatus() == OnlineStatus.ONLINE);
 
+        int warnMinorDiff = systemSettingService.getInt(VERSION_LAG_WARN_MINOR_DIFF);
+        int criticalMinorDiff = systemSettingService.getInt(VERSION_LAG_CRITICAL_MINOR_DIFF);
         boolean validVersion = SemVerComparator.isValid(device.getFirmwareVersion());
-        String clusterLevel = (validVersion && clusterMax != null) ? lagLevel(device.getFirmwareVersion(), clusterMax) : "none";
-        String repoLevel = (validVersion && repoLatest != null) ? lagLevel(device.getFirmwareVersion(), repoLatest) : "none";
+        String clusterLevel = (validVersion && clusterMax != null)
+                ? lagLevel(device.getFirmwareVersion(), clusterMax, warnMinorDiff, criticalMinorDiff) : "none";
+        String repoLevel = (validVersion && repoLatest != null)
+                ? lagLevel(device.getFirmwareVersion(), repoLatest, warnMinorDiff, criticalMinorDiff) : "none";
         row.setVersionLagLevelCluster(clusterLevel);
         row.setVersionLagLevelRepo(repoLevel);
 
@@ -101,26 +110,25 @@ public class OtaVersionMatrixServiceImpl implements IOtaVersionMatrixService {
         return row;
     }
 
-    /** warn：小版本差异 &gt;2（大版本相同）；critical：大版本差异 &gt;=1 或小版本差异 &gt;5。 */
-    private String lagLevel(String current, String baseline) {
-        String[] currentParts = current.substring(1).split("\\.");
-        String[] baselineParts = baseline.substring(1).split("\\.");
-        int currentMajor = Integer.parseInt(currentParts[0]);
-        int baselineMajor = Integer.parseInt(baselineParts[0]);
-        int currentMinor = Integer.parseInt(currentParts[1]);
-        int baselineMinor = Integer.parseInt(baselineParts[1]);
+    /**
+     * critical：大版本差异 &gt;=1（结构性规则，不可配置）或小版本差异 &gt; criticalMinorDiff；
+     * warn：小版本差异 &gt; warnMinorDiff。阈值来自 {@code ota_system_setting}。
+     */
+    private String lagLevel(String current, String baseline, int warnMinorDiff, int criticalMinorDiff) {
         if (SemVerComparator.compare(current, baseline) >= 0) {
             return "none";
         }
-        int majorDiff = baselineMajor - currentMajor;
-        int minorDiff = baselineMinor - currentMinor;
-        if (majorDiff >= 1 || (majorDiff == 0 && minorDiff > 5)) {
+        String[] currentParts = current.substring(1).split("\\.");
+        String[] baselineParts = baseline.substring(1).split("\\.");
+        int majorDiff = Integer.parseInt(baselineParts[0]) - Integer.parseInt(currentParts[0]);
+        int minorDiff = Integer.parseInt(baselineParts[1]) - Integer.parseInt(currentParts[1]);
+        if (majorDiff >= 1 || minorDiff > criticalMinorDiff) {
             return "critical";
         }
-        if (majorDiff == 0 && minorDiff > 2) {
+        if (minorDiff > warnMinorDiff) {
             return "warn";
         }
-        return majorDiff > 0 ? "warn" : "none";
+        return "none";
     }
 
     private String findLatestRepoVersion(String deviceType, String model) {

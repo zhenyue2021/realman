@@ -373,10 +373,11 @@ public class OtaTaskServiceImpl implements IOtaTaskService {
         } else if (!"ALL".equals(mode)) {
             throw new JeecgBootBizTipException("非法 upgradeMode：" + request.getUpgradeMode());
         }
-        // 已知限制：SSOT batchQuery 内部硬编码 LIMIT 500（见设备基座详细设计 2.3），
-        // 早于 max_batch_devices（默认 1000）配置项存在；目标设备超过 500 台的批量任务
-        // 在当前实现下只会取到前 500 台，不会真正触发 ERR_BATCH_DEVICE_LIMIT_EXCEEDED。
-        // 需要提高上限时应先调整 SSOT 侧的查询实现（分页遍历），不在本轮 OTA 范围内。
+        // SSOT batchQuery 默认只返回 500 条；显式传 limit = max_batch_devices + 1，
+        // 使返回条数超过批量上限时能被 create() 里的 targets.size() > maxBatchDevices
+        // 判断真正捕获到（而不是被 SSOT 默认值静默截断到 500 后误判为未超限）。
+        long maxBatchDevices = systemSettingService.getLong(MAX_BATCH_DEVICES);
+        query.setLimit((int) Math.min(Integer.MAX_VALUE - 1L, maxBatchDevices + 1));
         Result<List<DeviceInfoDTO>> result = deviceInfoFeignClient.batchQuery(query);
         return result != null && result.isSuccess() && result.getResult() != null ? result.getResult() : List.of();
     }

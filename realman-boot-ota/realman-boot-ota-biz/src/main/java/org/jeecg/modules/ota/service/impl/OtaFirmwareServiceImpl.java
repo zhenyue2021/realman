@@ -22,19 +22,24 @@ import org.jeecg.modules.ota.service.IOtaFirmwareService;
 import org.jeecg.modules.ota.service.IOtaKeyService;
 import org.jeecg.modules.ota.service.IOtaSystemSettingService;
 import org.jeecg.modules.ota.service.OtaAuditService;
+import org.jeecg.modules.ota.util.OtaMinioUtil;
 import org.jeecg.modules.ota.vo.FirmwareDTO;
 import org.jeecg.modules.ota.vo.FirmwareListQuery;
 import org.jeecg.modules.ota.vo.FirmwareUploadMetadata;
 import org.jeecg.modules.ota.vo.LocalScanResult;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
@@ -46,10 +51,11 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static org.jeecg.modules.ota.config.OtaSystemSettingDefaults.MAX_FIRMWARE_SIZE_MB;
+import static org.jeecg.modules.ota.config.OtaSystemSettingDefaults.OSS_URL_EXPIRY_SECONDS;
 
 /**
  * 固件包管理实现，对齐 OTA 平台详细设计 3.2/3.3（PRD 4.2.1/4.2.5）。
- * 已知限制见 {@link IOtaFirmwareService} 类注释（本地存储可用，OSS 未接入）。
+ * 本地磁盘存储与 OSS（MinIO）存储均已实现，见 {@link IOtaFirmwareService} 类注释。
  */
 @Slf4j
 @Service
@@ -69,6 +75,10 @@ public class OtaFirmwareServiceImpl implements IOtaFirmwareService {
     private final OtaAuditService auditService;
     private final OtaFirmwareStorageProperties storageProperties;
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    /** 仅在 ota.firmware.oss.enabled=true 时存在，与 OtaMinioConfig 共用同一开关 */
+    @Autowired(required = false)
+    private OtaMinioUtil minioUtil;
 
     @Override
     public FirmwareDTO upload(MultipartFile firmwareFile, MultipartFile sigFile, FirmwareUploadMetadata metadata, String operator) {
@@ -99,10 +109,12 @@ public class OtaFirmwareServiceImpl implements IOtaFirmwareService {
             throw new JeecgBootBizTipException("ERR_KEY_REVOKED: 当前无 active 状态的 OTA 公钥，无法上传固件包");
         }
 
+        boolean useOss = "OSS".equalsIgnoreCase(metadata.getStorageMode());
+        if (useOss && minioUtil == null) {
+            throw new JeecgBootBizTipException("OSS 存储未启用（ota.firmware.oss.enabled=false 或未正确配置 MinIO 凭证），无法以 OSS 模式上传，请改用 LOCAL 或先完成 OSS 配置");
+        }
+
         String sha256 = computeSha256(firmwareFile);
-        Path targetDir = Path.of(storageProperties.getStorageDir(), metadata.getDeviceType(), version);
-        Path firmwarePath = writeToStorage(firmwareFile, targetDir, originalName);
-        Path sigPath = writeSigToStorage(sigRaw, targetDir, originalName);
 
         OtaFirmware firmware = new OtaFirmware();
         firmware.setPackageId(IdUtil.fastSimpleUUID());
@@ -117,23 +129,70 @@ public class OtaFirmwareServiceImpl implements IOtaFirmwareService {
         firmware.setRiskLevel(StringUtils.hasText(metadata.getRiskLevel()) ? metadata.getRiskLevel() : "normal");
         firmware.setCancelableInExecuting(metadata.isCancelableInExecuting());
         firmware.setSha256(sha256);
-        firmware.setSigLocalPath(sigPath.toString());
         firmware.setKeyId(activeKey.getKeyId());
-        firmware.setStorageSource("LOCAL");
-        firmware.setDownloadUrl(firmwarePath.toUri().toString());
         firmware.setFileSizeMb((int) fileSizeMb);
         firmware.setCreatedBy(operator);
+
+        if (useOss) {
+            writeToOss(firmwareFile, sigRaw, metadata.getDeviceType(), version, originalName, firmware);
+        } else {
+            Path targetDir = Path.of(storageProperties.getStorageDir(), metadata.getDeviceType(), version);
+            Path firmwarePath = writeToStorage(firmwareFile, targetDir, originalName);
+            Path sigPath = writeSigToStorage(sigRaw, targetDir, originalName);
+            firmware.setSigLocalPath(sigPath.toString());
+            firmware.setStorageSource("LOCAL");
+            firmware.setDownloadUrl(firmwarePath.toUri().toString());
+            firmware.setDownloadUrlExpiresAt(null);
+        }
         firmwareMapper.insert(firmware);
 
         auditService.write("UPLOAD_FIRMWARE", operator, null, null, "normal", null, firmware.getPackageId(), activeKey.getKeyId(),
-                java.util.Map.of("fileName", originalName, "version", version, "sha256", sha256));
+                java.util.Map.of("fileName", originalName, "version", version, "sha256", sha256, "storageSource", firmware.getStorageSource()));
         return toDTO(firmware, activeKey.getStatus());
+    }
+
+    /** OSS 对象命名与本地目录结构对应：firmware/{deviceType}/{version}/{fileName}(.sig)。 */
+    private void writeToOss(MultipartFile firmwareFile, byte[] sigRaw, String deviceType, String version, String fileName, OtaFirmware firmware) {
+        String objectName = "firmware/" + deviceType + "/" + version + "/" + fileName;
+        String sigObjectName = objectName + ".sig";
+        try (InputStream in = firmwareFile.getInputStream()) {
+            minioUtil.putObject(objectName, in, firmwareFile.getSize(), "application/octet-stream");
+        } catch (IOException e) {
+            throw new JeecgBootBizTipException("固件包读取失败，无法上传 OSS：" + e.getMessage());
+        }
+        byte[] sigBase64 = Base64.getEncoder().encodeToString(sigRaw).getBytes(StandardCharsets.UTF_8);
+        minioUtil.putObject(sigObjectName, new ByteArrayInputStream(sigBase64), sigBase64.length, "text/plain");
+
+        long expirySeconds = systemSettingService.getLong(OSS_URL_EXPIRY_SECONDS);
+        firmware.setStorageSource("OSS");
+        firmware.setSigOssPath(sigObjectName);
+        firmware.setDownloadUrl(minioUtil.presignedUrl(objectName, expirySeconds));
+        firmware.setDownloadUrlExpiresAt(LocalDateTime.now().plusSeconds(expirySeconds));
+    }
+
+    @Override
+    public void refreshDownloadUrl(String packageId) {
+        OtaFirmware firmware = getRequired(packageId);
+        if (!"OSS".equals(firmware.getStorageSource())) {
+            log.warn("[ota] refreshDownloadUrl 仅对 OSS 存储生效，忽略 packageId={} storageSource={}", packageId, firmware.getStorageSource());
+            return;
+        }
+        if (minioUtil == null) {
+            log.warn("[ota] OSS 未启用，无法刷新预签名 URL packageId={}", packageId);
+            return;
+        }
+        String objectName = "firmware/" + firmware.getDeviceType() + "/" + firmware.getVersion() + "/" + firmware.getFirmwareFileName();
+        long expirySeconds = systemSettingService.getLong(OSS_URL_EXPIRY_SECONDS);
+        firmware.setDownloadUrl(minioUtil.presignedUrl(objectName, expirySeconds));
+        firmware.setDownloadUrlExpiresAt(LocalDateTime.now().plusSeconds(expirySeconds));
+        firmwareMapper.updateById(firmware);
+        log.info("[ota] 已刷新 OSS 预签名下载 URL packageId={} expiresAt={}", packageId, firmware.getDownloadUrlExpiresAt());
     }
 
     @Override
     public List<LocalScanResult> scan(int operate) {
         if (operate == 1) {
-            throw new JeecgBootBizTipException("OSS 扫描（operate=1）本轮未实现，需接入真实云厂商 SDK 与凭证后补充");
+            return scanOss();
         }
         List<LocalScanResult> results = new ArrayList<>();
         for (String mountPath : storageProperties.getLocalScanPaths()) {
@@ -151,6 +210,30 @@ public class OtaFirmwareServiceImpl implements IOtaFirmwareService {
                 result.setSigAvailable(new File(mountPath, file.getName() + ".sig").exists());
                 results.add(result);
             }
+        }
+        return results;
+    }
+
+    /** 扫描 OSS 存储桶 scanPrefix 下的候选固件文件（运维手工投放，尚未注册为固件包），对应本地盘扫描的 OSS 版本。 */
+    private List<LocalScanResult> scanOss() {
+        if (minioUtil == null) {
+            throw new JeecgBootBizTipException("OSS 存储未启用（ota.firmware.oss.enabled=false），无法执行 OSS 扫描");
+        }
+        String prefix = storageProperties.getOss().getScanPrefix();
+        String mountLabel = "oss://" + storageProperties.getOss().getBucket() + "/" + prefix;
+        List<LocalScanResult> results = new ArrayList<>();
+        for (String objectName : minioUtil.listObjectNames(prefix)) {
+            if (!objectName.endsWith(".tar.gz")) {
+                continue;
+            }
+            String fileName = objectName.substring(objectName.lastIndexOf('/') + 1);
+            LocalScanResult result = new LocalScanResult();
+            result.setFileName(fileName);
+            result.setMountPath(mountLabel);
+            result.setDeviceType(detectDeviceType(fileName));
+            result.setVersion(normalizeVersion(fileName));
+            result.setSigAvailable(minioUtil.objectExists(objectName + ".sig"));
+            results.add(result);
         }
         return results;
     }
@@ -312,6 +395,7 @@ public class OtaFirmwareServiceImpl implements IOtaFirmwareService {
         dto.setKeyId(firmware.getKeyId());
         dto.setKeyStatus(keyStatus);
         dto.setStorageSource(firmware.getStorageSource());
+        dto.setDownloadUrlExpiresAt(firmware.getDownloadUrlExpiresAt());
         dto.setFileSizeMb(firmware.getFileSizeMb());
         dto.setCreatedBy(firmware.getCreatedBy());
         dto.setCreatedAt(firmware.getCreatedAt());

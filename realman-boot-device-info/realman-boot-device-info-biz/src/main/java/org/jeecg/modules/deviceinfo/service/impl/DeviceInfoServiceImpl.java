@@ -53,6 +53,8 @@ import java.util.stream.Collectors;
 public class DeviceInfoServiceImpl extends ServiceImpl<DeviceInfoMapper, DeviceInfo> implements IDeviceInfoService {
 
     private static final ObjectMapper JSON = new ObjectMapper();
+    private static final int DEFAULT_BATCH_QUERY_LIMIT = 500;
+    private static final int MAX_BATCH_QUERY_LIMIT = 5000;
 
     @Override
     public DeviceInfoDTO getDevice(String deviceId) {
@@ -95,8 +97,14 @@ public class DeviceInfoServiceImpl extends ServiceImpl<DeviceInfoMapper, DeviceI
         if (Boolean.TRUE.equals(request.getOnlyOnline())) {
             wrapper.eq(DeviceInfo::getOnlineStatus, OnlineStatus.ONLINE.name());
         }
-        // 对齐能力清单/设备基座详细设计 2.3：单次批量查询上限 500 条，由调用方分页承担超出部分
-        wrapper.last("LIMIT 500");
+        // 默认 500 条（能力清单/设备基座详细设计 2.3），调用方可通过 limit 显式提高，
+        // 但受 MAX_BATCH_QUERY_LIMIT 硬上限保护，避免误传超大值拖垮 SSOT 查询。
+        // 此前曾固定 LIMIT 500 不接受调用方覆盖，导致 OTA max_batch_devices（默认 1000）
+        // 配置的批量任务在设备数超过 500 时被静默截断而非按预期报 ERR_BATCH_DEVICE_LIMIT_EXCEEDED。
+        int effectiveLimit = request.getLimit() != null && request.getLimit() > 0
+                ? Math.min(request.getLimit(), MAX_BATCH_QUERY_LIMIT)
+                : DEFAULT_BATCH_QUERY_LIMIT;
+        wrapper.last("LIMIT " + effectiveLimit);
         return list(wrapper).stream().map(this::toDTO).collect(Collectors.toList());
     }
 

@@ -69,6 +69,14 @@ public class OtaTaskDevice implements Serializable {
     @TableField("cancel_requested_at")
     private LocalDateTime cancelRequestedAt;
 
+    /** 下行发布尝试次数，区别于运维手动重试的 {@link #retryCount}；达到 dispatch_max_attempts 后置 FAILED。 */
+    @TableField("dispatch_attempt_count")
+    private Integer dispatchAttemptCount;
+
+    /** 最近一次下行发布尝试时间，供自动重试扫描判断退避间隔是否已到。 */
+    @TableField("last_dispatch_attempt_at")
+    private LocalDateTime lastDispatchAttemptAt;
+
     @TableField(value = "created_at", fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 }

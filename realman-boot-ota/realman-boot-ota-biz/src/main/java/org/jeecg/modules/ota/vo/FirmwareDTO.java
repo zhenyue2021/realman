@@ -44,6 +44,9 @@ public class FirmwareDTO implements Serializable {
 
     private String storageSource;
 
+    /** OSS 预签名 URL 到期时间；LOCAL 存储恒为空 */
+    private LocalDateTime downloadUrlExpiresAt;
+
     private Integer fileSizeMb;
 
     private String createdBy;

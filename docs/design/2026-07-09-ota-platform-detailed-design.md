@@ -78,9 +78,11 @@ PRD 假设 Token 通过 `Authorization: Bearer` 请求头携带。MQTT 报文没
 | 来源 | 扫描接口 | 说明 |
 | --- | --- | --- |
 | 本地盘（U 盘）| `GET /api/v1/firmware/local-scan?operate=0` | 默认路径 `/tmp`、`/media/realman` 及子目录 `ota/`；同名包不同路径全部返回，不去重；同步返回 `sig_available` |
-| OSS/S3 | `GET /api/v1/firmware/local-scan?operate=1` | OSS 凭证（`oss_endpoint`/`oss_bucket`/`oss_access_key_id`/`oss_access_key_secret`/`oss_region`）在系统设置中配置，加密存储，扫描接口调用方无需传凭证 |
+| OSS/S3 | `GET /api/v1/firmware/local-scan?operate=1` | **已实现**：接入 MinIO（S3 兼容协议），扫描 `ota.firmware.oss.scan-prefix`（默认 `inbox/`）下的候选文件。凭证走 `ota.firmware.oss.*` 配置文件管理，与代码库既有 MinIO 用法（`realman-boot-iot` AppConfig）一致；原文建议的"凭证经系统设置加密存储"改为沿用既有配置管理方式，如需管理端可配置凭证应作为独立需求实现 |
 
 `sig_available=false` 时禁止基于该包创建升级任务，提示"本地盘签名文件缺失"。
+
+**固件包 OSS 存储（已实现）**：上传时经 `FirmwareUploadMetadata.storageMode=OSS` 选择，对象命名 `firmware/{deviceType}/{version}/{fileName}(.sig)`；下载 URL 为 MinIO 预签名 URL，有效期取 `oss_url_expiry_seconds`（默认 86400s），到期时间落库 `ota_firmware.download_url_expires_at`。下发前若剩余有效期不足 1 小时自动刷新；设备上报 `ERR_URL_EXPIRED` 时自动刷新并重新下发（不占用额外错误码，复用已有 30 码枚举），两者均受 `dispatch_max_attempts` 预算约束，避免无限重试。默认关闭（`ota.firmware.oss.enabled=false`），本地磁盘仍是默认存储方式，不影响现有行为。
 
 ### 3.4 版本号规范
 

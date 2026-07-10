@@ -9,8 +9,10 @@ import org.jeecg.modules.commhub.contract.dto.UplinkEventPollQuery;
 import org.jeecg.modules.commhub.contract.event.DeviceUplinkEvent;
 import org.jeecg.modules.ota.contract.enums.OtaTaskState;
 import org.jeecg.modules.ota.entity.OtaTaskDevice;
+import org.jeecg.modules.ota.entity.OtaUplinkPollCursor;
 import org.jeecg.modules.ota.enums.NonTerminalStates;
 import org.jeecg.modules.ota.mapper.OtaTaskDeviceMapper;
+import org.jeecg.modules.ota.mapper.OtaUplinkPollCursorMapper;
 import org.jeecg.modules.ota.service.IOtaSystemSettingService;
 import org.jeecg.modules.ota.service.OtaTaskStateMachineService;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -20,20 +22,20 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static org.jeecg.modules.ota.config.OtaSystemSettingDefaults.CANCEL_ACK_TIMEOUT_SECONDS;
 
 /**
  * 上行事件消费：定时轮询通信中台归一化后的 {@code OTA_PROGRESS}/
  * {@code OTA_STATUS_REPORT} 事件，驱动设备级子任务状态机迁移；同时兜底扫描
- * EXECUTING 取消确认超时（PRD 4.6.1 cancel_ack_timeout）。
+ * EXECUTING 取消确认超时（PRD 4.6.1 cancel_ack_timeout）+ 下发失败自动重试。
  *
- * <p>已知限制：轮询游标（{@code cursor}）保存在内存中，多实例部署时各实例
- * 各自维护独立游标，服务重启后游标丢失（回退到"启动前 10 分钟"，可能重复
- * 处理少量历史事件——但落库更新是幂等的 upsert 语义，重复应用同一条最终态
- * 事件不会产生副作用，只是多做一次无害的 UPDATE）。生产环境如需精确的
- * "恰好一次"消费保证，应将游标迁移至 Redis/DB 持久化。
+ * <p>轮询游标按 {@code eventKind} 各自持久化到 {@code ota_uplink_poll_cursor}
+ * （修复此前两个 eventKind 共用同一个内存游标的问题——共用游标会导致后轮询的
+ * eventKind 的 {@code since} 被先轮询的 eventKind 已推进的游标误覆盖，从而
+ * 漏掉本应处理的事件），服务重启/多实例部署下游标不丢失、不互相干扰；内存里
+ * 仅做读多写少场景下的缓存加速，最终以 DB 值为准（只前进不回退）。
  */
 @Slf4j
 @Component
@@ -45,10 +47,11 @@ public class OtaUplinkPollingService {
 
     private final CommHubFeignClient commHubFeignClient;
     private final OtaTaskDeviceMapper taskDeviceMapper;
+    private final OtaUplinkPollCursorMapper cursorMapper;
     private final OtaTaskStateMachineService stateMachineService;
     private final IOtaSystemSettingService systemSettingService;
 
-    private final AtomicReference<LocalDateTime> cursor = new AtomicReference<>(LocalDateTime.now().minusMinutes(10));
+    private final Map<String, LocalDateTime> cursorCache = new ConcurrentHashMap<>();
 
     @Scheduled(fixedDelayString = "${ota.uplink-poll.interval-ms:5000}")
     public void poll() {
@@ -63,18 +66,24 @@ public class OtaUplinkPollingService {
         } catch (Exception e) {
             log.warn("[ota] 取消确认超时扫描异常: {}", e.getMessage());
         }
+        try {
+            stateMachineService.retryPendingDispatches();
+        } catch (Exception e) {
+            log.warn("[ota] 下发失败自动重试扫描异常: {}", e.getMessage());
+        }
     }
 
     private void pollEventKind(String eventKind) {
+        LocalDateTime since = loadCursor(eventKind);
         UplinkEventPollQuery query = new UplinkEventPollQuery();
         query.setEventKind(eventKind);
-        query.setSince(cursor.get());
+        query.setSince(since);
         query.setLimit(200);
         Result<List<DeviceUplinkEvent>> result = commHubFeignClient.pollUplinkEvents(query);
         if (result == null || !result.isSuccess() || result.getResult() == null || result.getResult().isEmpty()) {
             return;
         }
-        LocalDateTime maxReportedAt = cursor.get();
+        LocalDateTime maxReportedAt = since;
         for (DeviceUplinkEvent event : result.getResult()) {
             try {
                 applyEvent(event);
@@ -85,7 +94,32 @@ public class OtaUplinkPollingService {
                 maxReportedAt = event.getReportedAt();
             }
         }
-        cursor.set(maxReportedAt);
+        if (maxReportedAt.isAfter(since)) {
+            saveCursor(eventKind, maxReportedAt);
+        }
+    }
+
+    /** 优先取内存缓存；缓存未命中（服务刚启动）时从 DB 加载，仍缺失则回退到"启动前 10 分钟"。 */
+    private LocalDateTime loadCursor(String eventKind) {
+        LocalDateTime cached = cursorCache.get(eventKind);
+        if (cached != null) {
+            return cached;
+        }
+        OtaUplinkPollCursor persisted = cursorMapper.selectById(eventKind);
+        LocalDateTime initial = persisted != null && persisted.getCursorAt() != null
+                ? persisted.getCursorAt() : LocalDateTime.now().minusMinutes(10);
+        cursorCache.put(eventKind, initial);
+        return initial;
+    }
+
+    /** 原子的"只前进不回退"落库，避免多实例并发轮询时较慢的一个实例把游标写回退。 */
+    private void saveCursor(String eventKind, LocalDateTime newCursor) {
+        cursorCache.put(eventKind, newCursor);
+        try {
+            cursorMapper.upsertIfAfter(eventKind, newCursor);
+        } catch (Exception e) {
+            log.warn("[ota] 轮询游标持久化失败 eventKind={}: {}", eventKind, e.getMessage());
+        }
     }
 
     private void applyEvent(DeviceUplinkEvent event) {
@@ -129,6 +163,13 @@ public class OtaUplinkPollingService {
             return;
         }
 
+        String upgradeErrorCode = stringField(payload, "upgrade_error_code");
+        if (newState == OtaTaskState.FAILED
+                && stateMachineService.handleUrlExpiredIfApplicable(subTask, upgradeErrorCode)) {
+            stateMachineService.recomputeBatchStatus(taskId);
+            return;
+        }
+
         subTask.setState(newState.name());
         Object progressPct = payload.get("progress_pct");
         if (progressPct instanceof Number number) {
@@ -136,7 +177,7 @@ public class OtaUplinkPollingService {
         }
         subTask.setSubStage(stringField(payload, "sub_stage"));
         subTask.setSigVerifyResult(stringField(payload, "sig_verify_result"));
-        subTask.setUpgradeErrorCode(stringField(payload, "upgrade_error_code"));
+        subTask.setUpgradeErrorCode(upgradeErrorCode);
         subTask.setUpgradeErrorMsg(stringField(payload, "upgrade_error_msg"));
         subTask.setReportedAt(event.getReportedAt());
         subTask.setStateChangedAt(LocalDateTime.now());

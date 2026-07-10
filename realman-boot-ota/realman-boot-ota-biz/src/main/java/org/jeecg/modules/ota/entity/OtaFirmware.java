@@ -76,6 +76,10 @@ public class OtaFirmware implements Serializable {
     @TableField("download_url")
     private String downloadUrl;
 
+    /** OSS 预签名 URL 到期时间；LOCAL 存储恒为空（本地路径无过期概念） */
+    @TableField("download_url_expires_at")
+    private LocalDateTime downloadUrlExpiresAt;
+
     @TableField("file_size_mb")
     private Integer fileSizeMb;
 

@@ -35,6 +35,18 @@ public final class OtaSystemSettingDefaults {
     public static final String MAX_BATCH_DEVICES = "max_batch_devices";
     public static final String GLOBAL_SIG_VERIFY_ENABLED = "global_sig_verify_enabled";
 
+    /** 下发失败自动重试扫描（本轮新增，弥补"下行发布失败后子任务永久卡在 STARTING"的已知缺口） */
+    public static final String DISPATCH_MAX_ATTEMPTS = "dispatch_max_attempts";
+    public static final String DISPATCH_RETRY_INTERVAL_SECONDS = "dispatch_retry_interval_seconds";
+
+    /**
+     * 版本落后 warn/critical 判定阈值（本轮新增，弥补此前硬编码在
+     * OtaVersionMatrixServiceImpl 里的已知限制）。大版本号落后 &gt;=1 恒为 critical，
+     * 视为结构性规则不纳入配置；只有小版本号落后的 warn/critical 分界可配置。
+     */
+    public static final String VERSION_LAG_WARN_MINOR_DIFF = "version_lag_warn_minor_diff";
+    public static final String VERSION_LAG_CRITICAL_MINOR_DIFF = "version_lag_critical_minor_diff";
+
     public static final Map<String, String> DEFAULTS = defaults();
 
     private static Map<String, String> defaults() {
@@ -59,6 +71,10 @@ public final class OtaSystemSettingDefaults {
         map.put(MAX_FIRMWARE_SIZE_MB, "2048");
         map.put(MAX_BATCH_DEVICES, "1000");
         map.put(GLOBAL_SIG_VERIFY_ENABLED, "true");
+        map.put(DISPATCH_MAX_ATTEMPTS, "3");
+        map.put(DISPATCH_RETRY_INTERVAL_SECONDS, "60");
+        map.put(VERSION_LAG_WARN_MINOR_DIFF, "2");
+        map.put(VERSION_LAG_CRITICAL_MINOR_DIFF, "5");
         return map;
     }
 }

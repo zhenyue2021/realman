@@ -37,4 +37,7 @@ public class FirmwareUploadMetadata implements Serializable {
 
     @Schema(description = "EXECUTING 阶段是否可安全中断，默认 false")
     private boolean cancelableInExecuting = false;
+
+    @Schema(description = "LOCAL / OSS，默认 LOCAL；选择 OSS 时要求 ota.firmware.oss.enabled=true 已配置")
+    private String storageMode = "LOCAL";
 }

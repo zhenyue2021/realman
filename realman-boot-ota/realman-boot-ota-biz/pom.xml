@@ -13,8 +13,11 @@
       OTA 平台业务实现层：固件/密钥管理、前置校验、15 态状态机、批量策略、
       版本矩阵、系统设置。对齐 docs/design/2026-07-09-ota-platform-detailed-design.md。
 
-      已知限制（本轮范围之外，见提交说明）：OSS/S3 真实 SDK 集成（本轮只定义
-      清晰的存储接口，未接入具体云厂商 SDK）、带宽限速的真实网络层实施、
+      固件 OSS 存储已接入 MinIO（S3 兼容协议，与 realman-boot-iot 现有 MinIO
+      用法一致），见 OtaFirmwareStorageProperties/OtaMinioConfig/OtaMinioUtil，
+      默认关闭（ota.firmware.oss.enabled=false），本地磁盘仍是默认存储方式。
+
+      已知限制（本轮范围之外，见提交说明）：带宽限速的真实网络层实施、
       日志归档到 IA 存储的自动化任务（本轮只落库，不做冷热分层）。
     -->
     <dependencies>
@@ -64,6 +67,11 @@
             <groupId>cn.hutool</groupId>
             <artifactId>hutool-all</artifactId>
             <version>${hutool.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.minio</groupId>
+            <artifactId>minio</artifactId>
+            <version>${minio.version}</version>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
