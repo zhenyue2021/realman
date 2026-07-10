@@ -4,12 +4,21 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.datacollect.MqSendHelper;
+import org.jeecg.modules.device.datacollect.config.DataCollectIntegrationProperties;
 import org.jeecg.modules.device.datacollect.constant.DataCollectConstant;
 import org.jeecg.modules.device.datacollect.dto.mq.DeviceStatusMsg;
+import org.jeecg.modules.device.datacollect.http.DarwinHttpClient;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.stereotype.Component;
 
+/**
+ * 推送设备上下线状态给数采平台（Teleop → Darwin）。
+ *
+ * <p>{@code darwin.integration.http-enabled=true} 时改走 {@link DarwinHttpClient} 同步
+ * HTTP 直连（异步执行），不再经 RocketMQ。
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -18,6 +27,10 @@ public class DeviceStatusProducer {
 
     private final MqSendHelper mqSendHelper;
     private final ObjectMapper objectMapper;
+    private final DataCollectIntegrationProperties properties;
+
+    @Autowired(required = false)
+    private DarwinHttpClient darwinHttpClient;
 
     public void sendOnlineEvent(String tenant, String deviceCode, String deviceType,
                                 String deviceModel, String traceId) {
@@ -45,6 +58,16 @@ public class DeviceStatusProducer {
                         .offlineReason(offlineReason)
                         .build())
                 .build();
+
+        if (properties.isHttpEnabled()) {
+            if (darwinHttpClient == null) {
+                log.warn("[DataCollect][HTTP] DarwinHttpClient 未装配，跳过设备状态推送 deviceCode={} event={}", deviceCode, eventType);
+                return;
+            }
+            darwinHttpClient.reportDeviceStatus(msg);
+            return;
+        }
+
         String destination = DataCollectConstant.MQ_TOPIC_DEVICE_STATUS
                 + ":" + DataCollectConstant.MQ_TAG_DEVICE_STATUS;
         try {

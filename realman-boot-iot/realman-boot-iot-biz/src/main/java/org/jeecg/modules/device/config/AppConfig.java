@@ -109,6 +109,15 @@ public class AppConfig {
         return buildAuxExecutor("device-notify-", 4, 8, 1000);
     }
 
+    /**
+     * Darwin HTTP 直连池：{@code darwin.integration.http-enabled=true} 时，OSS 授权/文件地址/
+     * 设备状态改走同步 HTTP 调用外部数采平台，不能占用 MQTT 消息处理线程，见 {@code DarwinHttpClient}。
+     */
+    @Bean("darwinHttpExecutor")
+    public Executor darwinHttpExecutor() {
+        return buildAuxExecutor("darwin-http-", 4, 16, 500);
+    }
+
     private static Executor buildAuxExecutor(String threadPrefix, int core, int max, int queueCapacity) {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         executor.setCorePoolSize(core);

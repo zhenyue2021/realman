@@ -84,6 +84,16 @@ rocketmq:
 darwin:
   integration:
     enabled: false
+    # 双写切换开关：false 走 RocketMQ（默认），true 走下方 http 配置的同步 HTTP 直连，
+    # 见 org.jeecg.modules.device.datacollect.http.DarwinHttpClient。
+    # 真实契约（路径/字段/鉴权）尚未与达尔文平台侧确认，灰度验证前不要开启。
+    http-enabled: false
+    http:
+      base-url: ""
+      api-key-header: "X-Darwin-Api-Key"
+      api-key: ""
+      connect-timeout-ms: 3000
+      read-timeout-ms: 5000
     auto-submit-minutes: 10   # Darwin 工单开启后超时自动提交阈值（分钟），0=禁用
     default-department-id: "1958496759810363394"
     default-department-name: "城市运营管理集团有限公司"
