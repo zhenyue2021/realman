@@ -286,6 +286,6 @@ HTTP 没有持久连接，设备主动上报的数据不能像 MQTT 订阅那样
 | 3 | **不再需要独立子模块**：`realman-gateway` 已通过 `spring.cloud.gateway.discovery.locator.enabled=true` 按服务名自动路由到 `realman-ota`/`realman-device-mgmt` 等服务的 `context-path`，"业务/管理 API 统一输出"的诉求已被平台既有网关满足，未额外新建 WEB 端向反向代理层 |
 | 4 | **已完成**：HTTP-MQTT 桥接（`MqttBridgeController` + API Key 鉴权/限流）+ Webhook 订阅管理（含 `deviceIdFilter`、连续失败自动暂停/`resume`）+ 轮询兜底接口 |
 | 5 | **未开始**：与数据处理模块的 HTTP 直连 Client（第六章）尚未落地，`realman-boot-iot` 的 RocketMQ 生产者/消费者代码仍在运行 |
-| 6 | **未做**：路由注册表仍是 `MqttMessageDispatcher` 内的硬编码 `switch`，未落地为数据库/Nacos 可配置项 |
+| 6 | **已完成**：Topic 后缀 -&gt; 处理类别（routeType）的映射已落库 `comm_hub_topic_route`（`CommHubTopicRouteRegistry` 内存缓存 + 定时/手动刷新），经 `/api/v1/topic-routes` 管理；各 routeType 对应的实际处理逻辑仍是 `MqttMessageDispatcher` 内固定 Java 方法，不是脚本/规则引擎——这是本轮"可配置"的明确边界，不等同于免代码新增任意处理逻辑 |
 
 

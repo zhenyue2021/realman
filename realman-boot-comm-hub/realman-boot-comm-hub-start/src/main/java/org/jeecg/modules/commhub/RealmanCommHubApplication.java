@@ -8,6 +8,7 @@ import org.springframework.cloud.openfeign.EnableFeignClients;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.core.env.Environment;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -23,8 +24,11 @@ import java.net.UnknownHostException;
  * 设备信息基础服务（在线/离线/心跳事件同步目标）契约包。与
  * {@code realman-boot-device-info}/{@code realman-boot-device-mgmt} 一样不排除
  * {@code MybatisPlusSaasConfig}，复用其分页/乐观锁拦截器，不重复声明 {@code @MapperScan}。
+ *
+ * <p>{@code @EnableScheduling}：Topic 路由注册表定时刷新（{@code CommHubTopicRouteRegistry}）。
  */
 @EnableDiscoveryClient
+@EnableScheduling
 @EnableFeignClients(basePackages = {
         "org.jeecg.modules.devicemgmt.contract.api",
         "org.jeecg.modules.deviceinfo.contract.api"

@@ -9,7 +9,9 @@ import org.jeecg.modules.commhub.contract.dto.MqttPublishRequest;
 import org.jeecg.modules.commhub.contract.event.DeviceUplinkEvent;
 import org.jeecg.modules.commhub.contract.event.EventKind;
 import org.jeecg.modules.commhub.contract.event.Transport;
+import org.jeecg.modules.commhub.entity.CommHubTopicRoute;
 import org.jeecg.modules.commhub.mqtt.publisher.MqttPublisher;
+import org.jeecg.modules.commhub.service.CommHubTopicRouteRegistry;
 import org.jeecg.modules.commhub.service.DeviceStateSyncService;
 import org.jeecg.modules.commhub.service.IUplinkEventService;
 import org.jeecg.modules.deviceinfo.contract.dto.DeviceInfoDTO;
@@ -29,8 +31,11 @@ import java.util.regex.Pattern;
 
 /**
  * MQTT 上行消息路由。收到消息后立即甩到线程池处理，不占用 Paho 内部回调线程
- * （否则会阻塞后续消息接收，甚至拖死整个连接）。路由方式沿用"正则提取
- * {@code {deviceCode}}/{@code {path}} + 字符串匹配路径"的既有模式，独立实现。
+ * （否则会阻塞后续消息接收，甚至拖死整个连接）。Topic 匹配沿用"正则提取
+ * {@code {deviceCode}}/{@code {path}}"的既有模式；{@code path} -&gt; 处理类别的映射
+ * 经 {@link CommHubTopicRouteRegistry} 落库 {@code comm_hub_topic_route} 可配置
+ * （原硬编码 switch，见设备通信中台详细设计已知限制第 6 项），各处理类别对应的
+ * 实际逻辑仍是本类固定方法。
  *
  * <p>本轮范围：{@code status/report}（心跳/占用同步）、{@code ota/*}（归一化为
  * DeviceUplinkEvent 供 Webhook 转发，不做 OTA 业务解析——OTA 平台契约尚未落地）、
@@ -58,6 +63,7 @@ public class MqttMessageDispatcher {
     private final MqttAckPendingService ackPendingService;
     private final MqttPublisher mqttPublisher;
     private final DeviceMgmtFeignClient deviceMgmtFeignClient;
+    private final CommHubTopicRouteRegistry topicRouteRegistry;
     private final Executor mqttMessageExecutor;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -66,12 +72,14 @@ public class MqttMessageDispatcher {
                                   MqttAckPendingService ackPendingService,
                                   MqttPublisher mqttPublisher,
                                   DeviceMgmtFeignClient deviceMgmtFeignClient,
+                                  CommHubTopicRouteRegistry topicRouteRegistry,
                                   @Qualifier("mqttMessageExecutor") Executor mqttMessageExecutor) {
         this.deviceStateSyncService = deviceStateSyncService;
         this.uplinkEventService = uplinkEventService;
         this.ackPendingService = ackPendingService;
         this.mqttPublisher = mqttPublisher;
         this.deviceMgmtFeignClient = deviceMgmtFeignClient;
+        this.topicRouteRegistry = topicRouteRegistry;
         this.mqttMessageExecutor = mqttMessageExecutor;
     }
 
@@ -118,29 +126,40 @@ public class MqttMessageDispatcher {
         }
     }
 
+    /**
+     * Topic 后缀 -&gt; 处理类别（routeType）的映射查 {@link CommHubTopicRouteRegistry}
+     * （落库 {@code comm_hub_topic_route}，可配置，见类注释）；各 routeType 对应的
+     * 实际处理逻辑仍是本类固定方法，不是脚本/规则引擎——可配置的边界到此为止。
+     */
     private void handleDeviceTopic(String deviceCode, String path, String payload) {
         Map<String, Object> parsed = parsePayload(payload);
-        switch (path) {
-            case "status/report" -> deviceStateSyncService.handleStatusReport(deviceCode, parsed);
-            case "ota/heartbeat" -> handleHeartbeat(deviceCode, parsed);
-            case "ota/progress" -> publishUplinkEvent(deviceCode, EventKind.OTA_PROGRESS, Transport.MQTT, parsed);
-            case "ota/status-report" -> publishUplinkEvent(deviceCode, EventKind.OTA_STATUS_REPORT, Transport.MQTT, parsed);
-            case "ota/token-refresh" -> handleTokenRefresh(deviceCode, parsed);
-            case "bridge-ack" -> handleBridgeAck(parsed, payload);
-            default -> log.debug("[comm-hub] 未处理的设备端向 Topic 后缀，忽略 deviceCode={} path={}", deviceCode, path);
+        CommHubTopicRoute route = topicRouteRegistry.resolve(path);
+        if (route == null) {
+            log.debug("[comm-hub] 未注册或已禁用的设备端向 Topic 后缀，忽略 deviceCode={} path={}", deviceCode, path);
+            return;
+        }
+        switch (route.getRouteType()) {
+            case "SSOT_ONLY" -> deviceStateSyncService.handleStatusReport(deviceCode, parsed);
+            case "SSOT_AND_EVENT" -> handleSsotAndEvent(deviceCode, parsed, route.getEventKind());
+            case "EVENT_ONLY" -> publishUplinkEvent(deviceCode, EventKind.valueOf(route.getEventKind()), Transport.MQTT, parsed);
+            case "TOKEN_REFRESH" -> handleTokenRefresh(deviceCode, parsed);
+            case "BRIDGE_ACK" -> handleBridgeAck(parsed, payload);
+            case "IGNORE" -> log.debug("[comm-hub] Topic 路由标记为 IGNORE，忽略 deviceCode={} path={}", deviceCode, path);
+            default -> log.warn("[comm-hub] 未知 route_type={}，忽略 deviceCode={} path={}", route.getRouteType(), deviceCode, path);
         }
     }
 
     /**
-     * {@code ota/heartbeat}（PRD 心跳接口对齐 Topic，见设备通信中台详细设计 2.2/5.2）：
-     * 与 {@code status/report} 共用同一套 SSOT 同步逻辑（资源快照/占用态），额外把
-     * 心跳归一化为 {@code DeviceUplinkEvent(HEARTBEAT)}，使其可经 4.3.2 的 Webhook/
-     * 轮询转发给已订阅的第三方——这是 {@code status/report} 不做的（{@code status/report}
-     * 是仅供设备基座内部同步的既有 Topic，未在 5.2 映射表里承诺对外可观测）。
+     * {@code SSOT_AND_EVENT}（如 {@code ota/heartbeat}，PRD 心跳接口对齐 Topic，见设备
+     * 通信中台详细设计 2.2/5.2）：与 {@code status/report}（{@code SSOT_ONLY}）共用同一套
+     * SSOT 同步逻辑（资源快照/占用态），额外把上报归一化为 {@code DeviceUplinkEvent}，
+     * 使其可经 4.3.2 的 Webhook/轮询转发给已订阅的第三方——这是 {@code SSOT_ONLY} 不做的
+     * （{@code status/report} 是仅供设备基座内部同步的既有 Topic，未在 5.2 映射表里
+     * 承诺对外可观测）。
      */
-    private void handleHeartbeat(String deviceCode, Map<String, Object> parsed) {
+    private void handleSsotAndEvent(String deviceCode, Map<String, Object> parsed, String eventKindName) {
         deviceStateSyncService.handleStatusReport(deviceCode, parsed);
-        publishUplinkEvent(deviceCode, EventKind.HEARTBEAT, Transport.MQTT, parsed);
+        publishUplinkEvent(deviceCode, EventKind.valueOf(eventKindName), Transport.MQTT, parsed);
     }
 
     /**

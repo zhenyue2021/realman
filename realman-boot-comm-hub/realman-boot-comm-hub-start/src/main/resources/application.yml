@@ -47,6 +47,9 @@ comm-hub:
     keep-alive-seconds: 60
     connection-timeout-seconds: 10
     shared-subscription-group: comm-hub-cluster
+  topic-route:
+    # comm_hub_topic_route 内存缓存刷新间隔；管理端增删改后已自动刷新，此项仅用于兜底/多实例同步
+    refresh-interval-ms: 60000
     default-qos: 1
     idle-timeout-seconds: 90
     restart-debounce-ms: 30000
