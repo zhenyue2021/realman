@@ -24,6 +24,7 @@ import java.util.List;
 
 import static org.jeecg.modules.ota.config.OtaSystemSettingDefaults.DISPATCH_MAX_ATTEMPTS;
 import static org.jeecg.modules.ota.config.OtaSystemSettingDefaults.DISPATCH_RETRY_INTERVAL_SECONDS;
+import static org.jeecg.modules.ota.config.OtaSystemSettingDefaults.PENDING_URL_CHECK_INTERVAL_MINUTES;
 
 /**
  * 15 态状态机的共享操作：单设备下发（含下发前二次校验）+ 批量任务聚合状态重算。
@@ -34,9 +35,6 @@ import static org.jeecg.modules.ota.config.OtaSystemSettingDefaults.DISPATCH_RET
 @Component
 @RequiredArgsConstructor
 public class OtaTaskStateMachineService {
-
-    /** OSS 预签名 URL 剩余有效期低于此阈值时下发前主动刷新，对齐详细设计 9.9 附录"剩余&lt;1小时自动刷新" */
-    private static final long URL_REFRESH_THRESHOLD_MINUTES = 60;
 
     private final OtaTaskMapper taskMapper;
     private final OtaTaskDeviceMapper taskDeviceMapper;
@@ -106,16 +104,18 @@ public class OtaTaskStateMachineService {
     }
 
     /**
-     * 下发前若固件为 OSS 存储且预签名 URL 剩余有效期不足 {@link #URL_REFRESH_THRESHOLD_MINUTES}
-     * 分钟（含已过期），主动刷新后再下发，避免设备拿到即将/已经失效的下载地址。
-     * 返回刷新后的固件对象（未刷新时原样返回入参）。
+     * 下发前若固件为 OSS 存储且预签名 URL 剩余有效期不足 {@code pending_url_check_interval_minutes}
+     * 分钟（含已过期），主动刷新后再下发，避免设备拿到即将/已经失效的下载地址。复用
+     * 该已存在的系统设置（此前只定义未被任何代码读取的死配置，见 OTA 平台详细设计 9.9），
+     * 而不是另立新阈值。返回刷新后的固件对象（未刷新时原样返回入参）。
      */
     private OtaFirmware refreshUrlIfExpiringSoon(OtaFirmware firmware) {
         if (!"OSS".equals(firmware.getStorageSource())) {
             return firmware;
         }
+        long refreshThresholdMinutes = systemSettingService.getLong(PENDING_URL_CHECK_INTERVAL_MINUTES);
         LocalDateTime expiresAt = firmware.getDownloadUrlExpiresAt();
-        if (expiresAt != null && expiresAt.isAfter(LocalDateTime.now().plusMinutes(URL_REFRESH_THRESHOLD_MINUTES))) {
+        if (expiresAt != null && expiresAt.isAfter(LocalDateTime.now().plusMinutes(refreshThresholdMinutes))) {
             return firmware;
         }
         firmwareService.refreshDownloadUrl(firmware.getPackageId());

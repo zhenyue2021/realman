@@ -3,7 +3,11 @@ package org.jeecg.modules.ota.service.impl;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jeecg.common.api.vo.Result;
 import org.jeecg.common.exception.JeecgBootBizTipException;
+import org.jeecg.modules.commhub.contract.api.CommHubFeignClient;
+import org.jeecg.modules.commhub.contract.dto.MqttPublishRequest;
+import org.jeecg.modules.commhub.contract.dto.MqttPublishResult;
 import org.jeecg.modules.deviceinfo.contract.dto.DeviceInfoDTO;
 import org.jeecg.modules.deviceinfo.contract.enums.OccupancyDetail;
 import org.jeecg.modules.deviceinfo.contract.enums.OccupancyState;
@@ -45,10 +49,13 @@ public class OtaPrecheckServiceImpl implements IOtaPrecheckService {
     private static final String ERR_RESOURCE_INSUFFICIENT = "ERR_RESOURCE_INSUFFICIENT";
     private static final String ERR_VERSION_INCOMPATIBLE = "ERR_VERSION_INCOMPATIBLE";
     private static final int DEFAULT_MIN_MEMORY_MB = 256;
+    private static final String TOPIC_SUFFIX_RESOURCE_PROBE = "ota/resource-probe";
+    private static final long RESOURCE_PROBE_ACK_TIMEOUT_MS = 5000;
 
     private final OtaTaskDeviceMapper taskDeviceMapper;
     private final IOtaKeyService keyService;
     private final IOtaSystemSettingService systemSettingService;
+    private final CommHubFeignClient commHubFeignClient;
 
     @Override
     public boolean isOffline(DeviceInfoDTO device) {
@@ -81,42 +88,87 @@ public class OtaPrecheckServiceImpl implements IOtaPrecheckService {
 
     @Override
     public void checkResources(DeviceInfoDTO device) {
-        Map<String, Object> snapshot = device.getResourceSnapshot();
+        Map<String, Object> activeSnapshot = probeResourcesActively(device);
+        boolean activelyProbed = activeSnapshot != null;
+        Map<String, Object> snapshot = activelyProbed ? activeSnapshot : device.getResourceSnapshot();
         LocalDateTime lastHeartbeatAt = device.getLastHeartbeatAt();
-        if (CollectionUtils.isEmpty(snapshot) || lastHeartbeatAt == null) {
+        if (CollectionUtils.isEmpty(snapshot) || (!activelyProbed && lastHeartbeatAt == null)) {
             throw new JeecgBootBizTipException(ERR_RESOURCE_INSUFFICIENT + ": 设备尚无心跳资源数据，无法校验");
         }
 
-        assertFresh(lastHeartbeatAt, systemSettingService.getLong(DISK_VALID_SECONDS), "磁盘");
+        if (!activelyProbed) {
+            assertFresh(lastHeartbeatAt, systemSettingService.getLong(DISK_VALID_SECONDS), "磁盘");
+        }
         // 磁盘可用空间 ≥ 固件大小 × 2 的具体比较见 checkDiskSpaceForFirmware（调用方在拿到目标固件后另行调用），这里只做"有无数据"的基础校验
         Long diskAvailableMb = numberField(snapshot, "disk_available_mb");
         if (diskAvailableMb == null) {
             throw new JeecgBootBizTipException(ERR_RESOURCE_INSUFFICIENT + ": 缺少 disk_available_mb 字段");
         }
 
-        assertFresh(lastHeartbeatAt, systemSettingService.getLong(POWER_VALID_SECONDS), "电源");
+        if (!activelyProbed) {
+            assertFresh(lastHeartbeatAt, systemSettingService.getLong(POWER_VALID_SECONDS), "电源");
+        }
         String powerStatus = stringField(snapshot, "power_status");
         if (!"normal".equalsIgnoreCase(powerStatus)) {
             throw new JeecgBootBizTipException(ERR_RESOURCE_INSUFFICIENT + ": 电源状态异常 power_status=" + powerStatus);
         }
 
-        assertFresh(lastHeartbeatAt, systemSettingService.getLong(MEMORY_VALID_SECONDS), "内存");
+        if (!activelyProbed) {
+            assertFresh(lastHeartbeatAt, systemSettingService.getLong(MEMORY_VALID_SECONDS), "内存");
+        }
         Long memoryAvailableMb = numberField(snapshot, "memory_available_mb");
         if (memoryAvailableMb == null || memoryAvailableMb < DEFAULT_MIN_MEMORY_MB) {
             throw new JeecgBootBizTipException(ERR_RESOURCE_INSUFFICIENT + ": 可用内存不足，当前 " + memoryAvailableMb + "MiB");
         }
 
-        long networkValidSeconds = systemSettingService.getLong(NETWORK_VALID_SECONDS);
-        long secondsSinceHeartbeat = ChronoUnit.SECONDS.between(lastHeartbeatAt, LocalDateTime.now());
         Object networkReachable = snapshot.get("network_reachable");
-        if (secondsSinceHeartbeat > networkValidSeconds || !Boolean.TRUE.equals(networkReachable)) {
-            throw new JeecgBootBizTipException(ERR_RESOURCE_INSUFFICIENT
-                    + ": network_reachable 数据已超出有效期或不可达（最后上报 " + secondsSinceHeartbeat + " 秒前）");
+        if (activelyProbed) {
+            if (!Boolean.TRUE.equals(networkReachable)) {
+                throw new JeecgBootBizTipException(ERR_RESOURCE_INSUFFICIENT + ": 主动探测显示网络不可达（network_reachable=false）");
+            }
+        } else {
+            long networkValidSeconds = systemSettingService.getLong(NETWORK_VALID_SECONDS);
+            long secondsSinceHeartbeat = ChronoUnit.SECONDS.between(lastHeartbeatAt, LocalDateTime.now());
+            if (secondsSinceHeartbeat > networkValidSeconds || !Boolean.TRUE.equals(networkReachable)) {
+                throw new JeecgBootBizTipException(ERR_RESOURCE_INSUFFICIENT
+                        + ": network_reachable 数据已超出有效期或不可达（最后上报 " + secondsSinceHeartbeat + " 秒前）");
+            }
         }
         // cpu_load_5m 超阈值只警告，不阻止，对齐 PRD："建议等待后重试（不强制拒绝）"
         Long cpuLoad = numberField(snapshot, "cpu_load_5m");
         if (cpuLoad != null && cpuLoad > 80) {
             log.warn("[ota] 设备 CPU 负载偏高（仅警告，不阻止升级）deviceId={} cpuLoad5m={}", device.getDeviceId(), cpuLoad);
+        }
+    }
+
+    /**
+     * PRD 9.7.4 资源探测（operate=5）：创建任务前主动向设备请求实时资源数据，而非只
+     * 依赖可能已过期的心跳快照，见 OTA 平台详细设计 2.1（此前只补了 Topic 常量
+     * {@code CommHubTopicConstants#TOPIC_OTA_RESOURCE_PROBE}，未接入实际调用，是真实
+     * 遗漏而非设计如此）。经统一下行发布 {@code publish-and-wait}（{@code waitAck=true}）
+     * 实现；设备不支持或超时（{@code status != ACKED}）时返回 null，调用方按心跳基础值
+     * 回退，等价 PRD"设备端不支持 operate=5，返回 503"分支。
+     */
+    private Map<String, Object> probeResourcesActively(DeviceInfoDTO device) {
+        MqttPublishRequest request = new MqttPublishRequest();
+        request.setDeviceId(device.getDeviceId());
+        request.setTopicSuffix(TOPIC_SUFFIX_RESOURCE_PROBE);
+        request.setPayload(Map.of());
+        request.setWaitAck(true);
+        request.setAckTimeoutMs(RESOURCE_PROBE_ACK_TIMEOUT_MS);
+        try {
+            Result<MqttPublishResult> result = commHubFeignClient.publish(request);
+            if (result == null || !result.isSuccess() || result.getResult() == null) {
+                return null;
+            }
+            MqttPublishResult publishResult = result.getResult();
+            if (!"ACKED".equals(publishResult.getStatus()) || CollectionUtils.isEmpty(publishResult.getAckPayload())) {
+                return null;
+            }
+            return publishResult.getAckPayload();
+        } catch (Exception e) {
+            log.debug("[ota] 主动资源探测失败，回退心跳基础值 deviceId={}: {}", device.getDeviceId(), e.getMessage());
+            return null;
         }
     }
 
