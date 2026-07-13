@@ -1,6 +1,7 @@
 package org.jeecg.modules.commhub.service.impl;
 
 import cn.hutool.core.util.IdUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -9,18 +10,20 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.commhub.contract.event.DeviceUplinkEvent;
 import org.jeecg.modules.commhub.entity.DeviceUplinkEventLog;
+import org.jeecg.modules.commhub.entity.WebhookDeliveryTask;
 import org.jeecg.modules.commhub.entity.WebhookSubscription;
 import org.jeecg.modules.commhub.mapper.DeviceUplinkEventLogMapper;
+import org.jeecg.modules.commhub.mapper.WebhookDeliveryTaskMapper;
 import org.jeecg.modules.commhub.mapper.WebhookSubscriptionMapper;
 import org.jeecg.modules.commhub.service.IUplinkEventService;
-import org.jeecg.modules.commhub.service.IWebhookSubscriptionService;
-import org.jeecg.modules.commhub.service.WebhookDispatchClient;
 import org.jeecg.modules.commhub.vo.UplinkEventDTO;
 import org.jeecg.modules.commhub.vo.UplinkEventQuery;
 import org.jeecg.modules.deviceinfo.contract.dto.PageResult;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -33,14 +36,13 @@ public class UplinkEventServiceImpl implements IUplinkEventService {
 
     private final DeviceUplinkEventLogMapper eventLogMapper;
     private final WebhookSubscriptionMapper subscriptionMapper;
-    private final WebhookDispatchClient webhookDispatchClient;
-    private final IWebhookSubscriptionService webhookSubscriptionService;
+    private final WebhookDeliveryTaskMapper deliveryTaskMapper;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
     public void ingest(DeviceUplinkEvent event) {
         DeviceUplinkEventLog entry = new DeviceUplinkEventLog();
-        entry.setId(IdUtil.fastSimpleUUID());
+        entry.setId(IdUtil.getSnowflakeNextIdStr());
         entry.setDeviceId(event.getDeviceId());
         entry.setDeviceCode(event.getDeviceCode());
         entry.setDeviceType(event.getDeviceType() == null ? null : event.getDeviceType().name());
@@ -69,18 +71,20 @@ public class UplinkEventServiceImpl implements IUplinkEventService {
             return;
         }
         String eventKind = entry.getEventKind();
-        String bodyJson;
-        try {
-            bodyJson = objectMapper.writeValueAsString(event);
-        } catch (Exception e) {
-            log.warn("[comm-hub] 上行事件整体序列化失败，跳过 Webhook 推送 deviceCode={}: {}", event.getDeviceCode(), e.getMessage());
-            return;
-        }
+        LocalDateTime now = LocalDateTime.now();
         for (WebhookSubscription subscription : subscriptions) {
             if (matchesEventKind(subscription, eventKind) && matchesDeviceId(subscription, event.getDeviceId())) {
-                String subscriptionId = subscription.getId();
-                webhookDispatchClient.dispatchAsync(subscription.getCallbackUrl(), subscription.getHmacSecret(), bodyJson)
-                        .thenAccept(success -> webhookSubscriptionService.recordDispatchResult(subscriptionId, success));
+                WebhookDeliveryTask task = new WebhookDeliveryTask();
+                task.setId(IdUtil.fastSimpleUUID());
+                task.setEventLogId(entry.getId());
+                task.setSubscriptionId(subscription.getId());
+                task.setCallbackUrl(subscription.getCallbackUrl());
+                task.setStatus("PENDING");
+                task.setAttemptCount(0);
+                task.setNextRetryAt(now);
+                task.setCreatedAt(now);
+                task.setUpdatedAt(now);
+                deliveryTaskMapper.insert(task);
             }
         }
     }
@@ -115,10 +119,19 @@ public class UplinkEventServiceImpl implements IUplinkEventService {
     @Override
     public PageResult<UplinkEventDTO> queryPage(UplinkEventQuery query) {
         Page<DeviceUplinkEventLog> page = new Page<>(query.getPageNo(), query.getPageSize());
-        Page<DeviceUplinkEventLog> pageResult = eventLogMapper.selectPage(page, Wrappers.<DeviceUplinkEventLog>lambdaQuery()
+        LambdaQueryWrapper<DeviceUplinkEventLog> wrapper = Wrappers.<DeviceUplinkEventLog>lambdaQuery()
+                .eq(StringUtils.hasText(query.getTenantId()), DeviceUplinkEventLog::getTenantId, query.getTenantId())
                 .eq(StringUtils.hasText(query.getDeviceId()), DeviceUplinkEventLog::getDeviceId, query.getDeviceId())
                 .eq(StringUtils.hasText(query.getEventKind()), DeviceUplinkEventLog::getEventKind, query.getEventKind())
                 .ge(query.getSince() != null, DeviceUplinkEventLog::getReportedAt, query.getSince())
+                .gt(StringUtils.hasText(query.getAfterId()), DeviceUplinkEventLog::getId, query.getAfterId())
+                .orderByAsc(DeviceUplinkEventLog::getId));
+                .ge(query.getSince() != null, DeviceUplinkEventLog::getReportedAt, query.getSince());
+        if (!CollectionUtils.isEmpty(query.getDeviceScope())) {
+            wrapper.and(scope -> scope.in(DeviceUplinkEventLog::getDeviceId, query.getDeviceScope())
+                    .or().in(DeviceUplinkEventLog::getDeviceCode, query.getDeviceScope()));
+        }
+        Page<DeviceUplinkEventLog> pageResult = eventLogMapper.selectPage(page, wrapper
                 .orderByDesc(DeviceUplinkEventLog::getReportedAt));
 
         List<UplinkEventDTO> records = pageResult.getRecords().stream().map(this::toDTO).collect(Collectors.toList());
