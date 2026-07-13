@@ -120,8 +120,8 @@ CREATE TABLE `ota_system_setting` (
 
 CREATE TABLE `ota_uplink_poll_cursor` (
   `event_kind` varchar(32) NOT NULL COMMENT 'OTA_PROGRESS / OTA_STATUS_REPORT，各自独立游标',
-  `cursor_at`  datetime    NOT NULL COMMENT '已处理到的 reportedAt（兼容旧游标）',
-  `cursor_id`  varchar(36) DEFAULT NULL COMMENT '已处理到的上行事件雪花 ID 游标',
+  `cursor_at`  datetime    DEFAULT NULL COMMENT '历史 reportedAt 游标，仅兼容旧数据，不再作为消费位点',
+  `cursor_id`  varchar(36) DEFAULT NULL COMMENT '最后成功扫描的上行事件日志稳定 ID 游标',
   `updated_at` datetime    DEFAULT NULL,
   PRIMARY KEY (`event_kind`),
   KEY `idx_cursor_id` (`cursor_id`)

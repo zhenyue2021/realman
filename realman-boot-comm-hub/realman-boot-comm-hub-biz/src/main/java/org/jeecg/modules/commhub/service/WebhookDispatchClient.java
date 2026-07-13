@@ -22,7 +22,6 @@ import java.time.Duration;
  * <p>可靠重试不再在异步线程内 sleep 循环，而是由 {@code webhook_delivery_task}
  * 持久化任务和 {@code WebhookDeliveryWorker} 统一编排，保证服务重启后可恢复、失败可审计。
  */
-@Slf4j
 @Component
 public class WebhookDispatchClient {
 
@@ -38,28 +37,14 @@ public class WebhookDispatchClient {
                 .build();
     }
 
-    public WebhookDispatchResult dispatchOnce(String callbackUrl, String hmacSecret, String bodyJson) {
+    public void dispatchOnce(String callbackUrl, String hmacSecret, String bodyJson) {
         String signature = new HMac(HmacAlgorithm.HmacSHA256, hmacSecret.getBytes(StandardCharsets.UTF_8)).digestHex(bodyJson);
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set(SIGNATURE_HEADER, signature);
         HttpEntity<String> entity = new HttpEntity<>(bodyJson, headers);
-        try {
-            ResponseEntity<Void> response = restTemplate.postForEntity(callbackUrl, entity, Void.class);
-            return new WebhookDispatchResult(response.getStatusCode().is2xxSuccessful(), response.getStatusCode().value(), null);
-        } catch (HttpStatusCodeException e) {
-            log.warn("[comm-hub] Webhook 单次推送失败 url={} status={}: {}", callbackUrl, e.getStatusCode().value(), e.getMessage());
-            return new WebhookDispatchResult(false, e.getStatusCode().value(), truncate(e.getMessage()));
-        } catch (Exception e) {
-            log.warn("[comm-hub] Webhook 单次推送失败 url={}: {}", callbackUrl, e.getMessage());
-            return new WebhookDispatchResult(false, null, truncate(e.getMessage()));
-        }
+
+        restTemplate.postForEntity(callbackUrl, entity, Void.class);
     }
 
-    private static String truncate(String s) {
-        if (s == null) {
-            return null;
-        }
-        return s.length() <= MAX_ERROR_LEN ? s : s.substring(0, MAX_ERROR_LEN) + "...";
-    }
 }
