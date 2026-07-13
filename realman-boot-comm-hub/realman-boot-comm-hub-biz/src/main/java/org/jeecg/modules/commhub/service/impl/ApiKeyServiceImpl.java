@@ -15,6 +15,7 @@ import org.jeecg.modules.commhub.vo.ApiKeyCreateRequest;
 import org.jeecg.modules.commhub.vo.ApiKeyCreateResult;
 import org.jeecg.modules.commhub.vo.ApiKeyDTO;
 import org.jeecg.modules.commhub.vo.ApiKeyListQuery;
+import org.jeecg.modules.commhub.vo.ApiKeyAuthContext;
 import org.jeecg.modules.deviceinfo.contract.api.DeviceInfoFeignClient;
 import org.jeecg.modules.deviceinfo.contract.dto.DeviceInfoDTO;
 import org.jeecg.modules.deviceinfo.contract.dto.PageResult;
@@ -95,6 +96,29 @@ public class ApiKeyServiceImpl implements IApiKeyService {
 
     @Override
     public String assertAuthorized(String rawApiKey, String deviceId, String topicSuffix) {
+        CommHubApiKey entity = getActiveApiKey(rawApiKey);
+        assertDeviceAuthorized(entity, deviceId);
+        if (!matchesTopicScope(entity.getTopicSuffixScope(), topicSuffix)) {
+            log.warn("[comm-hub] API Key 越权尝试（Topic 超出 topicSuffixScope）apiKeyId={} topicSuffix={}", entity.getId(), topicSuffix);
+            throw new JeecgBootBizTipException(ERR_API_KEY_UNAUTHORIZED);
+        }
+        return entity.getId();
+    }
+
+    @Override
+    public ApiKeyAuthContext authenticatePolling(String rawApiKey, String deviceId) {
+        CommHubApiKey entity = getActiveApiKey(rawApiKey);
+        if (StringUtils.hasText(deviceId)) {
+            assertDeviceAuthorized(entity, deviceId);
+        }
+        ApiKeyAuthContext context = new ApiKeyAuthContext();
+        context.setApiKeyId(entity.getId());
+        context.setTenantId(entity.getTenantId());
+        context.setDeviceScope(toScopeList(entity.getDeviceScope()));
+        return context;
+    }
+
+    private CommHubApiKey getActiveApiKey(String rawApiKey) {
         if (!StringUtils.hasText(rawApiKey)) {
             throw new JeecgBootBizTipException(ERR_API_KEY_INVALID);
         }
@@ -104,7 +128,10 @@ public class ApiKeyServiceImpl implements IApiKeyService {
         if (entity == null || !"ACTIVE".equals(entity.getStatus())) {
             throw new JeecgBootBizTipException(ERR_API_KEY_INVALID);
         }
+        return entity;
+    }
 
+    private void assertDeviceAuthorized(CommHubApiKey entity, String deviceId) {
         DeviceInfoDTO device = getDeviceSafely(deviceId);
         if (device == null || !entity.getTenantId().equals(device.getTenantId())) {
             log.warn("[comm-hub] API Key 越权尝试（设备不存在或不属于该 Key 的租户）apiKeyId={} deviceId={}", entity.getId(), deviceId);
@@ -116,11 +143,6 @@ public class ApiKeyServiceImpl implements IApiKeyService {
             log.warn("[comm-hub] API Key 越权尝试（设备超出 deviceScope）apiKeyId={} deviceId={}", entity.getId(), deviceId);
             throw new JeecgBootBizTipException(ERR_API_KEY_UNAUTHORIZED);
         }
-        if (!matchesTopicScope(entity.getTopicSuffixScope(), topicSuffix)) {
-            log.warn("[comm-hub] API Key 越权尝试（Topic 超出 topicSuffixScope）apiKeyId={} topicSuffix={}", entity.getId(), topicSuffix);
-            throw new JeecgBootBizTipException(ERR_API_KEY_UNAUTHORIZED);
-        }
-        return entity.getId();
     }
 
     private boolean matchesScope(String scope, String value) {
@@ -187,5 +209,15 @@ public class ApiKeyServiceImpl implements IApiKeyService {
 
     private List<String> toList(String commaSeparated) {
         return StringUtils.hasText(commaSeparated) ? Arrays.asList(commaSeparated.split(",")) : Collections.emptyList();
+    }
+
+    private List<String> toScopeList(String scope) {
+        if (!StringUtils.hasText(scope) || WILDCARD.equals(scope.trim())) {
+            return Collections.emptyList();
+        }
+        return Arrays.stream(scope.split(","))
+                .map(String::trim)
+                .filter(StringUtils::hasText)
+                .collect(Collectors.toList());
     }
 }

@@ -1,6 +1,7 @@
 package org.jeecg.modules.commhub.service.impl;
 
 import cn.hutool.core.util.IdUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -19,6 +20,7 @@ import org.jeecg.modules.commhub.vo.UplinkEventDTO;
 import org.jeecg.modules.commhub.vo.UplinkEventQuery;
 import org.jeecg.modules.deviceinfo.contract.dto.PageResult;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
 import java.util.Collections;
@@ -115,10 +117,16 @@ public class UplinkEventServiceImpl implements IUplinkEventService {
     @Override
     public PageResult<UplinkEventDTO> queryPage(UplinkEventQuery query) {
         Page<DeviceUplinkEventLog> page = new Page<>(query.getPageNo(), query.getPageSize());
-        Page<DeviceUplinkEventLog> pageResult = eventLogMapper.selectPage(page, Wrappers.<DeviceUplinkEventLog>lambdaQuery()
+        LambdaQueryWrapper<DeviceUplinkEventLog> wrapper = Wrappers.<DeviceUplinkEventLog>lambdaQuery()
+                .eq(StringUtils.hasText(query.getTenantId()), DeviceUplinkEventLog::getTenantId, query.getTenantId())
                 .eq(StringUtils.hasText(query.getDeviceId()), DeviceUplinkEventLog::getDeviceId, query.getDeviceId())
                 .eq(StringUtils.hasText(query.getEventKind()), DeviceUplinkEventLog::getEventKind, query.getEventKind())
-                .ge(query.getSince() != null, DeviceUplinkEventLog::getReportedAt, query.getSince())
+                .ge(query.getSince() != null, DeviceUplinkEventLog::getReportedAt, query.getSince());
+        if (!CollectionUtils.isEmpty(query.getDeviceScope())) {
+            wrapper.and(scope -> scope.in(DeviceUplinkEventLog::getDeviceId, query.getDeviceScope())
+                    .or().in(DeviceUplinkEventLog::getDeviceCode, query.getDeviceScope()));
+        }
+        Page<DeviceUplinkEventLog> pageResult = eventLogMapper.selectPage(page, wrapper
                 .orderByDesc(DeviceUplinkEventLog::getReportedAt));
 
         List<UplinkEventDTO> records = pageResult.getRecords().stream().map(this::toDTO).collect(Collectors.toList());
