@@ -15,6 +15,7 @@ import org.jeecg.modules.commhub.vo.ApiKeyCreateRequest;
 import org.jeecg.modules.commhub.vo.ApiKeyCreateResult;
 import org.jeecg.modules.commhub.vo.ApiKeyDTO;
 import org.jeecg.modules.commhub.vo.ApiKeyListQuery;
+import org.jeecg.modules.commhub.vo.ApiKeyScope;
 import org.jeecg.modules.deviceinfo.contract.api.DeviceInfoFeignClient;
 import org.jeecg.modules.deviceinfo.contract.dto.DeviceInfoDTO;
 import org.jeecg.modules.deviceinfo.contract.dto.PageResult;
@@ -95,15 +96,7 @@ public class ApiKeyServiceImpl implements IApiKeyService {
 
     @Override
     public String assertAuthorized(String rawApiKey, String deviceId, String topicSuffix) {
-        if (!StringUtils.hasText(rawApiKey)) {
-            throw new JeecgBootBizTipException(ERR_API_KEY_INVALID);
-        }
-        CommHubApiKey entity = apiKeyMapper.selectOne(Wrappers.<CommHubApiKey>lambdaQuery()
-                .eq(CommHubApiKey::getApiKeyHash, DigestUtil.sha256Hex(rawApiKey))
-                .last("LIMIT 1"));
-        if (entity == null || !"ACTIVE".equals(entity.getStatus())) {
-            throw new JeecgBootBizTipException(ERR_API_KEY_INVALID);
-        }
+        CommHubApiKey entity = loadActiveKey(rawApiKey);
 
         DeviceInfoDTO device = getDeviceSafely(deviceId);
         if (device == null || !entity.getTenantId().equals(device.getTenantId())) {
@@ -121,6 +114,34 @@ public class ApiKeyServiceImpl implements IApiKeyService {
             throw new JeecgBootBizTipException(ERR_API_KEY_UNAUTHORIZED);
         }
         return entity.getId();
+    }
+
+
+    @Override
+    public ApiKeyScope resolveScope(String rawApiKey) {
+        CommHubApiKey entity = loadActiveKey(rawApiKey);
+        ApiKeyScope scope = new ApiKeyScope();
+        scope.setApiKeyId(entity.getId());
+        scope.setTenantId(entity.getTenantId());
+        scope.setDeviceScope(entity.getDeviceScope());
+        return scope;
+    }
+
+    private CommHubApiKey loadActiveKey(String rawApiKey) {
+        if (!StringUtils.hasText(rawApiKey)) {
+            throw new JeecgBootBizTipException(ERR_API_KEY_INVALID);
+        }
+        CommHubApiKey entity = apiKeyMapper.selectOne(Wrappers.<CommHubApiKey>lambdaQuery()
+                .eq(CommHubApiKey::getApiKeyHash, DigestUtil.sha256Hex(rawApiKey))
+                .last("LIMIT 1"));
+        if (entity == null || !"ACTIVE".equals(entity.getStatus())) {
+            throw new JeecgBootBizTipException(ERR_API_KEY_INVALID);
+        }
+        return entity;
+    }
+
+    public boolean isDeviceInScope(String scope, String value) {
+        return matchesScope(scope, value);
     }
 
     private boolean matchesScope(String scope, String value) {

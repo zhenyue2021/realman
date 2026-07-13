@@ -22,7 +22,10 @@ public class DeviceUplinkEvent implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    @Schema(description = "内部唯一标识（UUID）")
+    @Schema(description = "上行事件日志 ID；内部轮询消费推荐用作稳定游标")
+    private String eventId;
+
+    @Schema(description = "设备内部唯一标识（UUID）")
     private String deviceId;
 
     @Schema(description = "设备序列号 / 通信层标识")

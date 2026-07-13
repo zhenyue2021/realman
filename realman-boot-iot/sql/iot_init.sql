@@ -537,3 +537,23 @@ CREATE TABLE `iot_mq_message_log_history` (
     KEY `idx_hist_mq_backup_time` (`backup_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='MQ 消息日志归档表';
 
+
+CREATE TABLE `darwin_http_outbox` (
+  `id`             varchar(36) NOT NULL,
+  `path`           varchar(128) NOT NULL,
+  `request_body`   json NOT NULL,
+  `request_hash`   varchar(64) DEFAULT NULL,
+  `biz_key`        varchar(256) DEFAULT NULL COMMENT '业务幂等键，默认 deviceCode:path:requestHash',
+  `device_code`    varchar(64) DEFAULT NULL,
+  `status`         varchar(16) NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING/SENDING/RETRYING/SUCCESS/DEAD',
+  `attempt_count`  int NOT NULL DEFAULT 0,
+  `max_attempts`   int NOT NULL DEFAULT 8,
+  `next_retry_at`  datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `last_error`     varchar(500) DEFAULT NULL,
+  `created_at`     datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`     datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_status_next_retry` (`status`, `next_retry_at`),
+  KEY `idx_device_status` (`device_code`, `status`),
+  KEY `idx_biz_key` (`biz_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Darwin HTTP 出站 Outbox（文件地址/设备状态可恢复重放）';

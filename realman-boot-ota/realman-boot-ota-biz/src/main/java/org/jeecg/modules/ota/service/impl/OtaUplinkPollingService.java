@@ -52,6 +52,7 @@ public class OtaUplinkPollingService {
     private final IOtaSystemSettingService systemSettingService;
 
     private final Map<String, LocalDateTime> cursorCache = new ConcurrentHashMap<>();
+    private final Map<String, String> cursorIdCache = new ConcurrentHashMap<>();
 
     @Scheduled(fixedDelayString = "${ota.uplink-poll.interval-ms:5000}")
     public void poll() {
@@ -75,15 +76,18 @@ public class OtaUplinkPollingService {
 
     private void pollEventKind(String eventKind) {
         LocalDateTime since = loadCursor(eventKind);
+        String afterId = loadCursorId(eventKind);
         UplinkEventPollQuery query = new UplinkEventPollQuery();
         query.setEventKind(eventKind);
-        query.setSince(since);
+        query.setAfterId(afterId);
+        query.setSince(afterId == null ? since : null);
         query.setLimit(200);
         Result<List<DeviceUplinkEvent>> result = commHubFeignClient.pollUplinkEvents(query);
         if (result == null || !result.isSuccess() || result.getResult() == null || result.getResult().isEmpty()) {
             return;
         }
         LocalDateTime maxReportedAt = since;
+        String maxEventId = afterId;
         for (DeviceUplinkEvent event : result.getResult()) {
             try {
                 applyEvent(event);
@@ -93,8 +97,13 @@ public class OtaUplinkPollingService {
             if (event.getReportedAt() != null && event.getReportedAt().isAfter(maxReportedAt)) {
                 maxReportedAt = event.getReportedAt();
             }
+            if (event.getEventId() != null && (maxEventId == null || event.getEventId().compareTo(maxEventId) > 0)) {
+                maxEventId = event.getEventId();
+            }
         }
-        if (maxReportedAt.isAfter(since)) {
+        if (maxEventId != null && !maxEventId.equals(afterId)) {
+            saveCursor(eventKind, maxReportedAt, maxEventId);
+        } else if (maxReportedAt.isAfter(since)) {
             saveCursor(eventKind, maxReportedAt);
         }
     }
@@ -106,10 +115,26 @@ public class OtaUplinkPollingService {
             return cached;
         }
         OtaUplinkPollCursor persisted = cursorMapper.selectById(eventKind);
+        if (persisted != null && persisted.getCursorId() != null) {
+            cursorIdCache.put(eventKind, persisted.getCursorId());
+        }
         LocalDateTime initial = persisted != null && persisted.getCursorAt() != null
                 ? persisted.getCursorAt() : LocalDateTime.now().minusMinutes(10);
         cursorCache.put(eventKind, initial);
         return initial;
+    }
+
+    private String loadCursorId(String eventKind) {
+        String cached = cursorIdCache.get(eventKind);
+        if (cached != null) {
+            return cached;
+        }
+        OtaUplinkPollCursor persisted = cursorMapper.selectById(eventKind);
+        if (persisted != null && persisted.getCursorId() != null) {
+            cursorIdCache.put(eventKind, persisted.getCursorId());
+            return persisted.getCursorId();
+        }
+        return null;
     }
 
     /** 原子的"只前进不回退"落库，避免多实例并发轮询时较慢的一个实例把游标写回退。 */
@@ -119,6 +144,16 @@ public class OtaUplinkPollingService {
             cursorMapper.upsertIfAfter(eventKind, newCursor);
         } catch (Exception e) {
             log.warn("[ota] 轮询游标持久化失败 eventKind={}: {}", eventKind, e.getMessage());
+        }
+    }
+
+    private void saveCursor(String eventKind, LocalDateTime newCursor, String newCursorId) {
+        cursorCache.put(eventKind, newCursor);
+        cursorIdCache.put(eventKind, newCursorId);
+        try {
+            cursorMapper.upsertIfIdAfter(eventKind, newCursor, newCursorId);
+        } catch (Exception e) {
+            log.warn("[ota] 轮询 ID 游标持久化失败 eventKind={}: {}", eventKind, e.getMessage());
         }
     }
 
