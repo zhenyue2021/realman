@@ -40,4 +40,10 @@ public class MqttPublishRequest implements Serializable {
 
     @Schema(description = "等待 ACK 的超时时间（毫秒），仅 waitAck=true 时生效")
     private Long ackTimeoutMs;
+
+    @Schema(description = "ACK Topic 后缀，默认 bridge-ack；实际订阅/上报为 device/{code}/{ackTopicSuffix}")
+    private String ackTopicSuffix;
+
+    @Schema(description = "ACK JSON 中用于关联下行指令的字段名，默认 commandId")
+    private String ackCommandIdField;
 }
