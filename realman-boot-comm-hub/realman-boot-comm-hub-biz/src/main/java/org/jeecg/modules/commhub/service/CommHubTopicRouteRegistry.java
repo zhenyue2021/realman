@@ -47,6 +47,7 @@ public class CommHubTopicRouteRegistry {
             .thenComparing(CommHubTopicRoute::getTopicSuffix, Comparator.nullsLast(String::compareTo));
 
     private final CommHubTopicRouteMapper topicRouteMapper;
+    private final AntPathMatcher antPathMatcher = new AntPathMatcher();
 
     /** 按优先级预排序后的快照；resolve 只读遍历，避免消息主链路做排序或查库。 */
     private volatile List<CommHubTopicRoute> cache = List.of();

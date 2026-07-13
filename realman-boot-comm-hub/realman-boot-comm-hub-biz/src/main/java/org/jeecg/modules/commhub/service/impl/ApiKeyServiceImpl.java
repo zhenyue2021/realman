@@ -201,6 +201,34 @@ public class ApiKeyServiceImpl implements IApiKeyService {
         return matchesScope(scope, value);
     }
 
+
+    @Override
+    public ApiKeyScope resolveScope(String rawApiKey) {
+        CommHubApiKey entity = loadActiveKey(rawApiKey);
+        ApiKeyScope scope = new ApiKeyScope();
+        scope.setApiKeyId(entity.getId());
+        scope.setTenantId(entity.getTenantId());
+        scope.setDeviceScope(entity.getDeviceScope());
+        return scope;
+    }
+
+    private CommHubApiKey loadActiveKey(String rawApiKey) {
+        if (!StringUtils.hasText(rawApiKey)) {
+            throw new JeecgBootBizTipException(ERR_API_KEY_INVALID);
+        }
+        CommHubApiKey entity = apiKeyMapper.selectOne(Wrappers.<CommHubApiKey>lambdaQuery()
+                .eq(CommHubApiKey::getApiKeyHash, DigestUtil.sha256Hex(rawApiKey))
+                .last("LIMIT 1"));
+        if (entity == null || !"ACTIVE".equals(entity.getStatus())) {
+            throw new JeecgBootBizTipException(ERR_API_KEY_INVALID);
+        }
+        return entity;
+    }
+
+    public boolean isDeviceInScope(String scope, String value) {
+        return matchesScope(scope, value);
+    }
+
     private boolean matchesScope(String scope, String value) {
         if (!StringUtils.hasText(scope) || WILDCARD.equals(scope.trim())) {
             return true;

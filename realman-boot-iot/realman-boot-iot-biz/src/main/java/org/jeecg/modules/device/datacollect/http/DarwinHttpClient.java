@@ -48,6 +48,9 @@ public class DarwinHttpClient {
     private static final String PATH_FILE_REPORT = "/internal/data-processing/file-report";
     private static final String PATH_DEVICE_STATUS = "/internal/data-processing/device-status";
     private static final int MAX_FAIL_REASON_LEN = 500;
+    private static final String HEADER_IDEMPOTENCY_KEY = "X-Idempotency-Key";
+    private static final String HEADER_REQUEST_HASH = "X-Request-Hash";
+    private static final String HEADER_EVENT_ID = "X-Event-Id";
 
     private final DataCollectIntegrationProperties properties;
     private final MqMessageLogService mqMessageLogService;
@@ -112,6 +115,7 @@ public class DarwinHttpClient {
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
+            applyIdempotencyHeaders(headers, record.getMessageBody(), deviceCode, path, null);
             String apiKey = properties.getHttp().getApiKey();
             if (StringUtils.hasText(apiKey)) {
                 headers.set(properties.getHttp().getApiKeyHeader(), apiKey);
