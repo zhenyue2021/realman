@@ -18,6 +18,9 @@ public class ApiResult<T> {
     public static <T> ApiResult<T> fail(String msg) {
         return of(500, msg, false,null);
     }
+    public static <T> ApiResult<T> fail(int code, String msg) {
+        return of(code, msg, false,null);
+    }
     private static <T> ApiResult<T> of(int code, String msg, boolean success, T data) {
         ApiResult<T> r = new ApiResult<>(); r.code=code; r.message=msg; r.success = success; r.data=data; return r;
     }

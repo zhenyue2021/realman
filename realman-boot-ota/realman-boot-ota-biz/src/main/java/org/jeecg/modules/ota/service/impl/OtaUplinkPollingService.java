@@ -19,10 +19,12 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 import static org.jeecg.modules.ota.config.OtaSystemSettingDefaults.CANCEL_ACK_TIMEOUT_SECONDS;
 
@@ -31,7 +33,7 @@ import static org.jeecg.modules.ota.config.OtaSystemSettingDefaults.CANCEL_ACK_T
  * {@code OTA_STATUS_REPORT} 事件，驱动设备级子任务状态机迁移；同时兜底扫描
  * EXECUTING 取消确认超时（PRD 4.6.1 cancel_ack_timeout）+ 下发失败自动重试。
  *
- * <p>轮询游标按 {@code eventKind} 各自持久化到 {@code ota_uplink_poll_cursor}
+ * <p>轮询游标按稳定递增的事件日志 ID（非 reportedAt 业务时间）和 {@code eventKind} 各自持久化到 {@code ota_uplink_poll_cursor}
  * （修复此前两个 eventKind 共用同一个内存游标的问题——共用游标会导致后轮询的
  * eventKind 的 {@code since} 被先轮询的 eventKind 已推进的游标误覆盖，从而
  * 漏掉本应处理的事件），服务重启/多实例部署下游标不丢失、不互相干扰；内存里
@@ -51,8 +53,7 @@ public class OtaUplinkPollingService {
     private final OtaTaskStateMachineService stateMachineService;
     private final IOtaSystemSettingService systemSettingService;
 
-    private final Map<String, LocalDateTime> cursorCache = new ConcurrentHashMap<>();
-    private final Map<String, String> cursorIdCache = new ConcurrentHashMap<>();
+    private final Map<String, String> cursorCache = new ConcurrentHashMap<>();
 
     @Scheduled(fixedDelayString = "${ota.uplink-poll.interval-ms:5000}")
     public void poll() {
@@ -75,70 +76,55 @@ public class OtaUplinkPollingService {
     }
 
     private void pollEventKind(String eventKind) {
-        LocalDateTime since = loadCursor(eventKind);
-        String afterId = loadCursorId(eventKind);
+        String afterId = loadCursor(eventKind);
         UplinkEventPollQuery query = new UplinkEventPollQuery();
         query.setEventKind(eventKind);
         query.setAfterId(afterId);
-        query.setSince(afterId == null ? since : null);
         query.setLimit(200);
         Result<List<DeviceUplinkEvent>> result = commHubFeignClient.pollUplinkEvents(query);
         if (result == null || !result.isSuccess() || result.getResult() == null || result.getResult().isEmpty()) {
             return;
         }
-        LocalDateTime maxReportedAt = since;
-        String maxEventId = afterId;
-        for (DeviceUplinkEvent event : result.getResult()) {
+        List<DeviceUplinkEvent> events = result.getResult().stream()
+                .filter(event -> event.getEventId() != null)
+                .sorted(Comparator.comparing(DeviceUplinkEvent::getEventId))
+                .collect(Collectors.toList());
+        String lastProcessedId = afterId;
+        boolean batchSucceeded = true;
+        for (DeviceUplinkEvent event : events) {
             try {
                 applyEvent(event);
+                lastProcessedId = event.getEventId();
             } catch (Exception e) {
-                log.warn("[ota] 上行事件应用失败 deviceCode={}: {}", event.getDeviceCode(), e.getMessage());
-            }
-            if (event.getReportedAt() != null && event.getReportedAt().isAfter(maxReportedAt)) {
-                maxReportedAt = event.getReportedAt();
+                batchSucceeded = false;
+                log.warn("[ota] 上行事件应用失败，保留当前批次游标待下轮重试 eventId={} deviceCode={}: {}",
+                        event.getEventId(), event.getDeviceCode(), e.getMessage());
+                break;
             }
             if (event.getEventId() != null && (maxEventId == null || event.getEventId().compareTo(maxEventId) > 0)) {
                 maxEventId = event.getEventId();
             }
         }
-        if (maxEventId != null && !maxEventId.equals(afterId)) {
-            saveCursor(eventKind, maxReportedAt, maxEventId);
-        } else if (maxReportedAt.isAfter(since)) {
-            saveCursor(eventKind, maxReportedAt);
+        if (batchSucceeded && lastProcessedId != null && !lastProcessedId.equals(afterId)) {
+            saveCursor(eventKind, lastProcessedId);
         }
     }
 
-    /** 优先取内存缓存；缓存未命中（服务刚启动）时从 DB 加载，仍缺失则回退到"启动前 10 分钟"。 */
-    private LocalDateTime loadCursor(String eventKind) {
-        LocalDateTime cached = cursorCache.get(eventKind);
-        if (cached != null) {
-            return cached;
+    /** 优先取内存缓存；缓存未命中（服务刚启动）时从 DB 加载稳定 ID 游标。 */
+    private String loadCursor(String eventKind) {
+        if (cursorCache.containsKey(eventKind)) {
+            return cursorCache.get(eventKind);
         }
         OtaUplinkPollCursor persisted = cursorMapper.selectById(eventKind);
-        if (persisted != null && persisted.getCursorId() != null) {
-            cursorIdCache.put(eventKind, persisted.getCursorId());
+        String initial = persisted == null ? null : persisted.getCursorId();
+        if (initial != null) {
+            cursorCache.put(eventKind, initial);
         }
-        LocalDateTime initial = persisted != null && persisted.getCursorAt() != null
-                ? persisted.getCursorAt() : LocalDateTime.now().minusMinutes(10);
-        cursorCache.put(eventKind, initial);
         return initial;
     }
 
-    private String loadCursorId(String eventKind) {
-        String cached = cursorIdCache.get(eventKind);
-        if (cached != null) {
-            return cached;
-        }
-        OtaUplinkPollCursor persisted = cursorMapper.selectById(eventKind);
-        if (persisted != null && persisted.getCursorId() != null) {
-            cursorIdCache.put(eventKind, persisted.getCursorId());
-            return persisted.getCursorId();
-        }
-        return null;
-    }
-
-    /** 原子的"只前进不回退"落库，避免多实例并发轮询时较慢的一个实例把游标写回退。 */
-    private void saveCursor(String eventKind, LocalDateTime newCursor) {
+    /** 原子的"只前进不回退"落库，避免多实例并发轮询时较慢的一个实例把稳定游标写回退。 */
+    private void saveCursor(String eventKind, String newCursor) {
         cursorCache.put(eventKind, newCursor);
         try {
             cursorMapper.upsertIfAfter(eventKind, newCursor);

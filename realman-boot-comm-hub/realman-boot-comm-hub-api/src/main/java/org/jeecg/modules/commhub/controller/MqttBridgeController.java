@@ -55,6 +55,8 @@ public class MqttBridgeController {
         internal.setQos(request.getQos());
         internal.setWaitAck(request.isWaitAck());
         internal.setAckTimeoutMs(request.getAckTimeoutMs());
+        internal.setAckTopicSuffix(request.getAckTopicSuffix());
+        internal.setAckCommandIdField(request.getAckCommandIdField());
         return Result.ok(mqttPublisher.publish(internal));
     }
 }

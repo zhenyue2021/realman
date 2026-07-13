@@ -143,7 +143,7 @@ public class MqttMessageDispatcher {
             case "SSOT_AND_EVENT" -> handleSsotAndEvent(deviceCode, parsed, route.getEventKind());
             case "EVENT_ONLY" -> publishUplinkEvent(deviceCode, EventKind.valueOf(route.getEventKind()), Transport.MQTT, parsed);
             case "TOKEN_REFRESH" -> handleTokenRefresh(deviceCode, parsed);
-            case "BRIDGE_ACK" -> handleBridgeAck(parsed, payload);
+            case "BRIDGE_ACK" -> handleBridgeAck(path, parsed, payload);
             case "IGNORE" -> log.debug("[comm-hub] Topic 路由标记为 IGNORE，忽略 deviceCode={} path={}", deviceCode, path);
             default -> log.warn("[comm-hub] 未知 route_type={}，忽略 deviceCode={} path={}", route.getRouteType(), deviceCode, path);
         }
@@ -208,13 +208,16 @@ public class MqttMessageDispatcher {
         }
     }
 
-    private void handleBridgeAck(Map<String, Object> parsed, String rawPayload) {
-        Object commandId = parsed.get("commandId");
-        if (commandId == null) {
-            log.warn("[comm-hub] bridge-ack 缺少 commandId 字段，忽略: {}", rawPayload);
-            return;
+    private void handleBridgeAck(String ackTopicSuffix, Map<String, Object> parsed, String rawPayload) {
+        for (String commandIdField : ackPendingService.ackCommandIdFields(ackTopicSuffix)) {
+            Object commandId = parsed.get(commandIdField);
+            if (commandId != null) {
+                ackPendingService.complete(commandId.toString(), rawPayload);
+                return;
+            }
         }
-        ackPendingService.complete(commandId.toString(), rawPayload);
+        log.warn("[comm-hub] {} ACK 缺少可识别的指令关联字段，候选字段={}，忽略: {}",
+                ackTopicSuffix, ackPendingService.ackCommandIdFields(ackTopicSuffix), rawPayload);
     }
 
     private void publishUplinkEvent(String deviceCode, EventKind eventKind, Transport transport, Map<String, Object> payload) {

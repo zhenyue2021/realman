@@ -27,7 +27,7 @@ public class DataCollectIntegrationProperties {
 
     private Http http = new Http();
 
-    /** Darwin -> 我方 HTTP 回调接口鉴权配置。 */
+    /** Darwin 平台调用我方入站 HTTP 端点时使用的认证配置。 */
     private Inbound inbound = new Inbound();
 
     /**
@@ -46,11 +46,27 @@ public class DataCollectIntegrationProperties {
     @Data
     public static class Http {
         private String baseUrl = "";
-        /** 鉴权请求头名称，真实方案待达尔文平台侧确认，先假设为固定 API Key 请求头 */
+        /** 出站请求鉴权头名称，真实方案待达尔文平台侧确认，先假设为固定 API Key 请求头。 */
         private String apiKeyHeader = "X-Darwin-Api-Key";
         private String apiKey = "";
         private int connectTimeoutMs = 3000;
         private int readTimeoutMs = 5000;
+    }
+
+    @Data
+    public static class Inbound {
+        /** 入站 API Key 请求头，例如 darwin.integration.inbound.api-key-header=X-Darwin-Api-Key。 */
+        private String apiKeyHeader = "X-Darwin-Api-Key";
+        /** 入站 API Key 明文；为空时不启用 API Key 校验。 */
+        private String apiKey = "";
+        /** 入站 HMAC 密钥；为空时不启用 HMAC 校验。 */
+        private String hmacSecret = "";
+        /** 入站 HMAC 时间戳请求头，Unix epoch milliseconds。 */
+        private String timestampHeader = "X-Darwin-Timestamp";
+        /** 入站 HMAC 签名请求头，hex(HMAC-SHA256(canonicalString, hmacSecret))。 */
+        private String signatureHeader = "X-Darwin-Signature";
+        /** HMAC 防重放时间窗口，默认 5 分钟。 */
+        private long timestampWindowSeconds = 300;
     }
 
     /**

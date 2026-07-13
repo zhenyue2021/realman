@@ -22,6 +22,7 @@ public class OtaUplinkPollCursor implements Serializable {
     @TableId("event_kind")
     private String eventKind;
 
+    /** 兼容历史时间游标字段；新消费位点以 cursorId 为准。 */
     @TableField("cursor_at")
     private LocalDateTime cursorAt;
 
