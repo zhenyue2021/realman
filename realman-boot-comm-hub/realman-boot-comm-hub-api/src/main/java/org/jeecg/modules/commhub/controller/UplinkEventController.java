@@ -46,6 +46,7 @@ public class UplinkEventController {
         UplinkEventQuery internalQuery = new UplinkEventQuery();
         internalQuery.setEventKind(query.getEventKind());
         internalQuery.setSince(query.getSince());
+        internalQuery.setAfterId(query.getAfterId());
         internalQuery.setPageNo(1);
         internalQuery.setPageSize(query.getLimit() == null ? 200 : query.getLimit());
 
@@ -56,6 +57,7 @@ public class UplinkEventController {
 
     private DeviceUplinkEvent toContractEvent(UplinkEventDTO dto) {
         DeviceUplinkEvent event = new DeviceUplinkEvent();
+        event.setEventId(dto.getId());
         event.setDeviceId(dto.getDeviceId());
         event.setDeviceCode(dto.getDeviceCode());
         event.setDeviceType(StringUtils.hasText(dto.getDeviceType()) ? DeviceType.valueOf(dto.getDeviceType()) : null);
