@@ -1,11 +1,13 @@
 package org.jeecg.modules.device.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Operation;
-import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.config.shiro.IgnoreAuth;
+import org.jeecg.modules.device.datacollect.config.DataCollectIntegrationProperties;
 import org.jeecg.modules.device.datacollect.constant.DataCollectConstant;
 import org.jeecg.modules.device.datacollect.dto.http.WorkOrderItemResult;
 import org.jeecg.modules.device.datacollect.dto.mq.FileReportMsg;
@@ -20,6 +22,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -49,14 +56,30 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 public class DarwinIntegrationController {
 
+    private static final int DARWIN_INBOUND_AUTH_FAILED = 401001;
+
     private final IWorkOrderService workOrderService;
     private final IWorkOrderAttachmentService attachmentService;
+
     private final StringRedisTemplate redisTemplate;
+    private final DataCollectIntegrationProperties properties;
+    private final ObjectMapper objectMapper;
 
     @IgnoreAuth
     @PostMapping("/task/data-collect-task")
     @Operation(summary = "达尔文工单下发（替代 MQ_TOPIC_WORK_ORDER_IN 消费者），按单项返回结果")
-    public ApiResult<List<WorkOrderItemResult>> createDataCollectTask(@Valid @RequestBody WorkOrderCreateMsg request) {
+    public ApiResult<List<WorkOrderItemResult>> createDataCollectTask(@RequestBody String body, HttpServletRequest httpRequest) {
+        ApiResult<Void> authResult = authenticateInbound(httpRequest, body);
+        if (!authResult.isSuccess()) {
+            return ApiResult.fail(authResult.getCode(), authResult.getMessage());
+        }
+        WorkOrderCreateMsg request;
+        try {
+            request = objectMapper.readValue(body, WorkOrderCreateMsg.class);
+        } catch (Exception e) {
+            log.warn("[DataCollect][HTTP] 工单下发请求体解析失败", e);
+            return ApiResult.fail("请求体格式错误");
+        }
         List<WorkOrderItemResult> results = new ArrayList<>();
         if (request.getData() == null || request.getData().isEmpty()) {
             return ApiResult.ok(results, "data 为空，无工单需要处理");
@@ -86,7 +109,18 @@ public class DarwinIntegrationController {
     @IgnoreAuth
     @PostMapping("/data-processing/collected-file")
     @Operation(summary = "达尔文文件上报结果回传（替代 MQ_TOPIC_FILE_REPORT_IN 消费者）")
-    public ApiResult<Void> reportCollectedFile(@Valid @RequestBody FileReportMsg request) {
+    public ApiResult<Void> reportCollectedFile(@RequestBody String body, HttpServletRequest httpRequest) {
+        ApiResult<Void> authResult = authenticateInbound(httpRequest, body);
+        if (!authResult.isSuccess()) {
+            return authResult;
+        }
+        FileReportMsg request;
+        try {
+            request = objectMapper.readValue(body, FileReportMsg.class);
+        } catch (Exception e) {
+            log.warn("[DataCollect][HTTP] 文件上报请求体解析失败", e);
+            return ApiResult.fail("请求体格式错误");
+        }
         if (request.getDarwinFileId() == null || request.getDarwinFileId().isBlank()) {
             return ApiResult.fail("缺少 darwinFileId");
         }
@@ -112,4 +146,84 @@ public class DarwinIntegrationController {
                 request.getDarwinFileId(), request.getWorkOrderId());
         return ApiResult.ok(null);
     }
+
+    private ApiResult<Void> authenticateInbound(HttpServletRequest request, String body) {
+        DataCollectIntegrationProperties.Inbound inbound = properties.getInbound();
+        if (inbound == null) {
+            return ApiResult.fail(DARWIN_INBOUND_AUTH_FAILED, "Darwin 入站认证未配置");
+        }
+        boolean apiKeyConfigured = inbound.getApiKey() != null && !inbound.getApiKey().isBlank();
+        boolean hmacConfigured = inbound.getHmacSecret() != null && !inbound.getHmacSecret().isBlank();
+        if (!apiKeyConfigured && !hmacConfigured) {
+            return ApiResult.fail(DARWIN_INBOUND_AUTH_FAILED, "Darwin 入站认证未配置");
+        }
+        if (apiKeyConfigured && constantTimeEquals(inbound.getApiKey(), request.getHeader(inbound.getApiKeyHeader()))) {
+            return ApiResult.ok(null);
+        }
+        if (hmacConfigured && verifyHmac(request, body == null ? "" : body, inbound)) {
+            return ApiResult.ok(null);
+        }
+        log.warn("[DataCollect][HTTP] 入站认证失败 method={} path={}", request.getMethod(), request.getRequestURI());
+        return ApiResult.fail(DARWIN_INBOUND_AUTH_FAILED, "Darwin 入站认证失败");
+    }
+
+    private boolean verifyHmac(HttpServletRequest request, String body, DataCollectIntegrationProperties.Inbound inbound) {
+        String timestampText = request.getHeader(inbound.getTimestampHeader());
+        String signature = request.getHeader(inbound.getSignatureHeader());
+        if (timestampText == null || timestampText.isBlank() || signature == null || signature.isBlank()) {
+            return false;
+        }
+        long timestampMillis;
+        try {
+            timestampMillis = Long.parseLong(timestampText);
+        } catch (NumberFormatException e) {
+            return false;
+        }
+        long diffSeconds = Math.abs(Instant.now().toEpochMilli() - timestampMillis) / 1000;
+        if (diffSeconds > inbound.getTimestampWindowSeconds()) {
+            log.warn("[DataCollect][HTTP] 入站 HMAC 时间戳超窗 diffSeconds={} windowSeconds={}",
+                    diffSeconds, inbound.getTimestampWindowSeconds());
+            return false;
+        }
+        String bodyDigest = sha256Hex(body.getBytes(StandardCharsets.UTF_8));
+        String canonical = request.getMethod().toUpperCase() + "\n"
+                + request.getRequestURI() + "\n"
+                + timestampText + "\n"
+                + bodyDigest;
+        return constantTimeEquals(hmacSha256Hex(inbound.getHmacSecret(), canonical), signature);
+    }
+
+    private String hmacSha256Hex(String secret, String payload) {
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            return hex(mac.doFinal(payload.getBytes(StandardCharsets.UTF_8)));
+        } catch (Exception e) {
+            throw new IllegalStateException("HMAC-SHA256 计算失败", e);
+        }
+    }
+
+    private String sha256Hex(byte[] bytes) {
+        try {
+            return hex(MessageDigest.getInstance("SHA-256").digest(bytes));
+        } catch (Exception e) {
+            throw new IllegalStateException("SHA-256 计算失败", e);
+        }
+    }
+
+    private String hex(byte[] bytes) {
+        StringBuilder sb = new StringBuilder(bytes.length * 2);
+        for (byte b : bytes) {
+            sb.append(String.format("%02x", b));
+        }
+        return sb.toString();
+    }
+
+    private boolean constantTimeEquals(String expected, String actual) {
+        if (expected == null || actual == null) {
+            return false;
+        }
+        return MessageDigest.isEqual(expected.getBytes(StandardCharsets.UTF_8), actual.getBytes(StandardCharsets.UTF_8));
+    }
+
 }
