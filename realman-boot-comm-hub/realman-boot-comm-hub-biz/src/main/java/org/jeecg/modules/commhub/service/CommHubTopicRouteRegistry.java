@@ -9,10 +9,12 @@ import org.jeecg.modules.commhub.entity.CommHubTopicRoute;
 import org.jeecg.modules.commhub.mapper.CommHubTopicRouteMapper;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.util.AntPathMatcher;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Comparator;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -33,8 +35,10 @@ public class CommHubTopicRouteRegistry {
             "SSOT_ONLY", "SSOT_AND_EVENT", "EVENT_ONLY", "TOKEN_REFRESH", "BRIDGE_ACK", "IGNORE");
 
     private final CommHubTopicRouteMapper topicRouteMapper;
+    private final AntPathMatcher antPathMatcher = new AntPathMatcher();
 
     private volatile Map<String, CommHubTopicRoute> cache = Map.of();
+    private volatile List<CommHubTopicRoute> orderedRoutes = List.of();
 
     @PostConstruct
     public void init() {
@@ -47,6 +51,10 @@ public class CommHubTopicRouteRegistry {
             List<CommHubTopicRoute> routes = topicRouteMapper.selectList(null);
             cache = routes.stream().collect(Collectors.toMap(
                     CommHubTopicRoute::getTopicSuffix, r -> r, (a, b) -> b, ConcurrentHashMap::new));
+            orderedRoutes = routes.stream()
+                    .filter(r -> Boolean.TRUE.equals(r.getEnabled()))
+                    .sorted(Comparator.comparing((CommHubTopicRoute r) -> r.getPriority() == null ? 0 : r.getPriority()).reversed())
+                    .toList();
             log.debug("[comm-hub] Topic 路由注册表已刷新，共 {} 条", cache.size());
         } catch (Exception e) {
             log.warn("[comm-hub] Topic 路由注册表刷新失败，沿用旧缓存: {}", e.getMessage());
@@ -55,8 +63,28 @@ public class CommHubTopicRouteRegistry {
 
     /** 返回 null 表示该 Topic 后缀未注册（既不在库里，也不是历史硬编码遗留），调用方应忽略。 */
     public CommHubTopicRoute resolve(String topicSuffix) {
-        CommHubTopicRoute route = cache.get(topicSuffix);
-        return route != null && Boolean.TRUE.equals(route.getEnabled()) ? route : null;
+        CommHubTopicRoute exact = cache.get(topicSuffix);
+        if (exact != null && Boolean.TRUE.equals(exact.getEnabled())) {
+            return exact;
+        }
+        for (CommHubTopicRoute route : orderedRoutes) {
+            if (matches(route, topicSuffix)) {
+                return route;
+            }
+        }
+        return null;
+    }
+
+    private boolean matches(CommHubTopicRoute route, String topicSuffix) {
+        String pattern = route.getTopicSuffix();
+        String matchType = StringUtils.hasText(route.getMatchType()) ? route.getMatchType() : "EXACT";
+        return switch (matchType) {
+            case "PREFIX" -> topicSuffix.startsWith(pattern);
+            case "ANT" -> antPathMatcher.match(pattern, topicSuffix);
+            case "REGEX" -> topicSuffix.matches(pattern);
+            case "EXACT" -> topicSuffix.equals(pattern);
+            default -> false;
+        };
     }
 
     /** 管理端查询台账，直接读缓存（与实际生效路由完全一致，无需额外查库）。 */
@@ -74,6 +102,18 @@ public class CommHubTopicRouteRegistry {
     public void upsert(CommHubTopicRoute route, String operator) {
         if (!StringUtils.hasText(route.getTopicSuffix())) {
             throw new JeecgBootBizTipException("topicSuffix 不能为空");
+        }
+        if (!StringUtils.hasText(route.getMatchType())) {
+            route.setMatchType("EXACT");
+        }
+        if (!Set.of("EXACT", "PREFIX", "ANT", "REGEX").contains(route.getMatchType())) {
+            throw new JeecgBootBizTipException("未知 matchType：" + route.getMatchType());
+        }
+        if (route.getPriority() == null) {
+            route.setPriority(0);
+        }
+        if (!StringUtils.hasText(route.getHandlerKey())) {
+            route.setHandlerKey(route.getRouteType());
         }
         if (!VALID_ROUTE_TYPES.contains(route.getRouteType())) {
             throw new JeecgBootBizTipException("未知 routeType：" + route.getRouteType() + "，合法值：" + VALID_ROUTE_TYPES);
