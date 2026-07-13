@@ -10,14 +10,18 @@ import org.jeecg.modules.commhub.contract.event.DeviceUplinkEvent;
 import org.jeecg.modules.commhub.contract.event.EventKind;
 import org.jeecg.modules.commhub.contract.event.Transport;
 import org.jeecg.modules.deviceinfo.contract.dto.PageResult;
+import org.jeecg.modules.commhub.service.IApiKeyService;
+import org.jeecg.modules.commhub.vo.ApiKeyScope;
 import org.jeecg.modules.deviceinfo.contract.enums.DeviceType;
 import org.jeecg.modules.commhub.service.IUplinkEventService;
 import org.jeecg.modules.commhub.vo.UplinkEventDTO;
 import org.jeecg.modules.commhub.vo.UplinkEventQuery;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -31,11 +35,18 @@ import java.util.stream.Collectors;
 @Tag(name = "上行事件查询", description = "Webhook 推送的轮询兜底通道 + 内部消费入口")
 public class UplinkEventController {
 
+    private static final String HEADER_API_KEY = "X-Api-Key";
+
     private final IUplinkEventService uplinkEventService;
+    private final IApiKeyService apiKeyService;
 
     @GetMapping("/api/v1/devices/uplink-events")
     @Operation(summary = "上行事件轮询查询（对外）")
-    public Result<PageResult<UplinkEventDTO>> queryPage(UplinkEventQuery query) {
+    public Result<PageResult<UplinkEventDTO>> queryPage(UplinkEventQuery query,
+                                                          @RequestHeader(HEADER_API_KEY) String apiKey) {
+        ApiKeyScope scope = apiKeyService.resolveScope(apiKey);
+        query.setTenantId(scope.getTenantId());
+        query.setAuthorizedDevices(parseScope(scope.getDeviceScope()));
         return Result.ok(uplinkEventService.queryPage(query));
     }
 
@@ -46,6 +57,7 @@ public class UplinkEventController {
         UplinkEventQuery internalQuery = new UplinkEventQuery();
         internalQuery.setEventKind(query.getEventKind());
         internalQuery.setSince(query.getSince());
+        internalQuery.setAfterId(query.getAfterId());
         internalQuery.setPageNo(1);
         internalQuery.setPageSize(query.getLimit() == null ? 200 : query.getLimit());
 
@@ -54,8 +66,19 @@ public class UplinkEventController {
         return Result.ok(events);
     }
 
+    private List<String> parseScope(String deviceScope) {
+        if (!StringUtils.hasText(deviceScope) || "*".equals(deviceScope.trim())) {
+            return null;
+        }
+        return Arrays.stream(deviceScope.split(","))
+                .map(String::trim)
+                .filter(StringUtils::hasText)
+                .toList();
+    }
+
     private DeviceUplinkEvent toContractEvent(UplinkEventDTO dto) {
         DeviceUplinkEvent event = new DeviceUplinkEvent();
+        event.setEventId(dto.getId());
         event.setDeviceId(dto.getDeviceId());
         event.setDeviceCode(dto.getDeviceCode());
         event.setDeviceType(StringUtils.hasText(dto.getDeviceType()) ? DeviceType.valueOf(dto.getDeviceType()) : null);

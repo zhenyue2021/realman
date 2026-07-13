@@ -27,11 +27,22 @@ public class DataCollectIntegrationProperties {
 
     private Http http = new Http();
 
+    /** Darwin -> 我方 HTTP 回调接口鉴权配置。 */
+    private Inbound inbound = new Inbound();
+
     /**
      * Darwin 平台真实 HTTP 契约（路径、字段、鉴权方式）本仓库无法访问，以下按 V2 设计文档
      * 假设的契约实现（{@code POST {baseUrl}/internal/data-processing/oss-auth|file-report|
      * device-status}），需要与达尔文平台侧对接确认后再调整，不代表已验证的真实接口。
      */
+    @Data
+    public static class Inbound {
+        /** 是否要求 Darwin 回调携带固定 API Key。生产环境建议开启。 */
+        private boolean authEnabled = false;
+        private String apiKeyHeader = "X-Darwin-Api-Key";
+        private String apiKey = "";
+    }
+
     @Data
     public static class Http {
         private String baseUrl = "";
