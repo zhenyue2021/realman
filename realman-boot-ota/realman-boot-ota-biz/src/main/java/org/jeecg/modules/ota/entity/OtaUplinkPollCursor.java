@@ -25,6 +25,9 @@ public class OtaUplinkPollCursor implements Serializable {
     @TableField("cursor_at")
     private LocalDateTime cursorAt;
 
+    @TableField("cursor_id")
+    private String cursorId;
+
     @TableField("updated_at")
     private LocalDateTime updatedAt;
 }

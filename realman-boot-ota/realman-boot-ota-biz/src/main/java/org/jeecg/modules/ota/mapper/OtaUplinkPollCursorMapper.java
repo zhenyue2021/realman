@@ -21,4 +21,14 @@ public interface OtaUplinkPollCursorMapper extends BaseMapper<OtaUplinkPollCurso
             + "cursor_at = IF(VALUES(cursor_at) > cursor_at, VALUES(cursor_at), cursor_at), "
             + "updated_at = IF(VALUES(cursor_at) > cursor_at, NOW(), updated_at)")
     void upsertIfAfter(@Param("eventKind") String eventKind, @Param("cursorAt") LocalDateTime cursorAt);
+
+    @Update("INSERT INTO ota_uplink_poll_cursor (event_kind, cursor_at, cursor_id, updated_at) "
+            + "VALUES (#{eventKind}, #{cursorAt}, #{cursorId}, NOW()) "
+            + "ON DUPLICATE KEY UPDATE "
+            + "cursor_at = IF(cursor_id IS NULL OR VALUES(cursor_id) > cursor_id, VALUES(cursor_at), cursor_at), "
+            + "updated_at = IF(cursor_id IS NULL OR VALUES(cursor_id) > cursor_id, NOW(), updated_at), "
+            + "cursor_id = IF(cursor_id IS NULL OR VALUES(cursor_id) > cursor_id, VALUES(cursor_id), cursor_id)")
+    void upsertIfIdAfter(@Param("eventKind") String eventKind,
+                         @Param("cursorAt") LocalDateTime cursorAt,
+                         @Param("cursorId") String cursorId);
 }

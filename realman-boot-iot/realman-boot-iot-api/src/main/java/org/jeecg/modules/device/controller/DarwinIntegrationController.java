@@ -6,6 +6,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.config.shiro.IgnoreAuth;
+import org.jeecg.common.exception.JeecgBootBizTipException;
+import org.jeecg.modules.device.datacollect.config.DataCollectIntegrationProperties;
 import org.jeecg.modules.device.datacollect.constant.DataCollectConstant;
 import org.jeecg.modules.device.datacollect.dto.http.WorkOrderItemResult;
 import org.jeecg.modules.device.datacollect.dto.mq.FileReportMsg;
@@ -15,8 +17,10 @@ import org.jeecg.modules.device.service.workorder.IWorkOrderAttachmentService;
 import org.jeecg.modules.device.service.workorder.IWorkOrderService;
 import org.jeecg.modules.device.vo.ApiResult;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -52,11 +56,14 @@ public class DarwinIntegrationController {
     private final IWorkOrderService workOrderService;
     private final IWorkOrderAttachmentService attachmentService;
     private final StringRedisTemplate redisTemplate;
+    private final DataCollectIntegrationProperties integrationProperties;
 
     @IgnoreAuth
     @PostMapping("/task/data-collect-task")
     @Operation(summary = "达尔文工单下发（替代 MQ_TOPIC_WORK_ORDER_IN 消费者），按单项返回结果")
-    public ApiResult<List<WorkOrderItemResult>> createDataCollectTask(@Valid @RequestBody WorkOrderCreateMsg request) {
+    public ApiResult<List<WorkOrderItemResult>> createDataCollectTask(@RequestHeader(value = "X-Darwin-Api-Key", required = false) String apiKey,
+                                                                       @Valid @RequestBody WorkOrderCreateMsg request) {
+        assertInboundAuthorized(apiKey);
         List<WorkOrderItemResult> results = new ArrayList<>();
         if (request.getData() == null || request.getData().isEmpty()) {
             return ApiResult.ok(results, "data 为空，无工单需要处理");
@@ -86,7 +93,9 @@ public class DarwinIntegrationController {
     @IgnoreAuth
     @PostMapping("/data-processing/collected-file")
     @Operation(summary = "达尔文文件上报结果回传（替代 MQ_TOPIC_FILE_REPORT_IN 消费者）")
-    public ApiResult<Void> reportCollectedFile(@Valid @RequestBody FileReportMsg request) {
+    public ApiResult<Void> reportCollectedFile(@RequestHeader(value = "X-Darwin-Api-Key", required = false) String apiKey,
+                                                @Valid @RequestBody FileReportMsg request) {
+        assertInboundAuthorized(apiKey);
         if (request.getDarwinFileId() == null || request.getDarwinFileId().isBlank()) {
             return ApiResult.fail("缺少 darwinFileId");
         }
@@ -111,5 +120,15 @@ public class DarwinIntegrationController {
         log.info("[DataCollect][HTTP] 文件上报处理成功 darwinFileId={} workOrderId={}",
                 request.getDarwinFileId(), request.getWorkOrderId());
         return ApiResult.ok(null);
+    }
+
+    private void assertInboundAuthorized(String apiKey) {
+        DataCollectIntegrationProperties.Inbound inbound = integrationProperties.getInbound();
+        if (inbound == null || !inbound.isAuthEnabled()) {
+            return;
+        }
+        if (!StringUtils.hasText(inbound.getApiKey()) || !inbound.getApiKey().equals(apiKey)) {
+            throw new JeecgBootBizTipException("ERR_DARWIN_INBOUND_UNAUTHORIZED");
+        }
     }
 }

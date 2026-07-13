@@ -5,6 +5,7 @@ import org.jeecg.modules.commhub.vo.ApiKeyCreateRequest;
 import org.jeecg.modules.commhub.vo.ApiKeyCreateResult;
 import org.jeecg.modules.commhub.vo.ApiKeyDTO;
 import org.jeecg.modules.commhub.vo.ApiKeyListQuery;
+import org.jeecg.modules.commhub.vo.ApiKeyScope;
 
 /**
  * HTTP-MQTT 桥接第三方系统身份管理，见设备通信中台详细设计 4.3.1/4.5。
@@ -24,4 +25,7 @@ public interface IApiKeyService {
      * （{@code ERR_API_KEY_INVALID}/{@code ERR_API_KEY_UNAUTHORIZED}）。
      */
     String assertAuthorized(String rawApiKey, String deviceId, String topicSuffix);
+
+    /** 校验 API Key 有效性并返回其租户/设备范围，供只读轮询类接口做租户隔离。 */
+    ApiKeyScope resolveScope(String rawApiKey);
 }
