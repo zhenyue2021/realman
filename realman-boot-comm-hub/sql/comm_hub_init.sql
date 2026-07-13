@@ -50,7 +50,9 @@ CREATE TABLE `comm_hub_api_key` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='HTTP-MQTT 桥接第三方系统身份，见设备通信中台详细设计 4.3.1/4.5';
 
 CREATE TABLE `comm_hub_topic_route` (
-  `topic_suffix` varchar(64)  NOT NULL COMMENT '设备端向 Topic 后缀（device/{code}/ 之后的部分），如 status/report',
+  `topic_suffix` varchar(256) NOT NULL COMMENT '设备端向 Topic 后缀（device/{code}/ 之后的部分），如 status/report；按 match_type 可为精确值、前缀、Ant pattern 或正则',
+  `match_type`   varchar(16)  NOT NULL DEFAULT 'EXACT' COMMENT 'EXACT / PREFIX / ANT_PATTERN / REGEX；历史精确路由默认 EXACT',
+  `priority`     int          NOT NULL DEFAULT 0 COMMENT '匹配优先级，数值越大越先匹配；同优先级再按匹配类型和模式长度兜底排序',
   `route_type`   varchar(24)  NOT NULL COMMENT 'SSOT_ONLY / SSOT_AND_EVENT / EVENT_ONLY / TOKEN_REFRESH / BRIDGE_ACK / IGNORE',
   `event_kind`   varchar(32)  DEFAULT NULL COMMENT 'SSOT_AND_EVENT / EVENT_ONLY 必填，对应 EventKind 枚举名；其余 route_type 为空',
   `enabled`      tinyint(1)   NOT NULL DEFAULT 1,
@@ -61,13 +63,13 @@ CREATE TABLE `comm_hub_topic_route` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='设备端向 MQTT Topic 路由注册表（原 MqttMessageDispatcher 硬编码 switch，现落库可配置，见详细设计 2.4/已知限制第 6 项）';
 
 -- 初始路由，对应此前硬编码 switch 的既有行为，逐条迁移，行为不变
-INSERT INTO `comm_hub_topic_route` (`topic_suffix`, `route_type`, `event_kind`, `enabled`, `description`) VALUES
-  ('status/report',     'SSOT_ONLY',      NULL,                1, '设备基座内部心跳/占用态同步，不对外发布上行事件'),
-  ('ota/heartbeat',     'SSOT_AND_EVENT', 'HEARTBEAT',         1, 'PRD 心跳接口，同步 SSOT 且对外发布 HEARTBEAT 事件'),
-  ('ota/progress',      'EVENT_ONLY',     'OTA_PROGRESS',      1, 'OTA 升级进度上报，仅归一化为上行事件'),
-  ('ota/status-report', 'EVENT_ONLY',     'OTA_STATUS_REPORT', 1, 'OTA 状态机上报，仅归一化为上行事件'),
-  ('ota/token-refresh', 'TOKEN_REFRESH',  NULL,                1, 'Device Token 续签双向闭环，固定处理逻辑，不可通过 event_kind 配置'),
-  ('bridge-ack',        'BRIDGE_ACK',     NULL,                1, 'HTTP-MQTT 桥接下行指令的设备侧 ACK 回执，固定处理逻辑');
+INSERT INTO `comm_hub_topic_route` (`topic_suffix`, `match_type`, `priority`, `route_type`, `event_kind`, `enabled`, `description`) VALUES
+  ('status/report',     'EXACT', 0, 'SSOT_ONLY',      NULL,                1, '设备基座内部心跳/占用态同步，不对外发布上行事件'),
+  ('ota/heartbeat',     'EXACT', 0, 'SSOT_AND_EVENT', 'HEARTBEAT',         1, 'PRD 心跳接口，同步 SSOT 且对外发布 HEARTBEAT 事件'),
+  ('ota/progress',      'EXACT', 0, 'EVENT_ONLY',     'OTA_PROGRESS',      1, 'OTA 升级进度上报，仅归一化为上行事件'),
+  ('ota/status-report', 'EXACT', 0, 'EVENT_ONLY',     'OTA_STATUS_REPORT', 1, 'OTA 状态机上报，仅归一化为上行事件'),
+  ('ota/token-refresh', 'EXACT', 0, 'TOKEN_REFRESH',  NULL,                1, 'Device Token 续签双向闭环，固定处理逻辑，不可通过 event_kind 配置'),
+  ('bridge-ack',        'EXACT', 0, 'BRIDGE_ACK',     NULL,                1, 'HTTP-MQTT 桥接下行指令的设备侧 ACK 回执，固定处理逻辑');
 
 CREATE TABLE `device_uplink_event_log` (
   `id`           varchar(36)  NOT NULL COMMENT '稳定递增雪花 ID 字符串，作为轮询消费游标',
