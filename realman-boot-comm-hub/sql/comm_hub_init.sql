@@ -87,3 +87,25 @@ CREATE TABLE `device_uplink_event_log` (
   KEY `idx_event_kind_id` (`event_kind`, `id`),
   KEY `idx_tenant_event_kind` (`tenant_id`, `event_kind`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='统一上行事件落库记录（Webhook 推送来源 + 轮询兜底查询）';
+
+CREATE TABLE `webhook_delivery_task` (
+  `id`              varchar(36)  NOT NULL,
+  `event_log_id`    varchar(36)  NOT NULL COMMENT 'device_uplink_event_log.id',
+  `subscription_id` varchar(36)  NOT NULL COMMENT 'webhook_subscription.id',
+  `tenant_id`       varchar(32)  NOT NULL,
+  `callback_url`    varchar(512) NOT NULL,
+  `hmac_secret`     varchar(128) NOT NULL,
+  `request_body`    json         NOT NULL,
+  `status`          varchar(16)  NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING/SENDING/RETRYING/SUCCESS/DEAD',
+  `attempt_count`   int          NOT NULL DEFAULT 0,
+  `max_attempts`    int          NOT NULL DEFAULT 5,
+  `next_retry_at`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `last_error`      varchar(500) DEFAULT NULL,
+  `last_status_code` int         DEFAULT NULL,
+  `created_at`      datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`      datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_status_next_retry` (`status`, `next_retry_at`),
+  KEY `idx_event_subscription` (`event_log_id`, `subscription_id`),
+  KEY `idx_tenant_status` (`tenant_id`, `status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Webhook 持久化投递任务（可恢复重试/审计）';

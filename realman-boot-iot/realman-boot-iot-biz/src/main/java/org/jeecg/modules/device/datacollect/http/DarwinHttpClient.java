@@ -8,6 +8,7 @@ import org.jeecg.modules.device.datacollect.dto.mq.DeviceStatusMsg;
 import org.jeecg.modules.device.datacollect.dto.mq.FileAddressReportMsg;
 import org.jeecg.modules.device.datacollect.dto.mq.OssAuthRequestMsg;
 import org.jeecg.modules.device.datacollect.dto.mq.OssAuthResponseMsg;
+import org.jeecg.modules.device.datacollect.entity.DarwinHttpOutbox;
 import org.jeecg.modules.device.datacollect.log.MqMessageLogService;
 import org.jeecg.modules.device.datacollect.outbox.DarwinHttpOutbox;
 import org.jeecg.modules.device.datacollect.outbox.DarwinHttpOutboxService;
@@ -24,6 +25,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -51,17 +53,20 @@ public class DarwinHttpClient {
     private final MqMessageLogService mqMessageLogService;
     private final DarwinHttpOutboxService outboxService;
     private final ObjectMapper objectMapper;
+    private final DarwinHttpOutboxMapper outboxMapper;
     private final RestTemplate restTemplate;
 
     public DarwinHttpClient(DataCollectIntegrationProperties properties,
                              MqMessageLogService mqMessageLogService,
                              DarwinHttpOutboxService outboxService,
                              ObjectMapper objectMapper,
+                             DarwinHttpOutboxMapper outboxMapper,
                              RestTemplateBuilder builder) {
         this.properties = properties;
         this.mqMessageLogService = mqMessageLogService;
         this.outboxService = outboxService;
         this.objectMapper = objectMapper;
+        this.outboxMapper = outboxMapper;
         this.restTemplate = builder
                 .connectTimeout(Duration.ofMillis(properties.getHttp().getConnectTimeoutMs()))
                 .readTimeout(Duration.ofMillis(properties.getHttp().getReadTimeoutMs()))

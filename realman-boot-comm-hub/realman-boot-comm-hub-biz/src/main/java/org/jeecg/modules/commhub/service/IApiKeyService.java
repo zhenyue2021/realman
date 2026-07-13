@@ -5,6 +5,7 @@ import org.jeecg.modules.commhub.vo.ApiKeyCreateRequest;
 import org.jeecg.modules.commhub.vo.ApiKeyCreateResult;
 import org.jeecg.modules.commhub.vo.ApiKeyDTO;
 import org.jeecg.modules.commhub.vo.ApiKeyListQuery;
+import org.jeecg.modules.commhub.vo.ApiKeyScope;
 import org.jeecg.modules.commhub.vo.ApiKeyAuthContext;
 
 /**

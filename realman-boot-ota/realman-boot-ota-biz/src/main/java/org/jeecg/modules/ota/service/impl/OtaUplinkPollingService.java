@@ -104,6 +104,9 @@ public class OtaUplinkPollingService {
             if (event.getEventId() != null && (maxEventId == null || event.getEventId().compareTo(maxEventId) > 0)) {
                 maxEventId = event.getEventId();
             }
+            if (event.getEventId() != null && (maxEventId == null || event.getEventId().compareTo(maxEventId) > 0)) {
+                maxEventId = event.getEventId();
+            }
         }
         if (batchSucceeded && lastProcessedId != null && !lastProcessedId.equals(afterId)) {
             saveCursor(eventKind, lastProcessedId);
