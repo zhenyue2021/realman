@@ -36,6 +36,14 @@ public class DataCollectIntegrationProperties {
      * device-status}），需要与达尔文平台侧对接确认后再调整，不代表已验证的真实接口。
      */
     @Data
+    public static class Inbound {
+        /** 是否要求 Darwin 回调携带固定 API Key。生产环境建议开启。 */
+        private boolean authEnabled = false;
+        private String apiKeyHeader = "X-Darwin-Api-Key";
+        private String apiKey = "";
+    }
+
+    @Data
     public static class Http {
         private String baseUrl = "";
         /** 出站请求鉴权头名称，真实方案待达尔文平台侧确认，先假设为固定 API Key 请求头。 */

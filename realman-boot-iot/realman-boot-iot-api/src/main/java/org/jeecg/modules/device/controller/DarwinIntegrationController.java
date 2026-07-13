@@ -17,8 +17,10 @@ import org.jeecg.modules.device.service.workorder.IWorkOrderAttachmentService;
 import org.jeecg.modules.device.service.workorder.IWorkOrderService;
 import org.jeecg.modules.device.vo.ApiResult;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 

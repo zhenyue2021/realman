@@ -101,6 +101,9 @@ public class OtaUplinkPollingService {
                         event.getEventId(), event.getDeviceCode(), e.getMessage());
                 break;
             }
+            if (event.getEventId() != null && (maxEventId == null || event.getEventId().compareTo(maxEventId) > 0)) {
+                maxEventId = event.getEventId();
+            }
         }
         if (batchSucceeded && lastProcessedId != null && !lastProcessedId.equals(afterId)) {
             saveCursor(eventKind, lastProcessedId);
@@ -127,6 +130,16 @@ public class OtaUplinkPollingService {
             cursorMapper.upsertIfAfter(eventKind, newCursor);
         } catch (Exception e) {
             log.warn("[ota] 轮询游标持久化失败 eventKind={}: {}", eventKind, e.getMessage());
+        }
+    }
+
+    private void saveCursor(String eventKind, LocalDateTime newCursor, String newCursorId) {
+        cursorCache.put(eventKind, newCursor);
+        cursorIdCache.put(eventKind, newCursorId);
+        try {
+            cursorMapper.upsertIfIdAfter(eventKind, newCursor, newCursorId);
+        } catch (Exception e) {
+            log.warn("[ota] 轮询 ID 游标持久化失败 eventKind={}: {}", eventKind, e.getMessage());
         }
     }
 

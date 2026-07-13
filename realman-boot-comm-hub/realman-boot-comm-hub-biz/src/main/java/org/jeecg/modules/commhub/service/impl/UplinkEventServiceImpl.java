@@ -122,6 +122,7 @@ public class UplinkEventServiceImpl implements IUplinkEventService {
         LambdaQueryWrapper<DeviceUplinkEventLog> wrapper = Wrappers.<DeviceUplinkEventLog>lambdaQuery()
                 .eq(StringUtils.hasText(query.getTenantId()), DeviceUplinkEventLog::getTenantId, query.getTenantId())
                 .eq(StringUtils.hasText(query.getDeviceId()), DeviceUplinkEventLog::getDeviceId, query.getDeviceId())
+                .eq(StringUtils.hasText(query.getTenantId()), DeviceUplinkEventLog::getTenantId, query.getTenantId())
                 .eq(StringUtils.hasText(query.getEventKind()), DeviceUplinkEventLog::getEventKind, query.getEventKind())
                 .ge(query.getSince() != null, DeviceUplinkEventLog::getReportedAt, query.getSince())
                 .gt(StringUtils.hasText(query.getAfterId()), DeviceUplinkEventLog::getId, query.getAfterId())

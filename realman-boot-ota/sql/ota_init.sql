@@ -123,7 +123,8 @@ CREATE TABLE `ota_uplink_poll_cursor` (
   `cursor_at`  datetime    DEFAULT NULL COMMENT '历史 reportedAt 游标，仅兼容旧数据，不再作为消费位点',
   `cursor_id`  varchar(36) DEFAULT NULL COMMENT '最后成功扫描的上行事件日志稳定 ID 游标',
   `updated_at` datetime    DEFAULT NULL,
-  PRIMARY KEY (`event_kind`)
+  PRIMARY KEY (`event_kind`),
+  KEY `idx_cursor_id` (`cursor_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='上行事件轮询游标持久化，按 eventKind 各自维护，修复此前内存游标不持久/多实例不安全的已知限制';
 
 -- 17 项系统设置初始默认值（对齐详细设计第十章 / PRD 9.9）

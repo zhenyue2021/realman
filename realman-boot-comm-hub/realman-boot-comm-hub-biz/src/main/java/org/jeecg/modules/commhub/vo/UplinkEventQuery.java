@@ -20,6 +20,15 @@ public class UplinkEventQuery implements Serializable {
 
     private String deviceId;
 
+    /** 服务端注入的租户过滤条件，不允许第三方自行越权指定。 */
+    private String tenantId;
+
+    /** 服务端注入的设备范围，包含 deviceId 或 deviceCode；null 表示不限制。 */
+    private List<String> authorizedDevices;
+
+    /** 稳定增量游标：只返回 id 大于该值的事件。 */
+    private String afterId;
+
     private String eventKind;
 
     private String tenantId;
