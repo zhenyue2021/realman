@@ -10,6 +10,12 @@ import lombok.Data;
 @Builder
 public class DeviceProvisionResponseDTO {
 
+    /** 业务码：0=新注册 1=幂等返回；40001+ 为业务失败，见 DeviceProvisionBizCode */
+    private int bizCode;
+
+    /** 业务描述，供日志/调试；设备端应以 bizCode 为准 */
+    private String bizMessage;
+
     /** 平台分配的设备编码（MQTT clientId / username） */
     private String deviceCode;
 

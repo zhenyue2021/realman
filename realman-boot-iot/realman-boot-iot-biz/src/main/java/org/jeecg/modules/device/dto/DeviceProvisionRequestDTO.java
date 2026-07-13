@@ -7,8 +7,8 @@ import lombok.Data;
 /**
  * 设备 HTTP 自注册请求体。
  *
- * <p>签名规则：{@code sign = Md5Util.md5Encode(deviceCode + "|" + macAddress + "|" + timestamp, "UTF_8").toUpperCase()}
- * <p>deviceCode、macAddress 均以设备上传为准（仅 trim），签名与入库使用相同字符串。
+ * <p>签名规则：{@code sign = MD5(deviceCode + "|" + macAddress + "|" + timestamp).toUpperCase()}
+ * <p>uniqueness 唯一性：以 deviceCode 为准，macAddress 仅作信息存档，不再参与唯一性判断。
  */
 @Data
 public class DeviceProvisionRequestDTO {
