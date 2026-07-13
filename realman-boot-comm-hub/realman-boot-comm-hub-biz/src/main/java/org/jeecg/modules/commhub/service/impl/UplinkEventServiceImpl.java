@@ -42,7 +42,7 @@ public class UplinkEventServiceImpl implements IUplinkEventService {
     @Override
     public void ingest(DeviceUplinkEvent event) {
         DeviceUplinkEventLog entry = new DeviceUplinkEventLog();
-        entry.setId(IdUtil.fastSimpleUUID());
+        entry.setId(IdUtil.getSnowflakeNextIdStr());
         entry.setDeviceId(event.getDeviceId());
         entry.setDeviceCode(event.getDeviceCode());
         entry.setDeviceType(event.getDeviceType() == null ? null : event.getDeviceType().name());
@@ -123,6 +123,9 @@ public class UplinkEventServiceImpl implements IUplinkEventService {
                 .eq(StringUtils.hasText(query.getTenantId()), DeviceUplinkEventLog::getTenantId, query.getTenantId())
                 .eq(StringUtils.hasText(query.getDeviceId()), DeviceUplinkEventLog::getDeviceId, query.getDeviceId())
                 .eq(StringUtils.hasText(query.getEventKind()), DeviceUplinkEventLog::getEventKind, query.getEventKind())
+                .ge(query.getSince() != null, DeviceUplinkEventLog::getReportedAt, query.getSince())
+                .gt(StringUtils.hasText(query.getAfterId()), DeviceUplinkEventLog::getId, query.getAfterId())
+                .orderByAsc(DeviceUplinkEventLog::getId));
                 .ge(query.getSince() != null, DeviceUplinkEventLog::getReportedAt, query.getSince());
         if (!CollectionUtils.isEmpty(query.getDeviceScope())) {
             wrapper.and(scope -> scope.in(DeviceUplinkEventLog::getDeviceId, query.getDeviceScope())

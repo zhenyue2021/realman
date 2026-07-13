@@ -28,4 +28,7 @@ public class UplinkEventQuery implements Serializable {
     private List<String> deviceScope;
 
     private LocalDateTime since;
+
+    /** 稳定消费游标：只返回 id 大于该值的事件；reportedAt 仅作为业务时间过滤。 */
+    private String afterId;
 }
