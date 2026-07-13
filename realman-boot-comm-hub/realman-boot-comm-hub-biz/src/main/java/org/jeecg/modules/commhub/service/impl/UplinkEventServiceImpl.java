@@ -40,7 +40,7 @@ public class UplinkEventServiceImpl implements IUplinkEventService {
     @Override
     public void ingest(DeviceUplinkEvent event) {
         DeviceUplinkEventLog entry = new DeviceUplinkEventLog();
-        entry.setId(IdUtil.fastSimpleUUID());
+        entry.setId(IdUtil.getSnowflakeNextIdStr());
         entry.setDeviceId(event.getDeviceId());
         entry.setDeviceCode(event.getDeviceCode());
         entry.setDeviceType(event.getDeviceType() == null ? null : event.getDeviceType().name());
@@ -119,7 +119,8 @@ public class UplinkEventServiceImpl implements IUplinkEventService {
                 .eq(StringUtils.hasText(query.getDeviceId()), DeviceUplinkEventLog::getDeviceId, query.getDeviceId())
                 .eq(StringUtils.hasText(query.getEventKind()), DeviceUplinkEventLog::getEventKind, query.getEventKind())
                 .ge(query.getSince() != null, DeviceUplinkEventLog::getReportedAt, query.getSince())
-                .orderByDesc(DeviceUplinkEventLog::getReportedAt));
+                .gt(StringUtils.hasText(query.getAfterId()), DeviceUplinkEventLog::getId, query.getAfterId())
+                .orderByAsc(DeviceUplinkEventLog::getId));
 
         List<UplinkEventDTO> records = pageResult.getRecords().stream().map(this::toDTO).collect(Collectors.toList());
         return new PageResult<>(records, pageResult.getTotal(), query.getPageNo(), query.getPageSize());

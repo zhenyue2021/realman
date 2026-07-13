@@ -52,7 +52,7 @@ INSERT INTO `comm_hub_topic_route` (`topic_suffix`, `route_type`, `event_kind`, 
   ('bridge-ack',        'BRIDGE_ACK',     NULL,                1, 'HTTP-MQTT 桥接下行指令的设备侧 ACK 回执，固定处理逻辑');
 
 CREATE TABLE `device_uplink_event_log` (
-  `id`           varchar(36)  NOT NULL,
+  `id`           varchar(36)  NOT NULL COMMENT '稳定递增雪花 ID 字符串，作为轮询消费游标',
   `device_id`    varchar(36)  DEFAULT NULL,
   `device_code`  varchar(64)  DEFAULT NULL,
   `device_type`  varchar(20)  DEFAULT NULL,
@@ -64,5 +64,6 @@ CREATE TABLE `device_uplink_event_log` (
   `created_at`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_device_reported_at` (`device_id`, `reported_at`),
+  KEY `idx_event_kind_id` (`event_kind`, `id`),
   KEY `idx_tenant_event_kind` (`tenant_id`, `event_kind`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='统一上行事件落库记录（Webhook 推送来源 + 轮询兜底查询）';

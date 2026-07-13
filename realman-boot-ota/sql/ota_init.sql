@@ -120,7 +120,8 @@ CREATE TABLE `ota_system_setting` (
 
 CREATE TABLE `ota_uplink_poll_cursor` (
   `event_kind` varchar(32) NOT NULL COMMENT 'OTA_PROGRESS / OTA_STATUS_REPORT，各自独立游标',
-  `cursor_at`  datetime    NOT NULL,
+  `cursor_at`  datetime    DEFAULT NULL COMMENT '历史 reportedAt 游标，仅兼容旧数据，不再作为消费位点',
+  `cursor_id`  varchar(36) DEFAULT NULL COMMENT '最后成功扫描的上行事件日志稳定 ID 游标',
   `updated_at` datetime    DEFAULT NULL,
   PRIMARY KEY (`event_kind`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='上行事件轮询游标持久化，按 eventKind 各自维护，修复此前内存游标不持久/多实例不安全的已知限制';
