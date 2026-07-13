@@ -40,6 +40,7 @@ import java.util.concurrent.TimeoutException;
 public class MqttPublisher {
 
     private static final String CLAIM_COMMAND_ID = "commandId";
+    private static final long DEFAULT_ACK_TIMEOUT_MS = 10_000L;
 
     private final MqttClient publishClient;
     private final MqttAckPendingService ackPendingService;
@@ -74,9 +75,18 @@ public class MqttPublisher {
             return result;
         }
 
-        CompletableFuture<String> future = ackPendingService.register(commandId);
-        publishRaw(topic, bodyJson, request.getQos());
-        long timeoutMs = request.getAckTimeoutMs() != null ? request.getAckTimeoutMs() : 10_000L;
+        long timeoutMs = request.getAckTimeoutMs() != null ? request.getAckTimeoutMs() : DEFAULT_ACK_TIMEOUT_MS;
+        String ackTopicSuffix = defaultIfBlank(request.getAckTopicSuffix(), CommHubTopicConstants.TOPIC_BRIDGE_ACK);
+        String ackCommandIdField = defaultIfBlank(request.getAckCommandIdField(), CLAIM_COMMAND_ID);
+        CompletableFuture<String> future = ackPendingService.register(commandId, ackTopicSuffix, ackCommandIdField, timeoutMs);
+        log.debug("[comm-hub] register pending ACK commandId={} ackTopicSuffix={} ackCommandIdField={}",
+                commandId, ackTopicSuffix, ackCommandIdField);
+        try {
+            publishRaw(topic, bodyJson, request.getQos());
+        } catch (RuntimeException e) {
+            ackPendingService.abandon(commandId);
+            throw e;
+        }
         try {
             String ackJson = future.get(timeoutMs, TimeUnit.MILLISECONDS);
             result.setStatus("ACKED");
@@ -124,6 +134,10 @@ public class MqttPublisher {
             log.warn("[comm-hub] 下行载荷序列化失败，退化为仅 commandId: {}", e.getMessage());
             return "{\"" + CLAIM_COMMAND_ID + "\":\"" + commandId + "\"}";
         }
+    }
+
+    private String defaultIfBlank(String value, String defaultValue) {
+        return value == null || value.isBlank() ? defaultValue : value.trim();
     }
 
     private Map<String, Object> parseAckPayload(String ackJson) {

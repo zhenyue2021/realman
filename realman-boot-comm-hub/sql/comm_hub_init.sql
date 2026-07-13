@@ -49,7 +49,7 @@ INSERT INTO `comm_hub_topic_route` (`topic_suffix`, `route_type`, `event_kind`, 
   ('ota/progress',      'EVENT_ONLY',     'OTA_PROGRESS',      1, 'OTA 升级进度上报，仅归一化为上行事件'),
   ('ota/status-report', 'EVENT_ONLY',     'OTA_STATUS_REPORT', 1, 'OTA 状态机上报，仅归一化为上行事件'),
   ('ota/token-refresh', 'TOKEN_REFRESH',  NULL,                1, 'Device Token 续签双向闭环，固定处理逻辑，不可通过 event_kind 配置'),
-  ('bridge-ack',        'BRIDGE_ACK',     NULL,                1, 'HTTP-MQTT 桥接下行指令的设备侧 ACK 回执，固定处理逻辑');
+  ('bridge-ack',        'BRIDGE_ACK',     NULL,                1, 'HTTP-MQTT 桥接下行指令默认 ACK：device/{deviceCode}/bridge-ack，JSON commandId 关联；自定义 ACK Topic 使用 bridge-ack/vN 版本化后缀');
 
 CREATE TABLE `device_uplink_event_log` (
   `id`           varchar(36)  NOT NULL,
