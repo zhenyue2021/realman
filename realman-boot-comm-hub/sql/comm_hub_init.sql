@@ -16,6 +16,24 @@ CREATE TABLE `webhook_subscription` (
   KEY `idx_tenant_status` (`tenant_id`, `status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='上行事件 Webhook 订阅';
 
+
+CREATE TABLE `webhook_delivery_task` (
+  `id`              varchar(36)  NOT NULL,
+  `event_log_id`    varchar(36)  NOT NULL COMMENT '关联 device_uplink_event_log.id',
+  `subscription_id` varchar(36)  NOT NULL COMMENT '关联 webhook_subscription.id',
+  `callback_url`    varchar(512) NOT NULL COMMENT '任务创建时订阅回调地址快照',
+  `status`          varchar(16)  NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING / SENDING / RETRYING / SUCCESS / FAILED',
+  `attempt_count`   int          NOT NULL DEFAULT 0 COMMENT '已执行 HTTP 推送次数',
+  `next_retry_at`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '下一次可扫描投递时间',
+  `last_error`      varchar(1024) DEFAULT NULL COMMENT '最近一次失败原因',
+  `created_at`      datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`      datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_status_next_retry` (`status`, `next_retry_at`),
+  KEY `idx_event_log_id` (`event_log_id`),
+  KEY `idx_subscription_id` (`subscription_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Webhook 异步投递任务（定时扫描 + 持久化退避重试）';
+
 CREATE TABLE `comm_hub_api_key` (
   `id`                  varchar(36)  NOT NULL,
   `tenant_id`           varchar(32)  NOT NULL,
