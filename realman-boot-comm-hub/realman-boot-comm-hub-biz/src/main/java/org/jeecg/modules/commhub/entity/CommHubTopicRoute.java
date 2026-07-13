@@ -25,6 +25,14 @@ public class CommHubTopicRoute implements Serializable {
     @TableId("topic_suffix")
     private String topicSuffix;
 
+    /** EXACT / PREFIX / ANT_PATTERN / REGEX；历史数据为空时按 EXACT 处理 */
+    @TableField("match_type")
+    private String matchType;
+
+    /** 数值越大优先级越高；多条规则同时命中时先按 priority 选择 */
+    @TableField("priority")
+    private Integer priority;
+
     /** SSOT_ONLY / SSOT_AND_EVENT / EVENT_ONLY / TOKEN_REFRESH / BRIDGE_ACK / IGNORE */
     @TableField("route_type")
     private String routeType;
