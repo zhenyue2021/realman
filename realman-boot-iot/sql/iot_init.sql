@@ -261,6 +261,22 @@ CREATE TABLE `iot_mq_message_log` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='MQ 消息收发日志';
 
 
+
+CREATE TABLE `darwin_http_outbox` (
+                                      `id` varchar(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '主键',
+                                      `path` varchar(256) NOT NULL COMMENT 'Darwin HTTP 接口路径',
+                                      `request_body` mediumtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '请求体 JSON',
+                                      `device_code` varchar(64) DEFAULT NULL COMMENT '设备编码',
+                                      `status` varchar(32) NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING/FAILED_RETRYABLE/SUCCEEDED',
+                                      `attempt_count` int NOT NULL DEFAULT '0' COMMENT '已补偿尝试次数',
+                                      `next_retry_at` datetime NOT NULL COMMENT '下次补偿时间',
+                                      `last_error` text COMMENT '最近一次失败原因',
+                                      `created_at` datetime NOT NULL COMMENT '创建时间',
+                                      PRIMARY KEY (`id`),
+                                      KEY `idx_status_next_retry` (`status`, `next_retry_at`),
+                                      KEY `idx_device_code` (`device_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Darwin HTTP 出站补偿 outbox';
+
 -- `realman-boot`.iot_robot_slam_binding 定义
 
 CREATE TABLE `iot_robot_slam_binding` (
@@ -550,9 +566,6 @@ CREATE TABLE `darwin_http_outbox` (
   `max_attempts`   int NOT NULL DEFAULT 8,
   `next_retry_at`  datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `last_error`     varchar(500) DEFAULT NULL,
-  `locked_by`      varchar(128) DEFAULT NULL,
-  `locked_at`      datetime DEFAULT NULL,
-  `lock_expire_at` datetime DEFAULT NULL,
   `created_at`     datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at`     datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),

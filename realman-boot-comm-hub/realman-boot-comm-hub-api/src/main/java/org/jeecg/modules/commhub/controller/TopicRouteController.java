@@ -42,6 +42,7 @@ public class TopicRouteController {
     @RequiresPermissions("commHub:topicRoute:manage")
     @Operation(summary = "新增/编辑路由（topicSuffix 已存在则覆盖），立即生效")
     public Result<Void> upsert(@RequestBody CommHubTopicRoute route, HttpServletRequest httpRequest) {
+        topicRouteRegistry.validateRoute(route);
         topicRouteRegistry.upsert(route, RequestUtil.safeUsername(httpRequest));
         return Result.ok();
     }

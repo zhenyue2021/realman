@@ -31,5 +31,13 @@ public class UplinkEventQuery implements Serializable {
 
     private String eventKind;
 
+    private String tenantId;
+
+    /** 授权设备范围，支持 deviceId 或 deviceCode；为空表示租户下不限设备。 */
+    private List<String> deviceScope;
+
     private LocalDateTime since;
+
+    /** 稳定消费游标：只返回 id 大于该值的事件；reportedAt 仅作为业务时间过滤。 */
+    private String afterId;
 }

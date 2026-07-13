@@ -46,9 +46,13 @@ public final class CommHubTopicConstants {
 
     /**
      * HTTP-MQTT 桥接统一 ACK 回执 Topic 后缀（上行）。无论下行通过哪个
-     * {@code topicSuffix} 发布，设备统一在此 Topic 回 ACK，payload 内的
-     * {@code commandId} 字段与下行请求一一对应，供 publish-and-wait 关联。
-     * 见设备通信中台详细设计 4.3.1。
+     * {@code topicSuffix} 发布，默认要求设备向 {@code device/{deviceCode}/bridge-ack}
+     * 上报 JSON，且 JSON 内 {@code commandId} 字段必须与下行请求一一对应，
+     * 供 publish-and-wait 关联。若设备族确需差异化协议，可在下行请求中显式
+     * 指定 {@code ackTopicSuffix}/{@code ackCommandIdField}，并在
+     * {@code comm_hub_topic_route} 为对应 ACK Topic 后缀配置 {@code BRIDGE_ACK}。
+     * 自定义 ACK Topic 应采用版本化后缀（如 {@code bridge-ack/v2}），避免
+     * 与默认契约语义漂移。见设备通信中台详细设计 4.3.1。
      */
     public static final String TOPIC_BRIDGE_ACK = "bridge-ack";
 

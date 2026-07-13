@@ -21,10 +21,10 @@ public class UplinkEventPollQuery implements Serializable {
     @Schema(description = "事件种类过滤，缺省不过滤")
     private String eventKind;
 
-    @Schema(description = "只返回该时间之后上报的事件（不含等于），缺省不过滤；推荐新消费方优先使用 afterId")
+    @Schema(description = "业务时间下限过滤；不作为唯一消费位点，缺省不过滤")
     private LocalDateTime since;
 
-    @Schema(description = "稳定增量游标：只返回 id 大于该值的事件，避免 reportedAt 同秒重复/漏读")
+    @Schema(description = "稳定消费游标：只返回事件日志 id 大于该值的记录，缺省从最早记录开始")
     private String afterId;
 
     @Schema(description = "单次最多返回条数，默认 200")

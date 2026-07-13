@@ -6,7 +6,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.jeecg.modules.device.datacollect.entity.DarwinHttpOutbox;
 import org.jeecg.modules.device.datacollect.http.DarwinHttpClient;
 import org.jeecg.modules.device.datacollect.mapper.DarwinHttpOutboxMapper;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -20,29 +19,21 @@ import java.util.List;
 @ConditionalOnProperty(prefix = "darwin.integration", name = "http-enabled", havingValue = "true")
 public class DarwinHttpOutboxWorker {
 
+    private static final int BATCH_SIZE = 50;
     private static final int DEFAULT_MAX_ATTEMPTS = 8;
     private static final long[] BACKOFF_SECONDS = {60L, 120L, 300L, 600L, 1800L, 3600L, 7200L};
-
-    @Value("${darwin.integration.outbox.batch-size:50}")
-    private int batchSize;
-    @Value("${darwin.integration.outbox.lock-ttl-seconds:120}")
-    private long lockTtlSeconds;
-    @Value("${spring.application.name:iot}")
-    private String instanceId;
 
     private final DarwinHttpOutboxMapper outboxMapper;
     private final DarwinHttpClient darwinHttpClient;
 
-    @Scheduled(fixedDelayString = "${darwin.integration.outbox.fixed-delay-ms:10000}")
+    @Scheduled(fixedDelay = 10000L)
     public void replayDueOutbox() {
         LocalDateTime now = LocalDateTime.now();
         List<DarwinHttpOutbox> records = outboxMapper.selectList(Wrappers.<DarwinHttpOutbox>lambdaQuery()
-                .and(w -> w.in(DarwinHttpOutbox::getStatus, "PENDING", "RETRYING")
-                        .le(DarwinHttpOutbox::getNextRetryAt, now)
-                        .or(o -> o.eq(DarwinHttpOutbox::getStatus, "SENDING")
-                                .lt(DarwinHttpOutbox::getLockExpireAt, now)))
+                .in(DarwinHttpOutbox::getStatus, "PENDING", "RETRYING")
+                .le(DarwinHttpOutbox::getNextRetryAt, now)
                 .orderByAsc(DarwinHttpOutbox::getNextRetryAt)
-                .last("LIMIT " + batchSize));
+                .last("LIMIT " + BATCH_SIZE));
         for (DarwinHttpOutbox record : records) {
             processOne(record);
         }
@@ -72,16 +63,10 @@ public class DarwinHttpOutboxWorker {
     }
 
     private boolean claim(String id) {
-        LocalDateTime now = LocalDateTime.now();
         return outboxMapper.update(null, Wrappers.<DarwinHttpOutbox>lambdaUpdate()
                 .set(DarwinHttpOutbox::getStatus, "SENDING")
-                .set(DarwinHttpOutbox::getLockedBy, instanceId)
-                .set(DarwinHttpOutbox::getLockedAt, now)
-                .set(DarwinHttpOutbox::getLockExpireAt, now.plusSeconds(lockTtlSeconds))
                 .eq(DarwinHttpOutbox::getId, id)
-                .and(w -> w.in(DarwinHttpOutbox::getStatus, "PENDING", "RETRYING")
-                        .or(o -> o.eq(DarwinHttpOutbox::getStatus, "SENDING")
-                                .lt(DarwinHttpOutbox::getLockExpireAt, now)))) == 1;
+                .in(DarwinHttpOutbox::getStatus, "PENDING", "RETRYING")) == 1;
     }
 
     private static int safe(Integer value) {

@@ -13,7 +13,9 @@ import org.jeecg.modules.deviceinfo.contract.dto.PageResult;
 import org.jeecg.modules.commhub.service.IApiKeyService;
 import org.jeecg.modules.commhub.vo.ApiKeyScope;
 import org.jeecg.modules.deviceinfo.contract.enums.DeviceType;
+import org.jeecg.modules.commhub.service.IApiKeyService;
 import org.jeecg.modules.commhub.service.IUplinkEventService;
+import org.jeecg.modules.commhub.vo.ApiKeyAuthContext;
 import org.jeecg.modules.commhub.vo.UplinkEventDTO;
 import org.jeecg.modules.commhub.vo.UplinkEventQuery;
 import org.springframework.util.StringUtils;
@@ -26,9 +28,10 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * 上行事件轮询兜底通道：第三方不便接收 Webhook 时，定时轮询本接口获取增量事件，
- * 见设备通信中台详细设计 4.3.2。{@link #pollInternal} 是同一份落库数据的内部
- * Feign 版本，供 OTA 等业务服务消费，见 OTA 平台详细设计第二章协议映射表。
+ * 上行事件轮询兜底通道：第三方不便接收 Webhook 时，通过对外接口携带
+ * {@code X-Api-Key} 获取其租户与设备授权范围内的增量事件，见设备通信中台详细设计 4.3.2。
+ * {@link #pollInternal} 是同一份落库数据的内部 Feign 版本，供 OTA 等业务服务消费，
+ * 不复用对外 API Key 鉴权路径，见 OTA 平台详细设计第二章协议映射表。
  */
 @RestController
 @RequiredArgsConstructor
@@ -41,12 +44,12 @@ public class UplinkEventController {
     private final IApiKeyService apiKeyService;
 
     @GetMapping("/api/v1/devices/uplink-events")
-    @Operation(summary = "上行事件轮询查询（对外）")
+    @Operation(summary = "上行事件轮询查询（第三方，需 X-Api-Key，按租户和设备范围过滤）")
     public Result<PageResult<UplinkEventDTO>> queryPage(UplinkEventQuery query,
-                                                          @RequestHeader(HEADER_API_KEY) String apiKey) {
-        ApiKeyScope scope = apiKeyService.resolveScope(apiKey);
-        query.setTenantId(scope.getTenantId());
-        query.setAuthorizedDevices(parseScope(scope.getDeviceScope()));
+                                                         @RequestHeader(HEADER_API_KEY) String apiKey) {
+        ApiKeyAuthContext authContext = apiKeyService.authenticatePolling(apiKey, query.getDeviceId());
+        query.setTenantId(authContext.getTenantId());
+        query.setDeviceScope(authContext.getDeviceScope());
         return Result.ok(uplinkEventService.queryPage(query));
     }
 
