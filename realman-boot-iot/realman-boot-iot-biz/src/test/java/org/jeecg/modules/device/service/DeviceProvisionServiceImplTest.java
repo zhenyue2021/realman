@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.jeecg.common.util.Md5Util;
 import org.jeecg.modules.device.config.DeviceProvisionProperties;
 import org.jeecg.modules.device.constant.DeviceConstant;
+import org.jeecg.modules.device.constant.DeviceProvisionBizCode;
 import org.jeecg.modules.device.dto.DeviceProvisionRequestDTO;
 import org.jeecg.modules.device.dto.DeviceProvisionResponseDTO;
 import org.jeecg.modules.device.entity.IotDevice;
@@ -21,7 +22,6 @@ import java.time.Instant;
 import java.util.Locale;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -68,6 +68,8 @@ class DeviceProvisionServiceImplTest {
 
         DeviceProvisionResponseDTO response = service.provision(buildValidRequest());
 
+        assertThat(response.getBizCode()).isEqualTo(DeviceProvisionBizCode.REGISTERED_NEW.getCode());
+        assertThat(response.getBizMessage()).isEqualTo("设备注册成功");
         assertThat(response.getDeviceCode()).isEqualTo(DEVICE_CODE);
         assertThat(response.getMqttPassword()).isEqualTo("md5-secret");
         assertThat(response.isNewlyRegistered()).isTrue();
@@ -96,6 +98,8 @@ class DeviceProvisionServiceImplTest {
 
         DeviceProvisionResponseDTO response = service.provision(buildValidRequest());
 
+        assertThat(response.getBizCode()).isEqualTo(DeviceProvisionBizCode.ALREADY_REGISTERED.getCode());
+        assertThat(response.getBizMessage()).isEqualTo("设备已注册");
         assertThat(response.isNewlyRegistered()).isFalse();
         verify(lifecycleService, never()).addDevice(any());
     }
@@ -106,9 +110,10 @@ class DeviceProvisionServiceImplTest {
         DeviceProvisionRequestDTO request = buildValidRequest();
         request.setSign("bad-sign");
 
-        assertThatThrownBy(() -> service.provision(request))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("签名校验失败");
+        DeviceProvisionResponseDTO response = service.provision(request);
+
+        assertThat(response.getBizCode()).isEqualTo(DeviceProvisionBizCode.SIGN_INVALID.getCode());
+        assertThat(response.getBizMessage()).isEqualTo("签名校验失败");
     }
 
     @Test
@@ -116,9 +121,10 @@ class DeviceProvisionServiceImplTest {
     void provisionRejectsWhenDisabled() {
         properties.setEnabled(false);
 
-        assertThatThrownBy(() -> service.provision(buildValidRequest()))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("未启用");
+        DeviceProvisionResponseDTO response = service.provision(buildValidRequest());
+
+        assertThat(response.getBizCode()).isEqualTo(DeviceProvisionBizCode.PROVISION_DISABLED.getCode());
+        assertThat(response.getBizMessage()).contains("未启用");
     }
 
     private DeviceProvisionRequestDTO buildValidRequest() {

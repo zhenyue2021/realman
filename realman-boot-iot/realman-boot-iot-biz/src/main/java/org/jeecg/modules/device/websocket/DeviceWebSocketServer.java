@@ -251,6 +251,16 @@ public class DeviceWebSocketServer implements MessageListener {
     }
 
     /**
+     * 推送绑定机器人上线通知给主控（由 DeviceOnlineReportHandler 在收到 datacollect/deviceOnline 后调用）
+     *
+     * @param masterCode 主控 deviceCode
+     * @param robotJson  机器人设备 JSON（IotDevice 序列化结果）
+     */
+    public void pushRobotOnlineToMaster(String masterCode, String robotJson) {
+        redisPublish(masterCode, buildMsg(DeviceConstant.WebSocketType.ROBOT_ONLINE_STATUS, masterCode, robotJson));
+    }
+
+    /**
      * 推送 WebRTC 信令服务重启事件（由 WebRtcRestartHandler 在收到 device/{deviceCode}/webrtc/restart 后调用）
      *
      * @param deviceCode   设备编码

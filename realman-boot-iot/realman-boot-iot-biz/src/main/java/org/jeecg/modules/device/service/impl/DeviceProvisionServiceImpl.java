@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jeecg.common.util.Md5Util;
 import org.jeecg.modules.device.config.DeviceProvisionProperties;
 import org.jeecg.modules.device.constant.DeviceConstant;
+import org.jeecg.modules.device.constant.DeviceProvisionBizCode;
 import org.jeecg.modules.device.dto.DeviceProvisionRequestDTO;
 import org.jeecg.modules.device.dto.DeviceProvisionResponseDTO;
 import org.jeecg.modules.device.entity.IotDevice;
@@ -48,26 +49,50 @@ public class DeviceProvisionServiceImpl implements IDeviceProvisionService {
     @Transactional(rollbackFor = Exception.class)
     public DeviceProvisionResponseDTO provision(DeviceProvisionRequestDTO request) {
         if (!provisionProperties.isEnabled()) {
-            throw new IllegalStateException("设备自注册功能未启用");
+            return bizError(DeviceProvisionBizCode.PROVISION_DISABLED);
         }
 
         String deviceCode = normalizeDeviceCode(request.getDeviceCode());
+        if (deviceCode == null) {
+            return bizError(DeviceProvisionBizCode.VALIDATION_ERROR, "deviceCode 不能为空");
+        }
+
         String macAddress = requireMacAddress(request.getMacAddress());
-        int deviceType = parseDeviceType(request.getDeviceType());
+        if (macAddress == null) {
+            return bizError(DeviceProvisionBizCode.VALIDATION_ERROR, "macAddress 不能为空");
+        }
+
+        Integer deviceType = parseDeviceType(request.getDeviceType());
+        if (deviceType == null) {
+            if (request.getDeviceType() == null || request.getDeviceType().isBlank()) {
+                return bizError(DeviceProvisionBizCode.VALIDATION_ERROR, "deviceType 不能为空");
+            }
+            return bizError(DeviceProvisionBizCode.DEVICE_TYPE_INVALID);
+        }
+
+        if (request.getDeviceModel() == null || request.getDeviceModel().isBlank()) {
+            return bizError(DeviceProvisionBizCode.VALIDATION_ERROR, "deviceModel 不能为空");
+        }
         String deviceModel = request.getDeviceModel().trim();
 
-        validateTimestamp(request.getTimestamp());
-        validateSignature(deviceCode, macAddress, request.getTimestamp(), request.getSign());
+        DeviceProvisionResponseDTO timestampError = checkTimestamp(request.getTimestamp());
+        if (timestampError != null) {
+            return timestampError;
+        }
 
-        assertMacNotBoundToOtherDevice(macAddress, deviceCode);
+        DeviceProvisionResponseDTO signError = validateSignature(
+                deviceCode, macAddress, request.getTimestamp(), request.getSign());
+        if (signError != null) {
+            return signError;
+        }
 
-        IotDevice existing = findExistingDevice(deviceCode, macAddress);
+        IotDevice existing = findExistingDevice(deviceCode);
         if (existing != null) {
             if (Objects.equals(existing.getStatus(), DeviceConstant.DeviceStatus.DISABLED)) {
-                throw new IllegalStateException("设备已禁用，无法注册: " + existing.getDeviceCode());
+                return bizError(DeviceProvisionBizCode.DEVICE_DISABLED, existing.getDeviceCode());
             }
             log.info("[Provision] 设备已存在，幂等返回 deviceCode={}", existing.getDeviceCode());
-            return toResponse(existing, true);
+            return toResponse(existing, DeviceProvisionBizCode.ALREADY_REGISTERED, false);
         }
 
         IotDevice device = new IotDevice();
@@ -90,73 +115,60 @@ public class DeviceProvisionServiceImpl implements IDeviceProvisionService {
                 null, DeviceConstant.OperationSource.DEVICE, "SUCCESS", null, null, null);
         log.info("[Provision] 新设备注册成功 deviceCode={} deviceType={} tenantId={}",
                 saved.getDeviceCode(), deviceType, saved.getTenantId());
-        return toResponse(saved, true);
+        return toResponse(saved, DeviceProvisionBizCode.REGISTERED_NEW, true);
     }
 
-    private void validateTimestamp(Long timestamp) {
+    private DeviceProvisionResponseDTO checkTimestamp(Long timestamp) {
         if (timestamp == null || timestamp <= 0) {
-            throw new IllegalArgumentException("timestamp 无效");
+            return bizError(DeviceProvisionBizCode.VALIDATION_ERROR, "timestamp 无效");
         }
         long skewMs = Duration.ofSeconds(provisionProperties.getTimestampSkewSeconds()).toMillis();
         long now = Instant.now().toEpochMilli();
         if (Math.abs(now - timestamp) > skewMs) {
-            throw new IllegalArgumentException("请求已过期，请校准设备时间后重试");
+            return bizError(DeviceProvisionBizCode.TIMESTAMP_EXPIRED);
         }
+        return null;
     }
 
-    static void validateSignature(String deviceCode, String macAddress, long timestamp, String sign) {
+    static DeviceProvisionResponseDTO validateSignature(String deviceCode, String macAddress, long timestamp, String sign) {
         if (sign == null || sign.isBlank()) {
-            throw new IllegalArgumentException("sign 不能为空");
+            return bizError(DeviceProvisionBizCode.VALIDATION_ERROR, "sign 不能为空");
         }
         String payload = deviceCode + "|" + macAddress + "|" + timestamp;
         String expected = Md5Util.md5Encode(payload, "UTF_8").toUpperCase(Locale.ROOT);
         if (!expected.equals(sign.trim().toUpperCase(Locale.ROOT))) {
-            throw new IllegalArgumentException("签名校验失败");
+            return bizError(DeviceProvisionBizCode.SIGN_INVALID);
         }
+        return null;
     }
 
-    private static int parseDeviceType(String deviceType) {
+    private static Integer parseDeviceType(String deviceType) {
         if (deviceType == null || deviceType.isBlank()) {
-            throw new IllegalArgumentException("deviceType 不能为空");
+            return null;
         }
         String normalized = deviceType.trim();
         if (!ALLOWED_DEVICE_TYPES.contains(normalized)) {
-            throw new IllegalArgumentException("deviceType 不合法，仅支持 1(机器人) 或 2(主控)");
+            return null;
         }
         return Integer.parseInt(normalized);
     }
 
-    private void assertMacNotBoundToOtherDevice(String macAddress, String deviceCode) {
-        IotDevice byMac = deviceMapper.selectOne(new LambdaQueryWrapper<IotDevice>()
-                .eq(IotDevice::getMacAddress, macAddress)
-                .last("LIMIT 1"));
-        if (byMac != null && !deviceCode.equals(byMac.getDeviceCode())) {
-            throw new IllegalStateException("MAC 地址已被其他设备占用: " + macAddress);
-        }
-    }
-
-    private IotDevice findExistingDevice(String deviceCode, String macAddress) {
-        IotDevice byCode = deviceMapper.selectOne(new LambdaQueryWrapper<IotDevice>()
-                .eq(IotDevice::getDeviceCode, deviceCode)
-                .last("LIMIT 1"));
-        if (byCode != null) {
-            return byCode;
-        }
+    private IotDevice findExistingDevice(String deviceCode) {
         return deviceMapper.selectOne(new LambdaQueryWrapper<IotDevice>()
-                .eq(IotDevice::getMacAddress, macAddress)
+                .eq(IotDevice::getDeviceCode, deviceCode)
                 .last("LIMIT 1"));
     }
 
     private static String normalizeDeviceCode(String deviceCode) {
         if (deviceCode == null || deviceCode.isBlank()) {
-            throw new IllegalArgumentException("deviceCode 不能为空");
+            return null;
         }
         return deviceCode.trim();
     }
 
     private static String requireMacAddress(String macAddress) {
         if (macAddress == null || macAddress.isBlank()) {
-            throw new IllegalArgumentException("macAddress 不能为空");
+            return null;
         }
         return macAddress.trim();
     }
@@ -165,7 +177,6 @@ public class DeviceProvisionServiceImpl implements IDeviceProvisionService {
         if (deviceName != null && !deviceName.isBlank()) {
             return deviceName.trim();
         }
-
         return 1 == deviceType ? "机器人-" : "主控设备-" + deviceCode;
     }
 
@@ -176,13 +187,22 @@ public class DeviceProvisionServiceImpl implements IDeviceProvisionService {
         return value.trim();
     }
 
-    private DeviceProvisionResponseDTO toResponse(IotDevice device, boolean newlyRegistered) {
+    private DeviceProvisionResponseDTO toResponse(IotDevice device, DeviceProvisionBizCode bizCode, boolean newlyRegistered) {
         return DeviceProvisionResponseDTO.builder()
+                .bizCode(bizCode.getCode())
+                .bizMessage(bizCode.formatMessage())
                 .deviceCode(device.getDeviceCode())
                 .mqttPassword(device.getDeviceSecret())
                 .mqttBrokerUrl(mqttBrokerUrl)
                 .newlyRegistered(newlyRegistered)
                 .status(device.getStatus())
+                .build();
+    }
+
+    private static DeviceProvisionResponseDTO bizError(DeviceProvisionBizCode bizCode, Object... args) {
+        return DeviceProvisionResponseDTO.builder()
+                .bizCode(bizCode.getCode())
+                .bizMessage(bizCode.formatMessage(args))
                 .build();
     }
 }

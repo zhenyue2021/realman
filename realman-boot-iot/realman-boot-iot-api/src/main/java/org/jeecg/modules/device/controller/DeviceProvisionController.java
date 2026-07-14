@@ -6,14 +6,17 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jeecg.config.shiro.IgnoreAuth;
+import org.jeecg.modules.device.constant.DeviceProvisionBizCode;
 import org.jeecg.modules.device.dto.DeviceProvisionRequestDTO;
 import org.jeecg.modules.device.dto.DeviceProvisionResponseDTO;
 import org.jeecg.modules.device.service.IDeviceProvisionService;
 import org.jeecg.modules.device.vo.ApiResult;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 
 /**
  * 设备 HTTP 自注册接口（设备上电后、连接 MQTT 之前调用）。
@@ -49,13 +52,24 @@ public class DeviceProvisionController {
     public ApiResult<DeviceProvisionResponseDTO> provision(@Valid @RequestBody DeviceProvisionRequestDTO request) {
         log.info("[Provision] 收到注册请求 deviceType={} deviceCode={} mac={}",
                 request.getDeviceType(), request.getDeviceCode(), request.getMacAddress());
-        try {
-            DeviceProvisionResponseDTO response = provisionService.provision(request);
-            String msg = response.isNewlyRegistered() ? "设备注册成功" : "设备已注册";
-            return ApiResult.ok(response, msg);
-        } catch (IllegalArgumentException | IllegalStateException e) {
-            log.warn("[Provision] 注册失败 deviceCode={} reason={}", request.getDeviceCode(), e.getMessage());
-            return ApiResult.fail(e.getMessage());
+        DeviceProvisionResponseDTO response = provisionService.provision(request);
+        boolean bizSuccess = DeviceProvisionBizCode.isSuccess(response.getBizCode());
+        if (!bizSuccess) {
+            log.warn("[Provision] 注册失败 deviceCode={} bizCode={} bizMessage={}",
+                    request.getDeviceCode(), response.getBizCode(), response.getBizMessage());
         }
+        return ApiResult.transportOk(response, bizSuccess);
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ApiResult<DeviceProvisionResponseDTO> handleValidation(MethodArgumentNotValidException e) {
+        String msg = e.getBindingResult().getFieldErrors().stream()
+                .map(f -> f.getField() + ": " + f.getDefaultMessage())
+                .findFirst().orElse("参数校验失败");
+        DeviceProvisionResponseDTO response = DeviceProvisionResponseDTO.builder()
+                .bizCode(DeviceProvisionBizCode.VALIDATION_ERROR.getCode())
+                .bizMessage(DeviceProvisionBizCode.VALIDATION_ERROR.formatMessage(msg))
+                .build();
+        return ApiResult.transportOk(response, false);
     }
 }
