@@ -482,6 +482,8 @@ public interface DeviceConstant {
         String WORK_ORDER_LIST       = "WORK_ORDER_LIST";
         /** 主控当前关联设备信息 */
         String ASSOCIATED_DEVICE_INFO = "ASSOCIATED_DEVICE_INFO";
+        /** 绑定机器人上线通知（推送给主控） */
+        String ROBOT_ONLINE_STATUS    = "ROBOT_ONLINE_STATUS";
         /** WebRTC 信令服务已重新启动 */
         String WEBRTC_RESTART         = "WEBRTC_RESTART";
     }

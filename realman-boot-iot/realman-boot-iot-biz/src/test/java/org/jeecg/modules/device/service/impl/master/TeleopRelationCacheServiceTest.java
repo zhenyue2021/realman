@@ -44,6 +44,16 @@ class TeleopRelationCacheServiceTest {
     }
 
     @Test
+    @DisplayName("getMasterByRobot 返回 Redis 中的主控编码")
+    void getMasterByRobotReturnsCachedMaster() {
+        when(valueOps.get(DeviceConstant.RedisKey.TELEOP_ROBOT_TO_MASTER + "R1")).thenReturn("M1");
+
+        String master = service.getMasterByRobot("R1");
+
+        org.junit.jupiter.api.Assertions.assertEquals("M1", master);
+    }
+
+    @Test
     @DisplayName("clearByMaster 删除主控及匹配反向索引")
     void clearByMasterDeletesKeys() {
         when(valueOps.get(DeviceConstant.RedisKey.TELEOP_MASTER_TO_ROBOT + "M1")).thenReturn("R1");
